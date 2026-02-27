@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+:root {
+	--color-bg: #ffffff;
+	--color-fg: #1a1a2e;
+	--color-primary: #3b82f6;
+	--color-primary-hover: #2563eb;
+	--color-surface: #f8fafc;
+	--color-border: #e2e8f0;
+	--color-muted: #64748b;
+	--color-danger: #ef4444;
+	--color-success: #22c55e;
+}
+
+.dark {
+	--color-bg: #0f172a;
+	--color-fg: #e2e8f0;
+	--color-primary: #60a5fa;
+	--color-primary-hover: #93c5fd;
+	--color-surface: #1e293b;
+	--color-border: #334155;
+	--color-muted: #94a3b8;
+	--color-danger: #f87171;
+	--color-success: #4ade80;
+}
+
+.high-contrast {
+	--color-bg: #000000;
+	--color-fg: #ffffff;
+	--color-primary: #ffff00;
+	--color-primary-hover: #ffff66;
+	--color-surface: #1a1a1a;
+	--color-border: #ffffff;
+	--color-muted: #cccccc;
+	--color-danger: #ff6666;
+	--color-success: #66ff66;
+}
+
+body {
+	background-color: var(--color-bg);
+	color: var(--color-fg);
+	font-family:
+		system-ui,
+		-apple-system,
+		sans-serif;
+}
+
+/* Focus indicators per WCAG 2.4.7 — 2px outline with 3:1 contrast */
+:focus-visible {
+	outline: 2px solid var(--color-primary);
+	outline-offset: 2px;
+}
+
+/* Skip link */
+.skip-link {
+	position: absolute;
+	top: -100%;
+	left: 0;
+	z-index: 9999;
+	padding: 0.5rem 1rem;
+	background: var(--color-primary);
+	color: #fff;
+}
+
+.skip-link:focus {
+	top: 0;
+}
+
+/* Touch targets per WCAG 2.5.8 — minimum 24x24px */
+button,
+[role='button'],
+a {
+	min-height: 24px;
+	min-width: 24px;
+}
