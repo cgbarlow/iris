@@ -1,0 +1,6 @@
+<svelte:head>
+	<title>Admin — Iris</title>
+</svelte:head>
+
+<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Administration</h1>
+<p class="mt-2" style="color: var(--color-muted)">System administration and monitoring.</p>
