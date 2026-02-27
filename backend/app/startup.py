@@ -9,6 +9,7 @@ from app.audit.service import verify_audit_chain
 from app.migrations.m001_roles_users import up as m001_up
 from app.migrations.m002_entities_relationships_models import up as m002_up
 from app.migrations.m003_audit_log import up as m003_up
+from app.migrations.m004_comments_bookmarks import up as m004_up
 from app.migrations.seed import seed_roles_and_permissions
 
 if TYPE_CHECKING:
@@ -30,6 +31,7 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
     # 3. Run main database migrations
     await m001_up(db_manager.main_db)
     await m002_up(db_manager.main_db)
+    await m004_up(db_manager.main_db)
 
     # 4. Seed roles and permissions
     await seed_roles_and_permissions(db_manager.main_db)

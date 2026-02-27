@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
+from app.comments.router import router as comments_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
 from app.entities.router import router as entities_router
@@ -94,5 +95,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(relationships_router)
     app.include_router(models_router)
     app.include_router(users_router)
+    app.include_router(comments_router)
 
     return app
