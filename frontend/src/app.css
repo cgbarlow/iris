@@ -412,6 +412,50 @@ a {
 	background: #22c55e;
 }
 
+/* ── Browse mode ── */
+.model-canvas--browse {
+	cursor: default;
+}
+
+.canvas-mode-badge {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	padding: 4px 12px;
+	border-radius: 4px;
+	background: var(--color-muted);
+	color: #fff;
+	font-size: 0.75rem;
+	font-weight: 600;
+	z-index: 10;
+	pointer-events: none;
+}
+
+/* ── Entity detail panel ── */
+.entity-detail-panel {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 320px;
+	height: 100%;
+	padding: 16px;
+	background: var(--color-surface);
+	border-left: 1px solid var(--color-border);
+	z-index: 20;
+	overflow-y: auto;
+}
+
+.entity-detail-panel__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 16px;
+}
+
+.entity-detail-panel__body dt {
+	margin-top: 8px;
+}
+
 /* ── Canvas connect mode indicator ── */
 .canvas-connect-indicator {
 	position: absolute;
