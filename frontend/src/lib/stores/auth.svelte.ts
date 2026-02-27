@@ -3,10 +3,15 @@
 import type { AuthTokens, User } from '$lib/types/api.js';
 
 let accessToken = $state<string | null>(null);
+let refreshToken = $state<string | null>(null);
 let currentUser = $state<User | null>(null);
 
 export function getAccessToken(): string | null {
 	return accessToken;
+}
+
+export function getRefreshToken(): string | null {
+	return refreshToken;
 }
 
 export function getCurrentUser(): User | null {
@@ -19,10 +24,17 @@ export function isAuthenticated(): boolean {
 
 export function setAuth(tokens: AuthTokens, user: User): void {
 	accessToken = tokens.access_token;
+	refreshToken = tokens.refresh_token;
 	currentUser = user;
+}
+
+export function updateTokens(tokens: AuthTokens): void {
+	accessToken = tokens.access_token;
+	refreshToken = tokens.refresh_token;
 }
 
 export function clearAuth(): void {
 	accessToken = null;
+	refreshToken = null;
 	currentUser = null;
 }
