@@ -51,7 +51,7 @@ class DatabaseManager:
     """
 
     def __init__(self, config: DatabaseConfig) -> None:
-        self._config = config
+        self.config = config
         self._main_db: aiosqlite.Connection | None = None
         self._audit_db: aiosqlite.Connection | None = None
 
@@ -73,8 +73,8 @@ class DatabaseManager:
 
     async def connect(self) -> None:
         """Open and configure both database connections."""
-        self._main_db = await get_connection(self._config.main_db_path)
-        self._audit_db = await get_connection(self._config.audit_db_path)
+        self._main_db = await get_connection(self.config.main_db_path)
+        self._audit_db = await get_connection(self.config.audit_db_path)
 
     async def close(self) -> None:
         """Close both database connections."""
