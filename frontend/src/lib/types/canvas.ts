@@ -85,7 +85,7 @@ export const SIMPLE_ENTITY_TYPES: EntityTypeInfo[] = [
 
 /** Relationship type display metadata. */
 export interface RelationshipTypeInfo {
-	key: SimpleRelationshipType;
+	key: SimpleRelationshipType | UmlRelationshipType;
 	label: string;
 	description: string;
 }
@@ -97,4 +97,50 @@ export const SIMPLE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
 	{ key: 'composes', label: 'Composes', description: 'Source is composed of target' },
 	{ key: 'implements', label: 'Implements', description: 'Source implements target interface' },
 	{ key: 'contains', label: 'Contains', description: 'Source contains target (nesting)' },
+];
+
+/** Full View UML entity types. */
+export type UmlEntityType = 'class' | 'object' | 'use_case' | 'state' | 'activity' | 'node';
+
+/** Full View UML relationship types. */
+export type UmlRelationshipType =
+	| 'association'
+	| 'aggregation'
+	| 'composition'
+	| 'dependency'
+	| 'realization'
+	| 'generalization';
+
+/** UML class compartment data. */
+export interface ClassCompartments {
+	attributes?: string[];
+	operations?: string[];
+}
+
+/** UML entity type display metadata. */
+export interface UmlEntityTypeInfo {
+	key: UmlEntityType;
+	label: string;
+	icon: string;
+	description: string;
+}
+
+/** All UML entity types with display metadata. */
+export const UML_ENTITY_TYPES: UmlEntityTypeInfo[] = [
+	{ key: 'class', label: 'Class', icon: '▭', description: 'UML class with attributes and operations' },
+	{ key: 'object', label: 'Object', icon: '▯', description: 'Instance of a class' },
+	{ key: 'use_case', label: 'Use Case', icon: '◎', description: 'User goal or system function' },
+	{ key: 'state', label: 'State', icon: '◉', description: 'Condition during object life' },
+	{ key: 'activity', label: 'Activity', icon: '▷', description: 'Action or workflow step' },
+	{ key: 'node', label: 'Node', icon: '⬡', description: 'Computational resource' },
+];
+
+/** All UML relationship types with display metadata. */
+export const UML_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
+	{ key: 'association', label: 'Association', description: 'Structural link between classes' },
+	{ key: 'aggregation', label: 'Aggregation', description: 'Whole-part (weak ownership)' },
+	{ key: 'composition', label: 'Composition', description: 'Whole-part (strong ownership)' },
+	{ key: 'dependency', label: 'Dependency', description: 'Source depends on target' },
+	{ key: 'realization', label: 'Realization', description: 'Source implements target spec' },
+	{ key: 'generalization', label: 'Generalization', description: 'Source inherits from target' },
 ];
