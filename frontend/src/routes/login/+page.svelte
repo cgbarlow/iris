@@ -18,21 +18,10 @@
 
 	async function checkSetupNeeded() {
 		try {
-			// Try a setup call with empty body to see if setup is available
-			// A 400 "Setup already completed" means users exist
-			// A 422 (validation error) means setup is still needed
-			const response = await fetch('/api/auth/setup', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ username: '', password: '' }),
-			});
-			if (response.status === 400) {
-				const body = await response.json().catch(() => ({}));
-				if (body.detail === 'Setup already completed') {
-					needsSetup = false;
-				}
-			} else {
-				needsSetup = true;
+			const response = await fetch('/api/auth/setup/status');
+			if (response.ok) {
+				const data = await response.json();
+				needsSetup = data.needs_setup === true;
 			}
 		} catch {
 			needsSetup = false;

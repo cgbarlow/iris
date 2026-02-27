@@ -208,6 +208,15 @@ async def change_password(
     return {"message": "Password changed"}
 
 
+@router.get("/setup/status")
+async def setup_status(request: Request) -> dict[str, bool]:
+    """Check whether first-run setup is needed."""
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute("SELECT COUNT(*) FROM users")
+    row = await cursor.fetchone()
+    return {"needs_setup": row[0] == 0}
+
+
 @router.post("/setup")
 async def setup(body: SetupRequest, request: Request) -> dict[str, str]:
     """First-run admin setup — creates initial admin user."""
