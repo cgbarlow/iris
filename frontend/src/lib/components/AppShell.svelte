@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { isAuthenticated, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
 	let { children } = $props();
 
@@ -45,6 +46,7 @@
 		</div>
 
 		<div class="flex items-center gap-4">
+			<ThemeToggle />
 			{#if isAuthenticated()}
 				<span class="text-sm" style="color: var(--color-muted)">
 					{getCurrentUser()?.username}

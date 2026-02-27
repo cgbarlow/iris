@@ -4,12 +4,15 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import { isAuthenticated } from '$lib/stores/auth.svelte.js';
+	import { ModeWatcher } from 'mode-watcher';
 
 	let { children } = $props();
 
 	const publicRoutes = ['/login'];
 	const isPublicRoute = $derived(publicRoutes.includes(page.url.pathname));
 </script>
+
+<ModeWatcher />
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
