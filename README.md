@@ -23,7 +23,7 @@ iris/
 - **RBAC:** 4 roles (Admin, Architect, Reviewer, Viewer) with 26 permission mappings
 - **Audit:** Separate audit database with SHA-256 hash-chained immutable log
 - **Versioning:** Immutable append-only entity versions with revert-as-new-version rollback
-- **Search:** Semantic search with sentence-transformers embeddings
+- **Search:** Full-text search with SQLite FTS5 (semantic search planned — see docs/ROADMAP.md)
 
 ### Frontend
 
@@ -75,6 +75,23 @@ Four colour modes with WCAG-compliant contrast ratios:
 - **Edit Mode** — Full canvas editing with drag, connect, create, delete
 - **Browse Mode** — Read-only canvas for viewers and reviewers, with entity detail panel
 
+### Dashboard
+
+- Entity and model counts with linked navigation
+- Bookmarked models with quick access
+- Full-text search across entities and models
+- Quick navigation cards for key sections
+
+### Admin Panel
+
+- **User Management** — List, create, edit role, activate/deactivate users with WCAG-compliant forms and confirmation dialogs
+- **Audit Log** — Paginated audit log viewer with action/username/target filters, chain verification badge, and expandable row detail (JSON rendered as text, no `{@html}`)
+
+### Statistics & Cross-References
+
+- Entity relationship counts and model usage statistics
+- Entity-to-model cross-reference queries (which models reference an entity)
+
 ## Getting Started
 
 ### Prerequisites
@@ -105,13 +122,17 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 ### Running Tests
 
 ```sh
-# Backend (203 tests)
+# Backend (217 tests)
 cd backend
-uv run pytest
+uv run python -m pytest
 
-# Frontend (120 tests)
+# Frontend unit tests (120 tests)
 cd frontend
 npm test
+
+# Frontend E2E tests (10 suites, Playwright)
+cd frontend
+npx playwright test
 ```
 
 ## Compliance
@@ -143,9 +164,10 @@ npm test
 | Document | Purpose |
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
-| `docs/protocols.md` | 11 non-negotiable development protocols |
-| `docs/adrs/` | 8 Architecture Decision Records |
-| `docs/adrs/specs/` | 13 implementation specifications |
+| `docs/protocols.md` | 12 non-negotiable development protocols |
+| `docs/adrs/` | 10 Architecture Decision Records |
+| `docs/adrs/specs/` | 15 implementation specifications |
+| `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 
 ## Technology Stack
@@ -171,11 +193,12 @@ npm test
 |---------|-------|-------------|
 | v0.1.0 | A | Data Foundation — database schema, migrations, audit service |
 | v0.2.0 | B | Core API — auth, CRUD, rate limiting, audit middleware |
-| v0.3.0 | C | Search & Collaboration — comments, bookmarks, semantic search |
+| v0.3.0 | C | Search & Collaboration — comments, bookmarks, full-text search |
 | v0.4.0 | D | Frontend Foundation — auth flow, app shell, theming, routing, a11y |
 | v0.5.0 | E | Canvas — Simple View, UML, ArchiMate, sequence diagrams, keyboard a11y |
 | v0.6.0 | F | Browse Mode — read-only canvas, entity detail views, search UI |
 | v1.0.0 | G | Polish — WCAG audit, NZ ITSM verification, performance testing |
+| v1.1.0 | H | Remediation — audit API, entity statistics, dashboard, admin pages, documentation corrections, E2E tests |
 
 ## License
 

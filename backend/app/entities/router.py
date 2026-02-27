@@ -214,3 +214,73 @@ async def get_version(
     if result is None:
         raise HTTPException(status_code=404, detail="Version not found")
     return EntityVersionResponse(**result)
+
+
+@router.get("/{entity_id}/models")
+async def get_entity_models(
+    entity_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[dict[str, str]]:
+    """Get models that reference this entity."""
+    db = request.app.state.db_manager.main_db
+
+    # Check entity exists
+    entity = await get_entity(db, entity_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    # Find models whose latest version data JSON references this entity ID.
+    # model_versions.data may contain entity references in placements or nodes.
+    cursor = await db.execute(
+        "SELECT DISTINCT m.id, mv.name, m.model_type "
+        "FROM models m "
+        "JOIN model_versions mv ON m.id = mv.model_id AND m.current_version = mv.version "
+        "WHERE m.is_deleted = 0 AND mv.data LIKE ?",
+        (f"%{entity_id}%",),
+    )
+    rows = await cursor.fetchall()
+    return [
+        {"model_id": r[0], "name": r[1], "model_type": r[2]}
+        for r in rows
+    ]
+
+
+@router.get("/{entity_id}/stats")
+async def get_entity_stats(
+    entity_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, int]:
+    """Get statistics for an entity (relationship count, model usage count)."""
+    db = request.app.state.db_manager.main_db
+
+    # Check entity exists
+    entity = await get_entity(db, entity_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    # Count relationships where this entity is source or target
+    rel_cursor = await db.execute(
+        "SELECT COUNT(*) FROM relationships "
+        "WHERE (source_entity_id = ? OR target_entity_id = ?) AND is_deleted = 0",
+        (entity_id, entity_id),
+    )
+    rel_row = await rel_cursor.fetchone()
+    relationship_count: int = rel_row[0]
+
+    # Count models referencing this entity
+    model_cursor = await db.execute(
+        "SELECT COUNT(DISTINCT m.id) "
+        "FROM models m "
+        "JOIN model_versions mv ON m.id = mv.model_id AND m.current_version = mv.version "
+        "WHERE m.is_deleted = 0 AND mv.data LIKE ?",
+        (f"%{entity_id}%",),
+    )
+    model_row = await model_cursor.fetchone()
+    model_usage_count: int = model_row[0]
+
+    return {
+        "relationship_count": relationship_count,
+        "model_usage_count": model_usage_count,
+    }

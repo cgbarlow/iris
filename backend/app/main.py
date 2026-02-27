@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.bookmarks.router import router as bookmarks_router
 from app.comments.router import router as comments_router
@@ -100,5 +101,12 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(comments_router)
     app.include_router(bookmarks_router)
     app.include_router(search_router)
+    app.include_router(audit_router)
 
     return app
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app.main:create_app", factory=True, host="0.0.0.0", port=8000)

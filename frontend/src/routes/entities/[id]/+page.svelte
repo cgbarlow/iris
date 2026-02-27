@@ -1,17 +1,27 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { apiFetch } from '$lib/utils/api';
-	import type { Entity } from '$lib/types/api';
+	import type {
+		Entity,
+		EntityVersion,
+		Relationship,
+		RelationshipListResponse,
+		EntityModelRef,
+	} from '$lib/types/api';
+	import { ApiError } from '$lib/utils/api';
 
 	let entity = $state<Entity | null>(null);
-	let versions = $state<Array<{ version: number; created_at: string; change_summary: string }>>([]);
-	let relationships = $state<
-		Array<{ id: string; type: string; source_name: string; target_name: string }>
-	>([]);
-	let usedInModels = $state<Array<{ id: string; name: string }>>([]);
+	let versions = $state<EntityVersion[]>([]);
+	let relationships = $state<Relationship[]>([]);
+	let usedInModels = $state<EntityModelRef[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'details' | 'versions' | 'relationships' | 'models'>('details');
+
+	// Loading states per tab
+	let versionsLoading = $state(false);
+	let relationshipsLoading = $state(false);
+	let modelsLoading = $state(false);
 
 	$effect(() => {
 		const id = page.params.id;
@@ -22,16 +32,50 @@
 		loading = true;
 		error = null;
 		try {
-			const res: Response = await apiFetch(`/api/entities/${id}`);
-			if (res.ok) {
-				entity = await res.json();
-			} else {
-				error = `Entity not found (${res.status})`;
-			}
-		} catch {
-			error = 'Failed to load entity';
+			entity = await apiFetch<Entity>(`/api/entities/${id}`);
+			// Load tab data in parallel
+			await Promise.all([
+				loadVersions(id),
+				loadRelationships(id),
+				loadModels(id),
+			]);
+		} catch (e) {
+			error = e instanceof ApiError && e.status === 404
+				? 'Entity not found'
+				: 'Failed to load entity';
 		}
 		loading = false;
+	}
+
+	async function loadVersions(id: string) {
+		versionsLoading = true;
+		try {
+			versions = await apiFetch<EntityVersion[]>(`/api/entities/${id}/versions`);
+		} catch {
+			versions = [];
+		}
+		versionsLoading = false;
+	}
+
+	async function loadRelationships(id: string) {
+		relationshipsLoading = true;
+		try {
+			const data = await apiFetch<RelationshipListResponse>(`/api/relationships?entity_id=${id}`);
+			relationships = data.items;
+		} catch {
+			relationships = [];
+		}
+		relationshipsLoading = false;
+	}
+
+	async function loadModels(id: string) {
+		modelsLoading = true;
+		try {
+			usedInModels = await apiFetch<EntityModelRef[]>(`/api/entities/${id}/models`);
+		} catch {
+			usedInModels = [];
+		}
+		modelsLoading = false;
 	}
 </script>
 
@@ -119,13 +163,16 @@
 				{/if}
 			</dl>
 		{:else if activeTab === 'versions'}
-			{#if versions.length === 0}
+			{#if versionsLoading}
+				<p style="color: var(--color-muted)">Loading versions...</p>
+			{:else if versions.length === 0}
 				<p style="color: var(--color-muted)">No version history available.</p>
 			{:else}
 				<table class="w-full text-sm">
 					<thead>
 						<tr style="border-bottom: 1px solid var(--color-border)">
 							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
 						</tr>
@@ -134,43 +181,67 @@
 						{#each versions as v}
 							<tr style="border-bottom: 1px solid var(--color-border)">
 								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_summary}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
 							</tr>
 						{/each}
 					</tbody>
 				</table>
 			{/if}
 		{:else if activeTab === 'relationships'}
-			{#if relationships.length === 0}
+			{#if relationshipsLoading}
+				<p style="color: var(--color-muted)">Loading relationships...</p>
+			{:else if relationships.length === 0}
 				<p style="color: var(--color-muted)">No relationships found.</p>
 			{:else}
-				<ul class="flex flex-col gap-2">
-					{#each relationships as rel}
-						<li
-							class="rounded border p-3"
-							style="border-color: var(--color-border); color: var(--color-fg)"
-						>
-							<span class="font-medium">{rel.source_name}</span>
-							<span style="color: var(--color-muted)"> —{rel.type}→ </span>
-							<span class="font-medium">{rel.target_name}</span>
-						</li>
-					{/each}
-				</ul>
+				<table class="w-full text-sm">
+					<thead>
+						<tr style="border-bottom: 1px solid var(--color-border)">
+							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Source</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Target</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Label</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each relationships as rel}
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<td class="py-2" style="color: var(--color-fg)">{rel.relationship_type}</td>
+								<td class="py-2">
+									<a href="/entities/{rel.source_entity_id}" style="color: var(--color-primary)">
+										{rel.source_entity_id === entity.id ? entity.name : rel.source_entity_id}
+									</a>
+								</td>
+								<td class="py-2">
+									<a href="/entities/{rel.target_entity_id}" style="color: var(--color-primary)">
+										{rel.target_entity_id === entity.id ? entity.name : rel.target_entity_id}
+									</a>
+								</td>
+								<td class="py-2" style="color: var(--color-fg)">{rel.label ?? '—'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			{/if}
 		{:else if activeTab === 'models'}
-			{#if usedInModels.length === 0}
+			{#if modelsLoading}
+				<p style="color: var(--color-muted)">Loading models...</p>
+			{:else if usedInModels.length === 0}
 				<p style="color: var(--color-muted)">Not used in any models.</p>
 			{:else}
 				<ul class="flex flex-col gap-2">
 					{#each usedInModels as model}
 						<li>
 							<a
-								href="/models/{model.id}"
-								class="rounded border block p-3"
+								href="/models/{model.model_id}"
+								class="flex items-center gap-3 rounded border block p-3"
 								style="border-color: var(--color-border); color: var(--color-primary)"
 							>
-								{model.name}
+								<span class="font-medium">{model.name}</span>
+								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+									{model.model_type}
+								</span>
 							</a>
 						</li>
 					{/each}

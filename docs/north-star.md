@@ -47,7 +47,7 @@ Enable architects and stakeholders to communicate, decide, and align through cle
 | Styling | Tailwind CSS | [ADR-002](adrs/ADR-002-Frontend-Tech-Stack.md) |
 | Backend | Python / FastAPI | [ADR-004](adrs/ADR-004-Backend-Language-And-Framework.md) |
 | Database | SQLite | — |
-| Search | sqlite-vss / sentence-transformers | — |
+| Search | SQLite FTS5 (semantic search planned — see ROADMAP) | — |
 | Frontend Language | TypeScript | [ADR-002](adrs/ADR-002-Frontend-Tech-Stack.md) |
 
 ### Success Criteria

@@ -5,6 +5,36 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-27
+
+### Added
+- Read-only audit log API: `GET /api/audit` with pagination, filtering, and admin-only access (ADR-009, SPEC-009-A)
+- Audit chain verification API: `GET /api/audit/verify` returns hash chain integrity status
+- Entity statistics API: `GET /api/entities/{id}/stats` returns relationship and model usage counts
+- Entity cross-reference API: `GET /api/entities/{id}/models` returns models referencing an entity
+- Dashboard page with entity/model counts, bookmarked models, search, and quick navigation
+- Admin home page with navigation cards for user management and audit log
+- Admin users page with full CRUD: list, search, create, edit role, activate/deactivate
+- Admin audit page with paginated log table, filters, chain verification badge, and expandable row detail
+- ADR-009: Audit Log Read API
+- ADR-010: Search Implementation Clarification
+- SPEC-009-A: Audit Read API specification
+- SPEC-010-A: Search Roadmap specification
+- `docs/ROADMAP.md` documenting future semantic search enhancement
+- Comprehensive E2E test suite (10 suites, Playwright) covering auth, dashboard, models, entities, admin, navigation, theming, accessibility, and errors
+- Protocol 12: README Accuracy
+
+### Changed
+- Search documentation corrected from "semantic search with sentence-transformers" to "full-text search with SQLite FTS5" in README and north-star
+- v0.3.0 changelog corrected: "semantic search" → "full-text search with FTS5"
+
+### Fixed
+- `apiFetch` return type handling: all list and detail pages now correctly use typed `apiFetch<T>()` instead of treating result as raw `Response`
+- Entity detail page: versions, relationships, and used-in-models tabs now load real data from API
+- Model detail page: canvas tab renders `BrowseCanvas`/`ModelCanvas` from model data, versions tab loads from API
+- Dashboard page no longer a stub — displays live stats, bookmarks, search, and navigation
+- Admin pages no longer stubs — full user management and audit log functionality
+
 ## [1.0.0] - 2026-02-27
 
 ### Added
@@ -63,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comments CRUD on entities and models with soft delete
 - Per-user model bookmarks (bookmark/unbookmark/list)
-- Semantic search with sentence-transformers embeddings and vector storage
+- Full-text search with SQLite FTS5
 
 ## [0.2.0] - 2026-02-27
 

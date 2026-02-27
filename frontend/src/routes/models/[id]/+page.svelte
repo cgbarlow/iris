@@ -1,12 +1,22 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { apiFetch } from '$lib/utils/api';
-	import type { Model } from '$lib/types/api';
+	import { apiFetch, ApiError } from '$lib/utils/api';
+	import type { Model, ModelVersion } from '$lib/types/api';
+	import BrowseCanvas from '$lib/canvas/BrowseCanvas.svelte';
+	import ModelCanvas from '$lib/canvas/ModelCanvas.svelte';
+	import { isEditMode } from '$lib/stores/canvasMode.svelte';
+	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
 
 	let model = $state<Model | null>(null);
+	let versions = $state<ModelVersion[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'overview' | 'canvas' | 'versions'>('overview');
+	let versionsLoading = $state(false);
+
+	// Canvas data parsed from model.data
+	let canvasNodes = $state<CanvasNode[]>([]);
+	let canvasEdges = $state<CanvasEdge[]>([]);
 
 	$effect(() => {
 		const id = page.params.id;
@@ -17,16 +27,36 @@
 		loading = true;
 		error = null;
 		try {
-			const res: Response = await apiFetch(`/api/models/${id}`);
-			if (res.ok) {
-				model = await res.json();
-			} else {
-				error = `Model not found (${res.status})`;
-			}
-		} catch {
-			error = 'Failed to load model';
+			model = await apiFetch<Model>(`/api/models/${id}`);
+			parseCanvasData();
+			loadVersions(id);
+		} catch (e) {
+			error = e instanceof ApiError && e.status === 404
+				? 'Model not found'
+				: 'Failed to load model';
 		}
 		loading = false;
+	}
+
+	function parseCanvasData() {
+		if (!model?.data) {
+			canvasNodes = [];
+			canvasEdges = [];
+			return;
+		}
+		const data = model.data as Record<string, unknown>;
+		canvasNodes = (Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[];
+		canvasEdges = (Array.isArray(data.edges) ? data.edges : []) as CanvasEdge[];
+	}
+
+	async function loadVersions(id: string) {
+		versionsLoading = true;
+		try {
+			versions = await apiFetch<ModelVersion[]>(`/api/models/${id}/versions`);
+		} catch {
+			versions = [];
+		}
+		versionsLoading = false;
 	}
 </script>
 
@@ -104,9 +134,46 @@
 				{/if}
 			</dl>
 		{:else if activeTab === 'canvas'}
-			<p style="color: var(--color-muted)">Canvas view will render the model diagram here.</p>
+			{#if canvasNodes.length === 0}
+				<div class="flex items-center justify-center rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
+					<p style="color: var(--color-muted)">No diagram data available for this model.</p>
+				</div>
+			{:else}
+				<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+					{#if isEditMode()}
+						<ModelCanvas nodes={canvasNodes} edges={canvasEdges} />
+					{:else}
+						<BrowseCanvas nodes={canvasNodes} edges={canvasEdges} />
+					{/if}
+				</div>
+			{/if}
 		{:else if activeTab === 'versions'}
-			<p style="color: var(--color-muted)">Version history will be displayed here.</p>
+			{#if versionsLoading}
+				<p style="color: var(--color-muted)">Loading versions...</p>
+			{:else if versions.length === 0}
+				<p style="color: var(--color-muted)">No version history available.</p>
+			{:else}
+				<table class="w-full text-sm">
+					<thead>
+						<tr style="border-bottom: 1px solid var(--color-border)">
+							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each versions as v}
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
 		{/if}
 	</div>
 {/if}

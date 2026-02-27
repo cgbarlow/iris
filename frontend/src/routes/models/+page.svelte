@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { apiFetch } from '$lib/utils/api';
-	import type { Model } from '$lib/types/api';
+	import type { Model, PaginatedResponse } from '$lib/types/api';
 
 	let models = $state<Model[]>([]);
 	let loading = $state(true);
@@ -15,11 +15,8 @@
 	async function loadModels() {
 		loading = true;
 		try {
-			const res: Response = await apiFetch('/api/models');
-			if (res.ok) {
-				const data = await res.json();
-				models = data.items ?? data;
-			}
+			const data = await apiFetch<PaginatedResponse<Model>>('/api/models');
+			models = data.items;
 		} catch {
 			error = 'Failed to load models';
 		}

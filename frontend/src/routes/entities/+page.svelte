@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { apiFetch } from '$lib/utils/api';
-	import type { Entity } from '$lib/types/api';
+	import type { Entity, PaginatedResponse } from '$lib/types/api';
 	import { SIMPLE_ENTITY_TYPES } from '$lib/types/canvas';
 
 	let entities = $state<Entity[]>([]);
@@ -17,11 +17,8 @@
 	async function loadEntities() {
 		loading = true;
 		try {
-			const res: Response = await apiFetch('/api/entities');
-			if (res.ok) {
-				const data = await res.json();
-				entities = data.items ?? data;
-			}
+			const data = await apiFetch<PaginatedResponse<Entity>>('/api/entities');
+			entities = data.items;
 		} catch {
 			error = 'Failed to load entities';
 		}

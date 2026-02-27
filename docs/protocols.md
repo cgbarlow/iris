@@ -111,3 +111,13 @@ These protocols must be followed when using plan mode. They are non-negotiable.
 - Use stable releases only — no alpha, beta, release candidate, or pre-release versions unless explicitly approved
 - When updating existing dependencies, prefer the latest stable version compatible with the project's constraints
 - Document the version chosen and the date it was verified in the relevant commit message
+
+## 12. README Accuracy
+
+**The README must be kept up to date and must accurately reflect the implementation.**
+
+- Every feature described in the README must exist in the codebase — no aspirational claims
+- When a feature is added, changed, or removed, update the README in the same branch
+- Technical descriptions (algorithms, libraries, architecture) must match the actual implementation
+- If a capability is planned but not yet implemented, it must not appear in the README
+- README review is part of every release checklist
