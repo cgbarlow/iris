@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
+from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.startup import initialize_databases
 
@@ -42,6 +43,9 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         redoc_url="/redoc" if config.debug else None,
     )
     app.state.config = config
+
+    # Audit middleware per SPEC-007-A (innermost — runs after auth resolves)
+    app.add_middleware(AuditMiddleware)
 
     # Rate limiting middleware per SPEC-005-B
     app.add_middleware(
