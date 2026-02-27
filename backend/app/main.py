@@ -17,6 +17,7 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.models_crud.router import router as models_router
 from app.relationships.router import router as relationships_router
 from app.startup import initialize_databases
+from app.users.router import router as users_router
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -92,5 +93,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(entities_router)
     app.include_router(relationships_router)
     app.include_router(models_router)
+    app.include_router(users_router)
 
     return app
