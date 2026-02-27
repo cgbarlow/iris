@@ -58,6 +58,9 @@ class AppConfig:
     )
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
+    rate_limit_login: int = 10
+    rate_limit_refresh: int = 30
+    rate_limit_general: int = 100
 
 
 def get_config() -> AppConfig:
