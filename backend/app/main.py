@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.router import router as auth_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
+from app.entities.router import router as entities_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.startup import initialize_databases
@@ -86,5 +87,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     # Register routers
     app.include_router(auth_router)
+    app.include_router(entities_router)
 
     return app
