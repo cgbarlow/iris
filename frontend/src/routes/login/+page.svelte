@@ -12,6 +12,9 @@
 	let checkingSetup = $state(true);
 	let setupComplete = $state(false);
 
+	type View = 'login' | 'setup' | 'request-account' | 'forgot-password';
+	let view = $state<View>('login');
+
 	$effect(() => {
 		checkSetupNeeded();
 	});
@@ -110,7 +113,8 @@
 <main class="flex min-h-screen items-center justify-center p-4">
 	{#if checkingSetup}
 		<p style="color: var(--color-muted)">Loading...</p>
-	{:else if needsSetup}
+
+	{:else if needsSetup || view === 'setup'}
 		<form
 			onsubmit={handleSetup}
 			class="w-full max-w-sm rounded-lg p-6"
@@ -135,11 +139,11 @@
 			{/if}
 
 			<div class="mb-4">
-				<label for="username" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
+				<label for="setup-username" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
 					Username
 				</label>
 				<input
-					id="username"
+					id="setup-username"
 					type="text"
 					bind:value={username}
 					autocomplete="username"
@@ -150,11 +154,11 @@
 			</div>
 
 			<div class="mb-4">
-				<label for="password" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
+				<label for="setup-password" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
 					Password
 				</label>
 				<input
-					id="password"
+					id="setup-password"
 					type="password"
 					bind:value={password}
 					autocomplete="new-password"
@@ -165,11 +169,11 @@
 			</div>
 
 			<div class="mb-6">
-				<label for="confirm-password" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
+				<label for="setup-confirm-password" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
 					Confirm Password
 				</label>
 				<input
-					id="confirm-password"
+					id="setup-confirm-password"
 					type="password"
 					bind:value={confirmPassword}
 					autocomplete="new-password"
@@ -188,6 +192,69 @@
 				{loading ? 'Creating account...' : 'Create Admin Account'}
 			</button>
 		</form>
+
+	{:else if view === 'request-account'}
+		<div
+			class="w-full max-w-sm rounded-lg p-6"
+			style="background-color: var(--color-surface); border: 1px solid var(--color-border)"
+		>
+			<h1 class="mb-2 text-center text-2xl font-bold" style="color: var(--color-fg)">
+				Request an Account
+			</h1>
+			<p class="mb-4 text-center text-sm" style="color: var(--color-muted)">
+				Iris uses managed accounts. To get access, please contact your system administrator and request a new user account.
+			</p>
+			<div
+				class="mb-6 rounded p-4 text-sm"
+				style="background-color: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-fg)"
+			>
+				<p class="font-medium">Your administrator can:</p>
+				<ul class="mt-2 list-inside list-disc" style="color: var(--color-muted)">
+					<li>Create your account from the Admin panel</li>
+					<li>Assign your role (Viewer, Reviewer, Architect, or Admin)</li>
+					<li>Provide you with login credentials</li>
+				</ul>
+			</div>
+			<button
+				onclick={() => { error = ''; view = 'login'; }}
+				class="w-full rounded px-4 py-2 font-medium transition-colors"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			>
+				Back to Sign In
+			</button>
+		</div>
+
+	{:else if view === 'forgot-password'}
+		<div
+			class="w-full max-w-sm rounded-lg p-6"
+			style="background-color: var(--color-surface); border: 1px solid var(--color-border)"
+		>
+			<h1 class="mb-2 text-center text-2xl font-bold" style="color: var(--color-fg)">
+				Forgot Password
+			</h1>
+			<p class="mb-4 text-center text-sm" style="color: var(--color-muted)">
+				Password resets are handled by your system administrator.
+			</p>
+			<div
+				class="mb-6 rounded p-4 text-sm"
+				style="background-color: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-fg)"
+			>
+				<p class="font-medium">To reset your password:</p>
+				<ul class="mt-2 list-inside list-disc" style="color: var(--color-muted)">
+					<li>Contact your system administrator</li>
+					<li>They can reset your password from the Admin panel</li>
+					<li>You will be given temporary credentials to sign in</li>
+				</ul>
+			</div>
+			<button
+				onclick={() => { error = ''; view = 'login'; }}
+				class="w-full rounded px-4 py-2 font-medium transition-colors"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			>
+				Back to Sign In
+			</button>
+		</div>
+
 	{:else}
 		<form
 			onsubmit={handleLogin}
@@ -236,7 +303,7 @@
 				<span id="username-help" class="sr-only">Enter your username</span>
 			</div>
 
-			<div class="mb-6">
+			<div class="mb-4">
 				<label for="password" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
 					Password
 				</label>
@@ -261,6 +328,25 @@
 			>
 				{loading ? 'Signing in...' : 'Sign in'}
 			</button>
+
+			<div class="mt-4 flex justify-between text-sm">
+				<button
+					type="button"
+					onclick={() => { error = ''; view = 'request-account'; }}
+					class="underline"
+					style="color: var(--color-primary)"
+				>
+					Request an account
+				</button>
+				<button
+					type="button"
+					onclick={() => { error = ''; view = 'forgot-password'; }}
+					class="underline"
+					style="color: var(--color-primary)"
+				>
+					Forgot password?
+				</button>
+			</div>
 		</form>
 	{/if}
 </main>
