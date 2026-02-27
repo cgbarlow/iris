@@ -40,3 +40,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DatabaseManager` class for dual database connections (iris.db + iris_audit.db)
 - Migration 001: roles, role_permissions, users, password_history, refresh_tokens tables per SPEC-005-A/B
 - Migration 002: entities, entity_versions, relationships, relationship_versions, models, model_versions tables per SPEC-006-A/SPEC-003-A
+- Migration 003: audit_log table with hash chain columns in separate audit database per SPEC-007-A
