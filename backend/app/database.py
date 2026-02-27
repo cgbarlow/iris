@@ -1,8 +1,17 @@
-"""SQLite connection management with PRAGMA configuration per SPEC-004-A."""
+"""SQLite connection management with PRAGMA configuration per SPEC-004-A.
+
+Provides a DatabaseManager that maintains dual connections to iris.db and iris_audit.db
+with all 7 required PRAGMAs applied to each connection.
+"""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import aiosqlite
+
+if TYPE_CHECKING:
+    from app.config import DatabaseConfig
 
 _AUTO_VACUUM_INCREMENTAL = 2
 
@@ -29,3 +38,49 @@ async def get_connection(db_path: str) -> aiosqlite.Connection:
     db.row_factory = aiosqlite.Row
     await configure_connection(db)
     return db
+
+
+class DatabaseManager:
+    """Manages dual database connections for iris.db and iris_audit.db.
+
+    Usage:
+        manager = DatabaseManager(config.database)
+        await manager.connect()
+        # Use manager.main_db and manager.audit_db
+        await manager.close()
+    """
+
+    def __init__(self, config: DatabaseConfig) -> None:
+        self._config = config
+        self._main_db: aiosqlite.Connection | None = None
+        self._audit_db: aiosqlite.Connection | None = None
+
+    @property
+    def main_db(self) -> aiosqlite.Connection:
+        """Get the main application database connection."""
+        if self._main_db is None:
+            msg = "Database not connected. Call connect() first."
+            raise RuntimeError(msg)
+        return self._main_db
+
+    @property
+    def audit_db(self) -> aiosqlite.Connection:
+        """Get the audit database connection."""
+        if self._audit_db is None:
+            msg = "Database not connected. Call connect() first."
+            raise RuntimeError(msg)
+        return self._audit_db
+
+    async def connect(self) -> None:
+        """Open and configure both database connections."""
+        self._main_db = await get_connection(self._config.main_db_path)
+        self._audit_db = await get_connection(self._config.audit_db_path)
+
+    async def close(self) -> None:
+        """Close both database connections."""
+        if self._main_db is not None:
+            await self._main_db.close()
+            self._main_db = None
+        if self._audit_db is not None:
+            await self._audit_db.close()
+            self._audit_db = None

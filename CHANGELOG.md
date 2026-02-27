@@ -37,3 +37,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `app/database.py` — SQLite connection factory with all 7 PRAGMAs (WAL, FK, busy_timeout, synchronous, cache_size, journal_size_limit, auto_vacuum)
 - `tests/conftest.py` — shared test fixtures with real temp SQLite databases
 - `.gitignore` for Python, Node, database, and IDE files
+- `DatabaseManager` class for dual database connections (iris.db + iris_audit.db)
