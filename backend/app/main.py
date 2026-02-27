@@ -49,6 +49,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         version="0.1.0",
         docs_url="/docs" if config.debug else None,
         redoc_url="/redoc" if config.debug else None,
+        lifespan=lifespan,
     )
     app.state.config = config
 
