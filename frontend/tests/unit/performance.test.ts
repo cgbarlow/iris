@@ -18,10 +18,10 @@ function generateNodes(count: number) {
 	const nodes = [];
 	for (let i = 0; i < count; i++) {
 		nodes.push(
-			createCanvasNode(`Node ${i}`, 'component', `Description ${i}`, {
+			createCanvasNode(`node-perf-${i}`, `Node ${i}`, 'component', {
 				x: (i % 20) * 200,
 				y: Math.floor(i / 20) * 150,
-			}),
+			}, undefined, `Description ${i}`),
 		);
 	}
 	return nodes;
@@ -30,7 +30,7 @@ function generateNodes(count: number) {
 function generateEdges(nodes: ReturnType<typeof createCanvasNode>[], edgeCount: number) {
 	const edges = [];
 	for (let i = 0; i < edgeCount && i < nodes.length - 1; i++) {
-		edges.push(createCanvasEdge(nodes[i].id, nodes[i + 1].id, 'uses'));
+		edges.push(createCanvasEdge(`edge-perf-${i}`, nodes[i].id, nodes[i + 1].id, 'uses'));
 	}
 	return edges;
 }
