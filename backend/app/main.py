@@ -14,6 +14,7 @@ from app.database import DatabaseManager
 from app.entities.router import router as entities_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.relationships.router import router as relationships_router
 from app.startup import initialize_databases
 
 if TYPE_CHECKING:
@@ -88,5 +89,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     # Register routers
     app.include_router(auth_router)
     app.include_router(entities_router)
+    app.include_router(relationships_router)
 
     return app
