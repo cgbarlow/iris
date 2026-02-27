@@ -46,6 +46,14 @@
 		</div>
 
 		<div class="flex items-center gap-4">
+			<a
+				href="/help"
+				class="rounded px-2 py-1 text-sm"
+				style="color: var(--color-muted)"
+				aria-label="Help"
+			>
+				Help
+			</a>
 			<ThemeToggle />
 			{#if isAuthenticated()}
 				<span class="text-sm" style="color: var(--color-muted)">
