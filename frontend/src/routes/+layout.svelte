@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import favicon from '$lib/assets/favicon.svg';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import SessionTimeoutWarning from '$lib/components/SessionTimeoutWarning.svelte';
@@ -11,6 +12,12 @@
 
 	const publicRoutes = ['/login'];
 	const isPublicRoute = $derived(publicRoutes.includes(page.url.pathname));
+
+	$effect(() => {
+		if (!isPublicRoute && !isAuthenticated()) {
+			goto('/login');
+		}
+	});
 </script>
 
 <ModeWatcher />
