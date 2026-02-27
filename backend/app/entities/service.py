@@ -7,6 +7,9 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.search.service import index_entity as _index_entity
+from app.search.service import remove_entity_index as _remove_entity_index
+
 if TYPE_CHECKING:
     import aiosqlite
 
@@ -35,6 +38,11 @@ async def create_entity(
         "data, change_type, created_at, created_by) "
         "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
         (entity_id, name, description, data_json, now, created_by),
+    )
+    await db.commit()
+    await _index_entity(
+        db, entity_id=entity_id, name=name,
+        entity_type=entity_type, description=description,
     )
     await db.commit()
 
@@ -185,6 +193,18 @@ async def update_entity(
     )
     await db.commit()
 
+    # Re-index for search — need entity_type from the entity row
+    type_cursor = await db.execute(
+        "SELECT entity_type FROM entities WHERE id = ?", (entity_id,),
+    )
+    type_row = await type_cursor.fetchone()
+    if type_row:
+        await _index_entity(
+            db, entity_id=entity_id, name=name,
+            entity_type=type_row[0], description=description,
+        )
+        await db.commit()
+
     return {
         "id": entity_id,
         "current_version": new_version,
@@ -296,6 +316,8 @@ async def soft_delete_entity(
         (entity_id, new_version, ver_row[0], ver_row[1],
          ver_row[2], now, deleted_by),
     )
+    await db.commit()
+    await _remove_entity_index(db, entity_id)
     await db.commit()
     return True
 

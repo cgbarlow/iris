@@ -18,6 +18,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.models_crud.router import router as models_router
 from app.relationships.router import router as relationships_router
+from app.search.router import router as search_router
 from app.startup import initialize_databases
 from app.users.router import router as users_router
 
@@ -98,5 +99,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(users_router)
     app.include_router(comments_router)
     app.include_router(bookmarks_router)
+    app.include_router(search_router)
 
     return app

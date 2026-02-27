@@ -7,6 +7,9 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.search.service import index_model as _index_model
+from app.search.service import remove_model_index as _remove_model_index
+
 if TYPE_CHECKING:
     import aiosqlite
 
@@ -35,6 +38,11 @@ async def create_model(
         "data, change_type, created_at, created_by) "
         "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
         (model_id, name, description, data_json, now, created_by),
+    )
+    await db.commit()
+    await _index_model(
+        db, model_id=model_id, name=name,
+        model_type=model_type, description=description,
     )
     await db.commit()
 
@@ -177,6 +185,19 @@ async def update_model(
          change_summary, now, updated_by),
     )
     await db.commit()
+
+    # Re-index for search
+    type_cursor = await db.execute(
+        "SELECT model_type FROM models WHERE id = ?", (model_id,),
+    )
+    type_row = await type_cursor.fetchone()
+    if type_row:
+        await _index_model(
+            db, model_id=model_id, name=name,
+            model_type=type_row[0], description=description,
+        )
+        await db.commit()
+
     return {"current_version": new_version, "updated_at": now}
 
 
@@ -218,6 +239,8 @@ async def soft_delete_model(
         (model_id, new_version, ver_row[0], ver_row[1],
          ver_row[2], now, deleted_by),
     )
+    await db.commit()
+    await _remove_model_index(db, model_id)
     await db.commit()
     return True
 
