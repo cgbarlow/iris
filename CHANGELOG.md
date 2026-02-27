@@ -46,3 +46,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audit Pydantic models (AuditEntry, AuditVerifyResult)
 - `initialize_databases()` startup function: creates dirs, runs all migrations, seeds data, verifies audit chain
 - FastAPI application factory with lifespan, security headers middleware, CORS, health check per SPEC-004-A
+- Auth service: Argon2id hashing, password validation (12-128 chars, 3/4 complexity, common password check, history), JWT creation (HS256, 15min), refresh token rotation with family tracking per SPEC-005-B
