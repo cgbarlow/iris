@@ -6,9 +6,9 @@
 	--color-primary: #3b82f6;
 	--color-primary-hover: #2563eb;
 	--color-surface: #f8fafc;
-	--color-border: #e2e8f0;
+	--color-border: #6b7280;
 	--color-muted: #64748b;
-	--color-danger: #ef4444;
+	--color-danger: #dc2626;
 	--color-success: #22c55e;
 }
 
@@ -18,7 +18,7 @@
 	--color-primary: #60a5fa;
 	--color-primary-hover: #93c5fd;
 	--color-surface: #1e293b;
-	--color-border: #334155;
+	--color-border: #64748b;
 	--color-muted: #94a3b8;
 	--color-danger: #f87171;
 	--color-success: #4ade80;
@@ -83,6 +83,13 @@ a {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+	}
+}
+
+/* Reflow per WCAG 1.4.10 — content reflows at 320px without horizontal scroll */
+@media (max-width: 320px) {
+	body {
+		overflow-x: hidden;
 	}
 }
 

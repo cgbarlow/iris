@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import favicon from '$lib/assets/favicon.svg';
 	import AppShell from '$lib/components/AppShell.svelte';
+	import SessionTimeoutWarning from '$lib/components/SessionTimeoutWarning.svelte';
 	import { isAuthenticated } from '$lib/stores/auth.svelte.js';
 	import { ModeWatcher } from 'mode-watcher';
 
@@ -24,4 +25,5 @@
 	<AppShell>
 		{@render children()}
 	</AppShell>
+	<SessionTimeoutWarning />
 {/if}

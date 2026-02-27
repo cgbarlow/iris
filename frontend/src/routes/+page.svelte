@@ -1,5 +1,6 @@
-<script lang="ts">
-</script>
+<svelte:head>
+	<title>Dashboard — Iris</title>
+</svelte:head>
 
 <main class="flex min-h-screen items-center justify-center">
 	<div class="text-center">
