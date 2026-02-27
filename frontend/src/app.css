@@ -272,6 +272,75 @@ a {
 	fill: var(--color-fg);
 }
 
+/* ── UML nodes ── */
+.uml-node {
+	padding: 8px 12px;
+	border: 2px solid var(--color-border);
+	background: var(--color-surface);
+	color: var(--color-fg);
+	min-width: 160px;
+	font-size: 0.875rem;
+}
+
+.uml-node--selected {
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.uml-node__header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+.uml-node__icon {
+	font-size: 1rem;
+	flex-shrink: 0;
+}
+
+.uml-node__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.uml-node__compartment {
+	border-top: 1px solid var(--color-border);
+	margin-top: 4px;
+	padding-top: 4px;
+}
+
+.uml-node__item {
+	font-size: 0.75rem;
+	color: var(--color-muted);
+	padding: 1px 0;
+}
+
+.uml-node--class {
+	border-radius: 0;
+}
+.uml-node--object {
+	border-radius: 0;
+}
+.uml-node--use-case {
+	border-radius: 50%;
+	text-align: center;
+	min-width: auto;
+	padding: 16px 24px;
+}
+.uml-node--state {
+	border-radius: 16px;
+}
+.uml-node--activity {
+	border-radius: 16px;
+}
+.uml-node--deployment {
+	border-style: double;
+	border-width: 3px;
+	border-radius: 4px;
+}
+
 /* ── Canvas connect mode indicator ── */
 .canvas-connect-indicator {
 	position: absolute;
