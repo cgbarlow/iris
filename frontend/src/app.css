@@ -218,6 +218,60 @@ a {
 	background: var(--color-border);
 }
 
+/* ── Sequence diagram ── */
+.sequence-diagram {
+	overflow: auto;
+	width: 100%;
+	height: 100%;
+}
+
+.sequence-participant {
+	fill: var(--color-surface);
+	stroke: var(--color-border);
+	stroke-width: 2;
+}
+
+.sequence-participant__label {
+	font-size: 0.8rem;
+	font-weight: 600;
+	fill: var(--color-fg);
+}
+
+.sequence-activation {
+	fill: var(--color-surface);
+	stroke: var(--color-border);
+	stroke-width: 1;
+}
+
+.sequence-message {
+	cursor: pointer;
+}
+
+.sequence-message--selected .sequence-message__line {
+	stroke: var(--color-primary);
+	stroke-width: 3;
+}
+
+.sequence-message__line {
+	stroke: var(--color-fg);
+	stroke-width: 1.5;
+}
+
+.sequence-message__arrow {
+	fill: var(--color-fg);
+}
+
+.sequence-message__arrow--open {
+	fill: none;
+	stroke: var(--color-fg);
+	stroke-width: 1.5;
+}
+
+.sequence-message__label {
+	font-size: 0.7rem;
+	fill: var(--color-fg);
+}
+
 /* ── Canvas connect mode indicator ── */
 .canvas-connect-indicator {
 	position: absolute;
