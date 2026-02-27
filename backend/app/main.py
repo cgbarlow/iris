@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
+from app.bookmarks.router import router as bookmarks_router
 from app.comments.router import router as comments_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
@@ -96,5 +97,6 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(models_router)
     app.include_router(users_router)
     app.include_router(comments_router)
+    app.include_router(bookmarks_router)
 
     return app
