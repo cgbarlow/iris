@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth.router import router as auth_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
 from app.startup import initialize_databases
@@ -69,5 +70,8 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     @app.get("/health")
     async def health_check() -> dict[str, str]:
         return {"status": "healthy"}
+
+    # Register routers
+    app.include_router(auth_router)
 
     return app
