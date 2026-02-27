@@ -15,6 +15,26 @@ export type SimpleEntityType =
 /** Simple View relationship types. */
 export type SimpleRelationshipType = 'uses' | 'depends_on' | 'composes' | 'implements' | 'contains';
 
+/** Full View UML relationship types (declared early for RelationshipTypeInfo). */
+export type UmlRelationshipType =
+	| 'association'
+	| 'aggregation'
+	| 'composition'
+	| 'dependency'
+	| 'realization'
+	| 'generalization';
+
+/** Full View ArchiMate relationship types (declared early for RelationshipTypeInfo). */
+export type ArchimateRelationshipType =
+	| 'serving'
+	| 'flow'
+	| 'triggering'
+	| 'access'
+	| 'influence'
+	| 'archimate_realization'
+	| 'archimate_composition'
+	| 'archimate_aggregation';
+
 /** Data stored in each canvas node. */
 export interface CanvasNodeData {
 	label: string;
@@ -85,7 +105,7 @@ export const SIMPLE_ENTITY_TYPES: EntityTypeInfo[] = [
 
 /** Relationship type display metadata. */
 export interface RelationshipTypeInfo {
-	key: SimpleRelationshipType | UmlRelationshipType;
+	key: SimpleRelationshipType | UmlRelationshipType | ArchimateRelationshipType;
 	label: string;
 	description: string;
 }
@@ -101,15 +121,6 @@ export const SIMPLE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
 
 /** Full View UML entity types. */
 export type UmlEntityType = 'class' | 'object' | 'use_case' | 'state' | 'activity' | 'node';
-
-/** Full View UML relationship types. */
-export type UmlRelationshipType =
-	| 'association'
-	| 'aggregation'
-	| 'composition'
-	| 'dependency'
-	| 'realization'
-	| 'generalization';
 
 /** UML class compartment data. */
 export interface ClassCompartments {
@@ -143,4 +154,57 @@ export const UML_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
 	{ key: 'dependency', label: 'Dependency', description: 'Source depends on target' },
 	{ key: 'realization', label: 'Realization', description: 'Source implements target spec' },
 	{ key: 'generalization', label: 'Generalization', description: 'Source inherits from target' },
+];
+
+/** Full View ArchiMate entity types. */
+export type ArchimateEntityType =
+	| 'business_actor'
+	| 'business_role'
+	| 'business_process'
+	| 'business_service'
+	| 'business_object'
+	| 'application_component'
+	| 'application_service'
+	| 'application_interface'
+	| 'technology_node'
+	| 'technology_service'
+	| 'technology_interface';
+
+/** ArchiMate layer classification. */
+export type ArchimateLayer = 'business' | 'application' | 'technology';
+
+/** ArchiMate entity type display metadata. */
+export interface ArchimateEntityTypeInfo {
+	key: ArchimateEntityType;
+	label: string;
+	icon: string;
+	layer: ArchimateLayer;
+	description: string;
+}
+
+/** All ArchiMate entity types with display metadata. */
+export const ARCHIMATE_ENTITY_TYPES: ArchimateEntityTypeInfo[] = [
+	{ key: 'business_actor', label: 'Business Actor', icon: '👤', layer: 'business', description: 'Person or organisational unit' },
+	{ key: 'business_role', label: 'Business Role', icon: '🎭', layer: 'business', description: 'Responsibility assigned to an actor' },
+	{ key: 'business_process', label: 'Business Process', icon: '⟳', layer: 'business', description: 'Sequence of business behaviours' },
+	{ key: 'business_service', label: 'Business Service', icon: '◎', layer: 'business', description: 'Externally visible business functionality' },
+	{ key: 'business_object', label: 'Business Object', icon: '▤', layer: 'business', description: 'Business domain concept' },
+	{ key: 'application_component', label: 'Application Component', icon: '⬡', layer: 'application', description: 'Deployable application unit' },
+	{ key: 'application_service', label: 'Application Service', icon: '◎', layer: 'application', description: 'Externally visible application functionality' },
+	{ key: 'application_interface', label: 'Application Interface', icon: '◯', layer: 'application', description: 'Point of access to application services' },
+	{ key: 'technology_node', label: 'Technology Node', icon: '⬡', layer: 'technology', description: 'Computational or physical resource' },
+	{ key: 'technology_service', label: 'Technology Service', icon: '◎', layer: 'technology', description: 'Externally visible technology functionality' },
+	{ key: 'technology_interface', label: 'Technology Interface', icon: '◯', layer: 'technology', description: 'Point of access to technology services' },
+];
+
+/** All ArchiMate relationship types with display metadata. */
+export const ARCHIMATE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
+	{ key: 'serving', label: 'Serving', description: 'Source serves target' },
+	{ key: 'flow', label: 'Flow', description: 'Transfer of content between elements' },
+	{ key: 'triggering', label: 'Triggering', description: 'Source triggers target' },
+	{ key: 'access', label: 'Access', description: 'Source accesses target data' },
+	{ key: 'influence', label: 'Influence', description: 'Source influences target' },
+	{ key: 'archimate_realization', label: 'Realization', description: 'Source realises target' },
+	{ key: 'archimate_composition', label: 'Composition', description: 'Source composed of target' },
+	{ key: 'archimate_aggregation', label: 'Aggregation', description: 'Source aggregates target' },
 ];

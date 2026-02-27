@@ -341,6 +341,77 @@ a {
 	border-radius: 4px;
 }
 
+/* ── ArchiMate nodes ── */
+.archimate-node {
+	position: relative;
+	padding: 8px 12px;
+	border: 2px solid var(--color-border);
+	background: var(--color-surface);
+	color: var(--color-fg);
+	min-width: 160px;
+	font-size: 0.875rem;
+	border-radius: 4px;
+}
+
+.archimate-node--selected {
+	box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.archimate-node__header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+}
+
+.archimate-node__icon {
+	font-size: 1rem;
+	flex-shrink: 0;
+}
+
+.archimate-node__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.archimate-node__layer-badge {
+	position: absolute;
+	top: -8px;
+	right: -8px;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	font-size: 0.6rem;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+}
+
+/* Layer-specific colours (distinguished by border + badge, not colour alone) */
+.archimate-node--business {
+	border-left: 4px solid #f59e0b;
+}
+.archimate-node--business .archimate-node__layer-badge {
+	background: #f59e0b;
+}
+
+.archimate-node--application {
+	border-left: 4px solid #3b82f6;
+}
+.archimate-node--application .archimate-node__layer-badge {
+	background: #3b82f6;
+}
+
+.archimate-node--technology {
+	border-left: 4px solid #22c55e;
+}
+.archimate-node--technology .archimate-node__layer-badge {
+	background: #22c55e;
+}
+
 /* ── Canvas connect mode indicator ── */
 .canvas-connect-indicator {
 	position: absolute;
