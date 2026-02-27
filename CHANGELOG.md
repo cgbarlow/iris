@@ -44,3 +44,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Idempotent seed data for 4 roles and permission mappings per SPEC-005-A
 - Audit service with hash chain: genesis hash, compute_entry_hash(), write_audit_entry(), verify_audit_chain() per SPEC-007-A
 - Audit Pydantic models (AuditEntry, AuditVerifyResult)
+- `initialize_databases()` startup function: creates dirs, runs all migrations, seeds data, verifies audit chain
