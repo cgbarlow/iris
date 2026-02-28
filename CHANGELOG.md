@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Entity browse with grouping modes (by type, by tag), tags, and enriched information cards
+- Entity tags backend (entity_tags table, add/remove/list endpoints)
+- Entity list API enriched with tags, relationship count, and model usage count
+- ADR-025: Entity Browse Enhancements
+- SPEC-025-A: Entity Browse Enhancements
+
 ### Fixed
 - Search now returns results for all entities and models; FTS index rebuilt on startup
 

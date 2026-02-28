@@ -148,6 +148,38 @@ async def list_entities(
         }
         for r in rows
     ]
+
+    # Enrich with tags and stats
+    for item in items:
+        entity_id = item["id"]
+
+        # Tags
+        tag_cursor = await db.execute(
+            "SELECT tag FROM entity_tags WHERE entity_id = ? ORDER BY tag",
+            (entity_id,),
+        )
+        tag_rows = await tag_cursor.fetchall()
+        item["tags"] = [r[0] for r in tag_rows]
+
+        # Relationship count
+        rel_cursor = await db.execute(
+            "SELECT COUNT(*) FROM relationships "
+            "WHERE (source_entity_id = ? OR target_entity_id = ?) AND is_deleted = 0",
+            (entity_id, entity_id),
+        )
+        rel_row = await rel_cursor.fetchone()
+        item["relationship_count"] = rel_row[0] if rel_row else 0
+
+        # Model usage count
+        model_cursor = await db.execute(
+            "SELECT COUNT(DISTINCT m.id) FROM models m "
+            "JOIN model_versions mv ON m.id = mv.model_id AND m.current_version = mv.version "
+            "WHERE m.is_deleted = 0 AND mv.data LIKE ?",
+            (f'%{entity_id}%',),
+        )
+        model_row = await model_cursor.fetchone()
+        item["model_usage_count"] = model_row[0] if model_row else 0
+
     return items, total
 
 

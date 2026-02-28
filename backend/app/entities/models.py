@@ -42,6 +42,9 @@ class EntityResponse(BaseModel):
     created_by: str
     updated_at: str
     is_deleted: bool = False
+    tags: list[str] = Field(default_factory=list)
+    relationship_count: int = 0
+    model_usage_count: int = 0
 
 
 class EntityVersionResponse(BaseModel):
