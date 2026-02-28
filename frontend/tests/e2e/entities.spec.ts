@@ -30,8 +30,8 @@ test.describe('Entities', () => {
 		await expect(page.getByRole('heading', { name: 'Entities' })).toBeVisible();
 
 		// Wait for entities to load
-		await expect(page.getByText('E2E Test Entity Alpha')).toBeVisible({ timeout: 10_000 });
-		await expect(page.getByText('E2E Test Entity Beta')).toBeVisible();
+		await expect(page.getByText('E2E Test Entity Alpha').first()).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByText('E2E Test Entity Beta').first()).toBeVisible();
 	});
 
 	test('Search filters entities by name', async ({ page }) => {
@@ -39,23 +39,23 @@ test.describe('Entities', () => {
 		await page.goto('/entities');
 
 		// Wait for the list to load
-		await expect(page.getByText('E2E Test Entity Alpha')).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByText('E2E Test Entity Alpha').first()).toBeVisible({ timeout: 10_000 });
 
 		// Type into the search box
 		const searchInput = page.getByPlaceholder('Search entities...');
 		await searchInput.fill('Alpha');
 
 		// Alpha should be visible, Beta should not
-		await expect(page.getByText('E2E Test Entity Alpha')).toBeVisible();
-		await expect(page.getByText('E2E Test Entity Beta')).not.toBeVisible();
+		await expect(page.getByText('E2E Test Entity Alpha').first()).toBeVisible();
+		await expect(page.getByText('E2E Test Entity Beta')).toHaveCount(0);
 	});
 
 	test('Click entity navigates to detail page', async ({ page }) => {
 		await loginAsAdmin(page);
 		await page.goto('/entities');
 
-		await expect(page.getByText('E2E Test Entity Alpha')).toBeVisible({ timeout: 10_000 });
-		await page.getByText('E2E Test Entity Alpha').click();
+		await expect(page.getByText('E2E Test Entity Alpha').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByText('E2E Test Entity Alpha').first().click();
 
 		// Should navigate to the detail page
 		await page.waitForURL(/\/entities\/.+/);
@@ -71,7 +71,7 @@ test.describe('Entities', () => {
 
 		// Details tab should be active by default — verify metadata fields
 		await expect(page.getByText('Type')).toBeVisible();
-		await expect(page.getByText('system')).toBeVisible();
+		await expect(page.getByText('system', { exact: true }).first()).toBeVisible();
 		await expect(page.getByText('ID')).toBeVisible();
 	});
 

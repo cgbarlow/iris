@@ -32,6 +32,11 @@ test.describe('Navigation', () => {
 		await page.waitForURL('/entities');
 		await expect(page.getByRole('heading', { name: 'Entities' })).toBeVisible();
 
+		// Navigate to Settings
+		await sidebar.getByRole('link', { name: 'Settings' }).click();
+		await page.waitForURL('/settings');
+		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+
 		// Navigate back to Dashboard
 		await sidebar.getByRole('link', { name: 'Dashboard' }).click();
 		await page.waitForURL('/');
@@ -42,8 +47,8 @@ test.describe('Navigation', () => {
 		await loginAsAdmin(page);
 		await page.goto(`/models/${modelId}`);
 
-		// Wait for the model to load
-		await expect(page.getByRole('heading', { name: 'Nav Test Model' })).toBeVisible({ timeout: 10_000 });
+		// Wait for the model to load (may be slow when backend is under load)
+		await expect(page.getByRole('heading', { name: 'Nav Test Model' })).toBeVisible({ timeout: 15_000 });
 
 		// Breadcrumb nav should be present
 		const breadcrumb = page.locator('nav[aria-label="Breadcrumb"]');

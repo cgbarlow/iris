@@ -73,13 +73,14 @@
 	<title>Dashboard — Iris</title>
 </svelte:head>
 
+<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Dashboard</h1>
+<p class="mt-1" style="color: var(--color-muted)">Integrated Repository for Information & Systems</p>
+
 {#if loading}
-	<p style="color: var(--color-muted)">Loading dashboard...</p>
+	<p class="mt-4" style="color: var(--color-muted)">Loading dashboard...</p>
 {:else if error}
-	<div role="alert" style="color: var(--color-danger)">{error}</div>
+	<div role="alert" class="mt-4" style="color: var(--color-danger)">{error}</div>
 {:else}
-	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Dashboard</h1>
-	<p class="mt-1" style="color: var(--color-muted)">Integrated Repository for Information & Systems</p>
 
 	<!-- Stats -->
 	<div class="mt-6 grid grid-cols-2 gap-4" style="max-width: 400px">

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toggleMode, mode } from 'mode-watcher';
+	import { toggleMode, mode, setMode } from 'mode-watcher';
 
 	let highContrast = $state(false);
 
@@ -7,6 +7,7 @@
 		if (highContrast) {
 			highContrast = false;
 			document.documentElement.classList.remove('high-contrast');
+			setMode('light');
 		} else if (mode.current === 'light') {
 			toggleMode();
 		} else if (mode.current === 'dark') {

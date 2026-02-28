@@ -2,21 +2,21 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { isAuthenticated, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
 	let { children } = $props();
 
 	let sidebarOpen = $state(true);
 
 	const navItems = [
-		{ href: '/', label: 'Dashboard', icon: 'H' },
-		{ href: '/models', label: 'Models', icon: 'M' },
-		{ href: '/entities', label: 'Entities', icon: 'E' },
+		{ href: '/', label: 'Dashboard', shortcut: 'H' },
+		{ href: '/models', label: 'Models', shortcut: 'M' },
+		{ href: '/entities', label: 'Entities', shortcut: 'E' },
+		{ href: '/settings', label: 'Settings', shortcut: 'S' },
 	];
 
 	const adminItems = [
-		{ href: '/admin/users', label: 'Users', icon: 'U' },
-		{ href: '/admin/audit', label: 'Audit Log', icon: 'A' },
+		{ href: '/admin/users', label: 'Users', shortcut: 'U' },
+		{ href: '/admin/audit', label: 'Audit Log', shortcut: 'A' },
 	];
 
 	async function handleLogout() {
@@ -54,7 +54,6 @@
 			>
 				Help
 			</a>
-			<ThemeToggle />
 			{#if isAuthenticated()}
 				<span class="text-sm" style="color: var(--color-muted)">
 					{getCurrentUser()?.username}
@@ -83,11 +82,11 @@
 						<li>
 							<a
 								href={item.href}
-								class="block rounded px-3 py-2 text-sm transition-colors"
-								style="color: var(--color-fg)"
+								class="sidebar-link block rounded px-3 py-2 text-sm transition-colors"
+								style="color: var(--color-fg){page.url.pathname === item.href ? '; background-color: var(--color-bg)' : ''}"
 								aria-current={page.url.pathname === item.href ? 'page' : undefined}
+								title="{item.label} ({item.shortcut})"
 							>
-								<span aria-hidden="true" class="mr-2">{item.icon}</span>
 								{item.label}
 							</a>
 						</li>
@@ -104,11 +103,11 @@
 								<li>
 									<a
 										href={item.href}
-										class="block rounded px-3 py-2 text-sm transition-colors"
-										style="color: var(--color-fg)"
+										class="sidebar-link block rounded px-3 py-2 text-sm transition-colors"
+										style="color: var(--color-fg){page.url.pathname === item.href ? '; background-color: var(--color-bg)' : ''}"
 										aria-current={page.url.pathname === item.href ? 'page' : undefined}
+										title="{item.label} ({item.shortcut})"
 									>
-										<span aria-hidden="true" class="mr-2">{item.icon}</span>
 										{item.label}
 									</a>
 								</li>
@@ -125,3 +124,9 @@
 		</main>
 	</div>
 </div>
+
+<style>
+	.sidebar-link:hover {
+		background-color: var(--color-bg);
+	}
+</style>

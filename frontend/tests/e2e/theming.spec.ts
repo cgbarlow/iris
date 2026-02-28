@@ -6,49 +6,63 @@ test.describe('Theming', () => {
 		await seedAdmin();
 	});
 
-	test('Theme toggle exists and is interactive', async ({ page }) => {
+	test('Settings page has theme radio buttons', async ({ page }) => {
 		await loginAsAdmin(page);
+		await page.goto('/settings');
 
-		// The theme toggle button should be visible in the header
-		const themeButton = page.getByRole('button', { name: /toggle theme/i });
-		await expect(themeButton).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-		// Read the initial label text
-		const initialText = await themeButton.textContent();
+		// All three theme options should be visible
+		await expect(page.getByLabel('Light')).toBeVisible();
+		await expect(page.getByLabel('Dark')).toBeVisible();
+		await expect(page.getByLabel('High Contrast')).toBeVisible();
+	});
 
-		// Click to cycle theme
-		await themeButton.click();
+	test('Theme can be changed via Settings page', async ({ page }) => {
+		await loginAsAdmin(page);
+		await page.goto('/settings');
 
-		// The button text or aria-label should change after toggling
-		// Allow a short time for the mode-watcher to update
+		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+
+		// Select Dark theme
+		await page.getByLabel('Dark').check();
 		await page.waitForTimeout(300);
-		const updatedText = await themeButton.textContent();
 
-		// The text should have changed (Light -> Dark -> HC -> Light)
-		expect(
-			updatedText !== initialText || initialText === 'Light'
-		).toBeTruthy();
+		// The html element should have the dark class
+		const hasDark = await page.evaluate(() =>
+			document.documentElement.classList.contains('dark'),
+		);
+		expect(hasDark).toBeTruthy();
+
+		// Select Light theme
+		await page.getByLabel('Light').check();
+		await page.waitForTimeout(300);
+
+		const hasDarkAfterLight = await page.evaluate(() =>
+			document.documentElement.classList.contains('dark'),
+		);
+		expect(hasDarkAfterLight).toBeFalsy();
 	});
 
 	test('Theme persists across navigation', async ({ page }) => {
 		await loginAsAdmin(page);
+		await page.goto('/settings');
 
-		// Get the theme toggle button
-		const themeButton = page.getByRole('button', { name: /toggle theme/i });
-		await expect(themeButton).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-		// Toggle to dark (from default Light, one click goes to Dark)
-		await themeButton.click();
+		// Select Dark theme
+		await page.getByLabel('Dark').check();
 		await page.waitForTimeout(300);
-
-		const themeAfterToggle = await themeButton.textContent();
 
 		// Navigate to a different page
 		await page.goto('/models');
 		await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
 
-		// The theme toggle should still reflect the same theme
-		const themeAfterNav = await page.getByRole('button', { name: /toggle theme/i }).textContent();
-		expect(themeAfterNav).toBe(themeAfterToggle);
+		// Navigate back to Settings — Dark should still be selected
+		await page.goto('/settings');
+		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+
+		const darkChecked = await page.getByLabel('Dark').isChecked();
+		expect(darkChecked).toBeTruthy();
 	});
 });

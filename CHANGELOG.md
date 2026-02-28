@@ -5,6 +5,27 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-02-28
+
+### Added
+- Settings page with theme picker (Light, Dark, High Contrast)
+- "New Model" button on models list page with create dialog
+- Edit and Delete actions on model detail page
+- "New Entity" button on entities list page
+
+### Changed
+- Theme selection moved from header toggle to Settings page
+- Sidebar items: removed letter prefixes, added keyboard shortcut tooltips
+
+### Fixed
+- Theme toggle cycle bug: Light mode now reachable (was stuck in Dark/HC loop)
+- Auth redirect race condition in layout preventing login navigation
+- Auth store now persists to sessionStorage, surviving page reloads during E2E tests
+- Dashboard heading always visible immediately (no longer hidden behind loading state)
+- Vite preview proxy: API calls now correctly proxy to backend in production preview mode
+- Backend rate limits configurable via environment variables (IRIS_RATE_LIMIT_LOGIN, IRIS_RATE_LIMIT_GENERAL, IRIS_RATE_LIMIT_REFRESH)
+- E2E test suite: fixed password mismatch, strict mode violations, rate limit handling, and timing-sensitive assertions (41/41 pass)
+
 ## [1.1.0] - 2026-02-27
 
 ### Added

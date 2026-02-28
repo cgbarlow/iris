@@ -35,6 +35,7 @@ test.describe('Error Handling', () => {
 
 		// Type a query that will not match anything
 		const searchInput = page.getByLabel('Search');
+		await expect(searchInput).toBeVisible({ timeout: 15_000 });
 		await searchInput.fill('zzz_no_match_xyz_999');
 
 		// Wait for the debounced search to fire

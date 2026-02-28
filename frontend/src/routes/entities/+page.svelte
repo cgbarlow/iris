@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/utils/api';
+	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type { Entity, PaginatedResponse } from '$lib/types/api';
 	import { SIMPLE_ENTITY_TYPES } from '$lib/types/canvas';
+	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
+	import type { SimpleEntityType } from '$lib/types/canvas';
 
 	let entities = $state<Entity[]>([]);
 	let loading = $state(true);
@@ -9,6 +11,7 @@
 	let searchQuery = $state('');
 	let typeFilter = $state('');
 	let sortField = $state<'name' | 'entity_type' | 'updated_at'>('name');
+	let showCreateDialog = $state(false);
 
 	$effect(() => {
 		loadEntities();
@@ -23,6 +26,24 @@
 			error = 'Failed to load entities';
 		}
 		loading = false;
+	}
+
+	async function handleCreate(name: string, entityType: SimpleEntityType, description: string) {
+		try {
+			await apiFetch<Entity>('/api/entities', {
+				method: 'POST',
+				body: JSON.stringify({
+					entity_type: entityType,
+					name,
+					description,
+					data: {},
+				}),
+			});
+			showCreateDialog = false;
+			await loadEntities();
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create entity';
+		}
 	}
 
 	const filteredEntities = $derived(
@@ -50,8 +71,19 @@
 	<title>Entities — Iris</title>
 </svelte:head>
 
-<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Entities</h1>
-<p class="mt-2" style="color: var(--color-muted)">Browse and manage architectural entities.</p>
+<div class="flex items-center justify-between">
+	<div>
+		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Entities</h1>
+		<p class="mt-2" style="color: var(--color-muted)">Browse and manage architectural entities.</p>
+	</div>
+	<button
+		onclick={() => (showCreateDialog = true)}
+		class="rounded px-4 py-2 text-sm text-white"
+		style="background-color: var(--color-primary)"
+	>
+		New Entity
+	</button>
+</div>
 
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3">
@@ -132,3 +164,10 @@
 		</ul>
 	{/if}
 </div>
+
+<EntityDialog
+	open={showCreateDialog}
+	mode="create"
+	onsave={handleCreate}
+	oncancel={() => (showCreateDialog = false)}
+/>

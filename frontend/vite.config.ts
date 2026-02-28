@@ -12,6 +12,13 @@ export default defineConfig({
 		},
 		allowedHosts: true,
 	},
+	preview: {
+		proxy: {
+			'/api': 'http://localhost:8000',
+			'/health': 'http://localhost:8000',
+		},
+		allowedHosts: true,
+	},
 	test: {
 		include: ['tests/unit/**/*.test.ts'],
 		environment: 'jsdom',

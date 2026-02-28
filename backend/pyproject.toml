@@ -1,6 +1,6 @@
 [project]
 name = "iris-backend"
-version = "0.1.0"
+version = "1.1.1"
 description = "Iris — Integrated Repository for Information & Systems"
 requires-python = ">=3.11"
 dependencies = [

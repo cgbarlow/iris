@@ -13,7 +13,8 @@ test.describe('Admin Users', () => {
 		await expect(page.getByRole('heading', { name: 'User Management' })).toBeVisible();
 
 		// The admin user should appear in the table
-		await expect(page.getByText('admin')).toBeVisible({ timeout: 10_000 });
+		const table = page.locator('table');
+		await expect(table.getByRole('cell', { name: 'admin' }).first()).toBeVisible({ timeout: 10_000 });
 	});
 
 	test('Create new user appears in list', async ({ page }) => {

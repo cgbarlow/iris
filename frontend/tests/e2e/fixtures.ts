@@ -8,9 +8,32 @@
 import type { Page } from '@playwright/test';
 
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'TestPassword123!';
+const ADMIN_PASSWORD = 'TestPassword12345';
 
 const API_BASE = 'http://localhost:8000';
+
+/** Sleep helper for rate-limit back-off. */
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Wrapper around fetch that retries on HTTP 429 (rate limit) with exponential back-off.
+ */
+async function fetchWithRetry(
+	url: string,
+	init: RequestInit,
+	maxRetries = 5,
+): Promise<Response> {
+	let res: Response | undefined;
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		res = await fetch(url, init);
+		if (res.status !== 429) return res;
+		const delay = Math.min(1000 * 2 ** attempt, 15_000);
+		await sleep(delay);
+	}
+	return res!;
+}
 
 /**
  * Create the initial admin user via POST /api/auth/setup.
@@ -18,7 +41,7 @@ const API_BASE = 'http://localhost:8000';
  */
 export async function seedAdmin(baseURL?: string): Promise<void> {
 	const origin = baseURL ?? API_BASE;
-	const res = await fetch(`${origin}/api/auth/setup`, {
+	const res = await fetchWithRetry(`${origin}/api/auth/setup`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ username: ADMIN_USERNAME, password: ADMIN_PASSWORD }),
@@ -38,7 +61,7 @@ export async function getAuthToken(
 	password = ADMIN_PASSWORD,
 ): Promise<string> {
 	const origin = baseURL ?? API_BASE;
-	const res = await fetch(`${origin}/api/auth/login`, {
+	const res = await fetchWithRetry(`${origin}/api/auth/login`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ username, password }),
@@ -59,7 +82,8 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 	await page.getByLabel('Username').fill(ADMIN_USERNAME);
 	await page.getByLabel('Password').fill(ADMIN_PASSWORD);
 	await page.getByRole('button', { name: 'Sign in' }).click();
-	await page.waitForURL('/');
+	await page.waitForURL('/', { timeout: 15_000 });
+	await page.getByRole('heading', { name: 'Dashboard' }).waitFor({ timeout: 10_000 });
 }
 
 /**
@@ -76,7 +100,7 @@ export async function createEntity(
 	},
 ): Promise<Record<string, unknown>> {
 	const origin = baseURL ?? API_BASE;
-	const res = await fetch(`${origin}/api/entities`, {
+	const res = await fetchWithRetry(`${origin}/api/entities`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -109,7 +133,7 @@ export async function createModel(
 	},
 ): Promise<Record<string, unknown>> {
 	const origin = baseURL ?? API_BASE;
-	const res = await fetch(`${origin}/api/models`, {
+	const res = await fetchWithRetry(`${origin}/api/models`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -144,7 +168,7 @@ export async function createRelationship(
 	},
 ): Promise<Record<string, unknown>> {
 	const origin = baseURL ?? API_BASE;
-	const res = await fetch(`${origin}/api/relationships`, {
+	const res = await fetchWithRetry(`${origin}/api/relationships`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',

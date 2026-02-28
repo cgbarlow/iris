@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { apiFetch } from '$lib/utils/api';
+	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type { Model, PaginatedResponse } from '$lib/types/api';
+	import ModelDialog from '$lib/components/ModelDialog.svelte';
 
 	let models = $state<Model[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let sortField = $state<'name' | 'model_type' | 'updated_at'>('name');
+	let showCreateDialog = $state(false);
 
 	$effect(() => {
 		loadModels();
@@ -21,6 +23,24 @@
 			error = 'Failed to load models';
 		}
 		loading = false;
+	}
+
+	async function handleCreate(name: string, modelType: string, description: string) {
+		try {
+			await apiFetch<Model>('/api/models', {
+				method: 'POST',
+				body: JSON.stringify({
+					model_type: modelType,
+					name,
+					description,
+					data: {},
+				}),
+			});
+			showCreateDialog = false;
+			await loadModels();
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create model';
+		}
 	}
 
 	const filteredModels = $derived(
@@ -47,8 +67,19 @@
 	<title>Models — Iris</title>
 </svelte:head>
 
-<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Models</h1>
-<p class="mt-2" style="color: var(--color-muted)">Browse and manage architectural models.</p>
+<div class="flex items-center justify-between">
+	<div>
+		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Models</h1>
+		<p class="mt-2" style="color: var(--color-muted)">Browse and manage architectural models.</p>
+	</div>
+	<button
+		onclick={() => (showCreateDialog = true)}
+		class="rounded px-4 py-2 text-sm text-white"
+		style="background-color: var(--color-primary)"
+	>
+		New Model
+	</button>
+</div>
 
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3">
@@ -115,3 +146,10 @@
 		</ul>
 	{/if}
 </div>
+
+<ModelDialog
+	open={showCreateDialog}
+	mode="create"
+	onsave={handleCreate}
+	oncancel={() => (showCreateDialog = false)}
+/>

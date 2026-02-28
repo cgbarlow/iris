@@ -7,6 +7,7 @@
 	import SessionTimeoutWarning from '$lib/components/SessionTimeoutWarning.svelte';
 	import { isAuthenticated } from '$lib/stores/auth.svelte.js';
 	import { ModeWatcher } from 'mode-watcher';
+	import { tick } from 'svelte';
 
 	let { children } = $props();
 
@@ -15,7 +16,11 @@
 
 	$effect(() => {
 		if (!isPublicRoute && !isAuthenticated()) {
-			goto('/login');
+			tick().then(() => {
+				if (!isAuthenticated()) {
+					goto('/login');
+				}
+			});
 		}
 	});
 </script>

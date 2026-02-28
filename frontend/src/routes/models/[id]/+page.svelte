@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type { Model, ModelVersion } from '$lib/types/api';
 	import BrowseCanvas from '$lib/canvas/BrowseCanvas.svelte';
 	import ModelCanvas from '$lib/canvas/ModelCanvas.svelte';
+	import ModelDialog from '$lib/components/ModelDialog.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { isEditMode } from '$lib/stores/canvasMode.svelte';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
 
@@ -13,6 +16,9 @@
 	let error = $state<string | null>(null);
 	let activeTab = $state<'overview' | 'canvas' | 'versions'>('overview');
 	let versionsLoading = $state(false);
+
+	let showEditDialog = $state(false);
+	let showDeleteDialog = $state(false);
 
 	// Canvas data parsed from model.data
 	let canvasNodes = $state<CanvasNode[]>([]);
@@ -58,6 +64,40 @@
 		}
 		versionsLoading = false;
 	}
+
+	async function handleEdit(name: string, _modelType: string, description: string) {
+		if (!model) return;
+		try {
+			await apiFetch(`/api/models/${model.id}`, {
+				method: 'PUT',
+				headers: { 'If-Match': String(model.current_version) },
+				body: JSON.stringify({
+					name,
+					description,
+					data: model.data,
+					change_summary: 'Updated model details',
+				}),
+			});
+			showEditDialog = false;
+			await loadModel(model.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to update model';
+		}
+	}
+
+	async function handleDelete() {
+		if (!model) return;
+		try {
+			await apiFetch(`/api/models/${model.id}`, {
+				method: 'DELETE',
+				headers: { 'If-Match': String(model.current_version) },
+			});
+			showDeleteDialog = false;
+			await goto('/models');
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to delete model';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -79,8 +119,28 @@
 		{error}
 	</div>
 {:else if model}
-	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
-	<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
+	<div class="flex items-center justify-between">
+		<div>
+			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
+		</div>
+		<div class="flex gap-2">
+			<button
+				onclick={() => (showEditDialog = true)}
+				class="rounded px-4 py-2 text-sm"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			>
+				Edit
+			</button>
+			<button
+				onclick={() => (showDeleteDialog = true)}
+				class="rounded px-4 py-2 text-sm text-white"
+				style="background-color: var(--color-danger)"
+			>
+				Delete
+			</button>
+		</div>
+	</div>
 
 	<!-- Tab navigation -->
 	<div class="mt-6 flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
@@ -176,4 +236,23 @@
 			{/if}
 		{/if}
 	</div>
+
+	<ModelDialog
+		open={showEditDialog}
+		mode="edit"
+		initialName={model.name}
+		initialType={model.model_type}
+		initialDescription={model.description ?? ''}
+		onsave={handleEdit}
+		oncancel={() => (showEditDialog = false)}
+	/>
+
+	<ConfirmDialog
+		open={showDeleteDialog}
+		title="Delete Model"
+		message="Are you sure you want to delete '{model.name}'? This action cannot be undone."
+		confirmLabel="Delete"
+		onconfirm={handleDelete}
+		oncancel={() => (showDeleteDialog = false)}
+	/>
 {/if}

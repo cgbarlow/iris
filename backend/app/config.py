@@ -58,9 +58,15 @@ class AppConfig:
     )
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
-    rate_limit_login: int = 10
-    rate_limit_refresh: int = 30
-    rate_limit_general: int = 100
+    rate_limit_login: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_LOGIN", "10"))
+    )
+    rate_limit_refresh: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_REFRESH", "30"))
+    )
+    rate_limit_general: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_GENERAL", "100"))
+    )
 
 
 def get_config() -> AppConfig:

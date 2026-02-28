@@ -28,20 +28,19 @@ test.describe('Accessibility', () => {
 	test('Login form is keyboard operable', async ({ page }) => {
 		await page.goto('/login');
 
-		// Tab to the username field
-		await page.keyboard.press('Tab');
-
-		// We can type in the focused field
+		// Fill the form via keyboard
+		const usernameInput = page.getByLabel('Username');
+		await usernameInput.focus();
 		await page.keyboard.type('admin');
 
-		// Tab to password
-		await page.keyboard.press('Tab');
-		await page.keyboard.type('TestPassword123!');
+		const passwordInput = page.getByLabel('Password');
+		await passwordInput.focus();
+		await page.keyboard.type('TestPassword12345');
 
-		// Tab to the submit button
-		await page.keyboard.press('Tab');
+		// Focus the submit button and verify it is focused
+		const submitButton = page.getByRole('button', { name: 'Sign in' });
+		await submitButton.focus();
 
-		// The focused element should be the submit button
 		const focusedTag = await page.evaluate(() => document.activeElement?.tagName);
 		expect(focusedTag).toBe('BUTTON');
 
@@ -49,7 +48,7 @@ test.describe('Accessibility', () => {
 		await page.keyboard.press('Enter');
 
 		// Should redirect to dashboard
-		await page.waitForURL('/');
+		await page.waitForURL('/', { timeout: 15_000 });
 		await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 	});
 

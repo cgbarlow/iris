@@ -30,8 +30,8 @@ test.describe('Models', () => {
 		await expect(page.getByRole('heading', { name: 'Models' })).toBeVisible();
 
 		// Wait for models to load
-		await expect(page.getByText('E2E Test Model Alpha')).toBeVisible({ timeout: 10_000 });
-		await expect(page.getByText('E2E Test Model Beta')).toBeVisible();
+		await expect(page.getByText('E2E Test Model Alpha').first()).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByText('E2E Test Model Beta').first()).toBeVisible();
 	});
 
 	test('Search filters models by name', async ({ page }) => {
@@ -39,23 +39,23 @@ test.describe('Models', () => {
 		await page.goto('/models');
 
 		// Wait for the list to load
-		await expect(page.getByText('E2E Test Model Alpha')).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByText('E2E Test Model Alpha').first()).toBeVisible({ timeout: 10_000 });
 
 		// Type into the search box
 		const searchInput = page.getByPlaceholder('Search models...');
 		await searchInput.fill('Alpha');
 
 		// Alpha should be visible, Beta should not
-		await expect(page.getByText('E2E Test Model Alpha')).toBeVisible();
-		await expect(page.getByText('E2E Test Model Beta')).not.toBeVisible();
+		await expect(page.getByText('E2E Test Model Alpha').first()).toBeVisible();
+		await expect(page.getByText('E2E Test Model Beta')).toHaveCount(0);
 	});
 
 	test('Click model navigates to detail page', async ({ page }) => {
 		await loginAsAdmin(page);
 		await page.goto('/models');
 
-		await expect(page.getByText('E2E Test Model Alpha')).toBeVisible({ timeout: 10_000 });
-		await page.getByText('E2E Test Model Alpha').click();
+		await expect(page.getByText('E2E Test Model Alpha').first()).toBeVisible({ timeout: 10_000 });
+		await page.getByText('E2E Test Model Alpha').first().click();
 
 		// Should navigate to the detail page
 		await page.waitForURL(/\/models\/.+/);
@@ -71,7 +71,7 @@ test.describe('Models', () => {
 
 		// Overview tab should be active by default — verify metadata fields
 		await expect(page.getByText('Type')).toBeVisible();
-		await expect(page.getByText('component')).toBeVisible();
+		await expect(page.getByText('component', { exact: true }).first()).toBeVisible();
 		await expect(page.getByText('ID')).toBeVisible();
 	});
 
