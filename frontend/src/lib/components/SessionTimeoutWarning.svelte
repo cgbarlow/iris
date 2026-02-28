@@ -3,8 +3,8 @@
 	 * Session timeout warning per WCAG 2.2.1 (Timing Adjustable).
 	 * Shows a dialog 60s before JWT expiry, allowing the user to extend their session.
 	 */
-	import { getAccessToken, getRefreshToken, isAuthenticated } from '$lib/stores/auth.svelte.js';
-	import { apiFetch } from '$lib/utils/api';
+	import { getAccessToken, isAuthenticated, clearAuth } from '$lib/stores/auth.svelte.js';
+	import { tryRefresh } from '$lib/utils/api';
 
 	let showWarning = $state(false);
 	let secondsRemaining = $state(60);
@@ -55,20 +55,18 @@
 	});
 
 	async function extendSession() {
-		try {
-			const refresh = getRefreshToken();
-			if (refresh) {
-				await apiFetch('/api/auth/refresh', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ refresh_token: refresh }),
-				});
-			}
-		} catch {
-			// Refresh failed — will redirect to login on next API call
+		const success = await tryRefresh();
+		if (success) {
+			// Re-schedule warning timer with new token's expiry
+			if (timeoutId) clearTimeout(timeoutId);
+			if (intervalId) clearInterval(intervalId);
+			showWarning = false;
+			// The $effect watching isAuthenticated/getAccessToken will re-schedule
+		} else {
+			clearAuth();
+			showWarning = false;
+			if (intervalId) clearInterval(intervalId);
 		}
-		showWarning = false;
-		if (intervalId) clearInterval(intervalId);
 	}
 
 	function dismiss() {

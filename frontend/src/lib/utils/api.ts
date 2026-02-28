@@ -20,7 +20,7 @@ export class ApiError extends Error {
 
 let refreshPromise: Promise<boolean> | null = null;
 
-async function tryRefresh(): Promise<boolean> {
+export async function tryRefresh(): Promise<boolean> {
 	const token = getRefreshToken();
 	if (!token) return false;
 
