@@ -11,7 +11,6 @@
 	import { archimateNodeTypes } from './archimate/nodes';
 	import { archimateEdgeTypes } from './archimate/edges';
 	import CanvasAnnouncer from './controls/CanvasAnnouncer.svelte';
-	import CanvasToolbar from './controls/CanvasToolbar.svelte';
 	import KeyboardHandler from './controls/KeyboardHandler.svelte';
 	import type { CanvasNode, CanvasEdge, SimpleRelationshipType } from '$lib/types/canvas';
 
@@ -149,7 +148,6 @@
 	>
 		<Controls showLock={false} />
 		<Background />
-		<CanvasToolbar onannounce={handleAnnounce} />
 		<KeyboardHandler
 			bind:this={keyboardHandler}
 			{nodes}

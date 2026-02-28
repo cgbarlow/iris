@@ -148,3 +148,5 @@ When accessed via the browse route:
 ---
 
 *This specification implements [ADR-011](../ADR-011-Canvas-Integration-Testing.md).*
+
+*Extended by [SPEC-014-A](SPEC-014-A-Canvas-UX-Parity.md) with zoom/pan, edit mode, and focus view.*

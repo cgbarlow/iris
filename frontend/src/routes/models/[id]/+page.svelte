@@ -7,7 +7,13 @@
 	import ModelCanvas from '$lib/canvas/ModelCanvas.svelte';
 	import FullViewCanvas from '$lib/canvas/FullViewCanvas.svelte';
 	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
-	import type { SequenceDiagramData } from '$lib/canvas/sequence/types';
+	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
+	import ParticipantDialog from '$lib/canvas/sequence/ParticipantDialog.svelte';
+	import MessageDialog from '$lib/canvas/sequence/MessageDialog.svelte';
+	import { createSequenceViewport } from '$lib/canvas/sequence/useSequenceViewport.svelte';
+	import type { SequenceDiagramData, Participant, SequenceMessage } from '$lib/canvas/sequence/types';
+	import { SEQUENCE_LAYOUT as L } from '$lib/canvas/sequence/types';
+	import FocusView from '$lib/components/FocusView.svelte';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
@@ -64,6 +70,11 @@
 		activations: [],
 	});
 	let selectedMessageId = $state<string | null>(null);
+	let showAddParticipant = $state(false);
+	let showAddMessage = $state(false);
+
+	// Focus view state
+	let focusMode = $state(false);
 
 	// Entity picker state (link existing entity)
 	let showEntityPicker = $state(false);
@@ -309,6 +320,88 @@
 		parseCanvasData();
 		editing = false;
 	}
+
+	// Sequence diagram viewport
+	const seqContentWidth = $derived(
+		sequenceData.participants.length > 0
+			? sequenceData.participants.length * (L.participantWidth + L.participantGap) - L.participantGap + L.padding * 2
+			: 400,
+	);
+	const seqContentHeight = $derived(
+		sequenceData.participants.length > 0
+			? L.messageStartY + (sequenceData.messages.length + 1) * L.messageGap + L.participantHeight + L.padding
+			: 300,
+	);
+	const seqViewport = $derived(createSequenceViewport(seqContentWidth, seqContentHeight));
+
+	// Sequence editing
+
+	function handleAddParticipant(name: string, type: Participant['type']) {
+		const id = crypto.randomUUID();
+		sequenceData = {
+			...sequenceData,
+			participants: [...sequenceData.participants, { id, name, type }],
+		};
+		canvasDirty = true;
+		showAddParticipant = false;
+	}
+
+	function handleAddMessage(from: string, to: string, label: string, type: SequenceMessage['type']) {
+		const id = crypto.randomUUID();
+		const order = sequenceData.messages.length;
+		sequenceData = {
+			...sequenceData,
+			messages: [...sequenceData.messages, { id, from, to, label, type, order }],
+		};
+		canvasDirty = true;
+		showAddMessage = false;
+	}
+
+	function handleDeleteSelected() {
+		if (selectedMessageId) {
+			sequenceData = {
+				...sequenceData,
+				messages: sequenceData.messages
+					.filter((m) => m.id !== selectedMessageId)
+					.map((m, i) => ({ ...m, order: i })),
+				activations: sequenceData.activations.filter(
+					(a) => !sequenceData.messages.some(
+						(m) => m.id === selectedMessageId &&
+							(a.startOrder === m.order || a.endOrder === m.order),
+					),
+				),
+			};
+			selectedMessageId = null;
+			canvasDirty = true;
+		}
+	}
+
+	async function saveSequence() {
+		if (!model) return;
+		saving = true;
+		error = null;
+		try {
+			await apiFetch(`/api/models/${model.id}`, {
+				method: 'PUT',
+				headers: { 'If-Match': String(model.current_version) },
+				body: JSON.stringify({
+					name: model.name,
+					description: model.description ?? '',
+					data: {
+						participants: sequenceData.participants,
+						messages: sequenceData.messages,
+						activations: sequenceData.activations,
+					},
+					change_summary: 'Updated sequence diagram',
+				}),
+			});
+			canvasDirty = false;
+			await loadModel(model.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to save sequence';
+		}
+		saving = false;
+	}
 </script>
 
 <svelte:head>
@@ -414,20 +507,120 @@
 			</dl>
 		{:else if activeTab === 'canvas'}
 			{#if canvasType === 'sequence'}
-				<!-- Sequence diagram rendering -->
-				<div style="border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto; padding: 1rem; min-height: 300px">
-					{#if sequenceData.participants.length === 0}
-						<div class="flex flex-col items-center justify-center gap-3" style="min-height: 250px">
-							<p style="color: var(--color-muted)">This sequence diagram has no participants yet.</p>
-						</div>
+				<!-- Sequence diagram toolbar -->
+				<div class="mb-3 flex items-center gap-2">
+					{#if editing}
+						<button
+							onclick={() => (showAddParticipant = true)}
+							class="rounded px-3 py-1.5 text-sm text-white"
+							style="background-color: var(--color-primary)"
+						>
+							Add Participant
+						</button>
+						<button
+							onclick={() => (showAddMessage = true)}
+							disabled={sequenceData.participants.length < 2}
+							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+							style="background-color: var(--color-primary)"
+						>
+							Add Message
+						</button>
+						<button
+							onclick={handleDeleteSelected}
+							disabled={!selectedMessageId}
+							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+							style="border: 1px solid var(--color-danger); color: var(--color-danger)"
+						>
+							Delete Selected
+						</button>
+						<button
+							onclick={saveSequence}
+							disabled={saving || !canvasDirty}
+							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+							style="background-color: var(--color-success, #16a34a)"
+						>
+							{saving ? 'Saving...' : 'Save'}
+						</button>
+						<button
+							onclick={discardChanges}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Discard
+						</button>
+						{#if canvasDirty}
+							<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
+						{/if}
 					{:else}
+						<button
+							onclick={() => (editing = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="background-color: var(--color-primary); color: white"
+						>
+							Edit Canvas
+						</button>
+					{/if}
+					<button
+						onclick={() => (focusMode = true)}
+						class="rounded px-3 py-1.5 text-sm"
+						style="border: 1px solid var(--color-border); color: var(--color-fg)"
+					>
+						Focus
+					</button>
+				</div>
+
+				<!-- Sequence diagram rendering -->
+				{#if sequenceData.participants.length === 0 && !editing}
+					<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
+						<p style="color: var(--color-muted)">This sequence diagram has no participants yet.</p>
+						<button
+							onclick={() => (editing = true)}
+							class="rounded px-4 py-2 text-sm text-white"
+							style="background-color: var(--color-primary)"
+						>
+							Start Building
+						</button>
+					</div>
+				{:else}
+					{#if focusMode}
+						<FocusView onexit={() => (focusMode = false)}>
+							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden; position: relative">
+								<SequenceDiagram
+									data={sequenceData}
+									{selectedMessageId}
+									onmessageselect={(id) => (selectedMessageId = id)}
+									viewBox={seqViewport.viewBox}
+									onwheel={seqViewport.handleWheel}
+									onpointerdown={seqViewport.handlePointerDown}
+									onpointermove={seqViewport.handlePointerMove}
+									onpointerup={seqViewport.handlePointerUp}
+								/>
+								<SequenceToolbar
+									onzoomin={seqViewport.zoomIn}
+									onzoomout={seqViewport.zoomOut}
+									onfitview={seqViewport.fitView}
+								/>
+							</div>
+						</FocusView>
+					{/if}
+					<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden; position: relative">
 						<SequenceDiagram
 							data={sequenceData}
 							{selectedMessageId}
 							onmessageselect={(id) => (selectedMessageId = id)}
+							viewBox={seqViewport.viewBox}
+							onwheel={seqViewport.handleWheel}
+							onpointerdown={seqViewport.handlePointerDown}
+							onpointermove={seqViewport.handlePointerMove}
+							onpointerup={seqViewport.handlePointerUp}
 						/>
-					{/if}
-				</div>
+						<SequenceToolbar
+							onzoomin={seqViewport.zoomIn}
+							onzoomout={seqViewport.zoomOut}
+							onfitview={seqViewport.fitView}
+						/>
+					</div>
+				{/if}
 			{:else}
 				<!-- Canvas toolbar -->
 				<div class="mb-3 flex items-center gap-2">
@@ -473,10 +666,41 @@
 							Edit Canvas
 						</button>
 					{/if}
+					<button
+						onclick={() => (focusMode = true)}
+						class="rounded px-3 py-1.5 text-sm"
+						style="border: 1px solid var(--color-border); color: var(--color-fg)"
+					>
+						Focus
+					</button>
 				</div>
 
 				<!-- Canvas area -->
 				{#if editing}
+					{#if focusMode}
+						<FocusView onexit={() => (focusMode = false)}>
+							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden">
+								{#if canvasType === 'uml' || canvasType === 'archimate'}
+									<FullViewCanvas
+										viewType={fullViewType}
+										bind:nodes={canvasNodes}
+										bind:edges={canvasEdges}
+										oncreatenode={() => (showAddEntity = true)}
+										ondeletenode={handleDeleteNode}
+										onconnectnodes={handleConnectNodes}
+									/>
+								{:else}
+									<ModelCanvas
+										bind:nodes={canvasNodes}
+										bind:edges={canvasEdges}
+										oncreatenode={() => (showAddEntity = true)}
+										ondeletenode={handleDeleteNode}
+										onconnectnodes={handleConnectNodes}
+									/>
+								{/if}
+							</div>
+						</FocusView>
+					{/if}
 					<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 						{#if canvasType === 'uml' || canvasType === 'archimate'}
 							<FullViewCanvas
@@ -509,6 +733,17 @@
 						</button>
 					</div>
 				{:else}
+					{#if focusMode}
+						<FocusView onexit={() => (focusMode = false)}>
+							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden">
+								<BrowseCanvas
+									nodes={canvasNodes}
+									edges={canvasEdges}
+									onnodeselect={handleBrowseNodeSelect}
+								/>
+							</div>
+						</FocusView>
+					{/if}
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 							<BrowseCanvas
@@ -601,6 +836,19 @@
 		open={showEntityPicker}
 		onselect={handleLinkEntity}
 		oncancel={() => (showEntityPicker = false)}
+	/>
+
+	<ParticipantDialog
+		open={showAddParticipant}
+		onsave={handleAddParticipant}
+		oncancel={() => (showAddParticipant = false)}
+	/>
+
+	<MessageDialog
+		open={showAddMessage}
+		participants={sequenceData.participants}
+		onsave={handleAddMessage}
+		oncancel={() => (showAddMessage = false)}
 	/>
 
 {/if}

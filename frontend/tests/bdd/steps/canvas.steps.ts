@@ -438,3 +438,25 @@ Then('the canvas should render without errors', async ({ page }) => {
 	const canvas = page.locator('.svelte-flow, .sequence-diagram');
 	await expect(canvas.first()).toBeVisible();
 });
+
+Then('the sequence container should not overflow', async ({ page }) => {
+	const container = page.locator('.sequence-diagram');
+	await expect(container).toBeVisible();
+	// SVG should have a viewBox and fit within the container
+	const svg = container.locator('svg');
+	await expect(svg).toHaveAttribute('viewBox');
+});
+
+Then('the sequence zoom controls should be visible', async ({ page }) => {
+	await expect(page.getByRole('button', { name: 'Zoom in' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Zoom out' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Fit to screen' })).toBeVisible();
+});
+
+Then('the focus view should be visible', async ({ page }) => {
+	await expect(page.locator('[aria-label="Focus view"]')).toBeVisible();
+});
+
+Then('the focus view should not be visible', async ({ page }) => {
+	await expect(page.locator('[aria-label="Focus view"]')).not.toBeVisible();
+});
