@@ -5,6 +5,18 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-28
+
+### Added
+- Gallery/card view mode on models list page with responsive CSS grid layout
+- View mode toggle (list/gallery) in models toolbar with `aria-pressed` state
+- Card size slider (200px–400px) for adjusting gallery card width, visible only in gallery mode
+- localStorage persistence for view mode and card size preferences across sessions
+- Gallery cards show model name, type badge, full description, and updated date
+- ADR-012: Models Page Gallery View
+- SPEC-012-A: Gallery View Implementation
+- BDD test suite for gallery view (6 scenarios in models-gallery.feature)
+
 ## [1.2.1] - 2026-02-28
 
 ### Fixed

@@ -10,9 +10,22 @@
 	let sortField = $state<'name' | 'model_type' | 'updated_at'>('name');
 	let typeFilter = $state<string>('');
 	let showCreateDialog = $state(false);
+	let viewMode = $state<'list' | 'gallery'>(
+		(typeof window !== 'undefined' && localStorage.getItem('iris-models-view') as 'list' | 'gallery') || 'list'
+	);
+	let cardSize = $state<number>(
+		(typeof window !== 'undefined' && Number(localStorage.getItem('iris-models-card-size'))) || 250
+	);
 
 	$effect(() => {
 		loadModels();
+	});
+
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			localStorage.setItem('iris-models-view', viewMode);
+			localStorage.setItem('iris-models-card-size', String(cardSize));
+		}
 	});
 
 	async function loadModels() {
@@ -127,6 +140,41 @@
 			<option value="updated_at">Sort by updated</option>
 		</select>
 	</div>
+	<div class="flex items-center gap-1">
+		<button
+			onclick={() => (viewMode = 'list')}
+			aria-label="List view"
+			aria-pressed={viewMode === 'list'}
+			class="rounded border px-2 py-2 text-sm"
+			style="border-color: var(--color-border); {viewMode === 'list' ? 'background: var(--color-primary); color: white' : 'background: var(--color-bg); color: var(--color-fg)'}"
+		>
+			☰
+		</button>
+		<button
+			onclick={() => (viewMode = 'gallery')}
+			aria-label="Gallery view"
+			aria-pressed={viewMode === 'gallery'}
+			class="rounded border px-2 py-2 text-sm"
+			style="border-color: var(--color-border); {viewMode === 'gallery' ? 'background: var(--color-primary); color: white' : 'background: var(--color-bg); color: var(--color-fg)'}"
+		>
+			▦
+		</button>
+	</div>
+	{#if viewMode === 'gallery'}
+		<div class="flex items-center gap-2">
+			<label for="card-size-slider" class="sr-only">Card size</label>
+			<input
+				id="card-size-slider"
+				type="range"
+				min="200"
+				max="400"
+				step="50"
+				bind:value={cardSize}
+				aria-label="Card size"
+				class="w-24"
+			/>
+		</div>
+	{/if}
 </div>
 
 <!-- Results -->
@@ -141,29 +189,50 @@
 		<p class="mb-3 text-sm" style="color: var(--color-muted)">
 			{filteredModels.length} model{filteredModels.length === 1 ? '' : 's'}
 		</p>
-		<ul class="flex flex-col gap-2">
-			{#each filteredModels as model}
-				<li>
+		{#if viewMode === 'list'}
+			<ul class="flex flex-col gap-2" data-testid="models-list">
+				{#each filteredModels as model}
+					<li>
+						<a
+							href="/models/{model.id}"
+							class="flex items-center gap-3 rounded border p-3"
+							style="border-color: var(--color-border); color: var(--color-fg)"
+						>
+							<span class="text-sm font-medium" style="color: var(--color-primary)">
+								{model.name}
+							</span>
+							<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+								{model.model_type}
+							</span>
+							{#if model.description}
+								<span class="text-xs" style="color: var(--color-muted)">
+									{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}
+								</span>
+							{/if}
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<div class="grid gap-4" data-testid="models-gallery" style="grid-template-columns: repeat(auto-fill, minmax({cardSize}px, 1fr))">
+				{#each filteredModels as model}
 					<a
 						href="/models/{model.id}"
-						class="flex items-center gap-3 rounded border p-3"
+						class="flex flex-col gap-2 rounded border p-4"
 						style="border-color: var(--color-border); color: var(--color-fg)"
 					>
-						<span class="text-sm font-medium" style="color: var(--color-primary)">
-							{model.name}
-						</span>
-						<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-							{model.model_type}
-						</span>
+						<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
+						<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
 						{#if model.description}
-							<span class="text-xs" style="color: var(--color-muted)">
-								{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}
-							</span>
+							<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
 						{/if}
+						<span class="text-xs mt-auto" style="color: var(--color-muted)">
+							Updated {new Date(model.updated_at).toLocaleDateString()}
+						</span>
 					</a>
-				</li>
-			{/each}
-		</ul>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 </div>
 
