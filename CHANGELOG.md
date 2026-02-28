@@ -15,8 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version history tables include a User column showing who made each change
 - Canvas nodes now have connection handles on all four sides (top, bottom, left, right)
 - Dedicated bookmarks page accessible from sidebar navigation
+- Admin settings page with configurable session timeout and gallery thumbnail display mode
+- Settings API (`GET /api/settings`, `GET /api/settings/{key}`, `PUT /api/settings/{key}`) with admin-only write access
+- Dynamic session timeout: login and refresh endpoints read `session_timeout_minutes` from database settings
+- Settings database table (`m006_settings` migration) with default seed values
 - ADR-019: Metadata and User Attribution Display
 - SPEC-019-A: Metadata Display
+- ADR-021: Admin Settings and Configurable Session Timeout
+- SPEC-021-A: Admin Settings
 - ADR-025: Entity Browse Enhancements
 - SPEC-025-A: Entity Browse Enhancements
 
