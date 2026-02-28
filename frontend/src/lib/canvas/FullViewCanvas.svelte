@@ -22,6 +22,8 @@
 		ondeletenode?: (nodeId: string) => void;
 		onconnectnodes?: (sourceId: string, targetId: string) => void;
 		ondeleteedge?: (edgeId: string) => void;
+		onundo?: () => void;
+		onredo?: () => void;
 	}
 
 	let {
@@ -32,6 +34,8 @@
 		ondeletenode,
 		onconnectnodes,
 		ondeleteedge,
+		onundo,
+		onredo,
 	}: Props = $props();
 
 	let announcer: CanvasAnnouncer | undefined = $state();
@@ -200,6 +204,8 @@
 			ontoggleconnect={handleToggleConnect}
 			onannounce={handleAnnounce}
 			ondeleteedge={handleDeleteEdge}
+			{onundo}
+			{onredo}
 		/>
 	</SvelteFlow>
 

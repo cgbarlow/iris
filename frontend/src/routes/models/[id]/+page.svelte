@@ -21,6 +21,7 @@
 	import EntityDetailPanel from '$lib/canvas/controls/EntityDetailPanel.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import EntityPicker from '$lib/components/EntityPicker.svelte';
+	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import type { Entity } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
 	import type { SimpleEntityType, SimpleRelationshipType } from '$lib/types/canvas';
@@ -56,6 +57,9 @@
 	let canvasDirty = $state(false);
 	let saving = $state(false);
 	let selectedEdgeId = $state<string | null>(null);
+
+	// Canvas undo/redo history
+	const history = createCanvasHistory();
 
 	// RelationshipDialog state
 	let showRelationshipDialog = $state(false);
@@ -248,6 +252,7 @@
 					entityId: created.id,
 				},
 			};
+			history.pushState(canvasNodes, canvasEdges);
 			canvasNodes = [...canvasNodes, newNode];
 			canvasDirty = true;
 			showAddEntity = false;
@@ -257,6 +262,7 @@
 	}
 
 	function handleDeleteNode(nodeId: string) {
+		history.pushState(canvasNodes, canvasEdges);
 		canvasNodes = canvasNodes.filter((n) => n.id !== nodeId);
 		canvasEdges = canvasEdges.filter((e) => e.source !== nodeId && e.target !== nodeId);
 		canvasDirty = true;
@@ -283,6 +289,7 @@
 			type,
 			data: { relationshipType: type, label: label || undefined },
 		};
+		history.pushState(canvasNodes, canvasEdges);
 		canvasEdges = [...canvasEdges, newEdge];
 		canvasDirty = true;
 		showRelationshipDialog = false;
@@ -314,6 +321,7 @@
 				}),
 			});
 			canvasDirty = false;
+			history.clear();
 			await loadModel(model.id);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to save canvas';
@@ -336,13 +344,33 @@
 				entityId: entity.id,
 			},
 		};
+		history.pushState(canvasNodes, canvasEdges);
 		canvasNodes = [...canvasNodes, newNode];
 		canvasDirty = true;
 		showEntityPicker = false;
 	}
 
+	function handleUndo() {
+		const state = history.undo(canvasNodes, canvasEdges);
+		if (state) {
+			canvasNodes = state.nodes;
+			canvasEdges = state.edges;
+			canvasDirty = true;
+		}
+	}
+
+	function handleRedo() {
+		const state = history.redo(canvasNodes, canvasEdges);
+		if (state) {
+			canvasNodes = state.nodes;
+			canvasEdges = state.edges;
+			canvasDirty = true;
+		}
+	}
+
 	function discardChanges() {
 		parseCanvasData();
+		history.clear();
 		editing = false;
 	}
 
@@ -679,6 +707,26 @@
 							Delete Edge
 						</button>
 						<button
+							onclick={handleUndo}
+							disabled={!history.canUndo}
+							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							aria-label="Undo"
+							title="Undo (Ctrl+Z)"
+						>
+							Undo
+						</button>
+						<button
+							onclick={handleRedo}
+							disabled={!history.canRedo}
+							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							aria-label="Redo"
+							title="Redo (Ctrl+Y)"
+						>
+							Redo
+						</button>
+						<button
 							onclick={saveCanvas}
 							disabled={saving || !canvasDirty}
 							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
@@ -728,6 +776,8 @@
 										ondeletenode={handleDeleteNode}
 										onconnectnodes={handleConnectNodes}
 										ondeleteedge={handleDeleteEdge}
+										onundo={handleUndo}
+										onredo={handleRedo}
 									/>
 								{:else}
 									<ModelCanvas
@@ -737,6 +787,8 @@
 										ondeletenode={handleDeleteNode}
 										onconnectnodes={handleConnectNodes}
 										ondeleteedge={handleDeleteEdge}
+										onundo={handleUndo}
+										onredo={handleRedo}
 									/>
 								{/if}
 							</div>

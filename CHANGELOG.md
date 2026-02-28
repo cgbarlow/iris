@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Browse mode entity panel shows models using entity, linked model navigation, and link to entity detail page
 - Relationships auto-created when entities are connected in model canvases
 - Improved entity tab ordering and relationships empty state message
+- Undo/redo for canvas operations with toolbar buttons and Ctrl+Z/Ctrl+Y shortcuts
 - ADR-019: Metadata and User Attribution Display
 - SPEC-019-A: Metadata Display
 - ADR-021: Admin Settings and Configurable Session Timeout
@@ -34,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPEC-025-A: Entity Browse Enhancements
 - ADR-027: Edge Selection, Deletion, and Reconnection
 - SPEC-027-A: Edge Operations
+- ADR-028: Canvas Undo/Redo
+- SPEC-028-A: Canvas Undo/Redo Implementation
 
 ### Changed
 - Creating a new model now navigates directly to the model detail page
