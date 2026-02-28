@@ -23,6 +23,8 @@
 	{#if data.description}
 		<div class="canvas-node__description">{data.description}</div>
 	{/if}
-	<Handle type="target" position={Position.Top} />
-	<Handle type="source" position={Position.Bottom} />
+	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Right} id="right" />
 </div>

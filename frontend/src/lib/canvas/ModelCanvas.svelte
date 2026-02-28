@@ -134,6 +134,7 @@
 		nodeTypes={simpleViewNodeTypes}
 		edgeTypes={simpleViewEdgeTypes}
 		fitView
+		connectionMode="loose"
 		onnodeclick={handleNodeClick}
 		proOptions={{ hideAttribution: true }}
 		defaultEdgeOptions={{ type: 'uses' }}

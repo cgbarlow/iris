@@ -18,6 +18,8 @@
 		<span class="uml-node__icon" aria-hidden="true">▷</span>
 		<span class="uml-node__label">{data.label}</span>
 	</div>
-	<Handle type="target" position={Position.Top} />
-	<Handle type="source" position={Position.Bottom} />
+	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Right} id="right" />
 </div>

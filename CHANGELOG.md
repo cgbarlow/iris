@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Entity list API enriched with tags, relationship count, and model usage count
 - Entity and model detail pages now display created by username and modified date
 - Version history tables include a User column showing who made each change
+- Canvas nodes now have connection handles on all four sides (top, bottom, left, right)
 - ADR-019: Metadata and User Attribution Display
 - SPEC-019-A: Metadata Display
 - ADR-025: Entity Browse Enhancements
