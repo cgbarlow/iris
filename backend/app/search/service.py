@@ -8,6 +8,43 @@ if TYPE_CHECKING:
     import aiosqlite
 
 
+async def rebuild_search_index(db: aiosqlite.Connection) -> None:
+    """Rebuild FTS indices from current entity and model data."""
+    # Clear existing FTS data
+    await db.execute("DELETE FROM entities_fts")
+    await db.execute("DELETE FROM models_fts")
+
+    # Re-index all non-deleted entities
+    cursor = await db.execute(
+        "SELECT e.id, e.entity_type, ev.name, ev.description "
+        "FROM entities e "
+        "JOIN entity_versions ev ON e.id = ev.entity_id AND e.current_version = ev.version "
+        "WHERE e.is_deleted = 0"
+    )
+    for row in await cursor.fetchall():
+        await db.execute(
+            "INSERT INTO entities_fts (entity_id, name, entity_type, description) "
+            "VALUES (?, ?, ?, ?)",
+            (row[0], row[2], row[1], row[3] or ""),
+        )
+
+    # Re-index all non-deleted models
+    cursor = await db.execute(
+        "SELECT m.id, m.model_type, mv.name, mv.description "
+        "FROM models m "
+        "JOIN model_versions mv ON m.id = mv.model_id AND m.current_version = mv.version "
+        "WHERE m.is_deleted = 0"
+    )
+    for row in await cursor.fetchall():
+        await db.execute(
+            "INSERT INTO models_fts (model_id, name, model_type, description) "
+            "VALUES (?, ?, ?, ?)",
+            (row[0], row[2], row[1], row[3] or ""),
+        )
+
+    await db.commit()
+
+
 async def index_entity(
     db: aiosqlite.Connection,
     *,
