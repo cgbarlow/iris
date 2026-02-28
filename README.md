@@ -90,6 +90,13 @@ Four colour modes with WCAG-compliant contrast ratios:
 - **User Management** — List, create, edit role, activate/deactivate users with WCAG-compliant forms and confirmation dialogs
 - **Audit Log** — Paginated audit log viewer with action/username/target/date range filters, chain verification badge, and expandable row detail (JSON rendered as text, no `{@html}`)
 
+### Models Gallery View
+
+- Toggle between list view (compact single-line items) and gallery view (detailed cards)
+- Gallery renders models as responsive CSS grid cards showing name, type, full description, and updated date
+- Card size slider (200px–400px) adjusts card width in gallery mode
+- View mode and card size persist in localStorage across sessions
+
 ### Entity & Model Management
 
 - Entity CRUD with edit and delete on detail page (optimistic concurrency via If-Match)
@@ -185,8 +192,8 @@ npm run test:all-e2e
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 11 Architecture Decision Records |
-| `docs/adrs/specs/` | 20 implementation specifications |
+| `docs/adrs/` | 12 Architecture Decision Records |
+| `docs/adrs/specs/` | 21 implementation specifications |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 
@@ -222,6 +229,7 @@ npm run test:all-e2e
 | v1.0.0 | G | Polish — WCAG audit, NZ ITSM verification, performance testing |
 | v1.1.0 | H | Remediation — audit API, entity statistics, dashboard, admin pages, documentation corrections, E2E tests |
 | v1.2.0 | I | Canvas Completion — Full View canvas, sequence integration, bug fixes, BDD test suite, frontend feature gaps |
+| v1.3.0 | J | Gallery View — models page gallery/card view with card resize slider and localStorage persistence |
 
 ## License
 
