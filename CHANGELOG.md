@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Entity and model detail pages now display created by username and modified date
 - Version history tables include a User column showing who made each change
 - Canvas nodes now have connection handles on all four sides (top, bottom, left, right)
+- Dedicated bookmarks page accessible from sidebar navigation
 - ADR-019: Metadata and User Attribution Display
 - SPEC-019-A: Metadata Display
 - ADR-025: Entity Browse Enhancements
