@@ -5,6 +5,13 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Canvas toolbar buttons reorganized into logical groups: Create, Edit, Persist, View
+- ADR-030: Model Canvas Toolbar Layout
+- SPEC-030-A: Toolbar Layout Implementation
+
 ## [1.4.0] - 2026-02-28
 
 ### Added
