@@ -38,3 +38,8 @@ Feature: Models Gallery View
   Scenario: Slider is hidden in list view
     When I navigate to the models page
     Then I should not see the card size slider
+
+  Scenario: Gallery cards show preview thumbnails
+    When I navigate to the models page
+    And I click the gallery view toggle
+    Then each card should show a preview thumbnail

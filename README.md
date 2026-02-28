@@ -93,7 +93,8 @@ Four colour modes with WCAG-compliant contrast ratios:
 ### Models Gallery View
 
 - Toggle between list view (compact single-line items) and gallery view (detailed cards)
-- Gallery renders models as responsive CSS grid cards showing name, type, full description, and updated date
+- Gallery cards show static SVG preview thumbnails of model diagrams (canvas nodes/edges, sequence participants/lifelines)
+- Gallery renders models as responsive CSS grid cards showing thumbnail, name, type, full description, and updated date
 - Card size slider (200px–400px) adjusts card width in gallery mode
 - View mode and card size persist in localStorage across sessions
 

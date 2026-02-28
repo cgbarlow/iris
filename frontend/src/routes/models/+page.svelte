@@ -2,6 +2,7 @@
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type { Model, PaginatedResponse } from '$lib/types/api';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
+	import ModelThumbnail from '$lib/components/ModelThumbnail.svelte';
 
 	let models = $state<Model[]>([]);
 	let loading = $state(true);
@@ -218,17 +219,22 @@
 				{#each filteredModels as model}
 					<a
 						href="/models/{model.id}"
-						class="flex flex-col gap-2 rounded border p-4"
+						class="flex flex-col rounded border overflow-hidden"
 						style="border-color: var(--color-border); color: var(--color-fg)"
 					>
-						<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
-						<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
-						{#if model.description}
-							<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
-						{/if}
-						<span class="text-xs mt-auto" style="color: var(--color-muted)">
-							Updated {new Date(model.updated_at).toLocaleDateString()}
-						</span>
+						<div class="h-28 overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
+							<ModelThumbnail data={model.data} modelType={model.model_type} />
+						</div>
+						<div class="flex flex-col gap-2 p-4">
+							<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
+							<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
+							{#if model.description}
+								<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
+							{/if}
+							<span class="text-xs mt-auto" style="color: var(--color-muted)">
+								Updated {new Date(model.updated_at).toLocaleDateString()}
+							</span>
+						</div>
 					</a>
 				{/each}
 			</div>

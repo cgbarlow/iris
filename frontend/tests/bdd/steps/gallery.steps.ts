@@ -10,6 +10,13 @@ Given('models exist in the system', async () => {
 		name: 'Gallery Test Model',
 		model_type: 'simple',
 		description: 'A model for testing gallery view',
+		data: {
+			nodes: [
+				{ id: 'n1', position: { x: 0, y: 0 }, data: { label: 'A' } },
+				{ id: 'n2', position: { x: 200, y: 100 }, data: { label: 'B' } },
+			],
+			edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+		},
 	});
 	await createModel(undefined, token, {
 		name: 'Second Gallery Model',
@@ -87,4 +94,13 @@ Then('the cards should be larger', async ({ page }) => {
 
 Then('I should not see the card size slider', async ({ page }) => {
 	await expect(page.getByLabel('Card size')).not.toBeVisible();
+});
+
+Then('each card should show a preview thumbnail', async ({ page }) => {
+	const cards = page.locator('[data-testid="models-gallery"] a');
+	const count = await cards.count();
+	expect(count).toBeGreaterThan(0);
+	for (let i = 0; i < count; i++) {
+		await expect(cards.nth(i).locator('[data-testid="model-thumbnail"]')).toBeVisible();
+	}
 });
