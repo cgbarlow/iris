@@ -59,6 +59,7 @@ gap: 1rem (16px)
 
 Each card is an `<a>` linking to `/models/{id}` and displays:
 
+0. **Preview thumbnail** — static SVG rendered by `ModelThumbnail.svelte` in a fixed-height container (`h-28`), separated from card text by a bottom border (see [SPEC-013-A](SPEC-013-A-Model-Preview-Thumbnails.md))
 1. **Model name** — `font-medium`, primary colour
 2. **Model type badge** — small rounded badge with surface background
 3. **Description** — full text (not truncated), muted colour, only shown if present
@@ -123,6 +124,7 @@ Works across Light, Dark, and High Contrast themes without additional styling.
 | 4 | Card size slider adjusts card width | Resizing cards with the slider |
 | 5 | View preference persists across navigation | View preference persists across navigation |
 | 6 | Slider is hidden in list view | Slider is hidden in list view |
+| 7 | Gallery cards show preview thumbnails | Gallery cards show preview thumbnails |
 
 ---
 
