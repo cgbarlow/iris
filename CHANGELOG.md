@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ADR-025: Entity Browse Enhancements
 - SPEC-025-A: Entity Browse Enhancements
 
+### Changed
+- Creating a new model now navigates directly to the model detail page
+
 ### Fixed
 - Search now returns results for all entities and models; FTS index rebuilt on startup
 - Session timeout "Continue" button now correctly extends the session

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type { Model, PaginatedResponse } from '$lib/types/api';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
@@ -42,7 +43,7 @@
 
 	async function handleCreate(name: string, modelType: string, description: string) {
 		try {
-			await apiFetch<Model>('/api/models', {
+			const created = await apiFetch<Model>('/api/models', {
 				method: 'POST',
 				body: JSON.stringify({
 					model_type: modelType,
@@ -52,7 +53,7 @@
 				}),
 			});
 			showCreateDialog = false;
-			await loadModels();
+			await goto(`/models/${created.id}`);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create model';
 		}

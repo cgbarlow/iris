@@ -24,6 +24,11 @@ Given('an entity named {string} exists', async ({ page }, name: string) => {
 	await createEntity(undefined, token, { name, entity_type: 'component' });
 });
 
+Given('I am on the models page', async ({ page }) => {
+	await page.goto('/models');
+	await page.getByRole('heading', { name: 'Models' }).waitFor();
+});
+
 When('I navigate to model {string}', async ({ page }, name: string) => {
 	await page.goto('/models');
 	await page.getByRole('link', { name }).first().click();
@@ -74,4 +79,9 @@ Then('I should be on the models list page', async ({ page }) => {
 
 Then('I should be on the entities list page', async ({ page }) => {
 	await expect(page).toHaveURL('/entities');
+});
+
+Then('I should be on the model detail page for {string}', async ({ page }, name: string) => {
+	await expect(page).toHaveURL(/\/models\/[a-f0-9-]+/);
+	await expect(page.getByRole('heading', { name })).toBeVisible();
 });
