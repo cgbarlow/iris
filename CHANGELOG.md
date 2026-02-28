@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Search now returns results for all entities and models; FTS index rebuilt on startup
+- Session timeout "Continue" button now correctly extends the session
 
 ## [1.4.0] - 2026-02-28
 
