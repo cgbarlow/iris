@@ -55,6 +55,7 @@
 	let showAddEntity = $state(false);
 	let canvasDirty = $state(false);
 	let saving = $state(false);
+	let selectedEdgeId = $state<string | null>(null);
 
 	// RelationshipDialog state
 	let showRelationshipDialog = $state(false);
@@ -240,6 +241,12 @@
 	function handleDeleteNode(nodeId: string) {
 		canvasNodes = canvasNodes.filter((n) => n.id !== nodeId);
 		canvasEdges = canvasEdges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+		canvasDirty = true;
+	}
+
+	function handleDeleteEdge(edgeId: string) {
+		canvasEdges = canvasEdges.filter((e) => e.id !== edgeId);
+		selectedEdgeId = null;
 		canvasDirty = true;
 	}
 
@@ -640,6 +647,14 @@
 							Link Entity
 						</button>
 						<button
+							onclick={() => selectedEdgeId && handleDeleteEdge(selectedEdgeId)}
+							disabled={!selectedEdgeId}
+							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+							style="border: 1px solid var(--color-danger); color: var(--color-danger)"
+						>
+							Delete Edge
+						</button>
+						<button
 							onclick={saveCanvas}
 							disabled={saving || !canvasDirty}
 							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
@@ -688,6 +703,7 @@
 										oncreatenode={() => (showAddEntity = true)}
 										ondeletenode={handleDeleteNode}
 										onconnectnodes={handleConnectNodes}
+										ondeleteedge={handleDeleteEdge}
 									/>
 								{:else}
 									<ModelCanvas
@@ -696,6 +712,7 @@
 										oncreatenode={() => (showAddEntity = true)}
 										ondeletenode={handleDeleteNode}
 										onconnectnodes={handleConnectNodes}
+										ondeleteedge={handleDeleteEdge}
 									/>
 								{/if}
 							</div>
@@ -710,6 +727,7 @@
 								oncreatenode={() => (showAddEntity = true)}
 								ondeletenode={handleDeleteNode}
 								onconnectnodes={handleConnectNodes}
+								ondeleteedge={handleDeleteEdge}
 							/>
 						{:else}
 							<ModelCanvas
@@ -718,6 +736,7 @@
 								oncreatenode={() => (showAddEntity = true)}
 								ondeletenode={handleDeleteNode}
 								onconnectnodes={handleConnectNodes}
+								ondeleteedge={handleDeleteEdge}
 							/>
 						{/if}
 					</div>
