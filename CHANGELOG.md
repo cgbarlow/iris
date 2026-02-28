@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Browse mode entity panel shows models using entity, linked model navigation, and link to entity detail page
+- Relationships auto-created when entities are connected in model canvases
+- Improved entity tab ordering and relationships empty state message
 
 ### Fixed
 - Search now returns results for all entities and models; FTS index rebuilt on startup
