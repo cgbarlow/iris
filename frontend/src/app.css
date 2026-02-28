@@ -197,6 +197,12 @@ a {
 	fill: var(--color-muted);
 }
 
+/* Selected edge styling */
+.svelte-flow .svelte-flow__edge.selected path {
+	stroke-width: 3;
+	stroke: var(--color-primary);
+}
+
 /* ── Sequence diagram ── */
 .sequence-diagram {
 	position: relative;

@@ -18,6 +18,7 @@
 		oncreatenode?: () => void;
 		ondeletenode?: (nodeId: string) => void;
 		onconnectnodes?: (sourceId: string, targetId: string) => void;
+		ondeleteedge?: (edgeId: string) => void;
 	}
 
 	let {
@@ -26,17 +27,20 @@
 		oncreatenode,
 		ondeletenode,
 		onconnectnodes,
+		ondeleteedge,
 	}: Props = $props();
 
 	let announcer: CanvasAnnouncer | undefined = $state();
 	let keyboardHandler: KeyboardHandler | undefined = $state();
 
 	let selectedNodeId = $state<string | null>(null);
+	let selectedEdgeId = $state<string | null>(null);
 	let connectMode = $state(false);
 	let connectSourceId = $state<string | null>(null);
 
 	function handleNodeClick({ node }: { node: CanvasNode; event: MouseEvent | TouchEvent }) {
 		selectedNodeId = node.id;
+		selectedEdgeId = null;
 		announcer?.announce(`${node.data.label} selected, ${node.data.entityType}`);
 
 		if (connectMode && connectSourceId && connectSourceId !== node.id) {
@@ -44,8 +48,36 @@
 		}
 	}
 
+	function handleEdgeClick({ edge }: { edge: CanvasEdge; event: MouseEvent }) {
+		selectedEdgeId = edge.id;
+		selectedNodeId = null;
+		announcer?.announce(`Edge selected: ${edge.data?.label || edge.type || 'connection'}`);
+	}
+
+	function handleDeleteEdge(edgeId: string) {
+		if (ondeleteedge) {
+			ondeleteedge(edgeId);
+		} else {
+			edges = edges.filter((e) => e.id !== edgeId);
+		}
+		announcer?.announce('Edge deleted');
+		selectedEdgeId = null;
+	}
+
+	function handleReconnect(oldEdge: CanvasEdge, newConnection: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) {
+		edges = edges.map((e) =>
+			e.id === oldEdge.id
+				? { ...e, source: newConnection.source, target: newConnection.target, sourceHandle: newConnection.sourceHandle, targetHandle: newConnection.targetHandle }
+				: e,
+		);
+		announcer?.announce('Edge reconnected');
+	}
+
 	function handleSelect(nodeId: string | null) {
 		selectedNodeId = nodeId;
+		if (nodeId !== null) {
+			selectedEdgeId = null;
+		}
 	}
 
 	function handleMove(nodeId: string, dx: number, dy: number) {
@@ -135,7 +167,10 @@
 		edgeTypes={simpleViewEdgeTypes}
 		fitView
 		connectionMode="loose"
+		edgesReconnectable
 		onnodeclick={handleNodeClick}
+		onedgeclick={handleEdgeClick}
+		onreconnect={handleReconnect}
 		proOptions={{ hideAttribution: true }}
 		defaultEdgeOptions={{ type: 'uses' }}
 	>
@@ -146,6 +181,7 @@
 			{nodes}
 			{edges}
 			{selectedNodeId}
+			{selectedEdgeId}
 			{connectMode}
 			{connectSourceId}
 			onselect={handleSelect}
@@ -155,6 +191,7 @@
 			oncreate={handleCreate}
 			ontoggleconnect={handleToggleConnect}
 			onannounce={handleAnnounce}
+			ondeleteedge={handleDeleteEdge}
 		/>
 	</SvelteFlow>
 

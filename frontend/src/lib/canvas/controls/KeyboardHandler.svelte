@@ -12,6 +12,7 @@
 		selectedNodeId: string | null;
 		connectMode: boolean;
 		connectSourceId: string | null;
+		selectedEdgeId?: string | null;
 		onselect: (nodeId: string | null) => void;
 		onmove: (nodeId: string, dx: number, dy: number) => void;
 		ondelete: (nodeId: string) => void;
@@ -19,6 +20,7 @@
 		oncreate: () => void;
 		ontoggleconnect: () => void;
 		onannounce: (message: string) => void;
+		ondeleteedge?: (edgeId: string) => void;
 	}
 
 	let {
@@ -27,6 +29,7 @@
 		selectedNodeId,
 		connectMode,
 		connectSourceId,
+		selectedEdgeId,
 		onselect,
 		onmove,
 		ondelete,
@@ -34,6 +37,7 @@
 		oncreate,
 		ontoggleconnect,
 		onannounce,
+		ondeleteedge,
 	}: Props = $props();
 
 	const { fitView, zoomIn, zoomOut } = useSvelteFlow();
@@ -171,6 +175,9 @@
 			if (selectedNodeId && !ctrl) {
 				event.preventDefault();
 				ondelete(selectedNodeId);
+			} else if (selectedEdgeId && ondeleteedge && !ctrl) {
+				event.preventDefault();
+				ondeleteedge(selectedEdgeId);
 			}
 			return;
 		}
