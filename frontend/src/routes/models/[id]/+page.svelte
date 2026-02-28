@@ -223,18 +223,36 @@
 
 	// Canvas editing
 
-	function handleAddEntity(name: string, entityType: SimpleEntityType, description: string) {
-		const id = crypto.randomUUID();
-		const offset = canvasNodes.length * 40;
-		const newNode: CanvasNode = {
-			id,
-			type: entityType,
-			position: { x: 100 + offset, y: 100 + offset },
-			data: { label: name, entityType, description },
-		};
-		canvasNodes = [...canvasNodes, newNode];
-		canvasDirty = true;
-		showAddEntity = false;
+	async function handleAddEntity(name: string, entityType: SimpleEntityType, description: string) {
+		try {
+			const created = await apiFetch<Entity>('/api/entities', {
+				method: 'POST',
+				body: JSON.stringify({
+					entity_type: entityType,
+					name,
+					description,
+					data: {},
+				}),
+			});
+			const id = crypto.randomUUID();
+			const offset = canvasNodes.length * 40;
+			const newNode: CanvasNode = {
+				id,
+				type: entityType,
+				position: { x: 100 + offset, y: 100 + offset },
+				data: {
+					label: name,
+					entityType,
+					description,
+					entityId: created.id,
+				},
+			};
+			canvasNodes = [...canvasNodes, newNode];
+			canvasDirty = true;
+			showAddEntity = false;
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create entity';
+		}
 	}
 
 	function handleDeleteNode(nodeId: string) {
