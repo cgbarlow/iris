@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Canvas edges can be selected, deleted independently, and reconnected by dragging endpoints
 - Server-generated PNG thumbnails for model gallery cards with admin toggle between SVG and PNG modes
 - Browse mode entity panel shows models using entity, linked model navigation, and link to entity detail page
+- Relationships auto-created when entities are connected in model canvases
+- Improved entity tab ordering and relationships empty state message
 - ADR-019: Metadata and User Attribution Display
 - SPEC-019-A: Metadata Display
 - ADR-021: Admin Settings and Configurable Session Timeout

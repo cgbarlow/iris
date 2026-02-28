@@ -174,12 +174,12 @@
 		</button>
 		<button
 			role="tab"
-			aria-selected={activeTab === 'versions'}
-			onclick={() => (activeTab = 'versions')}
+			aria-selected={activeTab === 'models'}
+			onclick={() => (activeTab = 'models')}
 			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'versions' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'versions' ? 'var(--color-primary)' : 'transparent'}"
+			style="color: {activeTab === 'models' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'models' ? 'var(--color-primary)' : 'transparent'}"
 		>
-			Version History
+			Used In Models
 		</button>
 		<button
 			role="tab"
@@ -192,12 +192,12 @@
 		</button>
 		<button
 			role="tab"
-			aria-selected={activeTab === 'models'}
-			onclick={() => (activeTab = 'models')}
+			aria-selected={activeTab === 'versions'}
+			onclick={() => (activeTab = 'versions')}
 			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'models' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'models' ? 'var(--color-primary)' : 'transparent'}"
+			style="color: {activeTab === 'versions' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'versions' ? 'var(--color-primary)' : 'transparent'}"
 		>
-			Used In Models
+			Version History
 		</button>
 	</div>
 
@@ -228,40 +228,34 @@
 					<dd style="color: var(--color-fg)">{entity.description}</dd>
 				{/if}
 			</dl>
-		{:else if activeTab === 'versions'}
-			{#if versionsLoading}
-				<p style="color: var(--color-muted)">Loading versions...</p>
-			{:else if versions.length === 0}
-				<p style="color: var(--color-muted)">No version history available.</p>
+		{:else if activeTab === 'models'}
+			{#if modelsLoading}
+				<p style="color: var(--color-muted)">Loading models...</p>
+			{:else if usedInModels.length === 0}
+				<p style="color: var(--color-muted)">Not used in any models.</p>
 			{:else}
-				<table class="w-full text-sm">
-					<thead>
-						<tr style="border-bottom: 1px solid var(--color-border)">
-							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">User</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each versions as v}
-							<tr style="border-bottom: 1px solid var(--color-border)">
-								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.created_by_username ?? v.created_by}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<ul class="flex flex-col gap-2">
+					{#each usedInModels as model}
+						<li>
+							<a
+								href="/models/{model.model_id}"
+								class="flex items-center gap-3 rounded border block p-3"
+								style="border-color: var(--color-border); color: var(--color-primary)"
+							>
+								<span class="font-medium">{model.name}</span>
+								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+									{model.model_type}
+								</span>
+							</a>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		{:else if activeTab === 'relationships'}
 			{#if relationshipsLoading}
 				<p style="color: var(--color-muted)">Loading relationships...</p>
 			{:else if relationships.length === 0}
-				<p style="color: var(--color-muted)">No relationships found.</p>
+				<p style="color: var(--color-muted)">No relationships yet. Relationships are created automatically when entities are connected by edges in a model canvas.</p>
 			{:else}
 				<table class="w-full text-sm">
 					<thead>
@@ -292,28 +286,34 @@
 					</tbody>
 				</table>
 			{/if}
-		{:else if activeTab === 'models'}
-			{#if modelsLoading}
-				<p style="color: var(--color-muted)">Loading models...</p>
-			{:else if usedInModels.length === 0}
-				<p style="color: var(--color-muted)">Not used in any models.</p>
+		{:else if activeTab === 'versions'}
+			{#if versionsLoading}
+				<p style="color: var(--color-muted)">Loading versions...</p>
+			{:else if versions.length === 0}
+				<p style="color: var(--color-muted)">No version history available.</p>
 			{:else}
-				<ul class="flex flex-col gap-2">
-					{#each usedInModels as model}
-						<li>
-							<a
-								href="/models/{model.model_id}"
-								class="flex items-center gap-3 rounded border block p-3"
-								style="border-color: var(--color-border); color: var(--color-primary)"
-							>
-								<span class="font-medium">{model.name}</span>
-								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-									{model.model_type}
-								</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
+				<table class="w-full text-sm">
+					<thead>
+						<tr style="border-bottom: 1px solid var(--color-border)">
+							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">User</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each versions as v}
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.created_by_username ?? v.created_by}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			{/if}
 		{/if}
 	</div>

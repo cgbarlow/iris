@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.models_crud.thumbnail import generate_and_store_thumbnail
+from app.relationships.service import create_relationship
 from app.search.service import index_model as _index_model
 from app.search.service import remove_model_index as _remove_model_index
 
@@ -207,6 +208,50 @@ async def update_model(
     # Generate/update thumbnail
     if type_row:
         await generate_and_store_thumbnail(db, model_id, data, type_row[0])
+
+    # Auto-create entity relationships from canvas edges
+    try:
+        nodes_list = data.get("nodes", []) if isinstance(data, dict) else []
+        edges_list = data.get("edges", []) if isinstance(data, dict) else []
+
+        # Build node_id -> entityId mapping
+        node_entity_map: dict[str, str] = {}
+        for node in nodes_list:
+            if isinstance(node, dict) and isinstance(node.get("data"), dict):
+                entity_id = node["data"].get("entityId")
+                if entity_id:
+                    node_entity_map[node["id"]] = entity_id
+
+        # For each edge where both source and target have entityIds, create relationship
+        for edge in edges_list:
+            if not isinstance(edge, dict):
+                continue
+            source_entity = node_entity_map.get(edge.get("source", ""))
+            target_entity = node_entity_map.get(edge.get("target", ""))
+            if source_entity and target_entity and source_entity != target_entity:
+                # Check if relationship already exists
+                cursor = await db.execute(
+                    "SELECT id FROM relationships "
+                    "WHERE source_entity_id = ? AND target_entity_id = ? AND is_deleted = 0",
+                    (source_entity, target_entity),
+                )
+                existing = await cursor.fetchone()
+                if not existing:
+                    rel_type = "uses"
+                    if isinstance(edge.get("data"), dict):
+                        rel_type = edge["data"].get("relationshipType", "uses")
+                    await create_relationship(
+                        db,
+                        source_entity_id=source_entity,
+                        target_entity_id=target_entity,
+                        relationship_type=rel_type,
+                        label=None,
+                        description=None,
+                        data={},
+                        created_by=updated_by,
+                    )
+    except Exception:
+        pass  # Don't fail model save if relationship auto-creation fails
 
     return {"current_version": new_version, "updated_at": now}
 
