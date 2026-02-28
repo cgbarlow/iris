@@ -263,6 +263,18 @@ async def rollback_entity(
     )
     await db.commit()
 
+    # Re-index for search after rollback
+    type_cursor = await db.execute(
+        "SELECT entity_type FROM entities WHERE id = ?", (entity_id,),
+    )
+    type_row = await type_cursor.fetchone()
+    if type_row:
+        await _index_entity(
+            db, entity_id=entity_id, name=target_row[0],
+            entity_type=type_row[0], description=target_row[1],
+        )
+        await db.commit()
+
     return {
         "id": entity_id,
         "current_version": new_version,
