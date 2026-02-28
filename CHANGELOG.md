@@ -5,6 +5,19 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-02-28
+
+### Added
+- Focus view for all canvas types (fullscreen overlay, Escape to exit)
+- Sequence diagram zoom/pan/fit-to-view via SVG viewBox manipulation
+- Sequence diagram edit mode (Add Participant, Add Message, Delete Selected, Save/Discard)
+- Sequence diagram zoom toolbar (bottom-left, matching SvelteFlow Controls style)
+- ADR-014: Canvas UX Parity
+- SPEC-014-A: Canvas UX Parity Implementation
+
+### Fixed
+- Duplicate zoom controls — removed top-right CanvasToolbar, keeping bottom-left SvelteFlow Controls
+
 ## [1.3.1] - 2026-02-28
 
 ### Added

@@ -74,9 +74,11 @@ Four colour modes with WCAG-compliant contrast ratios:
 
 - **Edit Mode** — Full canvas editing with drag, connect, create, delete
 - **Browse Mode** — Read-only canvas for viewers and reviewers, click node to show entity detail panel
+- **Focus View** — Fullscreen overlay for distraction-free canvas work (all model types), Escape to exit
 - **Relationship Dialog** — When connecting two entities, a dialog prompts for relationship type and optional label
 - **Link Existing Entity** — Add entities from the repository to the canvas via searchable picker dialog
 - **Model Type Routing** — Model type determines which canvas renders: Simple View, UML, ArchiMate, or Sequence Diagram
+- **Sequence Editing** — Add/remove participants and messages, zoom/pan/fit-to-view via SVG viewBox
 
 ### Dashboard
 

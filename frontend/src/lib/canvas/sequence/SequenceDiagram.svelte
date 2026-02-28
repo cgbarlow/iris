@@ -10,9 +10,23 @@
 		data: SequenceDiagramData;
 		selectedMessageId?: string | null;
 		onmessageselect?: (messageId: string) => void;
+		viewBox?: string | null;
+		onwheel?: (e: WheelEvent) => void;
+		onpointerdown?: (e: PointerEvent) => void;
+		onpointermove?: (e: PointerEvent) => void;
+		onpointerup?: (e: PointerEvent) => void;
 	}
 
-	let { data, selectedMessageId = null, onmessageselect }: Props = $props();
+	let {
+		data,
+		selectedMessageId = null,
+		onmessageselect,
+		viewBox = null,
+		onwheel,
+		onpointerdown,
+		onpointermove,
+		onpointerup,
+	}: Props = $props();
 
 	/** Calculate the X center of a participant. */
 	function participantX(index: number): number {
@@ -82,11 +96,17 @@
 	aria-roledescription="sequence diagram"
 	onkeydown={handleKeydown}
 >
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<svg
-		width={diagramWidth}
-		height={diagramHeight}
-		viewBox="0 0 {diagramWidth} {diagramHeight}"
+		viewBox={viewBox ?? `0 0 ${diagramWidth} ${diagramHeight}`}
+		preserveAspectRatio="xMidYMid meet"
 		xmlns="http://www.w3.org/2000/svg"
+		role="img"
+		aria-label="Sequence diagram"
+		onwheel={onwheel}
+		onpointerdown={onpointerdown}
+		onpointermove={onpointermove}
+		onpointerup={onpointerup}
 	>
 		<!-- Lifelines -->
 		{#each data.participants as participant, i}
