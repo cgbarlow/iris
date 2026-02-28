@@ -37,10 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPEC-027-A: Edge Operations
 - ADR-028: Canvas Undo/Redo
 - SPEC-028-A: Canvas Undo/Redo Implementation
+- ADR-030: Model Canvas Toolbar Layout
+- SPEC-030-A: Toolbar Layout Implementation
 
 ### Changed
 - Creating a new model now navigates directly to the model detail page
 - Entities created within the model editor are now persisted as first-class entities
+- Canvas toolbar buttons reorganized into logical groups: Create, Edit, Persist, View
 
 ### Fixed
 - Search now returns results for all entities and models; FTS index rebuilt on startup

@@ -567,49 +567,58 @@
 		{:else if activeTab === 'canvas'}
 			{#if canvasType === 'sequence'}
 				<!-- Sequence diagram toolbar -->
-				<div class="mb-3 flex items-center gap-2">
+				<div class="mb-3 flex items-center gap-4">
 					{#if editing}
-						<button
-							onclick={() => (showAddParticipant = true)}
-							class="rounded px-3 py-1.5 text-sm text-white"
-							style="background-color: var(--color-primary)"
-						>
-							Add Participant
-						</button>
-						<button
-							onclick={() => (showAddMessage = true)}
-							disabled={sequenceData.participants.length < 2}
-							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
-							style="background-color: var(--color-primary)"
-						>
-							Add Message
-						</button>
-						<button
-							onclick={handleDeleteSelected}
-							disabled={!selectedMessageId}
-							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
-							style="border: 1px solid var(--color-danger); color: var(--color-danger)"
-						>
-							Delete Selected
-						</button>
-						<button
-							onclick={saveSequence}
-							disabled={saving || !canvasDirty}
-							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
-							style="background-color: var(--color-success, #16a34a)"
-						>
-							{saving ? 'Saving...' : 'Save'}
-						</button>
-						<button
-							onclick={discardChanges}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Discard
-						</button>
-						{#if canvasDirty}
-							<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
-						{/if}
+						<!-- Create group -->
+						<div class="flex items-center gap-2">
+							<button
+								onclick={() => (showAddParticipant = true)}
+								class="rounded px-3 py-1.5 text-sm text-white"
+								style="background-color: var(--color-primary)"
+							>
+								Add Participant
+							</button>
+							<button
+								onclick={() => (showAddMessage = true)}
+								disabled={sequenceData.participants.length < 2}
+								class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+								style="background-color: var(--color-primary)"
+							>
+								Add Message
+							</button>
+						</div>
+						<!-- Edit group -->
+						<div class="flex items-center gap-2">
+							<button
+								onclick={handleDeleteSelected}
+								disabled={!selectedMessageId}
+								class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+								style="border: 1px solid var(--color-danger); color: var(--color-danger)"
+							>
+								Delete Selected
+							</button>
+						</div>
+						<!-- Persist group -->
+						<div class="flex items-center gap-2">
+							<button
+								onclick={saveSequence}
+								disabled={saving || !canvasDirty}
+								class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+								style="background-color: var(--color-success, #16a34a)"
+							>
+								{saving ? 'Saving...' : 'Save'}
+							</button>
+							<button
+								onclick={discardChanges}
+								class="rounded px-3 py-1.5 text-sm"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							>
+								Discard
+							</button>
+							{#if canvasDirty}
+								<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
+							{/if}
+						</div>
 					{:else}
 						<button
 							onclick={() => (editing = true)}
@@ -619,13 +628,16 @@
 							Edit Canvas
 						</button>
 					{/if}
-					<button
-						onclick={() => (focusMode = true)}
-						class="rounded px-3 py-1.5 text-sm"
-						style="border: 1px solid var(--color-border); color: var(--color-fg)"
-					>
-						Focus
-					</button>
+					<!-- View group (always visible) -->
+					<div class="ml-auto">
+						<button
+							onclick={() => (focusMode = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Focus
+						</button>
+					</div>
 				</div>
 
 				<!-- Sequence diagram rendering -->
@@ -682,68 +694,77 @@
 				{/if}
 			{:else}
 				<!-- Canvas toolbar -->
-				<div class="mb-3 flex items-center gap-2">
+				<div class="mb-3 flex items-center gap-4">
 					{#if editing}
-						<button
-							onclick={() => (showAddEntity = true)}
-							class="rounded px-3 py-1.5 text-sm text-white"
-							style="background-color: var(--color-primary)"
-						>
-							Add Entity
-						</button>
-						<button
-							onclick={() => (showEntityPicker = true)}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Link Entity
-						</button>
-						<button
-							onclick={() => selectedEdgeId && handleDeleteEdge(selectedEdgeId)}
-							disabled={!selectedEdgeId}
-							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
-							style="border: 1px solid var(--color-danger); color: var(--color-danger)"
-						>
-							Delete Edge
-						</button>
-						<button
-							onclick={handleUndo}
-							disabled={!history.canUndo}
-							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-							aria-label="Undo"
-							title="Undo (Ctrl+Z)"
-						>
-							Undo
-						</button>
-						<button
-							onclick={handleRedo}
-							disabled={!history.canRedo}
-							class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-							aria-label="Redo"
-							title="Redo (Ctrl+Y)"
-						>
-							Redo
-						</button>
-						<button
-							onclick={saveCanvas}
-							disabled={saving || !canvasDirty}
-							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
-							style="background-color: var(--color-success, #16a34a)"
-						>
-							{saving ? 'Saving...' : 'Save'}
-						</button>
-						<button
-							onclick={discardChanges}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Discard
-						</button>
-						{#if canvasDirty}
-							<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
-						{/if}
+						<!-- Create group -->
+						<div class="flex items-center gap-2">
+							<button
+								onclick={() => (showAddEntity = true)}
+								class="rounded px-3 py-1.5 text-sm text-white"
+								style="background-color: var(--color-primary)"
+							>
+								Add Entity
+							</button>
+							<button
+								onclick={() => (showEntityPicker = true)}
+								class="rounded px-3 py-1.5 text-sm"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							>
+								Link Entity
+							</button>
+						</div>
+						<!-- Edit group -->
+						<div class="flex items-center gap-2">
+							<button
+								onclick={() => selectedEdgeId && handleDeleteEdge(selectedEdgeId)}
+								disabled={!selectedEdgeId}
+								class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+								style="border: 1px solid var(--color-danger); color: var(--color-danger)"
+							>
+								Delete Edge
+							</button>
+							<button
+								onclick={handleUndo}
+								disabled={!history.canUndo}
+								class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								aria-label="Undo"
+								title="Undo (Ctrl+Z)"
+							>
+								Undo
+							</button>
+							<button
+								onclick={handleRedo}
+								disabled={!history.canRedo}
+								class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								aria-label="Redo"
+								title="Redo (Ctrl+Y)"
+							>
+								Redo
+							</button>
+						</div>
+						<!-- Persist group -->
+						<div class="flex items-center gap-2">
+							<button
+								onclick={saveCanvas}
+								disabled={saving || !canvasDirty}
+								class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+								style="background-color: var(--color-success, #16a34a)"
+							>
+								{saving ? 'Saving...' : 'Save'}
+							</button>
+							<button
+								onclick={discardChanges}
+								class="rounded px-3 py-1.5 text-sm"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							>
+								Discard
+							</button>
+							{#if canvasDirty}
+								<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
+							{/if}
+						</div>
 					{:else}
 						<button
 							onclick={() => (editing = true)}
@@ -753,13 +774,16 @@
 							Edit Canvas
 						</button>
 					{/if}
-					<button
-						onclick={() => (focusMode = true)}
-						class="rounded px-3 py-1.5 text-sm"
-						style="border: 1px solid var(--color-border); color: var(--color-fg)"
-					>
-						Focus
-					</button>
+					<!-- View group (always visible) -->
+					<div class="ml-auto">
+						<button
+							onclick={() => (focusMode = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Focus
+						</button>
+					</div>
 				</div>
 
 				<!-- Canvas area -->
