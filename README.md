@@ -216,21 +216,6 @@ npm run test:all-e2e
 | Linting | Ruff | 0.9.x |
 | Type Checking | mypy (strict) | 1.x |
 
-## Versioning
-
-| Version | Phase | Description |
-|---------|-------|-------------|
-| v0.1.0 | A | Data Foundation — database schema, migrations, audit service |
-| v0.2.0 | B | Core API — auth, CRUD, rate limiting, audit middleware |
-| v0.3.0 | C | Search & Collaboration — comments, bookmarks, full-text search |
-| v0.4.0 | D | Frontend Foundation — auth flow, app shell, theming, routing, a11y |
-| v0.5.0 | E | Canvas — Simple View, UML, ArchiMate, sequence diagrams, keyboard a11y |
-| v0.6.0 | F | Browse Mode — read-only canvas, entity detail views, search UI |
-| v1.0.0 | G | Polish — WCAG audit, NZ ITSM verification, performance testing |
-| v1.1.0 | H | Remediation — audit API, entity statistics, dashboard, admin pages, documentation corrections, E2E tests |
-| v1.2.0 | I | Canvas Completion — Full View canvas, sequence integration, bug fixes, BDD test suite, frontend feature gaps |
-| v1.3.0 | J | Gallery View — models page gallery/card view with card resize slider and localStorage persistence |
-
 ## License
 
 All rights reserved.

@@ -32,7 +32,7 @@ export default defineConfig({
 		{
 			command: 'bash scripts/start-test-backend.sh',
 			port: 8000,
-			reuseExistingServer: false,
+			reuseExistingServer: true,
 			timeout: 15_000,
 		},
 		{
