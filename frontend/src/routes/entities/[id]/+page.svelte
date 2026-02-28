@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { apiFetch } from '$lib/utils/api';
+	import { goto } from '$app/navigation';
+	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type {
 		Entity,
 		EntityVersion,
@@ -8,7 +9,10 @@
 		RelationshipListResponse,
 		EntityModelRef,
 	} from '$lib/types/api';
-	import { ApiError } from '$lib/utils/api';
+	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import type { SimpleEntityType } from '$lib/types/canvas';
+	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 
 	let entity = $state<Entity | null>(null);
 	let versions = $state<EntityVersion[]>([]);
@@ -17,6 +21,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'details' | 'versions' | 'relationships' | 'models'>('details');
+	let showEditDialog = $state(false);
+	let showDeleteDialog = $state(false);
 
 	// Loading states per tab
 	let versionsLoading = $state(false);
@@ -77,6 +83,40 @@
 		}
 		modelsLoading = false;
 	}
+
+	async function handleEdit(name: string, type: SimpleEntityType, description: string) {
+		if (!entity) return;
+		try {
+			await apiFetch(`/api/entities/${entity.id}`, {
+				method: 'PUT',
+				headers: { 'If-Match': String(entity.current_version) },
+				body: JSON.stringify({
+					name,
+					entity_type: type,
+					description,
+					change_summary: 'Updated entity details',
+				}),
+			});
+			showEditDialog = false;
+			await loadEntity(entity.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to update entity';
+		}
+	}
+
+	async function handleDelete() {
+		if (!entity) return;
+		try {
+			await apiFetch(`/api/entities/${entity.id}`, {
+				method: 'DELETE',
+				headers: { 'If-Match': String(entity.current_version) },
+			});
+			showDeleteDialog = false;
+			await goto('/entities');
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to delete entity';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -98,8 +138,28 @@
 		{error}
 	</div>
 {:else if entity}
-	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{entity.name}</h1>
-	<p class="mt-1 text-sm" style="color: var(--color-muted)">{entity.entity_type}</p>
+	<div class="flex items-center justify-between">
+		<div>
+			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{entity.name}</h1>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">{entity.entity_type}</p>
+		</div>
+		<div class="flex gap-2">
+			<button
+				onclick={() => (showEditDialog = true)}
+				class="rounded px-4 py-2 text-sm"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			>
+				Edit
+			</button>
+			<button
+				onclick={() => (showDeleteDialog = true)}
+				class="rounded px-4 py-2 text-sm text-white"
+				style="background-color: var(--color-danger)"
+			>
+				Delete
+			</button>
+		</div>
+	</div>
 
 	<!-- Tab navigation -->
 	<div class="mt-6 flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Entity sections">
@@ -249,4 +309,28 @@
 			{/if}
 		{/if}
 	</div>
+
+	<!-- Comments section -->
+	<section class="mt-8">
+		<CommentsPanel targetType="entity" targetId={entity.id} />
+	</section>
+
+	<EntityDialog
+		open={showEditDialog}
+		mode="edit"
+		initialName={entity.name}
+		initialType={entity.entity_type as SimpleEntityType}
+		initialDescription={entity.description ?? ''}
+		onsave={handleEdit}
+		oncancel={() => (showEditDialog = false)}
+	/>
+
+	<ConfirmDialog
+		open={showDeleteDialog}
+		title="Delete Entity"
+		message="Are you sure you want to delete '{entity.name}'? This action cannot be undone."
+		confirmLabel="Delete"
+		onconfirm={handleDelete}
+		oncancel={() => (showDeleteDialog = false)}
+	/>
 {/if}

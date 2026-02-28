@@ -23,11 +23,17 @@
 	}: Props = $props();
 
 	let name = $state('');
-	let modelType = $state('component');
+	let modelType = $state('');
 	let description = $state('');
 	let dialogEl: HTMLDialogElement | undefined = $state();
 
-	const MODEL_TYPE_SUGGESTIONS = ['simple', 'component', 'sequence', 'uml', 'archimate'];
+	const MODEL_TYPES = [
+		{ value: 'simple', label: 'Simple' },
+		{ value: 'component', label: 'Component' },
+		{ value: 'sequence', label: 'Sequence' },
+		{ value: 'uml', label: 'UML' },
+		{ value: 'archimate', label: 'ArchiMate' },
+	];
 
 	$effect(() => {
 		if (open && dialogEl && !dialogEl.open) {
@@ -85,20 +91,18 @@
 			<div>
 				<label for="model-type" class="block text-sm font-medium">Model Type</label>
 				{#if mode === 'create'}
-					<input
+					<select
 						id="model-type"
 						bind:value={modelType}
 						required
-						autocomplete="off"
-						list="model-type-suggestions"
 						class="mt-1 w-full rounded border px-3 py-2 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-					/>
-					<datalist id="model-type-suggestions">
-						{#each MODEL_TYPE_SUGGESTIONS as suggestion}
-							<option value={suggestion}></option>
+					>
+						<option value="" disabled>Select a type…</option>
+						{#each MODEL_TYPES as t}
+							<option value={t.value}>{t.label}</option>
 						{/each}
-					</datalist>
+					</select>
 				{:else}
 					<input
 						id="model-type"

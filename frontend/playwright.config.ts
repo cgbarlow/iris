@@ -1,7 +1,13 @@
 import { defineConfig } from '@playwright/test';
+import { defineBddConfig } from 'playwright-bdd';
+
+const bddTestDir = defineBddConfig({
+	features: 'tests/bdd/features/**/*.feature',
+	steps: ['tests/bdd/steps/**/*.ts'],
+	outputDir: '.features-gen',
+});
 
 export default defineConfig({
-	testDir: 'tests/e2e',
 	timeout: 30_000,
 	retries: 1,
 	workers: 1,
@@ -11,7 +17,16 @@ export default defineConfig({
 		trace: 'on-first-retry',
 	},
 	projects: [
-		{ name: 'chromium', use: { browserName: 'chromium' } },
+		{
+			name: 'e2e',
+			testDir: 'tests/e2e',
+			use: { browserName: 'chromium' },
+		},
+		{
+			name: 'bdd',
+			testDir: bddTestDir,
+			use: { browserName: 'chromium' },
+		},
 	],
 	webServer: [
 		{

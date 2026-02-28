@@ -41,6 +41,7 @@ node_modules/
 build/
 .vercel/
 .output/
+.features-gen/
 
 # uv
 .uv/

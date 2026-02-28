@@ -2,13 +2,31 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
-	import type { Model, ModelVersion } from '$lib/types/api';
+	import type { Model, ModelVersion, Bookmark } from '$lib/types/api';
 	import BrowseCanvas from '$lib/canvas/BrowseCanvas.svelte';
 	import ModelCanvas from '$lib/canvas/ModelCanvas.svelte';
+	import FullViewCanvas from '$lib/canvas/FullViewCanvas.svelte';
+	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
+	import type { SequenceDiagramData } from '$lib/canvas/sequence/types';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { isEditMode } from '$lib/stores/canvasMode.svelte';
+	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
+	import RelationshipDialog from '$lib/canvas/controls/RelationshipDialog.svelte';
+	import EntityDetailPanel from '$lib/canvas/controls/EntityDetailPanel.svelte';
+	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
+	import EntityPicker from '$lib/components/EntityPicker.svelte';
+	import type { Entity } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
+	import type { SimpleEntityType, SimpleRelationshipType } from '$lib/types/canvas';
+	import {
+		SIMPLE_ENTITY_TYPES,
+		UML_ENTITY_TYPES,
+		ARCHIMATE_ENTITY_TYPES,
+		SIMPLE_RELATIONSHIP_TYPES,
+		UML_RELATIONSHIP_TYPES,
+		ARCHIMATE_RELATIONSHIP_TYPES,
+	} from '$lib/types/canvas';
+	import type { UmlEntityType, ArchimateEntityType } from '$lib/types/canvas';
 
 	let model = $state<Model | null>(null);
 	let versions = $state<ModelVersion[]>([]);
@@ -20,13 +38,71 @@
 	let showEditDialog = $state(false);
 	let showDeleteDialog = $state(false);
 
-	// Canvas data parsed from model.data
+	// Bookmark state
+	let isBookmarked = $state(false);
+	let bookmarkLoading = $state(false);
+
+	// Canvas state
 	let canvasNodes = $state<CanvasNode[]>([]);
 	let canvasEdges = $state<CanvasEdge[]>([]);
+	let editing = $state(false);
+	let showAddEntity = $state(false);
+	let canvasDirty = $state(false);
+	let saving = $state(false);
+
+	// RelationshipDialog state
+	let showRelationshipDialog = $state(false);
+	let pendingConnection = $state<{ sourceId: string; targetId: string } | null>(null);
+
+	// Browse mode entity detail panel state
+	let selectedBrowseNode = $state<CanvasNode | null>(null);
+
+	// Sequence diagram state
+	let sequenceData = $state<SequenceDiagramData>({
+		participants: [],
+		messages: [],
+		activations: [],
+	});
+	let selectedMessageId = $state<string | null>(null);
+
+	// Entity picker state (link existing entity)
+	let showEntityPicker = $state(false);
+
+	// Version rollback state
+	let rollbackVersion = $state<number | null>(null);
+	let showRollbackDialog = $state(false);
+	let rollbackLoading = $state(false);
 
 	$effect(() => {
 		const id = page.params.id;
 		if (id) loadModel(id);
+	});
+
+	/** Determine which canvas component to render based on model type. */
+	const canvasType = $derived.by(() => {
+		if (!model) return 'simple';
+		const mt = model.model_type;
+		if (mt === 'sequence') return 'sequence';
+		if (mt === 'uml') return 'uml';
+		if (mt === 'archimate') return 'archimate';
+		return 'simple'; // 'simple' and 'component' both use simple view
+	});
+
+	/** Get the Full View type for FullViewCanvas. */
+	const fullViewType = $derived(canvasType === 'uml' ? 'uml' : 'archimate') as 'uml' | 'archimate';
+
+	/** Source node name for RelationshipDialog display. */
+	const pendingSourceName = $derived.by(() => {
+		const pc = pendingConnection;
+		if (!pc) return '';
+		return canvasNodes.find((n) => n.id === pc.sourceId)?.data.label ?? 'Source';
+	});
+
+	/** Target node name for RelationshipDialog display. */
+	const pendingTargetName = $derived.by(() => {
+		const pc = pendingConnection;
+		if (!pc) return '';
+		return canvasNodes.find((n) => n.id === pc.targetId)?.data.label ?? 'Target';
 	});
 
 	async function loadModel(id: string) {
@@ -36,6 +112,7 @@
 			model = await apiFetch<Model>(`/api/models/${id}`);
 			parseCanvasData();
 			loadVersions(id);
+			loadBookmarkStatus(id);
 		} catch (e) {
 			error = e instanceof ApiError && e.status === 404
 				? 'Model not found'
@@ -48,11 +125,22 @@
 		if (!model?.data) {
 			canvasNodes = [];
 			canvasEdges = [];
+			sequenceData = { participants: [], messages: [], activations: [] };
 			return;
 		}
 		const data = model.data as Record<string, unknown>;
-		canvasNodes = (Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[];
-		canvasEdges = (Array.isArray(data.edges) ? data.edges : []) as CanvasEdge[];
+
+		if (model.model_type === 'sequence') {
+			sequenceData = {
+				participants: Array.isArray(data.participants) ? data.participants : [],
+				messages: Array.isArray(data.messages) ? data.messages : [],
+				activations: Array.isArray(data.activations) ? data.activations : [],
+			} as SequenceDiagramData;
+		} else {
+			canvasNodes = (Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[];
+			canvasEdges = (Array.isArray(data.edges) ? data.edges : []) as CanvasEdge[];
+		}
+		canvasDirty = false;
 	}
 
 	async function loadVersions(id: string) {
@@ -63,6 +151,35 @@
 			versions = [];
 		}
 		versionsLoading = false;
+	}
+
+	async function loadBookmarkStatus(id: string) {
+		try {
+			const bookmarks = await apiFetch<Bookmark[]>('/api/bookmarks');
+			isBookmarked = bookmarks.some((b) => b.model_id === id);
+		} catch {
+			isBookmarked = false;
+		}
+	}
+
+	async function toggleBookmark() {
+		if (!model || bookmarkLoading) return;
+		bookmarkLoading = true;
+		try {
+			if (isBookmarked) {
+				await apiFetch(`/api/bookmarks/${model.id}`, { method: 'DELETE' });
+				isBookmarked = false;
+			} else {
+				await apiFetch('/api/bookmarks', {
+					method: 'POST',
+					body: JSON.stringify({ model_id: model.id }),
+				});
+				isBookmarked = true;
+			}
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to update bookmark';
+		}
+		bookmarkLoading = false;
 	}
 
 	async function handleEdit(name: string, _modelType: string, description: string) {
@@ -98,6 +215,125 @@
 			error = e instanceof ApiError ? e.message : 'Failed to delete model';
 		}
 	}
+
+	// Canvas editing
+
+	function handleAddEntity(name: string, entityType: SimpleEntityType, description: string) {
+		const id = crypto.randomUUID();
+		const offset = canvasNodes.length * 40;
+		const newNode: CanvasNode = {
+			id,
+			type: entityType,
+			position: { x: 100 + offset, y: 100 + offset },
+			data: { label: name, entityType, description },
+		};
+		canvasNodes = [...canvasNodes, newNode];
+		canvasDirty = true;
+		showAddEntity = false;
+	}
+
+	function handleDeleteNode(nodeId: string) {
+		canvasNodes = canvasNodes.filter((n) => n.id !== nodeId);
+		canvasEdges = canvasEdges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+		canvasDirty = true;
+	}
+
+	function handleConnectNodes(sourceId: string, targetId: string) {
+		pendingConnection = { sourceId, targetId };
+		showRelationshipDialog = true;
+	}
+
+	function handleRelationshipSave(type: SimpleRelationshipType, label: string) {
+		if (!pendingConnection) return;
+		const { sourceId, targetId } = pendingConnection;
+		const newEdge: CanvasEdge = {
+			id: `e-${sourceId}-${targetId}`,
+			source: sourceId,
+			target: targetId,
+			type,
+			data: { relationshipType: type, label: label || undefined },
+		};
+		canvasEdges = [...canvasEdges, newEdge];
+		canvasDirty = true;
+		showRelationshipDialog = false;
+		pendingConnection = null;
+	}
+
+	function handleRelationshipCancel() {
+		showRelationshipDialog = false;
+		pendingConnection = null;
+	}
+
+	function handleBrowseNodeSelect(nodeId: string) {
+		selectedBrowseNode = canvasNodes.find((n) => n.id === nodeId) ?? null;
+	}
+
+	async function saveCanvas() {
+		if (!model) return;
+		saving = true;
+		error = null;
+		try {
+			await apiFetch(`/api/models/${model.id}`, {
+				method: 'PUT',
+				headers: { 'If-Match': String(model.current_version) },
+				body: JSON.stringify({
+					name: model.name,
+					description: model.description ?? '',
+					data: { nodes: canvasNodes, edges: canvasEdges },
+					change_summary: 'Updated model diagram',
+				}),
+			});
+			canvasDirty = false;
+			await loadModel(model.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to save canvas';
+		}
+		saving = false;
+	}
+
+	function handleLinkEntity(entity: Entity) {
+		const id = crypto.randomUUID();
+		const offset = canvasNodes.length * 40;
+		const entityType = entity.entity_type as SimpleEntityType;
+		const newNode: CanvasNode = {
+			id,
+			type: entityType,
+			position: { x: 100 + offset, y: 100 + offset },
+			data: {
+				label: entity.name,
+				entityType,
+				description: entity.description ?? '',
+				entityId: entity.id,
+			},
+		};
+		canvasNodes = [...canvasNodes, newNode];
+		canvasDirty = true;
+		showEntityPicker = false;
+	}
+
+	async function handleRollback() {
+		if (!model || rollbackVersion === null) return;
+		rollbackLoading = true;
+		error = null;
+		try {
+			await apiFetch(`/api/models/${model.id}/rollback`, {
+				method: 'POST',
+				headers: { 'If-Match': String(model.current_version) },
+				body: JSON.stringify({ version: rollbackVersion }),
+			});
+			showRollbackDialog = false;
+			rollbackVersion = null;
+			await loadModel(model.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to rollback';
+		}
+		rollbackLoading = false;
+	}
+
+	function discardChanges() {
+		parseCanvasData();
+		editing = false;
+	}
 </script>
 
 <svelte:head>
@@ -125,6 +361,14 @@
 			<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
 		</div>
 		<div class="flex gap-2">
+			<button
+				onclick={toggleBookmark}
+				disabled={bookmarkLoading}
+				class="rounded px-4 py-2 text-sm"
+				style="border: 1px solid {isBookmarked ? 'var(--color-primary)' : 'var(--color-border)'}; color: {isBookmarked ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {isBookmarked ? 'var(--color-surface, transparent)' : 'transparent'}"
+			>
+				{isBookmarked ? 'Bookmarked' : 'Bookmark'}
+			</button>
 			<button
 				onclick={() => (showEditDialog = true)}
 				class="rounded px-4 py-2 text-sm"
@@ -194,18 +438,120 @@
 				{/if}
 			</dl>
 		{:else if activeTab === 'canvas'}
-			{#if canvasNodes.length === 0}
-				<div class="flex items-center justify-center rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
-					<p style="color: var(--color-muted)">No diagram data available for this model.</p>
-				</div>
-			{:else}
-				<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-					{#if isEditMode()}
-						<ModelCanvas nodes={canvasNodes} edges={canvasEdges} />
+			{#if canvasType === 'sequence'}
+				<!-- Sequence diagram rendering -->
+				<div style="border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto; padding: 1rem; min-height: 300px">
+					{#if sequenceData.participants.length === 0}
+						<div class="flex flex-col items-center justify-center gap-3" style="min-height: 250px">
+							<p style="color: var(--color-muted)">This sequence diagram has no participants yet.</p>
+						</div>
 					{:else}
-						<BrowseCanvas nodes={canvasNodes} edges={canvasEdges} />
+						<SequenceDiagram
+							data={sequenceData}
+							{selectedMessageId}
+							onmessageselect={(id) => (selectedMessageId = id)}
+						/>
 					{/if}
 				</div>
+			{:else}
+				<!-- Canvas toolbar -->
+				<div class="mb-3 flex items-center gap-2">
+					{#if editing}
+						<button
+							onclick={() => (showAddEntity = true)}
+							class="rounded px-3 py-1.5 text-sm text-white"
+							style="background-color: var(--color-primary)"
+						>
+							Add Entity
+						</button>
+						<button
+							onclick={() => (showEntityPicker = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Link Entity
+						</button>
+						<button
+							onclick={saveCanvas}
+							disabled={saving || !canvasDirty}
+							class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+							style="background-color: var(--color-success, #16a34a)"
+						>
+							{saving ? 'Saving...' : 'Save'}
+						</button>
+						<button
+							onclick={discardChanges}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Discard
+						</button>
+						{#if canvasDirty}
+							<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
+						{/if}
+					{:else}
+						<button
+							onclick={() => (editing = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="background-color: var(--color-primary); color: white"
+						>
+							Edit Canvas
+						</button>
+					{/if}
+				</div>
+
+				<!-- Canvas area -->
+				{#if editing}
+					<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+						{#if canvasType === 'uml' || canvasType === 'archimate'}
+							<FullViewCanvas
+								viewType={fullViewType}
+								bind:nodes={canvasNodes}
+								bind:edges={canvasEdges}
+								oncreatenode={() => (showAddEntity = true)}
+								ondeletenode={handleDeleteNode}
+								onconnectnodes={handleConnectNodes}
+							/>
+						{:else}
+							<ModelCanvas
+								bind:nodes={canvasNodes}
+								bind:edges={canvasEdges}
+								oncreatenode={() => (showAddEntity = true)}
+								ondeletenode={handleDeleteNode}
+								onconnectnodes={handleConnectNodes}
+							/>
+						{/if}
+					</div>
+				{:else if canvasNodes.length === 0}
+					<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
+						<p style="color: var(--color-muted)">This model has no diagram yet.</p>
+						<button
+							onclick={() => (editing = true)}
+							class="rounded px-4 py-2 text-sm text-white"
+							style="background-color: var(--color-primary)"
+						>
+							Start Building
+						</button>
+					</div>
+				{:else}
+					<div class="flex gap-4">
+						<div class="flex-1" style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+							<BrowseCanvas
+								nodes={canvasNodes}
+								edges={canvasEdges}
+								onnodeselect={handleBrowseNodeSelect}
+							/>
+						</div>
+						{#if selectedBrowseNode}
+							<div style="width: 300px">
+								<EntityDetailPanel
+									entity={selectedBrowseNode.data}
+									onclose={() => (selectedBrowseNode = null)}
+								/>
+							</div>
+						{/if}
+					</div>
+				{/if}
 			{/if}
 		{:else if activeTab === 'versions'}
 			{#if versionsLoading}
@@ -220,6 +566,7 @@
 							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -229,6 +576,17 @@
 								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
+								<td class="py-2">
+									{#if v.version !== model.current_version}
+										<button
+											onclick={() => { rollbackVersion = v.version; showRollbackDialog = true; }}
+											class="rounded px-2 py-1 text-xs"
+											style="border: 1px solid var(--color-border); color: var(--color-fg)"
+										>
+											Rollback
+										</button>
+									{/if}
+								</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -236,6 +594,11 @@
 			{/if}
 		{/if}
 	</div>
+
+	<!-- Comments section -->
+	<section class="mt-8">
+		<CommentsPanel targetType="model" targetId={model.id} />
+	</section>
 
 	<ModelDialog
 		open={showEditDialog}
@@ -254,5 +617,35 @@
 		confirmLabel="Delete"
 		onconfirm={handleDelete}
 		oncancel={() => (showDeleteDialog = false)}
+	/>
+
+	<EntityDialog
+		open={showAddEntity}
+		mode="create"
+		onsave={handleAddEntity}
+		oncancel={() => (showAddEntity = false)}
+	/>
+
+	<RelationshipDialog
+		open={showRelationshipDialog}
+		sourceName={pendingSourceName}
+		targetName={pendingTargetName}
+		onsave={handleRelationshipSave}
+		oncancel={handleRelationshipCancel}
+	/>
+
+	<EntityPicker
+		open={showEntityPicker}
+		onselect={handleLinkEntity}
+		oncancel={() => (showEntityPicker = false)}
+	/>
+
+	<ConfirmDialog
+		open={showRollbackDialog}
+		title="Rollback Version"
+		message="Are you sure you want to rollback to version {rollbackVersion}? This will create a new version with the content of the selected version."
+		confirmLabel={rollbackLoading ? 'Rolling back...' : 'Rollback'}
+		onconfirm={handleRollback}
+		oncancel={() => { showRollbackDialog = false; rollbackVersion = null; }}
 	/>
 {/if}

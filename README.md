@@ -70,10 +70,13 @@ Four colour modes with WCAG-compliant contrast ratios:
 - **High Contrast** — Black background, yellow primary, 7:1+ ratios
 - **System** — Follows OS preference via `prefers-color-scheme`
 
-### Browse & Edit Modes
+### Canvas Interaction
 
 - **Edit Mode** — Full canvas editing with drag, connect, create, delete
-- **Browse Mode** — Read-only canvas for viewers and reviewers, with entity detail panel
+- **Browse Mode** — Read-only canvas for viewers and reviewers, click node to show entity detail panel
+- **Relationship Dialog** — When connecting two entities, a dialog prompts for relationship type and optional label
+- **Link Existing Entity** — Add entities from the repository to the canvas via searchable picker dialog
+- **Model Type Routing** — Model type determines which canvas renders: Simple View, UML, ArchiMate, or Sequence Diagram
 
 ### Dashboard
 
@@ -85,7 +88,16 @@ Four colour modes with WCAG-compliant contrast ratios:
 ### Admin Panel
 
 - **User Management** — List, create, edit role, activate/deactivate users with WCAG-compliant forms and confirmation dialogs
-- **Audit Log** — Paginated audit log viewer with action/username/target filters, chain verification badge, and expandable row detail (JSON rendered as text, no `{@html}`)
+- **Audit Log** — Paginated audit log viewer with action/username/target/date range filters, chain verification badge, and expandable row detail (JSON rendered as text, no `{@html}`)
+
+### Entity & Model Management
+
+- Entity CRUD with edit and delete on detail page (optimistic concurrency via If-Match)
+- Model CRUD with type filter on list page (Simple, Component, Sequence, UML, ArchiMate)
+- Bookmark toggle on model detail page
+- Comments on model and entity detail pages (add, edit, delete)
+- Version rollback on model detail Version History tab
+- Password change on Settings page with NZISM-compliant validation
 
 ### Statistics & Cross-References
 
@@ -126,13 +138,21 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 cd backend
 uv run python -m pytest
 
-# Frontend unit tests (120 tests)
+# Frontend unit tests
 cd frontend
 npm test
 
-# Frontend E2E tests (10 suites, Playwright)
+# Frontend E2E tests (Playwright, existing scripted tests)
 cd frontend
-npx playwright test
+npm run test:e2e
+
+# Frontend BDD tests (Gherkin feature files via playwright-bdd)
+cd frontend
+npm run test:bdd
+
+# All frontend E2E tests (scripted + BDD)
+cd frontend
+npm run test:all-e2e
 ```
 
 ## Compliance
@@ -165,8 +185,8 @@ npx playwright test
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 10 Architecture Decision Records |
-| `docs/adrs/specs/` | 15 implementation specifications |
+| `docs/adrs/` | 11 Architecture Decision Records |
+| `docs/adrs/specs/` | 20 implementation specifications |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 
@@ -183,7 +203,9 @@ npx playwright test
 | Auth Hashing | Argon2id | argon2-cffi |
 | JWT | python-jose | HS256 |
 | Testing (Backend) | pytest | 8.x |
-| Testing (Frontend) | Vitest | 4.x |
+| Testing (Frontend Unit) | Vitest | 4.x |
+| Testing (Frontend E2E) | Playwright | 1.58.x |
+| Testing (Frontend BDD) | playwright-bdd | 8.4.x |
 | Linting | Ruff | 0.9.x |
 | Type Checking | mypy (strict) | 1.x |
 
@@ -199,6 +221,7 @@ npx playwright test
 | v0.6.0 | F | Browse Mode — read-only canvas, entity detail views, search UI |
 | v1.0.0 | G | Polish — WCAG audit, NZ ITSM verification, performance testing |
 | v1.1.0 | H | Remediation — audit API, entity statistics, dashboard, admin pages, documentation corrections, E2E tests |
+| v1.2.0 | I | Canvas Completion — Full View canvas, sequence integration, bug fixes, BDD test suite, frontend feature gaps |
 
 ## License
 

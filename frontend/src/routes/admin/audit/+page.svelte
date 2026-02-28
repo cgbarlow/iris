@@ -13,6 +13,8 @@
 	let actionFilter = $state('');
 	let usernameFilter = $state('');
 	let targetTypeFilter = $state('');
+	let fromDate = $state('');
+	let toDate = $state('');
 
 	// Chain verification
 	let verifyResult = $state<AuditVerifyResult | null>(null);
@@ -36,6 +38,8 @@
 			if (actionFilter) params.set('action', actionFilter);
 			if (usernameFilter) params.set('username', usernameFilter);
 			if (targetTypeFilter) params.set('target_type', targetTypeFilter);
+			if (fromDate) params.set('from_date', fromDate);
+			if (toDate) params.set('to_date', toDate);
 
 			const data = await apiFetch<PaginatedResponse<AuditEntry>>(`/api/audit?${params.toString()}`);
 			entries = data.items;
@@ -152,6 +156,26 @@
 			bind:value={targetTypeFilter}
 			type="text"
 			placeholder="e.g. entity"
+			class="mt-1 rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		/>
+	</div>
+	<div>
+		<label for="audit-from-date" class="block text-xs" style="color: var(--color-muted)">From Date</label>
+		<input
+			id="audit-from-date"
+			bind:value={fromDate}
+			type="date"
+			class="mt-1 rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		/>
+	</div>
+	<div>
+		<label for="audit-to-date" class="block text-xs" style="color: var(--color-muted)">To Date</label>
+		<input
+			id="audit-to-date"
+			bind:value={toDate}
+			type="date"
 			class="mt-1 rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		/>

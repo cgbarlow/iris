@@ -12,7 +12,8 @@ test.describe('Theming', () => {
 
 		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-		// All three theme options should be visible
+		// All four theme options should be visible
+		await expect(page.getByLabel('System')).toBeVisible();
 		await expect(page.getByLabel('Light')).toBeVisible();
 		await expect(page.getByLabel('Dark')).toBeVisible();
 		await expect(page.getByLabel('High Contrast')).toBeVisible();

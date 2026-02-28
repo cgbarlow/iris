@@ -5,6 +5,33 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-28
+
+### Added
+- Full View canvas (UML + ArchiMate) with FullViewCanvas.svelte orchestrator
+- Sequence diagram rendering on canvas tab for sequence model types
+- RelationshipDialog wired to canvas edge creation with 5 relationship types
+- EntityDetailPanel in browse mode — click node to see entity details
+- Entity edit and delete on entity detail page with optimistic concurrency
+- Model type filter on models list page
+- Bookmark toggle on model detail page
+- Password change on Settings page with NZISM-compliant 12-char minimum
+- Audit date range filters (from_date/to_date) on admin audit page
+- Comments UI on model and entity detail pages (add, edit, delete)
+- Version rollback on model detail Version History tab
+- Canvas link existing entity via EntityPicker dialog
+- CommentsPanel component for inline comment CRUD
+- EntityPicker component for searchable entity selection
+- Gherkin BDD test suite with playwright-bdd (12 feature files, 5 step definition files)
+- Playwright MCP configuration for exploratory testing
+- ADR-011: Canvas Integration and Testing Strategy
+- SPEC-011-A through SPEC-011-E: Canvas interactions, Full View, sequence, BDD test plan, browse mode
+
+### Fixed
+- Canvas node type bug: entities now render with correct shapes (was using unregistered 'simpleEntity' type)
+- Canvas relationship creation: users can now choose relationship type via dialog (was hardcoded to 'uses')
+- Browse mode node clicks now show entity detail panel (was silently ignored)
+
 ## [1.1.1] - 2026-02-28
 
 ### Added

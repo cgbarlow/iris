@@ -8,6 +8,7 @@
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let sortField = $state<'name' | 'model_type' | 'updated_at'>('name');
+	let typeFilter = $state<string>('');
 	let showCreateDialog = $state(false);
 
 	$effect(() => {
@@ -46,6 +47,9 @@
 	const filteredModels = $derived(
 		models
 			.filter((m) => {
+				if (typeFilter && m.model_type.toLowerCase() !== typeFilter.toLowerCase()) {
+					return false;
+				}
 				if (searchQuery) {
 					const q = searchQuery.toLowerCase();
 					return (
@@ -93,6 +97,22 @@
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		/>
+	</div>
+	<div>
+		<label for="model-type-filter" class="sr-only">Filter by type</label>
+		<select
+			id="model-type-filter"
+			bind:value={typeFilter}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		>
+			<option value="">All</option>
+			<option value="simple">Simple</option>
+			<option value="component">Component</option>
+			<option value="sequence">Sequence</option>
+			<option value="uml">UML</option>
+			<option value="archimate">ArchiMate</option>
+		</select>
 	</div>
 	<div>
 		<label for="model-sort" class="sr-only">Sort by</label>
