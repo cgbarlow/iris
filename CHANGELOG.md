@@ -5,6 +5,16 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Admin settings page with configurable session timeout and gallery thumbnail display mode
+- Settings API (`GET /api/settings`, `GET /api/settings/{key}`, `PUT /api/settings/{key}`) with admin-only write access
+- Dynamic session timeout: login and refresh endpoints read `session_timeout_minutes` from database settings
+- Settings database table (`m006_settings` migration) with default seed values
+- ADR-021: Admin Settings and Configurable Session Timeout
+- SPEC-021-A: Admin Settings
+
 ## [1.4.0] - 2026-02-28
 
 ### Added

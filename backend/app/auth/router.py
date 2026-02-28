@@ -26,8 +26,20 @@ from app.auth.service import (
     rotate_refresh_token,
     validate_password,
 )
+from app.settings.service import get_setting
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+async def _get_session_timeout(db: object) -> int | None:
+    """Fetch session_timeout_minutes from settings, return None on failure."""
+    try:
+        setting = await get_setting(db, "session_timeout_minutes")  # type: ignore[arg-type]
+        if setting is not None:
+            return int(setting["value"])  # type: ignore[arg-type]
+    except (ValueError, TypeError, KeyError):
+        pass
+    return None
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -93,13 +105,19 @@ async def login(body: LoginRequest, request: Request) -> TokenResponse:
     )
     await db.commit()
 
-    access_token, _jti = create_access_token(user_id, role, config.auth)
+    # Fetch dynamic session timeout from settings
+    timeout = await _get_session_timeout(db)
+
+    access_token, _jti = create_access_token(
+        user_id, role, config.auth, timeout_minutes=timeout
+    )
     refresh_token = await create_refresh_token(db, user_id, config.auth)
 
+    expires_in = (timeout or config.auth.access_token_expire_minutes) * 60
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_in=config.auth.access_token_expire_minutes * 60,
+        expires_in=expires_in,
     )
 
 
@@ -123,12 +141,18 @@ async def refresh(body: RefreshRequest, request: Request) -> TokenResponse:
     if row is None:
         raise HTTPException(status_code=401, detail="User not found")
 
-    access_token, _ = create_access_token(user_id, row[0], config.auth)
+    # Fetch dynamic session timeout from settings
+    timeout = await _get_session_timeout(db)
 
+    access_token, _ = create_access_token(
+        user_id, row[0], config.auth, timeout_minutes=timeout
+    )
+
+    expires_in = (timeout or config.auth.access_token_expire_minutes) * 60
     return TokenResponse(
         access_token=access_token,
         refresh_token=new_refresh_token,
-        expires_in=config.auth.access_token_expire_minutes * 60,
+        expires_in=expires_in,
     )
 
 

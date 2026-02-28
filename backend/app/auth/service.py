@@ -83,16 +83,21 @@ def create_access_token(
     user_id: str,
     role: str,
     config: AuthConfig,
+    timeout_minutes: int | None = None,
 ) -> tuple[str, str]:
-    """Create a JWT access token. Returns (token, jti)."""
+    """Create a JWT access token. Returns (token, jti).
+
+    If timeout_minutes is provided, it overrides the config default.
+    """
     jti = str(uuid.uuid4())
     now = datetime.now(tz=UTC)
+    expire_minutes = timeout_minutes or config.access_token_expire_minutes
     payload: dict[str, Any] = {
         "sub": user_id,
         "role": role,
         "jti": jti,
         "iat": now,
-        "exp": now + timedelta(minutes=config.access_token_expire_minutes),
+        "exp": now + timedelta(minutes=expire_minutes),
     }
     token: str = jwt.encode(
         payload, config.jwt_secret, algorithm=config.jwt_algorithm

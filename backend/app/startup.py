@@ -11,7 +11,9 @@ from app.migrations.m002_entities_relationships_models import up as m002_up
 from app.migrations.m003_audit_log import up as m003_up
 from app.migrations.m004_comments_bookmarks import up as m004_up
 from app.migrations.m005_search import up as m005_up
+from app.migrations.m006_settings import up as m006_up
 from app.migrations.seed import seed_roles_and_permissions
+from app.settings.service import seed_defaults
 
 if TYPE_CHECKING:
     from app.database import DatabaseManager
@@ -34,9 +36,13 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
     await m002_up(db_manager.main_db)
     await m004_up(db_manager.main_db)
     await m005_up(db_manager.main_db)
+    await m006_up(db_manager.main_db)
 
     # 4. Seed roles and permissions
     await seed_roles_and_permissions(db_manager.main_db)
+
+    # 4b. Seed default settings
+    await seed_defaults(db_manager.main_db)
 
     # 5. Run audit database migration
     await m003_up(db_manager.audit_db)
