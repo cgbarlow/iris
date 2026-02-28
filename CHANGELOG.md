@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Entity browse with grouping modes (by type, by tag), tags, and enriched information cards
 - Entity tags backend (entity_tags table, add/remove/list endpoints)
 - Entity list API enriched with tags, relationship count, and model usage count
+- Entity and model detail pages now display created by username and modified date
+- Version history tables include a User column showing who made each change
+- ADR-019: Metadata and User Attribution Display
+- SPEC-019-A: Metadata Display
 - ADR-025: Entity Browse Enhancements
 - SPEC-025-A: Entity Browse Enhancements
 

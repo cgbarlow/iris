@@ -68,10 +68,12 @@ async def get_model(
     cursor = await db.execute(
         "SELECT m.id, m.model_type, m.current_version, "
         "mv.name, mv.description, mv.data, "
-        "m.created_at, m.created_by, m.updated_at, m.is_deleted "
+        "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
+        "u.username "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
+        "LEFT JOIN users u ON m.created_by = u.id "
         "WHERE m.id = ? AND m.is_deleted = 0",
         (model_id,),
     )
@@ -90,6 +92,7 @@ async def get_model(
         "created_by": row[7],
         "updated_at": row[8],
         "is_deleted": bool(row[9]),
+        "created_by_username": row[10] or "Unknown",
     }
 
 
@@ -251,11 +254,14 @@ async def get_model_versions(
 ) -> list[dict[str, object]]:
     """Get all versions of a model."""
     cursor = await db.execute(
-        "SELECT model_id, version, name, description, data, "
-        "change_type, change_summary, rollback_to, "
-        "created_at, created_by "
-        "FROM model_versions WHERE model_id = ? "
-        "ORDER BY version DESC",
+        "SELECT mv.model_id, mv.version, mv.name, mv.description, mv.data, "
+        "mv.change_type, mv.change_summary, mv.rollback_to, "
+        "mv.created_at, mv.created_by, "
+        "u.username "
+        "FROM model_versions mv "
+        "LEFT JOIN users u ON mv.created_by = u.id "
+        "WHERE mv.model_id = ? "
+        "ORDER BY mv.version DESC",
         (model_id,),
     )
     rows = await cursor.fetchall()
@@ -271,6 +277,7 @@ async def get_model_versions(
             "rollback_to": r[7],
             "created_at": r[8],
             "created_by": r[9],
+            "created_by_username": r[10] or "Unknown",
         }
         for r in rows
     ]

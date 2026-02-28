@@ -22,6 +22,7 @@ export interface Entity {
 	data: Record<string, unknown>;
 	created_at: string;
 	created_by: string;
+	created_by_username?: string;
 	updated_at: string;
 	is_deleted: boolean;
 	tags?: string[];
@@ -38,6 +39,7 @@ export interface Model {
 	data: Record<string, unknown>;
 	created_at: string;
 	created_by: string;
+	created_by_username?: string;
 	updated_at: string;
 	is_deleted: boolean;
 }
@@ -91,6 +93,7 @@ export interface EntityVersion {
 	rollback_to: number | null;
 	created_at: string;
 	created_by: string;
+	created_by_username?: string;
 }
 
 export interface ModelVersion {
@@ -104,6 +107,7 @@ export interface ModelVersion {
 	rollback_to: number | null;
 	created_at: string;
 	created_by: string;
+	created_by_username?: string;
 }
 
 export interface Relationship {
