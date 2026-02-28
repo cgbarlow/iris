@@ -19,6 +19,8 @@
 		oncreate: () => void;
 		ontoggleconnect: () => void;
 		onannounce: (message: string) => void;
+		onundo?: () => void;
+		onredo?: () => void;
 	}
 
 	let {
@@ -34,6 +36,8 @@
 		oncreate,
 		ontoggleconnect,
 		onannounce,
+		onundo,
+		onredo,
 	}: Props = $props();
 
 	const { fitView, zoomIn, zoomOut } = useSvelteFlow();
@@ -82,6 +86,16 @@
 			if (event.key === 'n' || event.key === 'N') {
 				event.preventDefault();
 				oncreate();
+				return;
+			}
+			if (event.key === 'z' || event.key === 'Z') {
+				event.preventDefault();
+				if (onundo) onundo();
+				return;
+			}
+			if (event.key === 'y' || event.key === 'Y') {
+				event.preventDefault();
+				if (onredo) onredo();
 				return;
 			}
 		}
