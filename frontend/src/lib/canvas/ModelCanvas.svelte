@@ -3,7 +3,7 @@
 	 * Main canvas component integrating Svelte Flow with Simple View
 	 * node/edge types, zoom/pan, keyboard navigation, and ARIA announcer.
 	 */
-	import { SvelteFlow, Controls, Background, useSvelteFlow } from '@xyflow/svelte';
+	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 
 	import { simpleViewNodeTypes } from './nodes';
@@ -35,8 +35,6 @@
 	let selectedNodeId = $state<string | null>(null);
 	let connectMode = $state(false);
 	let connectSourceId = $state<string | null>(null);
-
-	const { fitView, zoomIn, zoomOut } = useSvelteFlow();
 
 	function handleNodeClick({ node }: { node: CanvasNode; event: MouseEvent | TouchEvent }) {
 		selectedNodeId = node.id;
@@ -143,6 +141,22 @@
 	>
 		<Controls showLock={false} />
 		<Background />
+		<CanvasToolbar onannounce={handleAnnounce} />
+		<KeyboardHandler
+			bind:this={keyboardHandler}
+			{nodes}
+			{edges}
+			{selectedNodeId}
+			{connectMode}
+			{connectSourceId}
+			onselect={handleSelect}
+			onmove={handleMove}
+			ondelete={handleDelete}
+			onconnect={handleConnect}
+			oncreate={handleCreate}
+			ontoggleconnect={handleToggleConnect}
+			onannounce={handleAnnounce}
+		/>
 	</SvelteFlow>
 
 	{#if connectMode}
@@ -151,35 +165,5 @@
 		</div>
 	{/if}
 
-	<CanvasToolbar
-		onzoomin={() => {
-			zoomIn();
-			announcer?.announce('Zoomed in');
-		}}
-		onzoomout={() => {
-			zoomOut();
-			announcer?.announce('Zoomed out');
-		}}
-		onfit={() => {
-			fitView();
-			announcer?.announce('Fit to screen');
-		}}
-	/>
-
 	<CanvasAnnouncer bind:this={announcer} />
-	<KeyboardHandler
-		bind:this={keyboardHandler}
-		{nodes}
-		{edges}
-		{selectedNodeId}
-		{connectMode}
-		{connectSourceId}
-		onselect={handleSelect}
-		onmove={handleMove}
-		ondelete={handleDelete}
-		onconnect={handleConnect}
-		oncreate={handleCreate}
-		ontoggleconnect={handleToggleConnect}
-		onannounce={handleAnnounce}
-	/>
 </div>

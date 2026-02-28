@@ -68,10 +68,7 @@
 	// Entity picker state (link existing entity)
 	let showEntityPicker = $state(false);
 
-	// Version rollback state
-	let rollbackVersion = $state<number | null>(null);
-	let showRollbackDialog = $state(false);
-	let rollbackLoading = $state(false);
+	// Version rollback — not available for models (only entities have rollback API).
 
 	$effect(() => {
 		const id = page.params.id;
@@ -167,13 +164,10 @@
 		bookmarkLoading = true;
 		try {
 			if (isBookmarked) {
-				await apiFetch(`/api/bookmarks/${model.id}`, { method: 'DELETE' });
+				await apiFetch(`/api/models/${model.id}/bookmark`, { method: 'DELETE' });
 				isBookmarked = false;
 			} else {
-				await apiFetch('/api/bookmarks', {
-					method: 'POST',
-					body: JSON.stringify({ model_id: model.id }),
-				});
+				await apiFetch(`/api/models/${model.id}/bookmark`, { method: 'POST' });
 				isBookmarked = true;
 			}
 		} catch (e) {
@@ -309,25 +303,6 @@
 		canvasNodes = [...canvasNodes, newNode];
 		canvasDirty = true;
 		showEntityPicker = false;
-	}
-
-	async function handleRollback() {
-		if (!model || rollbackVersion === null) return;
-		rollbackLoading = true;
-		error = null;
-		try {
-			await apiFetch(`/api/models/${model.id}/rollback`, {
-				method: 'POST',
-				headers: { 'If-Match': String(model.current_version) },
-				body: JSON.stringify({ version: rollbackVersion }),
-			});
-			showRollbackDialog = false;
-			rollbackVersion = null;
-			await loadModel(model.id);
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'Failed to rollback';
-		}
-		rollbackLoading = false;
 	}
 
 	function discardChanges() {
@@ -566,7 +541,6 @@
 							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -576,17 +550,6 @@
 								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
-								<td class="py-2">
-									{#if v.version !== model.current_version}
-										<button
-											onclick={() => { rollbackVersion = v.version; showRollbackDialog = true; }}
-											class="rounded px-2 py-1 text-xs"
-											style="border: 1px solid var(--color-border); color: var(--color-fg)"
-										>
-											Rollback
-										</button>
-									{/if}
-								</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -640,12 +603,4 @@
 		oncancel={() => (showEntityPicker = false)}
 	/>
 
-	<ConfirmDialog
-		open={showRollbackDialog}
-		title="Rollback Version"
-		message="Are you sure you want to rollback to version {rollbackVersion}? This will create a new version with the content of the selected version."
-		confirmLabel={rollbackLoading ? 'Rolling back...' : 'Rollback'}
-		onconfirm={handleRollback}
-		oncancel={() => { showRollbackDialog = false; rollbackVersion = null; }}
-	/>
 {/if}

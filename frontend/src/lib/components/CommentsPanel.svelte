@@ -26,13 +26,17 @@
 		if (targetId) loadComments();
 	});
 
+	/** Build the target-specific base URL for comments. */
+	function commentsBaseUrl(): string {
+		const resource = targetType === 'model' ? 'models' : 'entities';
+		return `/api/${resource}/${targetId}/comments`;
+	}
+
 	async function loadComments() {
 		loading = true;
 		error = null;
 		try {
-			comments = await apiFetch<Comment[]>(
-				`/api/comments?target_type=${targetType}&target_id=${targetId}`,
-			);
+			comments = await apiFetch<Comment[]>(commentsBaseUrl());
 		} catch {
 			error = 'Failed to load comments';
 			comments = [];
@@ -48,13 +52,9 @@
 		submitting = true;
 		error = null;
 		try {
-			await apiFetch('/api/comments', {
+			await apiFetch(commentsBaseUrl(), {
 				method: 'POST',
-				body: JSON.stringify({
-					target_type: targetType,
-					target_id: targetId,
-					content: sanitized,
-				}),
+				body: JSON.stringify({ content: sanitized }),
 			});
 			newComment = '';
 			await loadComments();

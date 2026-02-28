@@ -12,6 +12,6 @@ Feature: Canvas Theme Rendering
 
     Examples:
       | theme          |
-      | light          |
-      | dark           |
-      | high-contrast  |
+      | Light          |
+      | Dark           |
+      | High Contrast  |

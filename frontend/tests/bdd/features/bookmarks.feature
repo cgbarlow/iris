@@ -11,7 +11,7 @@ Feature: Bookmarks
     Then the button should show "Bookmarked"
 
   Scenario: Removing a bookmark
-    Given model "Bookmark Test" is bookmarked
     When I navigate to model "Bookmark Test"
+    And I click the "Bookmark" button
     And I click the "Bookmarked" button
     Then the button should show "Bookmark"

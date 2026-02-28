@@ -45,11 +45,12 @@ Feature: Simple View Canvas
 
   Scenario: Saving canvas persists data
     Given the canvas has entity "Service A"
-    When I click "Save"
+    When I add entity "Service B"
+    And I click "Save"
     And the save succeeds
     And I reload the page
     And I click the "Canvas" tab
-    Then a node labelled "Service A" should appear on the canvas
+    Then a node labelled "Service B" should appear on the canvas
 
   Scenario: Discarding changes reverts canvas
     Given the canvas has a saved entity "Service A"

@@ -13,15 +13,19 @@ Feature: Comments
     Then the comment "This is a test comment" should be visible
 
   Scenario: Editing a comment
-    Given a comment "Original text" exists on model "Commented Model"
     When I navigate to model "Commented Model"
+    And I open the comments section
+    And I type "Original text"
+    And I click "Post Comment"
     And I click "Edit" on the comment
     And I change the comment to "Updated text"
     And I click "Save"
     Then the comment "Updated text" should be visible
 
   Scenario: Deleting a comment
-    Given a comment "To delete" exists on model "Commented Model"
     When I navigate to model "Commented Model"
+    And I open the comments section
+    And I type "To delete"
+    And I click "Post Comment"
     And I click "Delete" on the comment
     Then the comment "To delete" should not be visible

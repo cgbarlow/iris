@@ -1,13 +1,13 @@
 import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 
-const { Given, When, Then } = createBdd();
+const { When, Then } = createBdd();
 
 // --- Comments steps ---
 
 When('I open the comments section', async ({ page }) => {
-	// Comments panel should be visible on the page
-	await expect(page.getByText('Comments')).toBeVisible();
+	// Comments panel heading should be visible on the page
+	await expect(page.getByRole('heading', { name: 'Comments' })).toBeVisible();
 });
 
 When('I type {string}', async ({ page }, text: string) => {
@@ -23,10 +23,6 @@ When('I change the comment to {string}', async ({ page }, text: string) => {
 	await page.locator('.comments-panel textarea').first().fill(text);
 });
 
-Given('a comment {string} exists on model {string}', async ({ page }, _content: string, _model: string) => {
-	// Comment will be created via API or assumed to exist
-});
-
 Then('the comment {string} should be visible', async ({ page }, content: string) => {
 	await expect(page.getByText(content)).toBeVisible();
 });
@@ -39,10 +35,6 @@ Then('the comment {string} should not be visible', async ({ page }, content: str
 
 When('I click the {string} button', async ({ page }, buttonText: string) => {
 	await page.getByRole('button', { name: buttonText }).click();
-});
-
-Given('model {string} is bookmarked', async ({ page }, _name: string) => {
-	// Bookmark will be set via API or assumed
 });
 
 Then('the button should show {string}', async ({ page }, text: string) => {

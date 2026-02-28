@@ -3,7 +3,7 @@
 	 * Full View canvas for UML and ArchiMate diagram types.
 	 * Selects the appropriate node/edge type registries based on viewType prop.
 	 */
-	import { SvelteFlow, Controls, Background, useSvelteFlow } from '@xyflow/svelte';
+	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 
 	import { umlNodeTypes } from './uml/nodes';
@@ -39,8 +39,6 @@
 	let selectedNodeId = $state<string | null>(null);
 	let connectMode = $state(false);
 	let connectSourceId = $state<string | null>(null);
-
-	const { fitView, zoomIn, zoomOut } = useSvelteFlow();
 
 	const nodeTypes = $derived(viewType === 'uml' ? umlNodeTypes : archimateNodeTypes);
 	const edgeTypes = $derived(viewType === 'uml' ? umlEdgeTypes : archimateEdgeTypes);
@@ -151,6 +149,22 @@
 	>
 		<Controls showLock={false} />
 		<Background />
+		<CanvasToolbar onannounce={handleAnnounce} />
+		<KeyboardHandler
+			bind:this={keyboardHandler}
+			{nodes}
+			{edges}
+			{selectedNodeId}
+			{connectMode}
+			{connectSourceId}
+			onselect={handleSelect}
+			onmove={handleMove}
+			ondelete={handleDelete}
+			onconnect={handleConnect}
+			oncreate={handleCreate}
+			ontoggleconnect={handleToggleConnect}
+			onannounce={handleAnnounce}
+		/>
 	</SvelteFlow>
 
 	{#if connectMode}
@@ -159,35 +173,5 @@
 		</div>
 	{/if}
 
-	<CanvasToolbar
-		onzoomin={() => {
-			zoomIn();
-			announcer?.announce('Zoomed in');
-		}}
-		onzoomout={() => {
-			zoomOut();
-			announcer?.announce('Zoomed out');
-		}}
-		onfit={() => {
-			fitView();
-			announcer?.announce('Fit to screen');
-		}}
-	/>
-
 	<CanvasAnnouncer bind:this={announcer} />
-	<KeyboardHandler
-		bind:this={keyboardHandler}
-		{nodes}
-		{edges}
-		{selectedNodeId}
-		{connectMode}
-		{connectSourceId}
-		onselect={handleSelect}
-		onmove={handleMove}
-		ondelete={handleDelete}
-		onconnect={handleConnect}
-		oncreate={handleCreate}
-		ontoggleconnect={handleToggleConnect}
-		onannounce={handleAnnounce}
-	/>
 </div>

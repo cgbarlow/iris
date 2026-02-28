@@ -26,13 +26,13 @@ Given('an entity named {string} exists', async ({ page }, name: string) => {
 
 When('I navigate to model {string}', async ({ page }, name: string) => {
 	await page.goto('/models');
-	await page.getByText(name).click();
+	await page.getByRole('link', { name }).first().click();
 	await page.waitForURL(/\/models\//);
 });
 
 When('I navigate to entity {string}', async ({ page }, name: string) => {
 	await page.goto('/entities');
-	await page.getByText(name).click();
+	await page.getByRole('link', { name }).first().click();
 	await page.waitForURL(/\/entities\//);
 });
 

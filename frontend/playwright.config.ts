@@ -30,9 +30,9 @@ export default defineConfig({
 	],
 	webServer: [
 		{
-			command: 'cd ../backend && IRIS_RATE_LIMIT_LOGIN=200 IRIS_RATE_LIMIT_GENERAL=500 IRIS_RATE_LIMIT_REFRESH=200 uv run uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000',
+			command: 'bash scripts/start-test-backend.sh',
 			port: 8000,
-			reuseExistingServer: true,
+			reuseExistingServer: false,
 			timeout: 15_000,
 		},
 		{

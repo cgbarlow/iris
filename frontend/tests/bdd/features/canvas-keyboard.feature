@@ -4,7 +4,10 @@ Feature: Canvas Keyboard Navigation
   Background:
     Given I am logged in as an admin
     And a model with 3 entities on the canvas exists
-    And I am in canvas edit mode
+    When I navigate to model "Multi Entity Model"
+    And I click the "Canvas" tab
+    And I click "Edit Canvas"
+    And I focus the canvas
 
   Scenario: Tab cycles through nodes
     When I press Tab

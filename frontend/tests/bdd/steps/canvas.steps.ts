@@ -66,7 +66,7 @@ Given('the canvas has entities {string} and {string}', async ({ page }, name1: s
 		},
 	});
 	await page.goto('/models');
-	await page.getByText('Connection Test Model').click();
+	await page.getByRole('link', { name: 'Connection Test Model' }).first().click();
 	await page.getByRole('tab', { name: 'Canvas' }).click();
 	await page.getByRole('button', { name: 'Edit Canvas' }).click();
 });
@@ -87,7 +87,7 @@ Given('the canvas has entity {string} connected to entity {string}', async ({ pa
 		},
 	});
 	await page.goto('/models');
-	await page.getByText('Delete Test Model').click();
+	await page.getByRole('link', { name: 'Delete Test Model' }).first().click();
 	await page.getByRole('tab', { name: 'Canvas' }).click();
 	await page.getByRole('button', { name: 'Edit Canvas' }).click();
 });
@@ -105,7 +105,7 @@ Given('the canvas has entity {string}', async ({ page }, name: string) => {
 		},
 	});
 	await page.goto('/models');
-	await page.getByText('Save Test Model').click();
+	await page.getByRole('link', { name: 'Save Test Model' }).first().click();
 	await page.getByRole('tab', { name: 'Canvas' }).click();
 	await page.getByRole('button', { name: 'Edit Canvas' }).click();
 });
@@ -123,7 +123,7 @@ Given('the canvas has a saved entity {string}', async ({ page }, name: string) =
 		},
 	});
 	await page.goto('/models');
-	await page.getByText('Discard Test Model').click();
+	await page.getByRole('link', { name: 'Discard Test Model' }).first().click();
 	await page.getByRole('tab', { name: 'Canvas' }).click();
 });
 
@@ -150,8 +150,7 @@ Given('a model named {string} of type {string} with participants exists', async 
 
 Given('I am in canvas edit mode', async ({ page }) => {
 	await page.goto('/models');
-	const modelLink = page.locator('a[href*="/models/"]').first();
-	await modelLink.click();
+	await page.locator('a[href*="/models/"]').first().click();
 	await page.getByRole('tab', { name: 'Canvas' }).click();
 	const editBtn = page.getByRole('button', { name: 'Edit Canvas' });
 	const startBtn = page.getByRole('button', { name: 'Start Building' });
@@ -176,15 +175,18 @@ Given('I set the theme to {string}', async ({ page }, theme: string) => {
 Given('the entity detail panel is showing', async ({ page }) => {
 	const node = page.locator('.svelte-flow__node').first();
 	await node.click();
-	await expect(page.getByLabel('Entity details')).toBeVisible();
+	await expect(page.locator('[aria-label="Entity details"]')).toBeVisible();
+});
+
+Given('I focus the canvas', async ({ page }) => {
+	await page.locator('.svelte-flow').click();
 });
 
 // --- Canvas action steps ---
 
 When('I view the canvas in browse mode', async ({ page }) => {
 	await page.goto('/models');
-	const modelLink = page.locator('a[href*="/models/"]').first();
-	await modelLink.click();
+	await page.getByRole('link', { name: 'Canvas Test Model' }).first().click();
 	await page.getByRole('tab', { name: 'Canvas' }).click();
 });
 
@@ -276,9 +278,10 @@ When('I fill in entity name {string}', async ({ page }, name: string) => {
 });
 
 When('I select entity type {string}', async ({ page }, type: string) => {
-	const options = await page.getByLabel('Type').locator('option').allTextContents();
+	const typeSelect = page.getByLabel('Type', { exact: true });
+	const options = await typeSelect.locator('option').allTextContents();
 	const match = options.find(o => o.includes(type));
-	if (match) await page.getByLabel('Type').selectOption({ label: match });
+	if (match) await typeSelect.selectOption({ label: match });
 });
 
 When('I click the close button on the panel', async ({ page }) => {
@@ -335,11 +338,11 @@ Then('no edges should reference node {string}', async ({ page }, _label: string)
 });
 
 Then('the entity detail panel should appear', async ({ page }) => {
-	await expect(page.getByLabel('Entity details')).toBeVisible();
+	await expect(page.locator('[aria-label="Entity details"]')).toBeVisible();
 });
 
 Then('the entity detail panel should not be visible', async ({ page }) => {
-	await expect(page.getByLabel('Entity details')).not.toBeVisible();
+	await expect(page.locator('[aria-label="Entity details"]')).not.toBeVisible();
 });
 
 Then('I should see the entity type', async ({ page }) => {
@@ -348,7 +351,7 @@ Then('I should see the entity type', async ({ page }) => {
 
 Then('I should see the entity description', async ({ page }) => {
 	// Description may or may not be present
-	const panel = page.getByLabel('Entity details');
+	const panel = page.locator('[aria-label="Entity details"]');
 	await expect(panel).toBeVisible();
 });
 
@@ -424,7 +427,7 @@ Then('the sequence diagram should be visible', async ({ page }) => {
 });
 
 Then('I should see participant lifelines', async ({ page }) => {
-	await expect(page.locator('.sequence-participant')).toBeVisible();
+	await expect(page.locator('.sequence-participant').first()).toBeVisible();
 });
 
 Then('I should see the empty sequence message', async ({ page }) => {
