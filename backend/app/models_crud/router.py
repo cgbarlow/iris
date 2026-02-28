@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response as FastAPIResponse
 
 from app.auth.dependencies import get_current_user
 from app.models_crud.models import (
@@ -22,6 +23,7 @@ from app.models_crud.service import (
     soft_delete_model,
     update_model,
 )
+from app.models_crud.thumbnail import get_thumbnail
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -161,3 +163,20 @@ async def get_versions(
     if not versions:
         raise HTTPException(status_code=404, detail="Model not found")
     return [ModelVersionResponse(**v) for v in versions]
+
+
+@router.get("/{model_id}/thumbnail")
+async def get_model_thumbnail(model_id: str, request: Request):
+    """Get the PNG thumbnail for a model."""
+    db = request.app.state.db_manager.main_db
+    thumbnail = await get_thumbnail(db, model_id)
+    if thumbnail is None:
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    # Detect if it's SVG or PNG by checking magic bytes
+    content_type = "image/png" if thumbnail[:8] == b"\x89PNG\r\n\x1a\n" else "image/svg+xml"
+    return FastAPIResponse(
+        content=thumbnail,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=300"},
+    )

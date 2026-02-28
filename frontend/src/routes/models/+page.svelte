@@ -17,9 +17,14 @@
 	let cardSize = $state<number>(
 		(typeof window !== 'undefined' && Number(localStorage.getItem('iris-models-card-size'))) || 250
 	);
+	let thumbnailMode = $state<'svg' | 'png'>('svg');
 
 	$effect(() => {
 		loadModels();
+	});
+
+	$effect(() => {
+		loadThumbnailMode();
 	});
 
 	$effect(() => {
@@ -38,6 +43,16 @@
 			error = 'Failed to load models';
 		}
 		loading = false;
+	}
+
+	async function loadThumbnailMode() {
+		try {
+			const settings = await apiFetch<{key: string; value: string}[]>('/api/settings');
+			const mode = settings.find(s => s.key === 'gallery_thumbnail_mode');
+			if (mode) thumbnailMode = mode.value as 'svg' | 'png';
+		} catch {
+			// Settings may not exist yet, default to svg
+		}
 	}
 
 	async function handleCreate(name: string, modelType: string, description: string) {
@@ -223,7 +238,16 @@
 						style="border-color: var(--color-border); color: var(--color-fg)"
 					>
 						<div class="h-28 overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
-							<ModelThumbnail data={model.data} modelType={model.model_type} />
+							{#if thumbnailMode === 'png'}
+								<img
+									src="/api/models/{model.id}/thumbnail"
+									alt="Thumbnail for {model.name}"
+									class="h-full w-full object-cover"
+									loading="lazy"
+								/>
+							{:else}
+								<ModelThumbnail data={model.data} modelType={model.model_type} />
+							{/if}
 						</div>
 						<div class="flex flex-col gap-2 p-4">
 							<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
