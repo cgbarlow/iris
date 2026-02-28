@@ -500,6 +500,12 @@
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">Created</dt>
 				<dd style="color: var(--color-fg)">{model.created_at ?? 'N/A'}</dd>
 
+				<dt class="text-sm font-medium" style="color: var(--color-muted)">Created By</dt>
+				<dd style="color: var(--color-fg)">{model.created_by_username ?? model.created_by}</dd>
+
+				<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified</dt>
+				<dd style="color: var(--color-fg)">{model.updated_at ?? 'N/A'}</dd>
+
 				{#if model.description}
 					<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
 					<dd style="color: var(--color-fg)">{model.description}</dd>
@@ -774,6 +780,7 @@
 						<tr style="border-bottom: 1px solid var(--color-border)">
 							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+							<th class="py-2 text-left" style="color: var(--color-muted)">User</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
 							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
 						</tr>
@@ -783,6 +790,7 @@
 							<tr style="border-bottom: 1px solid var(--color-border)">
 								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
+								<td class="py-2" style="color: var(--color-fg)">{v.created_by_username ?? v.created_by}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
 								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
 							</tr>

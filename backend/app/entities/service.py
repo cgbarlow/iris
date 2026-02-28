@@ -68,10 +68,12 @@ async def get_entity(
     cursor = await db.execute(
         "SELECT e.id, e.entity_type, e.current_version, "
         "ev.name, ev.description, ev.data, "
-        "e.created_at, e.created_by, e.updated_at, e.is_deleted "
+        "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
+        "u.username "
         "FROM entities e "
         "JOIN entity_versions ev ON e.id = ev.entity_id "
         "AND e.current_version = ev.version "
+        "LEFT JOIN users u ON e.created_by = u.id "
         "WHERE e.id = ? AND e.is_deleted = 0",
         (entity_id,),
     )
@@ -90,6 +92,7 @@ async def get_entity(
         "created_by": row[7],
         "updated_at": row[8],
         "is_deleted": bool(row[9]),
+        "created_by_username": row[10] or "Unknown",
     }
 
 
@@ -328,11 +331,14 @@ async def get_entity_versions(
 ) -> list[dict[str, object]]:
     """Get all versions of an entity."""
     cursor = await db.execute(
-        "SELECT entity_id, version, name, description, data, "
-        "change_type, change_summary, rollback_to, "
-        "created_at, created_by "
-        "FROM entity_versions WHERE entity_id = ? "
-        "ORDER BY version DESC",
+        "SELECT ev.entity_id, ev.version, ev.name, ev.description, ev.data, "
+        "ev.change_type, ev.change_summary, ev.rollback_to, "
+        "ev.created_at, ev.created_by, "
+        "u.username "
+        "FROM entity_versions ev "
+        "LEFT JOIN users u ON ev.created_by = u.id "
+        "WHERE ev.entity_id = ? "
+        "ORDER BY ev.version DESC",
         (entity_id,),
     )
     rows = await cursor.fetchall()
@@ -348,6 +354,7 @@ async def get_entity_versions(
             "rollback_to": r[7],
             "created_at": r[8],
             "created_by": r[9],
+            "created_by_username": r[10] or "Unknown",
         }
         for r in rows
     ]

@@ -5,6 +5,14 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Entity and model detail pages now display created by username and modified date
+- Version history tables include a User column showing who made each change
+- ADR-019: Metadata and User Attribution Display
+- SPEC-019-A: Metadata Display
+
 ## [1.4.0] - 2026-02-28
 
 ### Added
