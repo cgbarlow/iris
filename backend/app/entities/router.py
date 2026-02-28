@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -67,6 +68,18 @@ async def list_all(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/tags/all")
+async def list_all_tags(
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[str]:
+    """List all unique tags."""
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute("SELECT DISTINCT tag FROM entity_tags ORDER BY tag")
+    rows = await cursor.fetchall()
+    return [row[0] for row in rows]
 
 
 @router.get("/{entity_id}", response_model=EntityResponse)
@@ -284,3 +297,47 @@ async def get_entity_stats(
         "relationship_count": relationship_count,
         "model_usage_count": model_usage_count,
     }
+
+
+@router.post("/{entity_id}/tags", status_code=201)
+async def add_tag(
+    entity_id: str,
+    body: dict[str, Any],
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Add a tag to an entity."""
+    db = request.app.state.db_manager.main_db
+    tag = body.get("tag", "").strip()
+    if not tag or len(tag) > 50:
+        raise HTTPException(status_code=400, detail="Tag must be 1-50 characters")
+    now = datetime.now(tz=UTC).isoformat()
+    try:
+        await db.execute(
+            "INSERT INTO entity_tags (entity_id, tag, created_at, created_by) "
+            "VALUES (?, ?, ?, ?)",
+            (entity_id, tag, now, current_user["id"]),
+        )
+        await db.commit()
+    except Exception:
+        raise HTTPException(  # noqa: B904
+            status_code=409, detail="Tag already exists"
+        )
+    return {"entity_id": entity_id, "tag": tag, "created_at": now}
+
+
+@router.delete("/{entity_id}/tags/{tag}")
+async def remove_tag(
+    entity_id: str,
+    tag: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Remove a tag from an entity."""
+    db = request.app.state.db_manager.main_db
+    await db.execute(
+        "DELETE FROM entity_tags WHERE entity_id = ? AND tag = ?",
+        (entity_id, tag),
+    )
+    await db.commit()
+    return {"status": "ok"}

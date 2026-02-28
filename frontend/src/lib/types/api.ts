@@ -24,6 +24,9 @@ export interface Entity {
 	created_by: string;
 	updated_at: string;
 	is_deleted: boolean;
+	tags?: string[];
+	relationship_count?: number;
+	model_usage_count?: number;
 }
 
 export interface Model {

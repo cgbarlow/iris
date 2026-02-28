@@ -12,9 +12,20 @@
 	let typeFilter = $state('');
 	let sortField = $state<'name' | 'entity_type' | 'updated_at'>('name');
 	let showCreateDialog = $state(false);
+	let groupMode = $state<'none' | 'type' | 'tag'>(
+		(typeof window !== 'undefined' &&
+			(localStorage.getItem('iris-entities-group') as 'none' | 'type' | 'tag')) ||
+			'none'
+	);
 
 	$effect(() => {
 		loadEntities();
+	});
+
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			localStorage.setItem('iris-entities-group', groupMode);
+		}
 	});
 
 	async function loadEntities() {
@@ -63,8 +74,40 @@
 				if (sortField === 'name') return a.name.localeCompare(b.name);
 				if (sortField === 'entity_type') return a.entity_type.localeCompare(b.entity_type);
 				return (b.updated_at ?? '').localeCompare(a.updated_at ?? '');
-			}),
+			})
 	);
+
+	const groupedEntities = $derived.by(() => {
+		const items = filteredEntities;
+		if (groupMode === 'none') return [{ key: '', items }];
+
+		const groups = new Map<string, Entity[]>();
+
+		if (groupMode === 'type') {
+			for (const e of items) {
+				const key = e.entity_type;
+				if (!groups.has(key)) groups.set(key, []);
+				groups.get(key)!.push(e);
+			}
+		} else if (groupMode === 'tag') {
+			const untagged: Entity[] = [];
+			for (const e of items) {
+				if (e.tags && e.tags.length > 0) {
+					for (const tag of e.tags) {
+						if (!groups.has(tag)) groups.set(tag, []);
+						groups.get(tag)!.push(e);
+					}
+				} else {
+					untagged.push(e);
+				}
+			}
+			if (untagged.length > 0) groups.set('Untagged', untagged);
+		}
+
+		return [...groups.entries()]
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([key, items]) => ({ key, items }));
+	});
 </script>
 
 <svelte:head>
@@ -125,6 +168,19 @@
 			<option value="updated_at">Sort by updated</option>
 		</select>
 	</div>
+	<div>
+		<label for="entity-group" class="sr-only">Group by</label>
+		<select
+			id="entity-group"
+			bind:value={groupMode}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		>
+			<option value="none">Not grouped</option>
+			<option value="type">By type</option>
+			<option value="tag">By tag</option>
+		</select>
+	</div>
 </div>
 
 <!-- Results -->
@@ -139,29 +195,76 @@
 		<p class="mb-3 text-sm" style="color: var(--color-muted)">
 			{filteredEntities.length} entit{filteredEntities.length === 1 ? 'y' : 'ies'}
 		</p>
-		<ul class="flex flex-col gap-2">
-			{#each filteredEntities as entity}
-				<li>
-					<a
-						href="/entities/{entity.id}"
-						class="flex items-center gap-3 rounded border p-3"
-						style="border-color: var(--color-border); color: var(--color-fg)"
-					>
-						<span class="text-sm font-medium" style="color: var(--color-primary)">
-							{entity.name}
-						</span>
-						<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-							{entity.entity_type}
-						</span>
-						{#if entity.description}
-							<span class="text-xs" style="color: var(--color-muted)">
-								{entity.description.slice(0, 60)}{entity.description.length > 60 ? '...' : ''}
-							</span>
-						{/if}
-					</a>
-				</li>
-			{/each}
-		</ul>
+		{#each groupedEntities as group}
+			{#if group.key}
+				<details open class="mt-4">
+					<summary class="cursor-pointer text-sm font-medium" style="color: var(--color-fg)">
+						{group.key} ({group.items.length})
+					</summary>
+					<ul class="mt-2 flex flex-col gap-2">
+						{#each group.items as entity}
+							<li>
+								<a
+									href="/entities/{entity.id}"
+									class="flex flex-wrap items-center gap-3 rounded border p-3"
+									style="border-color: var(--color-border); color: var(--color-fg)"
+								>
+									<span class="text-sm font-medium" style="color: var(--color-primary)">{entity.name}</span>
+									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">{entity.entity_type}</span>
+									{#if entity.tags && entity.tags.length > 0}
+										{#each entity.tags as tag}
+											<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+										{/each}
+									{/if}
+									{#if entity.relationship_count}
+										<span class="text-xs" style="color: var(--color-muted)">{entity.relationship_count} rel</span>
+									{/if}
+									{#if entity.model_usage_count}
+										<span class="text-xs" style="color: var(--color-muted)">{entity.model_usage_count} model{entity.model_usage_count === 1 ? '' : 's'}</span>
+									{/if}
+									{#if entity.description}
+										<span class="text-xs" style="color: var(--color-muted)">
+											{entity.description.slice(0, 60)}{entity.description.length > 60 ? '...' : ''}
+										</span>
+									{/if}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</details>
+			{:else}
+				<ul class="flex flex-col gap-2">
+					{#each group.items as entity}
+						<li>
+							<a
+								href="/entities/{entity.id}"
+								class="flex flex-wrap items-center gap-3 rounded border p-3"
+								style="border-color: var(--color-border); color: var(--color-fg)"
+							>
+								<span class="text-sm font-medium" style="color: var(--color-primary)">{entity.name}</span>
+								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">{entity.entity_type}</span>
+								{#if entity.tags && entity.tags.length > 0}
+									{#each entity.tags as tag}
+										<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+									{/each}
+								{/if}
+								{#if entity.relationship_count}
+									<span class="text-xs" style="color: var(--color-muted)">{entity.relationship_count} rel</span>
+								{/if}
+								{#if entity.model_usage_count}
+									<span class="text-xs" style="color: var(--color-muted)">{entity.model_usage_count} model{entity.model_usage_count === 1 ? '' : 's'}</span>
+								{/if}
+								{#if entity.description}
+									<span class="text-xs" style="color: var(--color-muted)">
+										{entity.description.slice(0, 60)}{entity.description.length > 60 ? '...' : ''}
+									</span>
+								{/if}
+							</a>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/each}
 	{/if}
 </div>
 
