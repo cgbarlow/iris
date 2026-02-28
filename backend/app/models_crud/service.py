@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.models_crud.thumbnail import generate_and_store_thumbnail
 from app.search.service import index_model as _index_model
 from app.search.service import remove_model_index as _remove_model_index
 
@@ -45,6 +46,8 @@ async def create_model(
         model_type=model_type, description=description,
     )
     await db.commit()
+
+    await generate_and_store_thumbnail(db, model_id, data, model_type)
 
     return {
         "id": model_id,
@@ -200,6 +203,10 @@ async def update_model(
             model_type=type_row[0], description=description,
         )
         await db.commit()
+
+    # Generate/update thumbnail
+    if type_row:
+        await generate_and_store_thumbnail(db, model_id, data, type_row[0])
 
     return {"current_version": new_version, "updated_at": now}
 
