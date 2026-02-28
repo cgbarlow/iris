@@ -5,7 +5,7 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.0] - 2026-02-28
 
 ### Added
 - Entity browse with grouping modes (by type, by tag), tags, and enriched information cards
@@ -25,20 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relationships auto-created when entities are connected in model canvases
 - Improved entity tab ordering and relationships empty state message
 - Undo/redo for canvas operations with toolbar buttons and Ctrl+Z/Ctrl+Y shortcuts
+- ADR-016: Search Index Synchronisation
+- ADR-017: Session Timeout Token Refresh Fix
+- ADR-018: Model Creation Navigation
 - ADR-019: Metadata and User Attribution Display
-- SPEC-019-A: Metadata Display
+- ADR-020: Entity Persistence from Model Editor
 - ADR-021: Admin Settings and Configurable Session Timeout
-- SPEC-021-A: Admin Settings
 - ADR-022: Server-Generated PNG Thumbnails
-- SPEC-022-A: PNG Thumbnails
+- ADR-023: Browse Mode Entity Navigation
+- ADR-024: Entity Relationship Auto-Creation
 - ADR-025: Entity Browse Enhancements
-- SPEC-025-A: Entity Browse Enhancements
+- ADR-026: Canvas Four-Position Connection Handles
 - ADR-027: Edge Selection, Deletion, and Reconnection
-- SPEC-027-A: Edge Operations
 - ADR-028: Canvas Undo/Redo
-- SPEC-028-A: Canvas Undo/Redo Implementation
+- ADR-029: Bookmarks Page
 - ADR-030: Model Canvas Toolbar Layout
-- SPEC-030-A: Toolbar Layout Implementation
 
 ### Changed
 - Creating a new model now navigates directly to the model detail page

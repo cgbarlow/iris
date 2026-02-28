@@ -4,6 +4,7 @@
 	 * Selects the appropriate node/edge type registries based on viewType prop.
 	 */
 	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
+	import { ConnectionMode } from '@xyflow/system';
 	import '@xyflow/svelte/dist/style.css';
 
 	import { umlNodeTypes } from './uml/nodes';
@@ -76,10 +77,10 @@
 		selectedEdgeId = null;
 	}
 
-	function handleReconnect(oldEdge: CanvasEdge, newConnection: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) {
+	function handleReconnect(oldEdge: CanvasEdge, newConnection: { source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }) {
 		edges = edges.map((e) =>
 			e.id === oldEdge.id
-				? { ...e, source: newConnection.source, target: newConnection.target, sourceHandle: newConnection.sourceHandle, targetHandle: newConnection.targetHandle }
+				? { ...e, source: newConnection.source, target: newConnection.target, sourceHandle: newConnection.sourceHandle ?? undefined, targetHandle: newConnection.targetHandle ?? undefined }
 				: e,
 		);
 		announcer?.announce('Edge reconnected');
@@ -178,8 +179,7 @@
 		{nodeTypes}
 		{edgeTypes}
 		fitView
-		connectionMode="loose"
-		edgesReconnectable
+		connectionMode={ConnectionMode.Loose}
 		onnodeclick={handleNodeClick}
 		onedgeclick={handleEdgeClick}
 		onreconnect={handleReconnect}
