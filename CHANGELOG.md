@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Creating a new model now navigates directly to the model detail page
+- Entities created within the model editor are now persisted as first-class entities
 
 ### Fixed
 - Search now returns results for all entities and models; FTS index rebuilt on startup
