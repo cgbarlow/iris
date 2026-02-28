@@ -41,6 +41,7 @@ export interface CanvasNodeData {
 	entityType: SimpleEntityType;
 	entityId?: string;
 	description?: string;
+	linkedModelId?: string;
 	[key: string]: unknown;
 }
 

@@ -757,6 +757,7 @@
 								<EntityDetailPanel
 									entity={selectedBrowseNode.data}
 									onclose={() => (selectedBrowseNode = null)}
+									currentModelId={model?.id}
 								/>
 							</div>
 						{/if}
