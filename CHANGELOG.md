@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Dedicated bookmarks page accessible from sidebar navigation
+
 ### Fixed
 - Session timeout "Continue" button now correctly extends the session
 
