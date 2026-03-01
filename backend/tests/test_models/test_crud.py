@@ -202,3 +202,35 @@ class TestModelVersions:
         assert resp.status_code == 200
         assert len(resp.json()) == 1
         assert resp.json()[0]["change_type"] == "create"
+
+
+class TestModelUsernameResolution:
+    """Verify GUID-to-username resolution in model responses (ADR-031)."""
+
+    async def test_get_model_returns_created_by_username(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_model(client, headers)
+        resp = await client.get(
+            f"/api/models/{created['id']}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "created_by_username" in data
+        assert data["created_by_username"] == "admin"
+
+    async def test_model_versions_return_created_by_username(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_model(client, headers)
+        resp = await client.get(
+            f"/api/models/{created['id']}/versions", headers=headers,
+        )
+        assert resp.status_code == 200
+        versions = resp.json()
+        assert len(versions) >= 1
+        for v in versions:
+            assert "created_by_username" in v
+            assert v["created_by_username"] == "admin"

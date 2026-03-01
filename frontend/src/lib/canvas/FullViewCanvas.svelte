@@ -23,8 +23,12 @@
 		ondeletenode?: (nodeId: string) => void;
 		onconnectnodes?: (sourceId: string, targetId: string) => void;
 		ondeleteedge?: (edgeId: string) => void;
+		onreconnectedge?: () => void;
+		onedgeselect?: (edgeId: string | null) => void;
+		onnodeselect?: (nodeId: string | null) => void;
 		onundo?: () => void;
 		onredo?: () => void;
+		onnodedragstart?: () => void;
 	}
 
 	let {
@@ -35,8 +39,12 @@
 		ondeletenode,
 		onconnectnodes,
 		ondeleteedge,
+		onreconnectedge,
+		onedgeselect,
+		onnodeselect,
 		onundo,
 		onredo,
+		onnodedragstart,
 	}: Props = $props();
 
 	let announcer: CanvasAnnouncer | undefined = $state();
@@ -54,6 +62,8 @@
 	function handleNodeClick({ node }: { node: CanvasNode; event: MouseEvent | TouchEvent }) {
 		selectedNodeId = node.id;
 		selectedEdgeId = null;
+		onedgeselect?.(null);
+		onnodeselect?.(node.id);
 		announcer?.announce(`${node.data.label} selected, ${node.data.entityType}`);
 
 		if (connectMode && connectSourceId && connectSourceId !== node.id) {
@@ -64,6 +74,8 @@
 	function handleEdgeClick({ edge }: { edge: CanvasEdge; event: MouseEvent }) {
 		selectedEdgeId = edge.id;
 		selectedNodeId = null;
+		onedgeselect?.(edge.id);
+		onnodeselect?.(null);
 		announcer?.announce(`Edge selected: ${edge.data?.label || edge.type || 'connection'}`);
 	}
 
@@ -75,9 +87,11 @@
 		}
 		announcer?.announce('Edge deleted');
 		selectedEdgeId = null;
+		onedgeselect?.(null);
 	}
 
 	function handleReconnect(oldEdge: CanvasEdge, newConnection: { source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null }) {
+		onreconnectedge?.();
 		edges = edges.map((e) =>
 			e.id === oldEdge.id
 				? { ...e, source: newConnection.source, target: newConnection.target, sourceHandle: newConnection.sourceHandle ?? undefined, targetHandle: newConnection.targetHandle ?? undefined }
@@ -183,6 +197,7 @@
 		onnodeclick={handleNodeClick}
 		onedgeclick={handleEdgeClick}
 		onreconnect={handleReconnect}
+		onnodedragstart={() => onnodedragstart?.()}
 		proOptions={{ hideAttribution: true }}
 		defaultEdgeOptions={{ type: defaultEdgeType }}
 	>

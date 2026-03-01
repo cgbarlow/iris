@@ -124,3 +124,45 @@ class TestAuditMiddleware:
         await _setup_and_login(client)
         is_valid, _count = await verify_audit_chain(db_manager.audit_db)
         assert is_valid
+
+
+class TestAuditUsernameResolution:
+    """Verify audit entries contain resolved username, not GUID (WP-6)."""
+
+    async def test_audit_entry_contains_username_not_guid(
+        self, client_and_db: tuple[httpx.AsyncClient, DatabaseManager]
+    ) -> None:
+        client, db_manager = client_and_db
+        tokens = await _setup_and_login(client)
+
+        # Make an authenticated mutating request
+        await client.post(
+            "/api/entities",
+            json={"entity_type": "service", "name": "Audit Test", "data": {}},
+            headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        )
+
+        cursor = await db_manager.audit_db.execute(
+            "SELECT username FROM audit_log WHERE action = 'POST /api/entities'"
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == "admin"
+
+    async def test_audit_username_for_anonymous_request(
+        self, client_and_db: tuple[httpx.AsyncClient, DatabaseManager]
+    ) -> None:
+        client, db_manager = client_and_db
+
+        # Unauthenticated POST (setup endpoint doesn't require auth)
+        await client.post(
+            "/api/auth/setup",
+            json={"username": "admin", "password": "AdminPass123!"},
+        )
+
+        cursor = await db_manager.audit_db.execute(
+            "SELECT username FROM audit_log WHERE action = 'POST /api/auth/setup'"
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == "anonymous"

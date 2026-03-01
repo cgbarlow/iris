@@ -33,6 +33,7 @@
 		{ value: 'sequence', label: 'Sequence' },
 		{ value: 'uml', label: 'UML' },
 		{ value: 'archimate', label: 'ArchiMate' },
+		{ value: 'roadmap', label: 'Roadmap' },
 	];
 
 	$effect(() => {

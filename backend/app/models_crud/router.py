@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -23,9 +24,28 @@ from app.models_crud.service import (
     soft_delete_model,
     update_model,
 )
-from app.models_crud.thumbnail import get_thumbnail
+from app.models_crud.thumbnail import get_thumbnail, regenerate_all_thumbnails
 
 router = APIRouter(prefix="/api/models", tags=["models"])
+admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _require_admin(current_user: dict[str, Any]) -> None:
+    """Raise 403 if not admin."""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+@admin_router.post("/thumbnails/regenerate")
+async def regenerate_thumbnails(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, int]:
+    """Regenerate PNG thumbnails for all models. Requires admin role."""
+    _require_admin(current_user)
+    db = request.app.state.db_manager.main_db
+    count = await regenerate_all_thumbnails(db)
+    return {"count": count}
 
 
 @router.post("", response_model=ModelResponse, status_code=201)
@@ -166,10 +186,14 @@ async def get_versions(
 
 
 @router.get("/{model_id}/thumbnail")
-async def get_model_thumbnail(model_id: str, request: Request):
+async def get_model_thumbnail(
+    model_id: str,
+    request: Request,
+    theme: str = Query(default="dark"),
+) -> FastAPIResponse:
     """Get the PNG thumbnail for a model."""
     db = request.app.state.db_manager.main_db
-    thumbnail = await get_thumbnail(db, model_id)
+    thumbnail = await get_thumbnail(db, model_id, theme=theme)
     if thumbnail is None:
         raise HTTPException(status_code=404, detail="Thumbnail not found")
 
@@ -180,3 +204,47 @@ async def get_model_thumbnail(model_id: str, request: Request):
         media_type=content_type,
         headers={"Cache-Control": "public, max-age=300"},
     )
+
+
+@router.post("/{model_id}/tags", status_code=201)
+async def add_tag(
+    model_id: str,
+    body: dict[str, Any],
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Add a tag to a model."""
+    db = request.app.state.db_manager.main_db
+    tag = body.get("tag", "").strip()
+    if not tag or len(tag) > 50:
+        raise HTTPException(status_code=400, detail="Tag must be 1-50 characters")
+    now = datetime.now(tz=UTC).isoformat()
+    try:
+        await db.execute(
+            "INSERT INTO model_tags (model_id, tag, created_at, created_by) "
+            "VALUES (?, ?, ?, ?)",
+            (model_id, tag, now, current_user["id"]),
+        )
+        await db.commit()
+    except Exception:
+        raise HTTPException(  # noqa: B904
+            status_code=409, detail="Tag already exists"
+        )
+    return {"model_id": model_id, "tag": tag, "created_at": now}
+
+
+@router.delete("/{model_id}/tags/{tag}")
+async def remove_tag(
+    model_id: str,
+    tag: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Remove a tag from a model."""
+    db = request.app.state.db_manager.main_db
+    await db.execute(
+        "DELETE FROM model_tags WHERE model_id = ? AND tag = ?",
+        (model_id, tag),
+    )
+    await db.commit()
+    return {"status": "ok"}

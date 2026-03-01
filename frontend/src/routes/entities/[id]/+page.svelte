@@ -13,11 +13,14 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { SimpleEntityType } from '$lib/types/canvas';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
+	import TagInput from '$lib/components/TagInput.svelte';
 
 	let entity = $state<Entity | null>(null);
 	let versions = $state<EntityVersion[]>([]);
 	let relationships = $state<Relationship[]>([]);
 	let usedInModels = $state<EntityModelRef[]>([]);
+	let inheritedTags = $state<string[]>([]);
+	let allTags = $state<string[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'details' | 'versions' | 'relationships' | 'models'>('details');
@@ -44,6 +47,7 @@
 				loadVersions(id),
 				loadRelationships(id),
 				loadModels(id),
+				loadAllTags(),
 			]);
 		} catch (e) {
 			error = e instanceof ApiError && e.status === 404
@@ -78,10 +82,55 @@
 		modelsLoading = true;
 		try {
 			usedInModels = await apiFetch<EntityModelRef[]>(`/api/entities/${id}/models`);
+			// Compute inherited tags from models this entity appears in
+			const modelTags = new Set<string>();
+			for (const ref of usedInModels) {
+				try {
+					const m = await apiFetch<{ tags?: string[] }>(`/api/models/${ref.model_id}`);
+					if (m.tags) m.tags.forEach((t) => modelTags.add(t));
+				} catch { /* skip inaccessible models */ }
+			}
+			// Exclude own tags from inherited
+			const ownTags = new Set(entity?.tags ?? []);
+			inheritedTags = [...modelTags].filter((t) => !ownTags.has(t)).sort();
 		} catch {
 			usedInModels = [];
+			inheritedTags = [];
 		}
 		modelsLoading = false;
+	}
+
+	async function loadAllTags() {
+		try {
+			allTags = await apiFetch<string[]>('/api/entities/tags/all');
+		} catch {
+			allTags = [];
+		}
+	}
+
+	async function handleAddTag(tag: string) {
+		if (!entity) return;
+		try {
+			await apiFetch(`/api/entities/${entity.id}/tags`, {
+				method: 'POST',
+				body: JSON.stringify({ tag }),
+			});
+			await loadEntity(entity.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to add tag';
+		}
+	}
+
+	async function handleRemoveTag(tag: string) {
+		if (!entity) return;
+		try {
+			await apiFetch(`/api/entities/${entity.id}/tags/${encodeURIComponent(tag)}`, {
+				method: 'DELETE',
+			});
+			await loadEntity(entity.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to remove tag';
+		}
 	}
 
 	async function handleEdit(name: string, type: SimpleEntityType, description: string) {
@@ -228,6 +277,17 @@
 					<dd style="color: var(--color-fg)">{entity.description}</dd>
 				{/if}
 			</dl>
+
+			<div class="mt-4">
+				<h3 class="text-sm font-medium mb-2" style="color: var(--color-muted)">Tags</h3>
+				<TagInput
+					tags={entity.tags ?? []}
+					onaddtag={handleAddTag}
+					onremovetag={handleRemoveTag}
+					{inheritedTags}
+					suggestions={allTags}
+				/>
+			</div>
 		{:else if activeTab === 'models'}
 			{#if modelsLoading}
 				<p style="color: var(--color-muted)">Loading models...</p>
@@ -272,12 +332,12 @@
 								<td class="py-2" style="color: var(--color-fg)">{rel.relationship_type}</td>
 								<td class="py-2">
 									<a href="/entities/{rel.source_entity_id}" style="color: var(--color-primary)">
-										{rel.source_entity_id === entity.id ? entity.name : rel.source_entity_id}
+										{rel.source_entity_id === entity.id ? entity.name : (rel.source_entity_name || rel.source_entity_id)}
 									</a>
 								</td>
 								<td class="py-2">
 									<a href="/entities/{rel.target_entity_id}" style="color: var(--color-primary)">
-										{rel.target_entity_id === entity.id ? entity.name : rel.target_entity_id}
+										{rel.target_entity_id === entity.id ? entity.name : (rel.target_entity_name || rel.target_entity_id)}
 									</a>
 								</td>
 								<td class="py-2" style="color: var(--color-fg)">{rel.label ?? '—'}</td>

@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { seedAdmin, getAuthToken, loginAsAdmin, createModel } from './fixtures';
+import { seedAdmin, getAuthToken, loginAsAdmin, loginAs, createModel, createUser } from './fixtures';
 
 let modelId: string;
+
+const VIEWER_USERNAME = 'nav_headertest_viewer';
+const VIEWER_PASSWORD = 'ViewerPass12345!';
 
 test.describe('Navigation', () => {
 	test.beforeAll(async () => {
@@ -14,6 +17,13 @@ test.describe('Navigation', () => {
 			description: 'Model for navigation breadcrumb tests',
 		});
 		modelId = model.id as string;
+
+		// Create a viewer user for non-admin header tests
+		await createUser(token, {
+			username: VIEWER_USERNAME,
+			password: VIEWER_PASSWORD,
+			role: 'viewer',
+		});
 	});
 
 	test('Sidebar links navigate correctly', async ({ page }) => {
@@ -92,5 +102,38 @@ test.describe('Navigation', () => {
 		await page.waitForURL('/help');
 		await expect(page.getByRole('heading', { name: 'Help' })).toBeVisible();
 		await expect(page.getByText('Keyboard Shortcuts')).toBeVisible();
+	});
+
+	test('Admin sees Settings link in header', async ({ page }) => {
+		await loginAsAdmin(page);
+
+		const header = page.locator('header');
+
+		// Admin Settings link should be visible in the header
+		const settingsLink = header.getByRole('link', { name: 'Admin Settings' });
+		await expect(settingsLink).toBeVisible();
+		await expect(settingsLink).toHaveAttribute('href', '/admin/settings');
+
+		// Settings link should appear before Help link in the header
+		const helpLink = header.getByRole('link', { name: 'Help' });
+		await expect(helpLink).toBeVisible();
+
+		// Click the Settings link and verify navigation
+		await settingsLink.click();
+		await page.waitForURL('/admin/settings');
+		await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+	});
+
+	test('Non-admin does not see Settings link in header', async ({ page }) => {
+		// Log in as the viewer user (created in beforeAll)
+		await loginAs(page, VIEWER_USERNAME, VIEWER_PASSWORD);
+
+		const header = page.locator('header');
+
+		// Help link should still be visible (available to all users)
+		await expect(header.getByRole('link', { name: 'Help' })).toBeVisible();
+
+		// Admin Settings link should NOT be visible for non-admin users
+		await expect(header.getByRole('link', { name: 'Admin Settings' })).not.toBeVisible();
 	});
 });

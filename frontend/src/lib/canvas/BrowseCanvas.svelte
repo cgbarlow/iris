@@ -19,6 +19,14 @@
 
 	let { nodes, edges, onnodeselect }: Props = $props();
 
+	/** Map nodes to include browseMode flag for hover navigation overlay. */
+	const browseNodes = $derived(
+		nodes.map((n) => ({
+			...n,
+			data: { ...n.data, browseMode: true },
+		}))
+	);
+
 	let announcer: CanvasAnnouncer | undefined = $state();
 
 	function handleNodeClick({ node }: { node: CanvasNode; event: MouseEvent | TouchEvent }) {
@@ -35,7 +43,7 @@
 	aria-roledescription="interactive diagram, read-only"
 >
 	<SvelteFlow
-		{nodes}
+		nodes={browseNodes}
 		{edges}
 		nodeTypes={simpleViewNodeTypes}
 		edgeTypes={simpleViewEdgeTypes}

@@ -40,6 +40,7 @@ class EntityResponse(BaseModel):
     data: dict[str, object] = Field(default_factory=dict)
     created_at: str
     created_by: str
+    created_by_username: str = "Unknown"
     updated_at: str
     is_deleted: bool = False
     tags: list[str] = Field(default_factory=list)
@@ -60,6 +61,7 @@ class EntityVersionResponse(BaseModel):
     rollback_to: int | None = None
     created_at: str
     created_by: str
+    created_by_username: str = "Unknown"
 
 
 class EntityListResponse(BaseModel):

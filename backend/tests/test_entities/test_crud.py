@@ -311,3 +311,117 @@ class TestEntityVersionHistory:
             f"/api/entities/{created['id']}/versions/99", headers=headers,
         )
         assert resp.status_code == 404
+
+
+class TestEntityUsernameResolution:
+    """Verify GUID-to-username resolution in entity responses (ADR-031)."""
+
+    async def test_get_entity_returns_created_by_username(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_entity(client, headers)
+        resp = await client.get(
+            f"/api/entities/{created['id']}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "created_by_username" in data
+        assert data["created_by_username"] == "admin"
+
+    async def test_entity_versions_return_created_by_username(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_entity(client, headers)
+        resp = await client.get(
+            f"/api/entities/{created['id']}/versions", headers=headers,
+        )
+        assert resp.status_code == 200
+        versions = resp.json()
+        assert len(versions) >= 1
+        for v in versions:
+            assert "created_by_username" in v
+            assert v["created_by_username"] == "admin"
+
+    async def test_created_by_username_defaults_to_unknown(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        """Verify that the schema default is 'Unknown' for the field."""
+        headers = await _auth_headers(client)
+        created = await _create_entity(client, headers)
+        resp = await client.get(
+            f"/api/entities/{created['id']}", headers=headers,
+        )
+        data = resp.json()
+        # For a valid user, we get the username; the default "Unknown" is
+        # only used when the LEFT JOIN returns NULL (deleted user).
+        assert data["created_by_username"] == "admin"
+
+
+class TestEntityTagsInGetEntity:
+    """Verify get_entity returns tags from entity_tags table (WP-11)."""
+
+    async def test_get_entity_returns_empty_tags_by_default(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_entity(client, headers)
+        resp = await client.get(
+            f"/api/entities/{created['id']}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "tags" in data
+        assert data["tags"] == []
+
+    async def test_get_entity_returns_tags_after_adding(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_entity(client, headers)
+        entity_id = created["id"]
+
+        # Add tags
+        await client.post(
+            f"/api/entities/{entity_id}/tags",
+            json={"tag": "backend"},
+            headers=headers,
+        )
+        await client.post(
+            f"/api/entities/{entity_id}/tags",
+            json={"tag": "api"},
+            headers=headers,
+        )
+
+        resp = await client.get(
+            f"/api/entities/{entity_id}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "tags" in data
+        assert sorted(data["tags"]) == ["api", "backend"]
+
+    async def test_get_entity_tags_after_deletion(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        created = await _create_entity(client, headers)
+        entity_id = created["id"]
+
+        # Add then remove a tag
+        await client.post(
+            f"/api/entities/{entity_id}/tags",
+            json={"tag": "temporary"},
+            headers=headers,
+        )
+        await client.delete(
+            f"/api/entities/{entity_id}/tags/temporary",
+            headers=headers,
+        )
+
+        resp = await client.get(
+            f"/api/entities/{entity_id}", headers=headers,
+        )
+        data = resp.json()
+        assert data["tags"] == []

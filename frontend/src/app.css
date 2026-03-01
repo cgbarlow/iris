@@ -115,11 +115,13 @@ a {
 }
 
 .canvas-node {
+	position: relative;
 	padding: 8px 12px;
 	border-radius: 6px;
 	border: 2px solid var(--color-border);
 	background: var(--color-surface);
 	color: var(--color-fg);
+	width: 200px;
 	min-width: 140px;
 	font-size: 0.875rem;
 }
@@ -151,9 +153,9 @@ a {
 	margin-top: 4px;
 	font-size: 0.75rem;
 	color: var(--color-muted);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	white-space: normal;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
 }
 
 /* Type-specific border styles (visual distinction beyond colour) */
@@ -190,6 +192,47 @@ a {
 	border-style: dotted;
 	border-radius: 8px;
 }
+.canvas-node--modelref {
+	border-style: double;
+	border-width: 4px;
+	border-color: var(--color-primary);
+	position: relative;
+}
+
+.canvas-node--modelref__stack {
+	position: absolute;
+	top: -4px;
+	left: -4px;
+	right: -4px;
+	bottom: -4px;
+	border: 2px double var(--color-primary);
+	border-radius: 6px;
+	opacity: 0.3;
+	pointer-events: none;
+	transform: translate(4px, 4px);
+	z-index: -1;
+}
+
+/* ── Browse mode node navigation overlay ── */
+.canvas-node__browse-link {
+	display: none;
+	position: absolute;
+	bottom: -2px;
+	right: -2px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: var(--color-primary);
+	color: #fff;
+	font-size: 0.65rem;
+	font-weight: 600;
+	text-decoration: none;
+	z-index: 5;
+	white-space: nowrap;
+}
+
+.canvas-node:hover .canvas-node__browse-link {
+	display: block;
+}
 
 /* ── Canvas edges ── */
 .canvas-edge__label {
@@ -201,6 +244,31 @@ a {
 .svelte-flow .svelte-flow__edge.selected path {
 	stroke-width: 3;
 	stroke: var(--color-primary);
+}
+
+/* ── Edge endpoint handles ── */
+.svelte-flow .svelte-flow__handle:hover {
+	width: 12px;
+	height: 12px;
+	background: var(--color-primary);
+	box-shadow: 0 0 6px var(--color-primary);
+}
+
+.svelte-flow .svelte-flow__edge.selected .svelte-flow__edgeupdater {
+	opacity: 1;
+}
+
+.svelte-flow .svelte-flow__edgeupdater circle {
+	r: 8;
+	fill: var(--color-primary);
+	stroke: var(--color-bg);
+	stroke-width: 2;
+}
+
+.svelte-flow .svelte-flow__edgeupdater:hover circle {
+	r: 10;
+	box-shadow: 0 0 8px var(--color-primary);
+	filter: drop-shadow(0 0 4px var(--color-primary));
 }
 
 /* ── Sequence diagram ── */

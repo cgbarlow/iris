@@ -224,3 +224,69 @@ class TestDeleteRelationship:
             f"/api/relationships/{created['id']}", headers=headers,
         )
         assert resp.status_code == 404
+
+
+class TestRelationshipEntityNameResolution:
+    """Verify entity name resolution in relationship responses (ADR-031)."""
+
+    async def test_list_relationships_returns_entity_names(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        src, tgt = await _create_two_entities(client, headers)
+        await _create_relationship(client, headers, src, tgt)
+        resp = await client.get(
+            f"/api/relationships?entity_id={src}", headers=headers,
+        )
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+        rel = items[0]
+        assert "source_entity_name" in rel
+        assert "target_entity_name" in rel
+        assert rel["source_entity_name"] == "App A"
+        assert rel["target_entity_name"] == "Service B"
+
+    async def test_get_relationship_returns_entity_names(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        headers = await _auth_headers(client)
+        src, tgt = await _create_two_entities(client, headers)
+        created = await _create_relationship(client, headers, src, tgt)
+        resp = await client.get(
+            f"/api/relationships/{created['id']}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "source_entity_name" in data
+        assert "target_entity_name" in data
+        assert data["source_entity_name"] == "App A"
+        assert data["target_entity_name"] == "Service B"
+
+    async def test_entity_names_default_empty_for_missing_entities(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        """Verify entity names fall back to empty string for deleted entities."""
+        headers = await _auth_headers(client)
+        src, tgt = await _create_two_entities(client, headers)
+        created = await _create_relationship(client, headers, src, tgt)
+        # Soft-delete the source entity
+        # First get the entity to know its version
+        src_resp = await client.get(
+            f"/api/entities/{src}", headers=headers,
+        )
+        src_version = src_resp.json()["current_version"]
+        await client.delete(
+            f"/api/entities/{src}",
+            headers={**headers, "If-Match": str(src_version)},
+        )
+        # The relationship should still exist and source name should be empty
+        resp = await client.get(
+            f"/api/relationships/{created['id']}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Source entity was deleted (is_deleted=1), so name should be empty
+        assert data["source_entity_name"] == ""
+        # Target entity still exists, so name should be present
+        assert data["target_entity_name"] == "Service B"

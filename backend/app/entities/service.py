@@ -81,7 +81,7 @@ async def get_entity(
     if row is None:
         return None
 
-    return {
+    entity = {
         "id": row[0],
         "entity_type": row[1],
         "current_version": row[2],
@@ -94,6 +94,16 @@ async def get_entity(
         "is_deleted": bool(row[9]),
         "created_by_username": row[10] or "Unknown",
     }
+
+    # Enrich with tags
+    tag_cursor = await db.execute(
+        "SELECT tag FROM entity_tags WHERE entity_id = ? ORDER BY tag",
+        (entity_id,),
+    )
+    tag_rows = await tag_cursor.fetchall()
+    entity["tags"] = [r[0] for r in tag_rows]
+
+    return entity
 
 
 async def list_entities(
