@@ -121,3 +121,16 @@ These protocols must be followed when using plan mode. They are non-negotiable.
 - Technical descriptions (algorithms, libraries, architecture) must match the actual implementation
 - If a capability is planned but not yet implemented, it must not appear in the README
 - README review is part of every release checklist
+
+## 13. Don't Repeat Yourself (DRY)
+
+**Eliminate duplication — every piece of knowledge must have a single, authoritative representation.**
+
+- Before writing new code, check for existing implementations that solve the same problem — reuse rather than duplicate
+- Extract shared logic into functions, utilities, or modules when the same pattern appears in more than one place
+- Shared constants, types, and configuration values must be defined once and imported everywhere they are used
+- When fixing a bug or changing behaviour, identify all locations where the same logic exists — fix them all or extract the common code
+- Components with identical or near-identical structure should be refactored into a single parameterised component
+- Backend and frontend must not independently re-implement the same validation rules — share the source of truth or derive one from the other
+- Test helpers and fixtures used across multiple test files must live in shared modules, not be copy-pasted
+- Duplication in ADRs and specs is acceptable — documentation may restate for clarity, but code must not
