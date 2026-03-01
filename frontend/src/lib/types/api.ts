@@ -42,6 +42,7 @@ export interface Model {
 	created_by_username?: string;
 	updated_at: string;
 	is_deleted: boolean;
+	tags?: string[];
 }
 
 export interface SearchResult {
@@ -123,6 +124,8 @@ export interface Relationship {
 	created_by: string;
 	updated_at: string;
 	is_deleted: boolean;
+	source_entity_name?: string;
+	target_entity_name?: string;
 }
 
 export interface RelationshipListResponse {

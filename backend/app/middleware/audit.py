@@ -43,6 +43,21 @@ def _get_client_ip(request: Request) -> str:
     return "unknown"
 
 
+async def _resolve_username(request: Request, user_id: str) -> str:
+    """Resolve user_id (GUID) to username via the users table."""
+    if user_id == "anonymous":
+        return "anonymous"
+    try:
+        main_db = request.app.state.db_manager.main_db
+        cursor = await main_db.execute(
+            "SELECT username FROM users WHERE id = ?", (user_id,),
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else user_id
+    except Exception:
+        return user_id
+
+
 class AuditMiddleware(BaseHTTPMiddleware):
     """Middleware that logs mutating requests to the audit chain."""
 
@@ -60,13 +75,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
         user_id = claims.get("sub", "anonymous") if claims else "anonymous"
         jti = claims.get("jti") if claims else None
         ip_address = _get_client_ip(request)
+        username = await _resolve_username(request, user_id)
 
         try:
             audit_db = request.app.state.db_manager.audit_db
             await write_audit_entry(
                 db=audit_db,
                 user_id=user_id,
-                username=user_id,
+                username=username,
                 action=action,
                 target_type="http",
                 target_id=request.url.path,

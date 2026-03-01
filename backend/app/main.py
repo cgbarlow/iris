@@ -17,6 +17,7 @@ from app.database import DatabaseManager
 from app.entities.router import router as entities_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.models_crud.router import admin_router as admin_thumbnails_router
 from app.models_crud.router import router as models_router
 from app.relationships.router import router as relationships_router
 from app.search.router import router as search_router
@@ -105,6 +106,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(search_router)
     app.include_router(audit_router)
     app.include_router(settings_router)
+    app.include_router(admin_thumbnails_router)
 
     return app
 

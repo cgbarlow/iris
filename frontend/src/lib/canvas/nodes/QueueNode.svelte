@@ -13,7 +13,7 @@
 <div
 	class="canvas-node canvas-node--queue"
 	class:canvas-node--selected={selected}
-	
+
 	aria-label="{data.label}, Queue"
 >
 	<div class="canvas-node__header">
@@ -22,6 +22,15 @@
 	</div>
 	{#if data.description}
 		<div class="canvas-node__description">{data.description}</div>
+	{/if}
+	{#if data.browseMode && data.entityId}
+		<a
+			href="/entities/{data.entityId}"
+			class="canvas-node__browse-link"
+			aria-label="View {data.label} details"
+		>
+			View details
+		</a>
 	{/if}
 	<Handle type="target" position={Position.Top} id="top" />
 	<Handle type="source" position={Position.Bottom} id="bottom" />

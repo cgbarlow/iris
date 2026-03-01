@@ -89,22 +89,23 @@
 				{#if modelsLoading}
 					<p class="mt-1 text-xs" style="color: var(--color-muted)">Loading...</p>
 				{:else if usedInModels.length === 0}
-					<p class="mt-1 text-xs" style="color: var(--color-muted)">Not used in any other models.</p>
+					<p class="mt-1 text-xs" style="color: var(--color-muted)">Not used in any models.</p>
 				{:else}
 					<ul class="mt-1 flex flex-col gap-1">
 						{#each usedInModels as model}
-							{#if model.model_id !== currentModelId}
-								<li>
-									<a
-										href="/models/{model.model_id}"
-										class="block rounded px-2 py-1 text-sm"
-										style="color: var(--color-primary)"
-									>
-										{model.name}
-										<span class="text-xs" style="color: var(--color-muted)">({model.model_type})</span>
-									</a>
-								</li>
-							{/if}
+							<li>
+								<a
+									href="/models/{model.model_id}"
+									class="block rounded px-2 py-1 text-sm"
+									style="color: var(--color-primary)"
+								>
+									{model.name}
+									{#if model.model_id === currentModelId}
+										<span class="text-xs" style="color: var(--color-muted)">(current)</span>
+									{/if}
+									<span class="text-xs" style="color: var(--color-muted)">({model.model_type})</span>
+								</a>
+							</li>
 						{/each}
 					</ul>
 				{/if}

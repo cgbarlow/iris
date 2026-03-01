@@ -5,6 +5,7 @@ export interface Participant {
 	id: string;
 	name: string;
 	type: 'actor' | 'component' | 'service';
+	entityId?: string;
 }
 
 /** A message between participants. */

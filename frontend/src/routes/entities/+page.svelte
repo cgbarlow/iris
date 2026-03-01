@@ -10,6 +10,8 @@
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let typeFilter = $state('');
+	let tagFilter = $state('');
+	let availableTags = $state<string[]>([]);
 	let sortField = $state<'name' | 'entity_type' | 'updated_at'>('name');
 	let showCreateDialog = $state(false);
 	let groupMode = $state<'none' | 'type' | 'tag'>(
@@ -33,10 +35,19 @@
 		try {
 			const data = await apiFetch<PaginatedResponse<Entity>>('/api/entities');
 			entities = data.items;
+			loadAvailableTags();
 		} catch {
 			error = 'Failed to load entities';
 		}
 		loading = false;
+	}
+
+	async function loadAvailableTags() {
+		try {
+			availableTags = await apiFetch<string[]>('/api/entities/tags/all');
+		} catch {
+			availableTags = [];
+		}
 	}
 
 	async function handleCreate(name: string, entityType: SimpleEntityType, description: string) {
@@ -61,6 +72,7 @@
 		entities
 			.filter((e) => {
 				if (typeFilter && e.entity_type !== typeFilter) return false;
+				if (tagFilter && !(e.tags ?? []).includes(tagFilter)) return false;
 				if (searchQuery) {
 					const q = searchQuery.toLowerCase();
 					return (
@@ -152,6 +164,20 @@
 			<option value="">All types</option>
 			{#each SIMPLE_ENTITY_TYPES as t}
 				<option value={t.key}>{t.label}</option>
+			{/each}
+		</select>
+	</div>
+	<div>
+		<label for="entity-tag-filter" class="sr-only">Filter by tag</label>
+		<select
+			id="entity-tag-filter"
+			bind:value={tagFilter}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		>
+			<option value="">All tags</option>
+			{#each availableTags as tag}
+				<option value={tag}>{tag}</option>
 			{/each}
 		</select>
 	</div>

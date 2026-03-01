@@ -11,6 +11,9 @@
 	let searchQuery = $state('');
 	let sortField = $state<'name' | 'model_type' | 'updated_at'>('name');
 	let typeFilter = $state<string>('');
+	let tagFilter = $state('');
+	let availableTags = $state<string[]>([]);
+	let templateFilter = $state(false);
 	let showCreateDialog = $state(false);
 	let viewMode = $state<'list' | 'gallery'>(
 		(typeof window !== 'undefined' && localStorage.getItem('iris-models-view') as 'list' | 'gallery') || 'list'
@@ -19,6 +22,8 @@
 		(typeof window !== 'undefined' && Number(localStorage.getItem('iris-models-card-size'))) || 250
 	);
 	let thumbnailMode = $state<'svg' | 'png'>('svg');
+	let thumbnailErrors = $state<Set<string>>(new Set());
+	let currentTheme = $state<'light' | 'dark' | 'high-contrast'>('dark');
 
 	$effect(() => {
 		loadModels();
@@ -26,6 +31,24 @@
 
 	$effect(() => {
 		loadThumbnailMode();
+	});
+
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		const detectTheme = () => {
+			const el = document.documentElement;
+			if (el.classList.contains('high-contrast')) {
+				currentTheme = 'high-contrast';
+			} else if (el.classList.contains('dark')) {
+				currentTheme = 'dark';
+			} else {
+				currentTheme = 'light';
+			}
+		};
+		detectTheme();
+		const observer = new MutationObserver(detectTheme);
+		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+		return () => observer.disconnect();
 	});
 
 	$effect(() => {
@@ -40,10 +63,19 @@
 		try {
 			const data = await apiFetch<PaginatedResponse<Model>>('/api/models');
 			models = data.items;
+			loadAvailableTags();
 		} catch {
 			error = 'Failed to load models';
 		}
 		loading = false;
+	}
+
+	async function loadAvailableTags() {
+		try {
+			availableTags = await apiFetch<string[]>('/api/entities/tags/all');
+		} catch {
+			availableTags = [];
+		}
 	}
 
 	async function loadThumbnailMode() {
@@ -80,6 +112,8 @@
 				if (typeFilter && m.model_type.toLowerCase() !== typeFilter.toLowerCase()) {
 					return false;
 				}
+				if (tagFilter && !(m.tags ?? []).includes(tagFilter)) return false;
+			if (templateFilter && !(m.tags ?? []).includes('template')) return false;
 				if (searchQuery) {
 					const q = searchQuery.toLowerCase();
 					return (
@@ -142,6 +176,21 @@
 			<option value="sequence">Sequence</option>
 			<option value="uml">UML</option>
 			<option value="archimate">ArchiMate</option>
+			<option value="roadmap">Roadmap</option>
+		</select>
+	</div>
+	<div>
+		<label for="model-tag-filter" class="sr-only">Filter by tag</label>
+		<select
+			id="model-tag-filter"
+			bind:value={tagFilter}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		>
+			<option value="">All tags</option>
+			{#each availableTags as tag}
+				<option value={tag}>{tag}</option>
+			{/each}
 		</select>
 	</div>
 	<div>
@@ -177,6 +226,17 @@
 			▦
 		</button>
 	</div>
+	<button
+		onclick={() => (templateFilter = !templateFilter)}
+		aria-label="Show templates only"
+		aria-pressed={templateFilter}
+		class="rounded border px-3 py-2 text-sm"
+		style="border-color: var(--color-border); {templateFilter
+			? 'background: var(--color-primary); color: white'
+			: 'background: var(--color-bg); color: var(--color-fg)'}"
+	>
+		Templates
+	</button>
 	{#if viewMode === 'gallery'}
 		<div class="flex items-center gap-2">
 			<label for="card-size-slider" class="sr-only">Card size</label>
@@ -221,6 +281,14 @@
 							<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
 								{model.model_type}
 							</span>
+							{#if (model.tags ?? []).includes('template')}
+								<span class="rounded px-2 py-0.5 text-xs font-medium" style="background: var(--color-success, #16a34a); color: white">Template</span>
+							{/if}
+							{#if model.tags && model.tags.length > 0}
+								{#each model.tags.filter(t => t !== 'template') as tag}
+									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+								{/each}
+							{/if}
 							{#if model.description}
 								<span class="text-xs" style="color: var(--color-muted)">
 									{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}
@@ -238,13 +306,14 @@
 						class="flex flex-col rounded border overflow-hidden"
 						style="border-color: var(--color-border); color: var(--color-fg)"
 					>
-						<div class="h-28 overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
-							{#if thumbnailMode === 'png'}
+						<div class="flex h-28 items-center justify-center overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
+							{#if thumbnailMode === 'png' && !thumbnailErrors.has(model.id)}
 								<img
-									src="/api/models/{model.id}/thumbnail"
+									src="/api/models/{model.id}/thumbnail?theme={currentTheme}"
 									alt="Thumbnail for {model.name}"
-									class="h-full w-full object-cover"
+									class="h-full w-full object-contain"
 									loading="lazy"
+									onerror={() => { thumbnailErrors = new Set([...thumbnailErrors, model.id]); }}
 								/>
 							{:else}
 								<ModelThumbnail data={model.data} modelType={model.model_type} />
@@ -253,6 +322,9 @@
 						<div class="flex flex-col gap-2 p-4">
 							<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
 							<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
+							{#if (model.tags ?? []).includes('template')}
+								<span class="rounded px-2 py-0.5 text-xs font-medium w-fit" style="background: var(--color-success, #16a34a); color: white">Template</span>
+							{/if}
 							{#if model.description}
 								<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
 							{/if}

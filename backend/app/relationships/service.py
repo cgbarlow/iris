@@ -69,10 +69,19 @@ async def get_relationship(
         "SELECT r.id, r.source_entity_id, r.target_entity_id, "
         "r.relationship_type, r.current_version, "
         "rv.label, rv.description, rv.data, "
-        "r.created_at, r.created_by, r.updated_at, r.is_deleted "
+        "r.created_at, r.created_by, r.updated_at, r.is_deleted, "
+        "sev.name, tev.name "
         "FROM relationships r "
         "JOIN relationship_versions rv ON r.id = rv.relationship_id "
         "AND r.current_version = rv.version "
+        "LEFT JOIN entities se ON r.source_entity_id = se.id "
+        "AND se.is_deleted = 0 "
+        "LEFT JOIN entity_versions sev ON se.id = sev.entity_id "
+        "AND se.current_version = sev.version "
+        "LEFT JOIN entities te ON r.target_entity_id = te.id "
+        "AND te.is_deleted = 0 "
+        "LEFT JOIN entity_versions tev ON te.id = tev.entity_id "
+        "AND te.current_version = tev.version "
         "WHERE r.id = ? AND r.is_deleted = 0",
         (rel_id,),
     )
@@ -93,6 +102,8 @@ async def get_relationship(
         "created_by": row[9],
         "updated_at": row[10],
         "is_deleted": bool(row[11]),
+        "source_entity_name": row[12] or "",
+        "target_entity_name": row[13] or "",
     }
 
 
@@ -127,10 +138,19 @@ async def list_relationships(
         f"SELECT r.id, r.source_entity_id, r.target_entity_id, "  # noqa: S608
         "r.relationship_type, r.current_version, "
         "rv.label, rv.description, rv.data, "
-        "r.created_at, r.created_by, r.updated_at, r.is_deleted "
+        "r.created_at, r.created_by, r.updated_at, r.is_deleted, "
+        "sev.name, tev.name "
         "FROM relationships r "
         "JOIN relationship_versions rv ON r.id = rv.relationship_id "
         "AND r.current_version = rv.version "
+        "LEFT JOIN entities se ON r.source_entity_id = se.id "
+        "AND se.is_deleted = 0 "
+        "LEFT JOIN entity_versions sev ON se.id = sev.entity_id "
+        "AND se.current_version = sev.version "
+        "LEFT JOIN entities te ON r.target_entity_id = te.id "
+        "AND te.is_deleted = 0 "
+        "LEFT JOIN entity_versions tev ON te.id = tev.entity_id "
+        "AND te.current_version = tev.version "
         f"WHERE {where_sql} "
         "ORDER BY r.updated_at DESC LIMIT ? OFFSET ?",
         [*params, page_size, offset],
@@ -151,6 +171,8 @@ async def list_relationships(
             "created_by": r[9],
             "updated_at": r[10],
             "is_deleted": bool(r[11]),
+            "source_entity_name": r[12] or "",
+            "target_entity_name": r[13] or "",
         }
         for r in rows
     ]

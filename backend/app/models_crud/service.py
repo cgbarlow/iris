@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.models_crud.thumbnail import generate_and_store_thumbnail
+from app.models_crud.thumbnail import VALID_THEMES, generate_and_store_thumbnail
 from app.relationships.service import create_relationship
 from app.search.service import index_model as _index_model
 from app.search.service import remove_model_index as _remove_model_index
@@ -48,7 +48,8 @@ async def create_model(
     )
     await db.commit()
 
-    await generate_and_store_thumbnail(db, model_id, data, model_type)
+    for theme in VALID_THEMES:
+        await generate_and_store_thumbnail(db, model_id, data, model_type, theme=theme)
 
     return {
         "id": model_id,
@@ -85,6 +86,14 @@ async def get_model(
     if row is None:
         return None
 
+    # Fetch tags for this model
+    tag_cursor = await db.execute(
+        "SELECT tag FROM model_tags WHERE model_id = ? ORDER BY tag",
+        (model_id,),
+    )
+    tag_rows = await tag_cursor.fetchall()
+    tags = [t[0] for t in tag_rows]
+
     return {
         "id": row[0],
         "model_type": row[1],
@@ -97,6 +106,7 @@ async def get_model(
         "updated_at": row[8],
         "is_deleted": bool(row[9]),
         "created_by_username": row[10] or "Unknown",
+        "tags": tags,
     }
 
 
@@ -138,6 +148,19 @@ async def list_models(
     )
     rows = await cursor.fetchall()
 
+    # Collect model IDs for batch tag lookup
+    model_ids = [r[0] for r in rows]
+    tags_by_model: dict[str, list[str]] = {mid: [] for mid in model_ids}
+    if model_ids:
+        placeholders = ",".join("?" for _ in model_ids)
+        tag_cursor = await db.execute(
+            f"SELECT model_id, tag FROM model_tags WHERE model_id IN ({placeholders}) ORDER BY tag",  # noqa: S608
+            model_ids,
+        )
+        tag_rows = await tag_cursor.fetchall()
+        for tr in tag_rows:
+            tags_by_model[tr[0]].append(tr[1])
+
     items = [
         {
             "id": r[0],
@@ -150,6 +173,7 @@ async def list_models(
             "created_by": r[7],
             "updated_at": r[8],
             "is_deleted": bool(r[9]),
+            "tags": tags_by_model.get(r[0], []),
         }
         for r in rows
     ]
@@ -205,9 +229,10 @@ async def update_model(
         )
         await db.commit()
 
-    # Generate/update thumbnail
+    # Generate/update thumbnail for all themes
     if type_row:
-        await generate_and_store_thumbnail(db, model_id, data, type_row[0])
+        for theme in VALID_THEMES:
+            await generate_and_store_thumbnail(db, model_id, data, type_row[0], theme=theme)
 
     # Auto-create entity relationships from canvas edges
     try:

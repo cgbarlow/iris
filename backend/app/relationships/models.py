@@ -40,6 +40,8 @@ class RelationshipResponse(BaseModel):
     created_by: str
     updated_at: str
     is_deleted: bool = False
+    source_entity_name: str = ""
+    target_entity_name: str = ""
 
 
 class RelationshipVersionResponse(BaseModel):

@@ -7,6 +7,7 @@ import PackageNode from './PackageNode.svelte';
 import ActorNode from './ActorNode.svelte';
 import DatabaseNode from './DatabaseNode.svelte';
 import QueueNode from './QueueNode.svelte';
+import ModelRefNode from './ModelRefNode.svelte';
 
 export const simpleViewNodeTypes = {
 	component: ComponentNode,
@@ -16,4 +17,5 @@ export const simpleViewNodeTypes = {
 	actor: ActorNode,
 	database: DatabaseNode,
 	queue: QueueNode,
+	modelref: ModelRefNode,
 } as const;

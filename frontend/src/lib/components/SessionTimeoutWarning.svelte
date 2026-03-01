@@ -2,9 +2,14 @@
 	/**
 	 * Session timeout warning per WCAG 2.2.1 (Timing Adjustable).
 	 * Shows a dialog 60s before JWT expiry, allowing the user to extend their session.
+	 *
+	 * ADR-031: The $effect reads getAccessToken() FIRST (before any early returns)
+	 * to ensure Svelte 5 tracks the $state dependency. This guarantees the effect
+	 * re-runs whenever the token changes — including silent auto-refresh by apiFetch.
 	 */
 	import { getAccessToken, isAuthenticated, clearAuth } from '$lib/stores/auth.svelte.js';
 	import { tryRefresh } from '$lib/utils/api';
+	import { parseTokenExpiry } from '$lib/utils/tokenExpiry.js';
 
 	let showWarning = $state(false);
 	let secondsRemaining = $state(60);
@@ -13,31 +18,31 @@
 	let dialogEl: HTMLDialogElement | undefined = $state();
 
 	$effect(() => {
-		if (!isAuthenticated()) return;
-
+		// ADR-031: Read token FIRST to ensure Svelte tracks the $state dependency.
+		// This must happen before any early returns so the effect re-runs whenever
+		// updateTokens() or setAuth() writes a new token value (e.g. auto-refresh).
 		const token = getAccessToken();
+
+		if (!isAuthenticated()) return;
 		if (!token) return;
 
-		try {
-			const payload = JSON.parse(atob(token.split('.')[1]));
-			const expiresAt = payload.exp * 1000;
-			const warningTime = expiresAt - 60_000;
-			const now = Date.now();
+		const expiresAt = parseTokenExpiry(token);
+		if (!expiresAt) return;
 
-			if (warningTime > now) {
-				timeoutId = setTimeout(() => {
-					showWarning = true;
-					secondsRemaining = 60;
-					intervalId = setInterval(() => {
-						secondsRemaining--;
-						if (secondsRemaining <= 0) {
-							clearInterval(intervalId);
-						}
-					}, 1000);
-				}, warningTime - now);
-			}
-		} catch {
-			// Invalid token — ignore
+		const warningTime = expiresAt - 60_000;
+		const now = Date.now();
+
+		if (warningTime > now) {
+			timeoutId = setTimeout(() => {
+				showWarning = true;
+				secondsRemaining = 60;
+				intervalId = setInterval(() => {
+					secondsRemaining--;
+					if (secondsRemaining <= 0) {
+						clearInterval(intervalId);
+					}
+				}, 1000);
+			}, warningTime - now);
 		}
 
 		return () => {

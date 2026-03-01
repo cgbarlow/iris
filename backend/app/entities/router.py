@@ -75,9 +75,15 @@ async def list_all_tags(
     request: Request,
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> list[str]:
-    """List all unique tags."""
+    """List all unique tags from entities and models."""
     db = request.app.state.db_manager.main_db
-    cursor = await db.execute("SELECT DISTINCT tag FROM entity_tags ORDER BY tag")
+    cursor = await db.execute(
+        "SELECT DISTINCT tag FROM ("
+        "  SELECT tag FROM entity_tags"
+        "  UNION"
+        "  SELECT tag FROM model_tags"
+        ") ORDER BY tag"
+    )
     rows = await cursor.fetchall()
     return [row[0] for row in rows]
 

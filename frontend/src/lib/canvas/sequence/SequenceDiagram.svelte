@@ -10,6 +10,7 @@
 		data: SequenceDiagramData;
 		selectedMessageId?: string | null;
 		onmessageselect?: (messageId: string) => void;
+		onparticipantselect?: (participant: Participant) => void;
 		viewBox?: string | null;
 		onwheel?: (e: WheelEvent) => void;
 		onpointerdown?: (e: PointerEvent) => void;
@@ -21,6 +22,7 @@
 		data,
 		selectedMessageId = null,
 		onmessageselect,
+		onparticipantselect,
 		viewBox = null,
 		onwheel,
 		onpointerdown,
@@ -60,6 +62,10 @@
 
 	/** Sorted messages by order. */
 	const sortedMessages = $derived([...data.messages].sort((a, b) => a.order - b.order));
+
+	function handleParticipantClick(participant: Participant) {
+		onparticipantselect?.(participant);
+	}
 
 	function handleMessageClick(messageId: string) {
 		onmessageselect?.(messageId);
@@ -125,7 +131,21 @@
 		<!-- Participant headers -->
 		{#each data.participants as participant, i}
 			{@const cx = participantX(i)}
-			<g aria-label="{participant.name}, {participant.type}">
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_tabindex -->
+			<g
+				aria-label="{participant.name}, {participant.type}"
+				role={onparticipantselect ? 'button' : undefined}
+				tabindex={onparticipantselect ? 0 : undefined}
+				onclick={() => handleParticipantClick(participant)}
+				onkeydown={(e: KeyboardEvent) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						handleParticipantClick(participant);
+					}
+				}}
+				style={onparticipantselect ? 'cursor: pointer' : undefined}
+				class="sequence-participant-header"
+			>
 				<rect
 					x={cx - L.participantWidth / 2}
 					y={L.headerY}

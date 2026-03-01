@@ -14,6 +14,9 @@
 	let error = $state<string | null>(null);
 	let success = $state<string | null>(null);
 	let saving = $state(false);
+	let regenerating = $state(false);
+	let regenSuccess = $state<string | null>(null);
+	let regenError = $state<string | null>(null);
 
 	// Form values
 	let sessionTimeout = $state(15);
@@ -43,6 +46,22 @@
 			method: 'PUT',
 			body: JSON.stringify({ value: sanitized }),
 		});
+	}
+
+	async function regenerateThumbnails() {
+		regenerating = true;
+		regenSuccess = null;
+		regenError = null;
+		try {
+			const result = await apiFetch<{ count: number }>('/api/admin/thumbnails/regenerate', {
+				method: 'POST',
+			});
+			regenSuccess = `Regenerated ${result.count} model thumbnails`;
+		} catch (e) {
+			regenError =
+				e instanceof ApiError ? e.message : 'Failed to regenerate thumbnails';
+		}
+		regenerating = false;
 	}
 
 	async function saveAll() {
@@ -138,6 +157,41 @@
 					</label>
 				</div>
 			</fieldset>
+		</div>
+
+		<div class="rounded border p-4" style="border-color: var(--color-border)">
+			<h2 class="text-lg font-medium" style="color: var(--color-fg)">
+				Thumbnail Regeneration
+			</h2>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">
+				Regenerate PNG thumbnails for all models across all themes.
+			</p>
+			{#if regenError}
+				<div
+					role="alert"
+					class="mt-3 rounded border p-3 text-sm"
+					style="border-color: var(--color-danger); color: var(--color-danger)"
+				>
+					{regenError}
+				</div>
+			{/if}
+			{#if regenSuccess}
+				<div
+					role="status"
+					class="mt-3 rounded border p-3 text-sm"
+					style="border-color: var(--color-success, #16a34a); color: var(--color-success, #16a34a)"
+				>
+					{regenSuccess}
+				</div>
+			{/if}
+			<button
+				onclick={regenerateThumbnails}
+				disabled={regenerating}
+				class="mt-3 rounded px-4 py-2 text-sm text-white disabled:opacity-50"
+				style="background-color: var(--color-primary)"
+			>
+				{regenerating ? 'Regenerating...' : 'Regenerate Thumbnails'}
+			</button>
 		</div>
 
 		<button

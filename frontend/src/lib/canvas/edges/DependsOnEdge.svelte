@@ -1,5 +1,13 @@
 <script lang="ts">
-	import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/svelte';
+	import {
+		BaseEdge,
+		EdgeReconnectAnchor,
+		getBezierPath,
+		getStraightPath,
+		getSmoothStepPath,
+		type EdgeProps,
+	} from '@xyflow/svelte';
+	import EdgeLabel from './EdgeLabel.svelte';
 
 	let {
 		id,
@@ -14,16 +22,15 @@
 		data,
 	}: EdgeProps = $props();
 
-	const path = $derived(
-		getBezierPath({
-			sourceX,
-			sourceY,
-			targetX,
-			targetY,
-			sourcePosition,
-			targetPosition,
-		}),
-	);
+	const path = $derived.by(() => {
+		const pathParams = { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition };
+		const rt = data?.routingType;
+		if (rt === 'straight') return getStraightPath(pathParams);
+		if (rt === 'step') return getSmoothStepPath({ ...pathParams, borderRadius: 0 });
+		if (rt === 'smoothstep') return getSmoothStepPath(pathParams);
+		if (rt === 'bezier') return getBezierPath(pathParams);
+		return getBezierPath(pathParams);
+	});
 </script>
 
 <BaseEdge
@@ -34,15 +41,7 @@
 	aria-label="{data?.label ?? 'Depends on'} relationship"
 />
 {#if data?.label}
-	<text>
-		<textPath
-			href="#{id}"
-			startOffset="50%"
-			text-anchor="middle"
-			dominant-baseline="text-before-edge"
-			class="canvas-edge__label"
-		>
-			{data.label}
-		</textPath>
-	</text>
+	<EdgeLabel edgeId={id} label={data.label} labelX={path[1]} labelY={path[2]} offsetX={data.labelOffsetX ?? 0} offsetY={data.labelOffsetY ?? 0} rotation={data.labelRotation ?? 0} />
 {/if}
+<EdgeReconnectAnchor type="source" position={{ x: sourceX, y: sourceY }} />
+<EdgeReconnectAnchor type="target" position={{ x: targetX, y: targetY }} />

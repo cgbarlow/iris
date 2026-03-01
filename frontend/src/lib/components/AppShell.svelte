@@ -18,6 +18,7 @@
 	const adminItems = [
 		{ href: '/admin/users', label: 'Users', shortcut: 'U' },
 		{ href: '/admin/audit', label: 'Audit Log', shortcut: 'A' },
+		{ href: '/admin/settings', label: 'Settings', shortcut: 'S' },
 	];
 
 	async function handleLogout() {

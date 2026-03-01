@@ -1,8 +1,8 @@
-# ADR-031: GUID to Username Resolution
+# ADR-034: GUID to Username Resolution
 
 | Field | Value |
 |-------|-------|
-| **Decision ID** | ADR-031 |
+| **Decision ID** | ADR-034 |
 | **Initiative** | GUID to Username Resolution |
 | **Proposed By** | Architecture Team |
 | **Date** | 2026-03-01 |
@@ -98,7 +98,7 @@
 
 | Reference ID | Title | Type | Location |
 |--------------|-------|------|----------|
-| SPEC-031-A | GUID Username Resolution | Technical Specification | [specs/SPEC-031-A-GUID-Username-Resolution.md](specs/SPEC-031-A-GUID-Username-Resolution.md) |
+| SPEC-034-A | GUID Username Resolution | Technical Specification | [specs/SPEC-034-A-GUID-Username-Resolution.md](specs/SPEC-034-A-GUID-Username-Resolution.md) |
 
 ---
 

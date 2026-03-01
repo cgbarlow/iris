@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/svelte';
+	import { BaseEdge, EdgeReconnectAnchor, getBezierPath, type EdgeProps } from '@xyflow/svelte';
 
 	let { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }: EdgeProps = $props();
 
@@ -7,3 +7,5 @@
 </script>
 
 <BaseEdge {id} path={path[0]} {markerEnd} style={style ?? ''} aria-label="Composition" />
+<EdgeReconnectAnchor type="source" position={{ x: sourceX, y: sourceY }} />
+<EdgeReconnectAnchor type="target" position={{ x: targetX, y: targetY }} />

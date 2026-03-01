@@ -5,6 +5,91 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-01
+
+### Added
+- Theme-aware PNG thumbnails: 3 theme variants (light/dark/high-contrast) with parameterized SVG colors, composite PK migration, ?theme= query param on thumbnail API (WP-1)
+- Edge label editing: shared EdgeLabel.svelte component using EdgeLabelRenderer with double-click inline editing, DOMPurify sanitization, and CustomEvent dispatch (WP-3)
+- Edge label repositioning: drag-to-reposition via pointer events, labelOffsetX/Y/Rotation in CanvasEdgeData (WP-4)
+- Canvas node description sync: refreshNodeDescriptions() fetches entity data after canvas load, updating labels and descriptions via Promise.all (WP-5)
+- Sequence diagram browse mode: onparticipantselect callback enables click-to-detail on participants with linked entities (WP-7)
+- Model-in-model visual differentiation: ModelRefNode.svelte with stacked-squares visual, registered as 'modelref' node type (WP-8)
+- Admin PNG regeneration button: POST /api/admin/thumbnails/regenerate endpoint with admin guard, settings page button with loading/success states (WP-9)
+- Tag autocomplete: suggestions prop on TagInput with filtered dropdown, keyboard navigation (Arrow keys, Enter, Escape), ARIA combobox support (WP-10)
+- ADR-046 through ADR-052 and corresponding specs
+- Example Iris Architecture Models: idempotent seed creates 15 entities, 20 relationships, and 4 models (Iris Architecture, API Request Flow sequence diagram, Data Layer, Iris Enterprise View) with full canvas layouts and DB relationship records on first startup (WP-16)
+- ADR-045: Example Iris Architecture Models
+- SPEC-045-A: Example Architecture Models Seed
+- Entity Edit from Model Editor: "Edit Entity" button in canvas toolbar (edit mode) when a linked entity node is selected; fetches entity from API, opens EntityDialog in edit mode, saves via PUT with If-Match header, and updates canvas node label/type/description in place (WP-15)
+- ADR-044: Entity Edit from Model Editor
+- SPEC-044-A: Entity Edit from Model Editor Implementation
+- Template Designation: "Template" checkbox on model detail overview tab to mark models as reusable templates via the `template` tag; "Templates" toggle button on model list page filters to template models; green "Template" badge on model cards/list items (WP-13)
+- ADR-043: Template Designation
+- SPEC-043-A: Template Designation Implementation
+- Connector Manipulation: per-edge routing type selection (Default, Straight, Step, Smooth Step, Bezier) via toolbar dropdown when an edge is selected in edit mode; routing type persists with model data and integrates with undo/redo (WP-11)
+- ADR-042: Connector Manipulation
+- SPEC-042-A: Connector Manipulation Implementation
+- 59 tests for connector routing (type definitions, edge component path functions, routing change logic, undo/redo integration, page UI)
+- Export Model: "Export" dropdown in canvas toolbar (edit mode) supports SVG, PNG, and PDF download; Visio and Draw.io shown as disabled placeholders (WP-10)
+- ADR-039: Model Export
+- SPEC-039-A: Model Export Implementation
+- 13 unit tests for export utilities (filename sanitization, SVG extraction, DOM integrity)
+- Clone Model: "Clone" button on model detail page duplicates a model with its canvas layout, pre-filling name with "(Copy)" suffix (WP-14)
+- ADR-041: Clone Model
+- SPEC-041-A: Clone Model Implementation
+- Roadmap model type: available in model creation dialog, model type filter, and detail page canvas (uses simple canvas view)
+- ADR-040: Roadmap Model Type
+- SPEC-040-A: Roadmap Model Type Implementation
+- Admin Settings link in application header for admin users, providing quick access to `/admin/settings` regardless of sidebar state
+- ADR-031: Admin Settings Header Link
+- ADR-031: Session Timeout During Active Use
+- ADR-033: Search Display Fix — verified entity CRUD operations correctly maintain FTS5 search index
+- ADR-034: GUID to Username Resolution
+- SPEC-034-A: GUID Username Resolution Implementation
+- 6 regression tests for entity search indexing (create, update, delete, description search, multiple entities, deep link format)
+- 8 tests for GUID-to-username resolution (entity, model, and relationship endpoints)
+- ADR-032: PNG Thumbnail Startup Regeneration and Frontend Fallback
+- SPEC-032-A: PNG Thumbnail Fix
+- 8 tests for PNG thumbnail generation (endpoint returns PNG, startup regeneration, stale SVG replacement, deleted model skipping)
+- ADR-036: Browse Mode Fixes
+- SPEC-036-A: Browse Mode Fixes Implementation
+- ADR-038: Edge Reconnection Fix
+- SPEC-038-A: Edge Reconnection Fix Implementation
+- 45 tests for edge reconnection (reconnection logic, undo integration, EdgeReconnectAnchor presence in all 12 edge components)
+
+### Changed
+- TagInput component now accepts optional `suggestions` prop for autocomplete (WP-10)
+- Edge components (Uses, DependsOn, Composes, Implements, Contains) now use shared EdgeLabel component (WP-3)
+- CanvasEdgeData extended with labelOffsetX, labelOffsetY, labelRotation fields (WP-4)
+- Undo/redo now covers node drag moves: dragging a node pushes pre-drag state to the undo stack
+- Undo/Redo button tooltips updated from "Ctrl+Z"/"Ctrl+Y" to "Ctrl/Cmd+Z"/"Ctrl/Cmd+Y" for Mac compatibility
+- Non-focus-mode editing canvases now pass onundo/onredo to enable Ctrl+Z/Ctrl+Y keyboard shortcuts
+- ADR-035: Undo/Redo Node Moves + Mac Shortcut Labels
+
+### Fixed
+- Gallery thumbnail sizing: changed object-cover to object-contain with flex centering for correct aspect ratio (WP-2)
+- Canvas node description sync: node descriptions now refresh from linked entities after canvas load (WP-5)
+- Audit log username resolution: audit entries now show username instead of GUID via _resolve_username() (WP-6)
+- Entity tag display: get_entity() now includes tags from entity_tags table (WP-11)
+- Export captures full viewport: uses html-to-image for complete node+edge capture, export button always visible (WP-12)
+- Edge endpoint selection highlight: CSS for handle hover glow, larger dot size, and primary color on selected edges (WP-13)
+- Edge reconnection now works: added `EdgeReconnectAnchor` to all 12 custom edge components (Simple View, UML, ArchiMate) enabling drag-to-reconnect endpoints (ADR-038)
+- Canvas connector creation now creates a real relationship record in the database when both nodes are linked to entities, so entity detail pages show the connection
+- Edge reconnection and deletion now push to undo history, enabling Ctrl+Z reversal
+- PNG gallery mode now displays images: added `cairosvg` as required dependency, thumbnails regenerated on startup for all models, frontend falls back to SVG component on image load error (ADR-032)
+- "Used In Models" panel now shows all models including the current model (marked with "(current)") instead of filtering it out, fixing empty list when entity is only in the current model
+- Browse mode canvas nodes now show a "View details" hover overlay link for direct navigation to entity detail page
+- Session timeout warning no longer appears during active use; the `$effect` timer now reschedules whenever the JWT is silently refreshed by `apiFetch` auto-refresh
+- Entity and model API responses now include `created_by_username` field (Pydantic schemas were stripping the field returned by the service layer)
+- Version history API responses now include `created_by_username` for all entity and model versions
+- Relationships API responses now include `source_entity_name` and `target_entity_name` (service layer JOINs entities table to resolve names)
+- Relationships tab on entity detail page now shows entity names instead of raw GUIDs for source/target entities
+- EdgeLabel component: fixed import of non-existent `EdgeLabelRenderer` — now correctly uses `EdgeLabel` from @xyflow/svelte
+- Canvas nodes now have standard 200px width with word-wrapping descriptions instead of truncation
+- New node placement uses grid-based overlap avoidance instead of diagonal offset
+- Focus mode edit controls: toolbar (Add Entity, Undo/Redo, Save/Discard) now renders inside the FocusView overlay so controls are visible in fullscreen
+- Focus mode no longer renders the normal canvas underneath the overlay
+
 ## [1.5.0] - 2026-02-28
 
 ### Added

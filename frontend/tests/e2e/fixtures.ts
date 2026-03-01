@@ -189,4 +189,45 @@ export async function createRelationship(
 	return (await res.json()) as Record<string, unknown>;
 }
 
+/**
+ * Create a user via the admin API.
+ * Requires an admin token. Silently ignores 409 (user already exists).
+ */
+export async function createUser(
+	token: string,
+	data: { username: string; password: string; role?: string },
+	baseURL?: string,
+): Promise<Record<string, unknown>> {
+	const origin = baseURL ?? API_BASE;
+	const res = await fetchWithRetry(`${origin}/api/users`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			username: data.username,
+			password: data.password,
+			role: data.role ?? 'viewer',
+		}),
+	});
+	// 201 = created, 409 = already exists — both are fine
+	if (!res.ok && res.status !== 409) {
+		throw new Error(`createUser failed: ${res.status} ${await res.text()}`);
+	}
+	return (await res.json()) as Record<string, unknown>;
+}
+
+/**
+ * Fill the login form and submit it with arbitrary credentials.
+ */
+export async function loginAs(page: Page, username: string, password: string): Promise<void> {
+	await page.goto('/login');
+	await page.getByLabel('Username').fill(username);
+	await page.getByLabel('Password').fill(password);
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await page.waitForURL('/', { timeout: 15_000 });
+	await page.getByRole('heading', { name: 'Dashboard' }).waitFor({ timeout: 10_000 });
+}
+
 export { ADMIN_USERNAME, ADMIN_PASSWORD };

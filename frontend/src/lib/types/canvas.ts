@@ -42,14 +42,22 @@ export interface CanvasNodeData {
 	entityId?: string;
 	description?: string;
 	linkedModelId?: string;
+	browseMode?: boolean;
 	[key: string]: unknown;
 }
+
+/** Routing algorithm for edge path rendering. */
+export type EdgeRoutingType = 'default' | 'straight' | 'step' | 'smoothstep' | 'bezier';
 
 /** Data stored in each canvas edge. */
 export interface CanvasEdgeData {
 	relationshipType: SimpleRelationshipType;
 	relationshipId?: string;
 	label?: string;
+	routingType?: EdgeRoutingType;
+	labelOffsetX?: number;
+	labelOffsetY?: number;
+	labelRotation?: number;
 	[key: string]: unknown;
 }
 
