@@ -5,7 +5,7 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.6.0] - 2026-03-01
+## [1.5.0] - 2026-03-01
 
 ### Added
 - Theme-aware PNG thumbnails: 3 theme variants (light/dark/high-contrast) with parameterized SVG colors, composite PK migration, ?theme= query param on thumbnail API (WP-1)
@@ -89,51 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New node placement uses grid-based overlap avoidance instead of diagonal offset
 - Focus mode edit controls: toolbar (Add Entity, Undo/Redo, Save/Discard) now renders inside the FocusView overlay so controls are visible in fullscreen
 - Focus mode no longer renders the normal canvas underneath the overlay
-
-## [1.5.0] - 2026-02-28
-
-### Added
-- Entity browse with grouping modes (by type, by tag), tags, and enriched information cards
-- Entity tags backend (entity_tags table, add/remove/list endpoints)
-- Entity list API enriched with tags, relationship count, and model usage count
-- Entity and model detail pages now display created by username and modified date
-- Version history tables include a User column showing who made each change
-- Canvas nodes now have connection handles on all four sides (top, bottom, left, right)
-- Dedicated bookmarks page accessible from sidebar navigation
-- Admin settings page with configurable session timeout and gallery thumbnail display mode
-- Settings API (`GET /api/settings`, `GET /api/settings/{key}`, `PUT /api/settings/{key}`) with admin-only write access
-- Dynamic session timeout: login and refresh endpoints read `session_timeout_minutes` from database settings
-- Settings database table (`m006_settings` migration) with default seed values
-- Canvas edges can be selected, deleted independently, and reconnected by dragging endpoints
-- Server-generated PNG thumbnails for model gallery cards with admin toggle between SVG and PNG modes
-- Browse mode entity panel shows models using entity, linked model navigation, and link to entity detail page
-- Relationships auto-created when entities are connected in model canvases
-- Improved entity tab ordering and relationships empty state message
-- Undo/redo for canvas operations with toolbar buttons and Ctrl+Z/Ctrl+Y shortcuts
-- ADR-016: Search Index Synchronisation
-- ADR-017: Session Timeout Token Refresh Fix
-- ADR-018: Model Creation Navigation
-- ADR-019: Metadata and User Attribution Display
-- ADR-020: Entity Persistence from Model Editor
-- ADR-021: Admin Settings and Configurable Session Timeout
-- ADR-022: Server-Generated PNG Thumbnails
-- ADR-023: Browse Mode Entity Navigation
-- ADR-024: Entity Relationship Auto-Creation
-- ADR-025: Entity Browse Enhancements
-- ADR-026: Canvas Four-Position Connection Handles
-- ADR-027: Edge Selection, Deletion, and Reconnection
-- ADR-028: Canvas Undo/Redo
-- ADR-029: Bookmarks Page
-- ADR-030: Model Canvas Toolbar Layout
-
-### Changed
-- Creating a new model now navigates directly to the model detail page
-- Entities created within the model editor are now persisted as first-class entities
-- Canvas toolbar buttons reorganized into logical groups: Create, Edit, Persist, View
-
-### Fixed
-- Search now returns results for all entities and models; FTS index rebuilt on startup
-- Session timeout "Continue" button now correctly extends the session
 
 ## [1.4.0] - 2026-02-28
 
