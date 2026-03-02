@@ -1075,10 +1075,10 @@
 	<!-- Main content -->
 	<div class="min-w-0 flex-1">
 	<!-- Tab navigation -->
-	<div class="flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
+	<div class="flex items-end gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
 		<button
 			onclick={toggleSidebar}
-			class="mr-2 mb-2 rounded px-3 py-1.5 text-sm"
+			class="mr-2 mb-1 rounded px-4 py-2 text-sm"
 			style="border: 1px solid {sidebarOpen ? 'var(--color-primary)' : 'var(--color-border)'}; color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {sidebarOpen ? 'var(--color-surface, transparent)' : 'transparent'}"
 			aria-label="Toggle hierarchy sidebar"
 			aria-pressed={sidebarOpen}
