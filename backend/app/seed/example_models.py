@@ -1,11 +1,12 @@
 """Idempotent seed: example models demonstrating Iris's own architecture.
 
-Creates entities representing the Iris system and five models:
+Creates entities representing the Iris system and six models:
   1. Iris Architecture (component) — core component overview
   2. API Request Flow (sequence) — login and data fetch sequence
   3. Data Layer (component) — database, versioning, and search internals
   4. Iris Enterprise View (archimate) — high-level enterprise architecture
   5. Iris System Overview (component) — model-in-model view referencing all above
+  6. Data Model (component) — complete database schema with all tables and FKs
 
 All entities are tagged with 'iris' and 'example'; models are tagged with
 'iris', 'example', and 'template'.
@@ -423,10 +424,10 @@ def _build_system_overview_model(
     rids: dict[str, str],
     mids: dict[int, str] | None = None,
 ) -> dict[str, object]:
-    """Top-level overview with modelref nodes for all four sub-models plus key entities."""
+    """Top-level overview with modelref nodes for all sub-models plus key entities."""
     mids = mids or {}
     nodes = [
-        # Model references — the four sub-models
+        # Model references — the sub-models
         {"id": "mr0", "type": "modelref",
          "position": {"x": 60, "y": 50},
          "data": {"label": "Iris Architecture", "entityType": "component",
@@ -447,6 +448,11 @@ def _build_system_overview_model(
          "data": {"label": "Iris Enterprise View", "entityType": "component",
                   "description": "ArchiMate enterprise architecture view",
                   "linkedModelId": mids.get(3, "")}},
+        {"id": "mr5", "type": "modelref",
+         "position": {"x": 60, "y": 550},
+         "data": {"label": "Data Model", "entityType": "database",
+                  "description": "Complete database schema with all 20 tables and FK relationships",
+                  "linkedModelId": mids.get(5, "")}},
         # Key entities providing context
         {"id": "n10", "type": "actor",
          "position": {"x": 640, "y": 50},
@@ -478,6 +484,238 @@ def _build_system_overview_model(
          "data": {"relationshipType": "composes", "label": "Includes"}},
         {"id": "eo7", "source": "mr3", "target": "mr2", "type": "composes",
          "data": {"relationshipType": "composes", "label": "Includes"}},
+        # Data Model details the Data Layer schema
+        {"id": "eo8", "source": "mr5", "target": "mr2", "type": "depends_on",
+         "data": {"relationshipType": "depends_on", "label": "Schema for"}},
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+
+# ── Model 6: Data Model (component) ──────────────────────────────────────────
+
+def _build_data_model(
+    eids: dict[str, str],
+    rids: dict[str, str],
+    mids: dict[int, str] | None = None,
+) -> dict[str, object]:
+    """Complete database schema showing all tables and foreign key relationships."""
+    mids = mids or {}
+    nodes = [
+        # ── Row 1: Auth & Access Control (y=50) ──
+        {"id": "t_roles", "type": "database",
+         "position": {"x": 60, "y": 50},
+         "data": {"label": "roles", "entityType": "database",
+                  "description": "id (PK), name, description, created_at "
+                  "— 4 seeded roles: admin, architect, reviewer, viewer"}},
+        {"id": "t_role_perms", "type": "database",
+         "position": {"x": 350, "y": 50},
+         "data": {"label": "role_permissions", "entityType": "database",
+                  "description": "role_id (FK\u2192roles), permission "
+                  "— composite PK, 63 seeded permission mappings"}},
+        {"id": "t_users", "type": "database",
+         "position": {"x": 640, "y": 50},
+         "data": {"label": "users", "entityType": "database",
+                  "description": "id (PK), username (UNIQUE), password_hash, "
+                  "role (FK\u2192roles), is_active, failed_login_count, "
+                  "locked_until, last_login_at, password_changed_at"}},
+        # ── Row 2: Auth Support (y=300) ──
+        {"id": "t_pwd_hist", "type": "database",
+         "position": {"x": 350, "y": 300},
+         "data": {"label": "password_history", "entityType": "database",
+                  "description": "user_id (FK\u2192users), password_hash, "
+                  "changed_at — composite PK, prevents password reuse"}},
+        {"id": "t_refresh", "type": "database",
+         "position": {"x": 640, "y": 300},
+         "data": {"label": "refresh_tokens", "entityType": "database",
+                  "description": "id (PK), user_id (FK\u2192users), family_id, "
+                  "expires_at, used_at, revoked — token rotation with family tracking"}},
+        # ── Row 3: Core Domain – Entities (y=550) ──
+        {"id": "t_entities", "type": "database",
+         "position": {"x": 60, "y": 550},
+         "data": {"label": "entities", "entityType": "database",
+                  "description": "id (PK), entity_type, current_version, "
+                  "created_by (FK\u2192users), is_deleted — soft delete, "
+                  "optimistic concurrency"}},
+        {"id": "t_entity_ver", "type": "database",
+         "position": {"x": 350, "y": 550},
+         "data": {"label": "entity_versions", "entityType": "database",
+                  "description": "entity_id (FK\u2192entities), version "
+                  "— composite PK, name, description, data (JSON), "
+                  "change_type, rollback_to"}},
+        {"id": "t_entity_tags", "type": "database",
+         "position": {"x": 640, "y": 550},
+         "data": {"label": "entity_tags", "entityType": "database",
+                  "description": "entity_id (FK\u2192entities), tag "
+                  "— composite PK, created_at, created_by"}},
+        # ── Row 4: Core Domain – Relationships (y=800) ──
+        {"id": "t_rels", "type": "database",
+         "position": {"x": 60, "y": 800},
+         "data": {"label": "relationships", "entityType": "database",
+                  "description": "id (PK), source_entity_id (FK\u2192entities), "
+                  "target_entity_id (FK\u2192entities), relationship_type, "
+                  "current_version, is_deleted"}},
+        {"id": "t_rel_ver", "type": "database",
+         "position": {"x": 350, "y": 800},
+         "data": {"label": "relationship_versions", "entityType": "database",
+                  "description": "relationship_id (FK\u2192relationships), version "
+                  "— composite PK, label, description, data (JSON), change_type"}},
+        # ── Row 5: Core Domain – Models (y=1050) ──
+        {"id": "t_models", "type": "database",
+         "position": {"x": 60, "y": 1050},
+         "data": {"label": "models", "entityType": "database",
+                  "description": "id (PK), model_type, current_version, "
+                  "created_by (FK\u2192users), is_deleted — component, "
+                  "sequence, archimate, roadmap"}},
+        {"id": "t_model_ver", "type": "database",
+         "position": {"x": 350, "y": 1050},
+         "data": {"label": "model_versions", "entityType": "database",
+                  "description": "model_id (FK\u2192models), version "
+                  "— composite PK, name, description, data (JSON canvas), "
+                  "change_type"}},
+        {"id": "t_model_tags", "type": "database",
+         "position": {"x": 640, "y": 1050},
+         "data": {"label": "model_tags", "entityType": "database",
+                  "description": "model_id (FK\u2192models), tag "
+                  "— composite PK, created_at, created_by"}},
+        # ── Row 6: Features (y=1300) ──
+        {"id": "t_comments", "type": "database",
+         "position": {"x": 60, "y": 1300},
+         "data": {"label": "comments", "entityType": "database",
+                  "description": "id (PK), target_type (entity|model), "
+                  "target_id, user_id (FK\u2192users), content, is_deleted "
+                  "— soft delete"}},
+        {"id": "t_bookmarks", "type": "database",
+         "position": {"x": 350, "y": 1300},
+         "data": {"label": "bookmarks", "entityType": "database",
+                  "description": "user_id (FK\u2192users), model_id (FK\u2192models) "
+                  "— composite PK, per-user model bookmarks"}},
+        {"id": "t_thumbs", "type": "database",
+         "position": {"x": 640, "y": 1300},
+         "data": {"label": "model_thumbnails", "entityType": "database",
+                  "description": "model_id (FK\u2192models), theme — composite PK, "
+                  "thumbnail (BLOB PNG), 3 theme variants per model"}},
+        # ── Row 7: Search & Config (y=1550) ──
+        {"id": "t_ent_fts", "type": "service",
+         "position": {"x": 60, "y": 1550},
+         "data": {"label": "entities_fts", "entityType": "service",
+                  "description": "FTS5 virtual table — entity_id, name, "
+                  "entity_type, description, porter unicode61 tokenizer"}},
+        {"id": "t_mod_fts", "type": "service",
+         "position": {"x": 350, "y": 1550},
+         "data": {"label": "models_fts", "entityType": "service",
+                  "description": "FTS5 virtual table — model_id, name, "
+                  "model_type, description, porter unicode61 tokenizer"}},
+        {"id": "t_settings", "type": "database",
+         "position": {"x": 640, "y": 1550},
+         "data": {"label": "settings", "entityType": "database",
+                  "description": "key (PK), value, updated_at, updated_by "
+                  "— application configuration key-value store"}},
+        # ── Row 8: Audit (y=1800) ──
+        {"id": "t_audit", "type": "package",
+         "position": {"x": 350, "y": 1800},
+         "data": {"label": "audit_log", "entityType": "package",
+                  "description": "Separate DB (iris_audit.db) — id (PK), "
+                  "timestamp, user_id, username, action, target_type, "
+                  "target_id, detail, previous_hash, entry_hash "
+                  "— SHA-256 hash chain"}},
+        # ── Model reference to Data Layer ──
+        {"id": "mr_data_layer", "type": "modelref",
+         "position": {"x": 930, "y": 50},
+         "data": {"label": "Data Layer", "entityType": "component",
+                  "description": "Component model showing database services, "
+                  "versioning, search, and audit",
+                  "linkedModelId": mids.get(2, "")}},
+    ]
+    edges = [
+        # Auth
+        {"id": "fk1", "source": "t_role_perms", "target": "t_roles",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "role_id \u2192 roles.id"}},
+        {"id": "fk2", "source": "t_users", "target": "t_roles",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "role \u2192 roles.id"}},
+        {"id": "fk3", "source": "t_pwd_hist", "target": "t_users",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "user_id \u2192 users.id"}},
+        {"id": "fk4", "source": "t_refresh", "target": "t_users",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "user_id \u2192 users.id"}},
+        # Entities
+        {"id": "fk5", "source": "t_entities", "target": "t_users",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "created_by \u2192 users.id"}},
+        {"id": "fk6", "source": "t_entity_ver", "target": "t_entities",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "entity_id \u2192 entities.id"}},
+        {"id": "fk7", "source": "t_entity_tags", "target": "t_entities",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "entity_id \u2192 entities.id"}},
+        # Relationships
+        {"id": "fk8", "source": "t_rels", "target": "t_entities",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "source_entity_id \u2192 entities.id"}},
+        {"id": "fk9", "source": "t_rels", "target": "t_entities",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "target_entity_id \u2192 entities.id"}},
+        {"id": "fk10", "source": "t_rel_ver", "target": "t_rels",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "relationship_id \u2192 relationships.id"}},
+        # Models
+        {"id": "fk11", "source": "t_models", "target": "t_users",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "created_by \u2192 users.id"}},
+        {"id": "fk12", "source": "t_model_ver", "target": "t_models",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "model_id \u2192 models.id"}},
+        {"id": "fk13", "source": "t_model_tags", "target": "t_models",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "model_id \u2192 models.id"}},
+        # Features
+        {"id": "fk14", "source": "t_comments", "target": "t_users",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "user_id \u2192 users.id"}},
+        {"id": "fk15", "source": "t_bookmarks", "target": "t_users",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "user_id \u2192 users.id"}},
+        {"id": "fk16", "source": "t_bookmarks", "target": "t_models",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "model_id \u2192 models.id"}},
+        {"id": "fk17", "source": "t_thumbs", "target": "t_models",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "model_id \u2192 models.id"}},
+        # Search indexes
+        {"id": "fk18", "source": "t_ent_fts", "target": "t_entities",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "indexes entities"}},
+        {"id": "fk19", "source": "t_mod_fts", "target": "t_models",
+         "type": "depends_on",
+         "data": {"relationshipType": "depends_on",
+                  "label": "indexes models"}},
+        # Model ref links
+        {"id": "ref1", "source": "mr_data_layer", "target": "t_entities",
+         "type": "composes",
+         "data": {"relationshipType": "composes", "label": "Manages"}},
+        {"id": "ref2", "source": "mr_data_layer", "target": "t_models",
+         "type": "composes",
+         "data": {"relationshipType": "composes", "label": "Manages"}},
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -539,11 +777,26 @@ _MODELS = [
         "name": "Iris System Overview",
         "description": (
             "Top-level overview model using model-in-model references to "
-            "all four Iris sub-models (Architecture, API Flow, Data Layer, "
-            "Enterprise View), showing how they relate to each other and "
-            "to key actors."
+            "all Iris sub-models (Architecture, API Flow, Data Layer, "
+            "Enterprise View, Data Model), showing how they relate to "
+            "each other and to key actors."
         ),
         "builder": _build_system_overview_model,
+        "tags": _MODEL_TAGS,
+    },
+    {
+        "index": 5,
+        "model_type": "component",
+        "name": "Data Model",
+        "description": (
+            "Complete database schema for Iris showing all 20 tables "
+            "across both databases (iris.db and iris_audit.db), their "
+            "columns, primary keys, and 19 foreign key relationships. "
+            "Covers auth, entities, relationships, models, versioning, "
+            "comments, bookmarks, thumbnails, tags, FTS5 search indexes, "
+            "settings, and audit log."
+        ),
+        "builder": _build_data_model,
         "tags": _MODEL_TAGS,
     },
 ]

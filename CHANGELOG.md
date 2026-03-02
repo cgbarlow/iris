@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.2] - 2026-03-02
 
+### Added
+- Data Model seed: 6th example model mapping the complete Iris database schema (20 tables, 19 FK relationships) across both databases, linked to the Data Layer model via modelref
+- System Overview seed updated with Data Model modelref node and "Schema for" edge to Data Layer
+
 ### Fixed
 - Centre-point connector persistence: edges connected via centre handles disappeared on save/reload because only a `type="source"` handle existed — @xyflow couldn't match `targetHandle: "center"` on the target node. Added matching `type="target"` centre handle to all 15 node components (ADR-053)
 
