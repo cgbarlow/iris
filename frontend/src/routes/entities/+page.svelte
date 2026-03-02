@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import type { Entity, PaginatedResponse, BatchResult } from '$lib/types/api';
 	import { SIMPLE_ENTITY_TYPES } from '$lib/types/canvas';
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
@@ -31,8 +32,8 @@
 	let pageSize = $state(50);
 	let total = $state(0);
 
-	// Set filter state
-	let currentSetId = $state('');
+	// Set filter state — initialise from global store
+	let currentSetId = $state(getActiveSetId());
 
 	// Batch selection state
 	let selectMode = $state(false);
@@ -98,8 +99,13 @@
 		}
 	}
 
-	function handleSetChange(setId: string) {
-		currentSetId = setId;
+	function handleSetChange(newSetId: string, setName?: string) {
+		currentSetId = newSetId;
+		if (newSetId) {
+			setActiveSet(newSetId, setName ?? newSetId);
+		} else {
+			clearActiveSet();
+		}
 		page = 1;
 		loadEntities();
 	}

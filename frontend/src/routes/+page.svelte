@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { apiFetch } from '$lib/utils/api';
+	import { setActiveSet, clearActiveSet, getActiveSetId } from '$lib/stores/activeSet.svelte.js';
 	import type {
 		PaginatedResponse,
 		Entity,
@@ -47,6 +48,7 @@
 			// Resolve active set if filtering
 			if (setId) {
 				activeSet = setsData.items.find((s) => s.id === setId) ?? null;
+				if (activeSet) setActiveSet(activeSet.id, activeSet.name);
 			} else {
 				activeSet = null;
 			}
@@ -71,7 +73,8 @@
 		}
 		searching = true;
 		try {
-			const data = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}`);
+			const setFilter = setId ? `&set_id=${setId}` : '';
+			const data = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}${setFilter}`);
 			searchResults = data.results;
 		} catch {
 			searchResults = [];
@@ -101,16 +104,26 @@
 
 	<!-- Stats -->
 	<div class="mt-6 grid grid-cols-3 gap-4" style="max-width: 600px">
-		<a
-			href={setId ? `/entities?set_id=${setId}` : '/entities'}
+		<div
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
-			<div class="text-3xl font-bold" style="color: var(--color-primary)">{entityCount}</div>
-			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Entities{#if activeSet} (filtered){/if}
-			</div>
-		</a>
+			{#if activeSet}
+				<div class="text-xl font-bold" style="color: var(--color-fg)">{activeSet.name}</div>
+				<button
+					onclick={() => { clearActiveSet(); window.location.href = '/'; }}
+					class="mt-1 inline-block text-sm"
+					style="color: var(--color-primary); background: none; border: none; cursor: pointer; padding: 0"
+				>
+					Reset filter
+				</button>
+			{:else}
+				<a href="/sets" style="color: inherit; text-decoration: none">
+					<div class="text-3xl font-bold" style="color: var(--color-primary)">{setCount}</div>
+					<div class="mt-1 text-sm" style="color: var(--color-muted)">Sets</div>
+				</a>
+			{/if}
+		</div>
 		<a
 			href={setId ? `/models?set_id=${setId}` : '/models'}
 			class="rounded border p-4 text-center"
@@ -121,23 +134,16 @@
 				Models{#if activeSet} (filtered){/if}
 			</div>
 		</a>
-		<div
+		<a
+			href={setId ? `/entities?set_id=${setId}` : '/entities'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
-			{#if activeSet}
-				<div class="text-sm font-medium" style="color: var(--color-primary)">{activeSet.name}</div>
-				<div class="mt-1 text-sm" style="color: var(--color-muted)">Set selected</div>
-				<a href="/" class="mt-1 inline-block text-xs" style="color: var(--color-primary)">
-					Reset filter
-				</a>
-			{:else}
-				<a href="/sets" style="color: inherit; text-decoration: none">
-					<div class="text-3xl font-bold" style="color: var(--color-primary)">{setCount}</div>
-					<div class="mt-1 text-sm" style="color: var(--color-muted)">Sets</div>
-				</a>
-			{/if}
-		</div>
+			<div class="text-3xl font-bold" style="color: var(--color-primary)">{entityCount}</div>
+			<div class="mt-1 text-sm" style="color: var(--color-muted)">
+				Entities{#if activeSet} (filtered){/if}
+			</div>
+		</a>
 	</div>
 
 	<!-- Search -->
@@ -203,31 +209,4 @@
 		</div>
 	{/if}
 
-	<!-- Quick Navigation -->
-	<div class="mt-6">
-		<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Quick Navigation</h2>
-		<div class="mt-2 grid grid-cols-3 gap-3" style="max-width: 500px">
-			<a
-				href="/models"
-				class="rounded border p-4 text-center text-sm font-medium"
-				style="border-color: var(--color-border); color: var(--color-primary)"
-			>
-				Models
-			</a>
-			<a
-				href="/entities"
-				class="rounded border p-4 text-center text-sm font-medium"
-				style="border-color: var(--color-border); color: var(--color-primary)"
-			>
-				Entities
-			</a>
-			<a
-				href="/help"
-				class="rounded border p-4 text-center text-sm font-medium"
-				style="border-color: var(--color-border); color: var(--color-primary)"
-			>
-				Help
-			</a>
-		</div>
-	</div>
 {/if}

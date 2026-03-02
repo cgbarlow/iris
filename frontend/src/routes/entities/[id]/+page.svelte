@@ -13,7 +13,6 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { SimpleEntityType } from '$lib/types/canvas';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
-	import TagInput from '$lib/components/TagInput.svelte';
 
 	let entity = $state<Entity | null>(null);
 	let versions = $state<EntityVersion[]>([]);
@@ -108,32 +107,7 @@
 		}
 	}
 
-	async function handleAddTag(tag: string) {
-		if (!entity) return;
-		try {
-			await apiFetch(`/api/entities/${entity.id}/tags`, {
-				method: 'POST',
-				body: JSON.stringify({ tag }),
-			});
-			await loadEntity(entity.id);
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'Failed to add tag';
-		}
-	}
-
-	async function handleRemoveTag(tag: string) {
-		if (!entity) return;
-		try {
-			await apiFetch(`/api/entities/${entity.id}/tags/${encodeURIComponent(tag)}`, {
-				method: 'DELETE',
-			});
-			await loadEntity(entity.id);
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'Failed to remove tag';
-		}
-	}
-
-	async function handleEdit(name: string, type: SimpleEntityType, description: string) {
+	async function handleEdit(name: string, type: SimpleEntityType, description: string, newTags?: string[]) {
 		if (!entity) return;
 		try {
 			await apiFetch(`/api/entities/${entity.id}`, {
@@ -146,6 +120,25 @@
 					change_summary: 'Updated entity details',
 				}),
 			});
+
+			// Sync tags if provided
+			if (newTags !== undefined) {
+				const oldTags = entity.tags ?? [];
+				const toAdd = newTags.filter((t) => !oldTags.includes(t));
+				const toRemove = oldTags.filter((t) => !newTags.includes(t));
+				for (const tag of toAdd) {
+					await apiFetch(`/api/entities/${entity.id}/tags`, {
+						method: 'POST',
+						body: JSON.stringify({ tag }),
+					});
+				}
+				for (const tag of toRemove) {
+					await apiFetch(`/api/entities/${entity.id}/tags/${encodeURIComponent(tag)}`, {
+						method: 'DELETE',
+					});
+				}
+			}
+
 			showEditDialog = false;
 			await loadEntity(entity.id);
 		} catch (e) {
@@ -255,10 +248,17 @@
 		{#if activeTab === 'details'}
 			<dl class="grid gap-4" style="grid-template-columns: auto 1fr">
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">ID</dt>
-				<dd class="font-mono text-xs" style="color: var(--color-fg)">{entity.id}</dd>
+				<dd class="text-sm" style="color: var(--color-fg)">{entity.id}</dd>
 
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
 				<dd style="color: var(--color-fg)">{entity.entity_type}</dd>
+
+				<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
+				<dd>
+					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
+						{entity.set_name ?? 'Default'}
+					</span>
+				</dd>
 
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">Version</dt>
 				<dd style="color: var(--color-fg)">{entity.current_version ?? 'N/A'}</dd>
@@ -276,18 +276,23 @@
 					<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
 					<dd style="color: var(--color-fg)">{entity.description}</dd>
 				{/if}
-			</dl>
 
-			<div class="mt-4">
-				<h3 class="text-sm font-medium mb-2" style="color: var(--color-muted)">Tags</h3>
-				<TagInput
-					tags={entity.tags ?? []}
-					onaddtag={handleAddTag}
-					onremovetag={handleRemoveTag}
-					{inheritedTags}
-					suggestions={allTags}
-				/>
-			</div>
+				<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>
+				<dd>
+					{#if (entity.tags ?? []).length > 0 || inheritedTags.length > 0}
+						<div class="flex flex-wrap gap-1">
+							{#each (entity.tags ?? []) as tag}
+								<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+							{/each}
+							{#each inheritedTags as tag}
+								<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-muted); color: white; opacity: 0.5" title="Inherited tag">{tag}</span>
+							{/each}
+						</div>
+					{:else}
+						<span style="color: var(--color-muted)">None</span>
+					{/if}
+				</dd>
+			</dl>
 		{:else if activeTab === 'models'}
 			{#if modelsLoading}
 				<p style="color: var(--color-muted)">Loading models...</p>
@@ -389,6 +394,9 @@
 		initialName={entity.name}
 		initialType={entity.entity_type as SimpleEntityType}
 		initialDescription={entity.description ?? ''}
+		initialTags={entity.tags ?? []}
+		suggestions={allTags}
+		{inheritedTags}
 		onsave={handleEdit}
 		oncancel={() => (showEditDialog = false)}
 	/>

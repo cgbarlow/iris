@@ -264,6 +264,16 @@ async def force_delete_set(
         (now, set_id),
     )
 
+    # Soft-delete relationships where source or target is in this set
+    await db.execute(
+        "UPDATE relationships SET is_deleted = 1, updated_at = ? "
+        "WHERE is_deleted = 0 AND ("
+        "  source_entity_id IN (SELECT id FROM entities WHERE set_id = ?) OR "
+        "  target_entity_id IN (SELECT id FROM entities WHERE set_id = ?)"
+        ")",
+        (now, set_id, set_id),
+    )
+
     # Remove search indexes for deleted entities
     await db.execute(
         "DELETE FROM entities_fts WHERE entity_id IN "
@@ -329,10 +339,14 @@ async def store_set_thumbnail_image(
 async def get_set_thumbnail(
     db: aiosqlite.Connection,
     set_id: str,
+    *,
+    theme: str = "dark",
 ) -> bytes | None:
     """Get the thumbnail bytes for a set.
 
-    If source is 'model', fetch from model_thumbnails (dark theme).
+    If source is 'model', respects the gallery_thumbnail_mode admin setting:
+      - 'svg': generates SVG on the fly from model data
+      - 'png': returns stored PNG from model_thumbnails
     If source is 'image', return the stored BLOB.
     Otherwise return None.
     """
@@ -348,12 +362,43 @@ async def get_set_thumbnail(
     source, model_id, image_blob = row
 
     if source == "model" and model_id:
-        # Fetch from model_thumbnails (dark theme preferred)
+        # Check admin thumbnail mode setting
+        from app.settings.service import get_setting
+
+        mode_setting = await get_setting(db, "gallery_thumbnail_mode")
+        thumbnail_mode = mode_setting["value"] if mode_setting else "svg"
+
+        if thumbnail_mode == "svg":
+            # Generate SVG on the fly from model data
+            from app.models_crud.thumbnail import generate_svg_from_model_data
+
+            mc = await db.execute(
+                "SELECT mv.data, m.model_type FROM model_versions mv "
+                "JOIN models m ON m.id = mv.model_id "
+                "WHERE mv.model_id = ? ORDER BY mv.version DESC LIMIT 1",
+                (model_id,),
+            )
+            mrow = await mc.fetchone()
+            if mrow is None:
+                return None
+            import json
+
+            data = json.loads(mrow[0]) if isinstance(mrow[0], str) else mrow[0]
+            svg_str = generate_svg_from_model_data(data, mrow[1], theme=theme)
+            return svg_str.encode("utf-8")
+
+        # PNG mode: fetch from model_thumbnails for the requested theme
         tc = await db.execute(
-            "SELECT png_data FROM model_thumbnails WHERE model_id = ? AND theme = 'dark'",
-            (model_id,),
+            "SELECT thumbnail FROM model_thumbnails WHERE model_id = ? AND theme = ?",
+            (model_id, theme),
         )
         trow = await tc.fetchone()
+        if trow is None and theme != "dark":
+            tc = await db.execute(
+                "SELECT thumbnail FROM model_thumbnails WHERE model_id = ? AND theme = 'dark'",
+                (model_id,),
+            )
+            trow = await tc.fetchone()
         return trow[0] if trow else None
 
     if source == "image" and image_blob:

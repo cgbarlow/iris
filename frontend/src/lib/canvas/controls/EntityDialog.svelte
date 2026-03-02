@@ -2,6 +2,7 @@
 	/** Dialog for creating/editing entities on the canvas. */
 	import DOMPurify from 'dompurify';
 	import { SIMPLE_ENTITY_TYPES, type SimpleEntityType } from '$lib/types/canvas';
+	import TagInput from '$lib/components/TagInput.svelte';
 
 	interface Props {
 		open: boolean;
@@ -9,7 +10,10 @@
 		initialName?: string;
 		initialType?: SimpleEntityType;
 		initialDescription?: string;
-		onsave: (name: string, type: SimpleEntityType, description: string) => void;
+		initialTags?: string[];
+		suggestions?: string[];
+		inheritedTags?: string[];
+		onsave: (name: string, type: SimpleEntityType, description: string, tags?: string[]) => void;
 		oncancel: () => void;
 	}
 
@@ -19,6 +23,9 @@
 		initialName = '',
 		initialType = 'component',
 		initialDescription = '',
+		initialTags = [],
+		suggestions = [],
+		inheritedTags = [],
 		onsave,
 		oncancel,
 	}: Props = $props();
@@ -26,6 +33,7 @@
 	let name = $state('');
 	let entityType = $state<SimpleEntityType>('component');
 	let description = $state('');
+	let tags = $state<string[]>([]);
 	let dialogEl: HTMLDialogElement | undefined = $state();
 
 	$effect(() => {
@@ -33,18 +41,33 @@
 			name = initialName;
 			entityType = initialType;
 			description = initialDescription;
+			tags = [...initialTags];
 			dialogEl.showModal();
 		} else if (!open && dialogEl?.open) {
 			dialogEl.close();
 		}
 	});
 
+	function handleAddTag(tag: string) {
+		if (!tags.includes(tag)) {
+			tags = [...tags, tag];
+		}
+	}
+
+	function handleRemoveTag(tag: string) {
+		tags = tags.filter((t) => t !== tag);
+	}
+
 	function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		const sanitizedName = DOMPurify.sanitize(name.trim());
 		const sanitizedDesc = DOMPurify.sanitize(description.trim());
 		if (sanitizedName) {
-			onsave(sanitizedName, entityType, sanitizedDesc);
+			if (mode === 'edit') {
+				onsave(sanitizedName, entityType, sanitizedDesc, tags);
+			} else {
+				onsave(sanitizedName, entityType, sanitizedDesc);
+			}
 		}
 	}
 
@@ -104,6 +127,19 @@
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 				></textarea>
 			</div>
+
+			{#if mode === 'edit'}
+				<div>
+					<label class="block text-sm font-medium mb-2">Tags</label>
+					<TagInput
+						{tags}
+						onaddtag={handleAddTag}
+						onremovetag={handleRemoveTag}
+						{inheritedTags}
+						{suggestions}
+					/>
+				</div>
+			{/if}
 
 			<div class="flex justify-end gap-3">
 				<button

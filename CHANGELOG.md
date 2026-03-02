@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.7.0] - 2026-03-02
 
 ### Added
+- Persistent set selection: selecting a set on any page carries the filter across Models, Entities, and Dashboard navigation via a sessionStorage-backed global store (ADR-062, SPEC-062-A)
+- Active set display in AppShell header: "Iris / {SetName}" with link to Sets page when a set is active
+- Sets page active set highlighting with primary-colored border and "Reset filter" button
+- Import page inline set creation: "+ New Set..." option in SetSelector opens create dialog, auto-selects new set
+- Import page "View Models" link now includes set filter for the imported set
+- Read-only tag badges and "Template: Yes/No" field on model overview tab
+- Read-only tag badges and "Set" field on entity details tab
+- Editable tags and template toggle in model edit dialog
+- Editable tags in entity edit dialog
+- ADR-062: Persistent Set Selection
+- SPEC-062-A: Persistent Set Selection specification
+
+### Changed
+- General API rate limit increased from 100 to 300 requests/minute to prevent 429 errors during normal browsing
+- Model detail ID field styling normalized (removed `font-mono text-xs`, now matches other fields)
+- Entity detail ID field styling normalized (same as models)
+- SetSelector `onchange` now passes set name along with ID; added `showNewSet`/`onNewSet` props and `reload()` export
+- Sets page button styling aligned with Models page pattern (consistent `gap-2`, `px-3`/`px-4 py-2`, `text-sm`)
+- Dashboard search now scoped to active set when filtering
+
 - Sets: top-level workspace grouping — each model/entity belongs to exactly one set; Default set (well-known UUID) created on migration with all existing items backfilled (ADR-060, SPEC-060-A)
 - Sets CRUD API: `POST/GET/PUT/DELETE /api/sets`, `GET /api/sets/{id}/tags` for scoped tag listing; 409 on non-empty delete, 403 on Default set delete
 - Set-scoped tags: tags are stored the same way but filtered per-set in UI and API — "v1.0" in Set A is independent from "v1.0" in Set B

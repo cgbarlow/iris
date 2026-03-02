@@ -2,7 +2,11 @@
 	/** SparxEA import page — upload .qea files to import models, entities, and relationships. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
+	import { setActiveSet } from '$lib/stores/activeSet.svelte.js';
+	import { apiFetch } from '$lib/utils/api';
+	import type { IrisSet } from '$lib/types/api';
 	import SetSelector from '$lib/components/SetSelector.svelte';
+	import SetDialog from '$lib/components/SetDialog.svelte';
 
 	interface ImportWarning {
 		category: string;
@@ -27,6 +31,9 @@
 	let selectedFile = $state<File | null>(null);
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let importSetId = $state('');
+	let importSetName = $state('');
+	let showCreateSetDialog = $state(false);
+	let selectorRef: { reload: () => Promise<void> } | undefined = $state();
 
 	function handleDragOver(event: DragEvent) {
 		event.preventDefault();
@@ -108,6 +115,26 @@
 		progress = 0;
 		if (fileInputEl) fileInputEl.value = '';
 	}
+
+	async function handleCreateSet(name: string, description: string | null) {
+		try {
+			const created = await apiFetch<IrisSet>('/api/sets', {
+				method: 'POST',
+				body: JSON.stringify({ name, description }),
+			});
+			showCreateSetDialog = false;
+			importSetId = created.id;
+			importSetName = created.name;
+			await selectorRef?.reload();
+		} catch {
+			error = 'Failed to create set';
+		}
+	}
+
+	function handleSetChange(id: string, name?: string) {
+		importSetId = id;
+		importSetName = name ?? '';
+	}
 </script>
 
 <svelte:head>
@@ -165,7 +192,8 @@
 
 		<div class="mt-4 flex gap-3">
 			<a
-				href="/models"
+				href={importSetId ? `/models?set_id=${importSetId}` : '/models'}
+				onclick={() => { if (importSetId && importSetName) setActiveSet(importSetId, importSetName); }}
 				class="rounded px-4 py-2 text-sm text-white"
 				style="background-color: var(--color-primary)"
 			>
@@ -198,7 +226,6 @@
 		<input
 			bind:this={fileInputEl}
 			type="file"
-			accept=".qea"
 			class="hidden"
 			onchange={handleFileInput}
 			aria-hidden="true"
@@ -219,10 +246,13 @@
 	{#if selectedFile}
 		<div class="mt-4">
 			<SetSelector
+				bind:this={selectorRef}
 				value={importSetId}
-				onchange={(id) => (importSetId = id)}
+				onchange={handleSetChange}
 				showAll={false}
 				label="Import into set"
+				showNewSet={true}
+				onNewSet={() => (showCreateSetDialog = true)}
 			/>
 		</div>
 		<div class="mt-4 flex items-center gap-4">
@@ -277,3 +307,9 @@
 		</div>
 	{/if}
 {/if}
+
+<SetDialog
+	open={showCreateSetDialog}
+	oncreate={handleCreateSet}
+	oncancel={() => (showCreateSetDialog = false)}
+/>

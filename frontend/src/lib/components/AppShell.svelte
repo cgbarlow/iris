@@ -2,16 +2,20 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { isAuthenticated, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
+	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
 
 	let { children } = $props();
 
 	let sidebarOpen = $state(true);
 
+	const activeSetId = $derived(getActiveSetId());
+	const activeSetName = $derived(getActiveSetName());
+
 	const navItems = [
 		{ href: '/', label: 'Dashboard', shortcut: 'H' },
+		{ href: '/sets', label: 'Sets', shortcut: 'T' },
 		{ href: '/models', label: 'Models', shortcut: 'M' },
 		{ href: '/entities', label: 'Entities', shortcut: 'E' },
-		{ href: '/sets', label: 'Sets', shortcut: 'T' },
 		{ href: '/import', label: 'Import', shortcut: 'I' },
 		{ href: '/bookmarks', label: 'Bookmarks', shortcut: 'B' },
 		{ href: '/settings', label: 'Settings', shortcut: 'S' },
@@ -47,6 +51,10 @@
 				<span aria-hidden="true" class="text-lg">&#9776;</span>
 			</button>
 			<a href="/" class="text-lg font-bold" style="color: var(--color-fg)">Iris</a>
+			{#if activeSetId}
+				<span style="color: var(--color-fg)">/</span>
+				<a href="/sets" class="text-lg" style="color: var(--color-fg)">{activeSetName}</a>
+			{/if}
 		</div>
 
 		<div class="flex items-center gap-4">

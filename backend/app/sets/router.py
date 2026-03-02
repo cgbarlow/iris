@@ -178,17 +178,21 @@ async def upload_thumbnail(
 async def get_thumbnail(
     set_id: str,
     request: Request,
+    theme: str = Query(default="dark"),  # noqa: B008
 ) -> FastAPIResponse:
     """Get the thumbnail image for a set."""
     db = request.app.state.db_manager.main_db
-    image_bytes = await get_set_thumbnail(db, set_id)
+    image_bytes = await get_set_thumbnail(db, set_id, theme=theme)
     if image_bytes is None:
         raise HTTPException(status_code=404, detail="Thumbnail not found")
 
     # Detect content type from magic bytes
-    content_type = (
-        "image/png" if image_bytes[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
-    )
+    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        content_type = "image/png"
+    elif image_bytes[:4] == b"\xff\xd8\xff\xe0" or image_bytes[:4] == b"\xff\xd8\xff\xe1":
+        content_type = "image/jpeg"
+    else:
+        content_type = "image/svg+xml"
     return FastAPIResponse(
         content=image_bytes,
         media_type=content_type,

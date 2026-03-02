@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
+	import { getActiveSetId, clearActiveSet, setActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import type { IrisSet } from '$lib/types/api';
 	import SetDialog from '$lib/components/SetDialog.svelte';
 
@@ -13,6 +14,10 @@
 	);
 	let editMode = $state(false);
 	let showCreateDialog = $state(false);
+	let thumbnailMode = $state<'svg' | 'png'>('svg');
+	let currentTheme = $state('dark');
+
+	const activeSetIdValue = $derived(getActiveSetId());
 
 	let filteredSets = $derived(
 		searchQuery.trim()
@@ -26,7 +31,36 @@
 
 	$effect(() => {
 		loadSets();
+		loadThumbnailMode();
 	});
+
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		const detectTheme = () => {
+			const el = document.documentElement;
+			if (el.classList.contains('high-contrast')) {
+				currentTheme = 'high-contrast';
+			} else if (el.classList.contains('dark')) {
+				currentTheme = 'dark';
+			} else {
+				currentTheme = 'light';
+			}
+		};
+		detectTheme();
+		const observer = new MutationObserver(detectTheme);
+		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+		return () => observer.disconnect();
+	});
+
+	async function loadThumbnailMode() {
+		try {
+			const settings = await apiFetch<{key: string; value: string}[]>('/api/settings');
+			const mode = settings.find(s => s.key === 'gallery_thumbnail_mode');
+			if (mode) thumbnailMode = mode.value as 'svg' | 'png';
+		} catch {
+			// default to svg
+		}
+	}
 
 	$effect(() => {
 		if (typeof localStorage !== 'undefined') {
@@ -50,8 +84,14 @@
 		if (editMode) {
 			goto(`/sets/${set.id}`);
 		} else {
+			setActiveSet(set.id, set.name);
 			goto(`/?set_id=${set.id}`);
 		}
+	}
+
+	function handleResetFilter() {
+		clearActiveSet();
+		goto('/');
 	}
 
 	async function handleCreate(name: string, description: string | null) {
@@ -69,7 +109,7 @@
 
 	function getThumbnailUrl(set: IrisSet): string | null {
 		if (set.thumbnail_source === 'model' && set.thumbnail_model_id) {
-			return `/api/sets/${set.id}/thumbnail`;
+			return `/api/sets/${set.id}/thumbnail?theme=${currentTheme}`;
 		}
 		if (set.thumbnail_source === 'image' && set.has_thumbnail_image) {
 			return `/api/sets/${set.id}/thumbnail`;
@@ -84,19 +124,28 @@
 
 <div class="flex items-center justify-between">
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Sets</h1>
-	<div class="flex items-center gap-3">
+	<div class="flex items-center gap-2">
+		{#if activeSetIdValue}
+			<button
+				onclick={handleResetFilter}
+				class="rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); color: var(--color-primary)"
+			>
+				Reset filter
+			</button>
+		{/if}
 		<button
 			onclick={() => (editMode = !editMode)}
-			class="rounded px-3 py-1.5 text-sm"
-			style={editMode
-				? 'background-color: var(--color-primary); color: white'
-				: 'border: 1px solid var(--color-border); color: var(--color-fg)'}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); {editMode
+				? 'background: var(--color-primary); color: white'
+				: 'color: var(--color-fg)'}"
 		>
 			Edit Sets
 		</button>
 		<button
 			onclick={() => (showCreateDialog = true)}
-			class="rounded px-3 py-1.5 text-sm text-white"
+			class="rounded px-4 py-2 text-sm text-white"
 			style="background-color: var(--color-primary)"
 		>
 			New Set
@@ -152,7 +201,7 @@
 			<button
 				onclick={() => handleSetClick(set)}
 				class="flex items-center gap-4 rounded border p-3 text-left transition-colors"
-				style="border-color: var(--color-border); color: var(--color-fg); background: transparent; width: 100%; cursor: pointer"
+				style="border-color: {set.id === activeSetIdValue ? 'var(--color-primary)' : 'var(--color-border)'}; color: var(--color-fg); background: transparent; width: 100%; cursor: pointer; {set.id === activeSetIdValue ? 'border-width: 2px' : ''}"
 				onmouseenter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface)')}
 				onmouseleave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
 			>
@@ -185,7 +234,7 @@
 			<button
 				onclick={() => handleSetClick(set)}
 				class="flex flex-col items-center rounded border p-4 text-center transition-colors"
-				style="border-color: var(--color-border); color: var(--color-fg); background: transparent; cursor: pointer"
+				style="border-color: {set.id === activeSetIdValue ? 'var(--color-primary)' : 'var(--color-border)'}; color: var(--color-fg); background: transparent; cursor: pointer; {set.id === activeSetIdValue ? 'border-width: 2px' : ''}"
 				onmouseenter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface)')}
 				onmouseleave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
 			>

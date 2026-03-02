@@ -4,15 +4,22 @@
 
 	interface Props {
 		value: string;
-		onchange: (setId: string) => void;
+		onchange: (setId: string, setName?: string) => void;
 		showAll?: boolean;
 		label?: string;
+		showNewSet?: boolean;
+		onNewSet?: () => void;
 	}
 
-	let { value, onchange, showAll = true, label = 'Set' }: Props = $props();
+	let { value, onchange, showAll = true, label = 'Set', showNewSet = false, onNewSet }: Props = $props();
 
 	let sets = $state<IrisSet[]>([]);
 	let loading = $state(true);
+	let previousValue = $state(value);
+
+	export async function reload() {
+		await loadSets();
+	}
 
 	async function loadSets() {
 		loading = true;
@@ -27,7 +34,15 @@
 
 	function handleChange(e: Event) {
 		const select = e.target as HTMLSelectElement;
-		onchange(select.value);
+		if (select.value === '__new__') {
+			// Reset to previous value and trigger new set callback
+			select.value = previousValue;
+			onNewSet?.();
+			return;
+		}
+		previousValue = select.value;
+		const selectedSet = sets.find((s) => s.id === select.value);
+		onchange(select.value, selectedSet?.name);
 	}
 
 	$effect(() => {
@@ -53,5 +68,8 @@
 		{#each sets as s}
 			<option value={s.id}>{s.name} ({s.model_count + s.entity_count})</option>
 		{/each}
+		{#if showNewSet}
+			<option value="__new__">+ New Set...</option>
+		{/if}
 	</select>
 </div>

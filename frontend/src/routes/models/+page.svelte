@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import type { Model, PaginatedResponse, ModelHierarchyNode, BatchResult } from '$lib/types/api';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
 	import ModelThumbnail from '$lib/components/ModelThumbnail.svelte';
@@ -38,8 +39,9 @@
 	let pageSize = $state(50);
 	let total = $state(0);
 
-	// Set filter state
-	let currentSetId = $state('');
+	// Set filter state — initialise from URL param or global store
+	const urlSetId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('set_id') : null;
+	let currentSetId = $state(urlSetId || getActiveSetId());
 
 	// Batch selection state
 	let selectMode = $state(false);
@@ -168,8 +170,20 @@
 		}
 	}
 
-	function handleSetChange(setId: string) {
-		currentSetId = setId;
+	function truncateDescription(text: string, max = 150): string {
+		if (text.length <= max) return text;
+		const truncated = text.slice(0, max);
+		const lastSpace = truncated.lastIndexOf(' ');
+		return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + '...';
+	}
+
+	function handleSetChange(newSetId: string, setName?: string) {
+		currentSetId = newSetId;
+		if (newSetId) {
+			setActiveSet(newSetId, setName ?? newSetId);
+		} else {
+			clearActiveSet();
+		}
 		page = 1;
 		loadModels();
 	}
@@ -534,7 +548,7 @@
 								{/if}
 								{#if model.description}
 									<span class="text-xs" style="color: var(--color-muted)">
-										{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}
+										{truncateDescription(model.description)}
 									</span>
 								{/if}
 							</a>
@@ -578,7 +592,7 @@
 									<span class="rounded px-2 py-0.5 text-xs font-medium w-fit" style="background: var(--color-success, #16a34a); color: white">Template</span>
 								{/if}
 								{#if model.description}
-									<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
+									<p class="text-sm" style="color: var(--color-muted)">{truncateDescription(model.description)}</p>
 								{/if}
 								<span class="text-xs mt-auto" style="color: var(--color-muted)">
 									Updated {new Date(model.updated_at).toLocaleDateString()}
