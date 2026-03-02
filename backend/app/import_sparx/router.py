@@ -1,0 +1,47 @@
+"""API router for SparxEA .qea file import."""
+
+from __future__ import annotations
+
+import os
+import tempfile
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+
+from app.auth.dependencies import get_current_user
+from app.import_sparx.service import import_sparx_file
+
+router = APIRouter(prefix="/api/import", tags=["import"])
+
+
+@router.post("/sparx")
+async def import_sparx(
+    file: UploadFile,
+    request: Request,
+    current_user: dict = Depends(get_current_user),  # noqa: B008
+) -> dict:
+    """Import a SparxEA .qea file."""
+    if not file.filename or not file.filename.endswith(".qea"):
+        raise HTTPException(status_code=400, detail="File must have .qea extension")
+
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(suffix=".qea", delete=False) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        db = request.app.state.db_manager.main_db
+        summary = await import_sparx_file(db, tmp_path, imported_by=current_user["id"])
+        return {
+            "models_created": summary.models_created,
+            "entities_created": summary.entities_created,
+            "relationships_created": summary.relationships_created,
+            "diagrams_created": summary.diagrams_created,
+            "elements_skipped": summary.elements_skipped,
+            "connectors_skipped": summary.connectors_skipped,
+            "warnings": [
+                {"category": w.category, "message": w.message} for w in summary.warnings
+            ],
+        }
+    finally:
+        os.unlink(tmp_path)

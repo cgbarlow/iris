@@ -24,6 +24,7 @@ async def create_model(
     description: str | None,
     data: dict[str, object],
     created_by: str,
+    parent_model_id: str | None = None,
 ) -> dict[str, object]:
     """Create a new model with initial version."""
     model_id = str(uuid.uuid4())
@@ -32,8 +33,8 @@ async def create_model(
 
     await db.execute(
         "INSERT INTO models (id, model_type, current_version, "
-        "created_at, created_by, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
-        (model_id, model_type, now, created_by, now),
+        "created_at, created_by, updated_at, parent_model_id) VALUES (?, ?, 1, ?, ?, ?, ?)",
+        (model_id, model_type, now, created_by, now, parent_model_id),
     )
     await db.execute(
         "INSERT INTO model_versions (model_id, version, name, description, "
@@ -62,6 +63,7 @@ async def create_model(
         "created_by": created_by,
         "updated_at": now,
         "is_deleted": False,
+        "parent_model_id": parent_model_id,
     }
 
 
@@ -74,7 +76,7 @@ async def get_model(
         "SELECT m.id, m.model_type, m.current_version, "
         "mv.name, mv.description, mv.data, "
         "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
-        "u.username "
+        "u.username, m.parent_model_id "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
@@ -106,6 +108,7 @@ async def get_model(
         "updated_at": row[8],
         "is_deleted": bool(row[9]),
         "created_by_username": row[10] or "Unknown",
+        "parent_model_id": row[11],
         "tags": tags,
     }
 
@@ -138,7 +141,8 @@ async def list_models(
     cursor = await db.execute(
         f"SELECT m.id, m.model_type, m.current_version, "  # noqa: S608
         "mv.name, mv.description, mv.data, "
-        "m.created_at, m.created_by, m.updated_at, m.is_deleted "
+        "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
+        "m.parent_model_id "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
@@ -173,6 +177,7 @@ async def list_models(
             "created_by": r[7],
             "updated_at": r[8],
             "is_deleted": bool(r[9]),
+            "parent_model_id": r[10],
             "tags": tags_by_model.get(r[0], []),
         }
         for r in rows
@@ -323,6 +328,196 @@ async def soft_delete_model(
     await _remove_model_index(db, model_id)
     await db.commit()
     return True
+
+
+async def validate_no_cycle(
+    db: aiosqlite.Connection,
+    model_id: str,
+    proposed_parent_id: str,
+) -> bool:
+    """Check that setting proposed_parent_id won't create a cycle.
+
+    Walks up from proposed_parent_id to root. If we encounter model_id,
+    it would create a cycle. Returns True if safe, False if cycle detected.
+    """
+    if model_id == proposed_parent_id:
+        return False
+
+    current = proposed_parent_id
+    visited: set[str] = set()
+    while current is not None:
+        if current == model_id:
+            return False
+        if current in visited:
+            return False  # existing cycle in data — shouldn't happen
+        visited.add(current)
+        cursor = await db.execute(
+            "SELECT parent_model_id FROM models WHERE id = ? AND is_deleted = 0",
+            (current,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            break
+        current = row[0]
+    return True
+
+
+async def set_model_parent(
+    db: aiosqlite.Connection,
+    model_id: str,
+    parent_model_id: str | None,
+    updated_by: str,
+) -> dict[str, object] | None:
+    """Set or unset a model's parent. Returns None on failure."""
+    # Verify model exists
+    cursor = await db.execute(
+        "SELECT id FROM models WHERE id = ? AND is_deleted = 0",
+        (model_id,),
+    )
+    if await cursor.fetchone() is None:
+        return None
+
+    # If setting a parent, verify parent exists and no cycle
+    if parent_model_id is not None:
+        cursor = await db.execute(
+            "SELECT id FROM models WHERE id = ? AND is_deleted = 0",
+            (parent_model_id,),
+        )
+        if await cursor.fetchone() is None:
+            return None
+
+        if not await validate_no_cycle(db, model_id, parent_model_id):
+            return {"error": "cycle"}
+
+    now = datetime.now(tz=UTC).isoformat()
+    await db.execute(
+        "UPDATE models SET parent_model_id = ?, updated_at = ? WHERE id = ?",
+        (parent_model_id, now, model_id),
+    )
+    await db.commit()
+    return {"model_id": model_id, "parent_model_id": parent_model_id}
+
+
+async def get_ancestors(
+    db: aiosqlite.Connection,
+    model_id: str,
+) -> list[dict[str, object]]:
+    """Get ancestor chain from model to root (breadcrumb order: root first)."""
+    ancestors: list[dict[str, object]] = []
+    current = model_id
+
+    # First get the parent of the starting model
+    cursor = await db.execute(
+        "SELECT parent_model_id FROM models WHERE id = ? AND is_deleted = 0",
+        (current,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return []
+    current = row[0]
+
+    visited: set[str] = set()
+    while current is not None:
+        if current in visited:
+            break
+        visited.add(current)
+        cursor = await db.execute(
+            "SELECT m.id, mv.name, m.model_type, m.parent_model_id "
+            "FROM models m "
+            "JOIN model_versions mv ON m.id = mv.model_id "
+            "AND m.current_version = mv.version "
+            "WHERE m.id = ? AND m.is_deleted = 0",
+            (current,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            break
+        ancestors.append({
+            "id": row[0],
+            "name": row[1],
+            "model_type": row[2],
+            "parent_model_id": row[3],
+        })
+        current = row[3]
+
+    ancestors.reverse()  # root first
+    return ancestors
+
+
+async def get_children(
+    db: aiosqlite.Connection,
+    model_id: str,
+) -> list[dict[str, object]]:
+    """Get direct children of a model."""
+    cursor = await db.execute(
+        "SELECT m.id, mv.name, m.model_type, m.parent_model_id "
+        "FROM models m "
+        "JOIN model_versions mv ON m.id = mv.model_id "
+        "AND m.current_version = mv.version "
+        "WHERE m.parent_model_id = ? AND m.is_deleted = 0 "
+        "ORDER BY mv.name",
+        (model_id,),
+    )
+    rows = await cursor.fetchall()
+    return [
+        {
+            "id": r[0],
+            "name": r[1],
+            "model_type": r[2],
+            "parent_model_id": r[3],
+        }
+        for r in rows
+    ]
+
+
+async def get_model_hierarchy(
+    db: aiosqlite.Connection,
+    root_id: str | None = None,
+) -> list[dict[str, object]]:
+    """Get the model hierarchy as a tree.
+
+    If root_id is given, returns subtree rooted at that model.
+    Otherwise returns all root models with their children.
+    """
+    # Fetch all non-deleted models
+    cursor = await db.execute(
+        "SELECT m.id, mv.name, m.model_type, m.parent_model_id "
+        "FROM models m "
+        "JOIN model_versions mv ON m.id = mv.model_id "
+        "AND m.current_version = mv.version "
+        "WHERE m.is_deleted = 0 "
+        "ORDER BY mv.name",
+    )
+    rows = await cursor.fetchall()
+
+    # Build lookup structures
+    nodes: dict[str, dict[str, object]] = {}
+    for r in rows:
+        nodes[r[0]] = {
+            "id": r[0],
+            "name": r[1],
+            "model_type": r[2],
+            "parent_model_id": r[3],
+            "children": [],
+        }
+
+    # Build tree
+    roots: list[dict[str, object]] = []
+    for node in nodes.values():
+        parent_id = node["parent_model_id"]
+        if parent_id is not None and parent_id in nodes:
+            parent_children: list[dict[str, object]] = nodes[parent_id]["children"]  # type: ignore[assignment]
+            parent_children.append(node)
+        elif parent_id is None or parent_id not in nodes:
+            roots.append(node)
+
+    if root_id is not None:
+        # Return subtree rooted at root_id
+        if root_id in nodes:
+            return [nodes[root_id]]
+        return []
+
+    return roots
 
 
 async def get_model_versions(

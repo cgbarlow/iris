@@ -15,6 +15,7 @@ from app.comments.router import router as comments_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
 from app.entities.router import router as entities_router
+from app.import_sparx.router import router as import_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.models_crud.router import admin_router as admin_thumbnails_router
@@ -72,7 +73,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         allow_origins=config.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "If-Match"],
         max_age=3600,
     )
 
@@ -107,6 +108,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(audit_router)
     app.include_router(settings_router)
     app.include_router(admin_thumbnails_router)
+    app.include_router(import_router)
 
     return app
 

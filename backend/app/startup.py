@@ -16,6 +16,7 @@ from app.migrations.m007_thumbnails import up as m007_up
 from app.migrations.m008_entity_tags import up as m008_up
 from app.migrations.m009_model_tags import up as m009_up
 from app.migrations.m010_thumbnail_themes import up as m010_up
+from app.migrations.m011_model_hierarchy import up as m011_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.models_crud.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
@@ -48,6 +49,7 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
     await m008_up(db_manager.main_db)
     await m009_up(db_manager.main_db)
     await m010_up(db_manager.main_db)
+    await m011_up(db_manager.main_db)
 
     # 3b. Rebuild FTS search index from existing data
     await rebuild_search_index(db_manager.main_db)

@@ -1,0 +1,27 @@
+<script lang="ts">
+	import { Handle, Position } from '@xyflow/svelte';
+
+	interface Props {
+		data: { label: string; [key: string]: unknown };
+		selected?: boolean;
+	}
+
+	let { data, selected = false }: Props = $props();
+</script>
+
+<div
+	class="uml-node uml-node--component"
+	class:uml-node--selected={selected}
+	aria-label="{data.label}, Component"
+>
+	<div class="uml-node__header">
+		<span class="uml-node__label">{data.label}</span>
+		<span class="uml-node__icon uml-node__icon--top-right" aria-hidden="true">⊞</span>
+	</div>
+	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Right} id="right" />
+	<Handle type="source" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
+	<Handle type="target" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
+</div>

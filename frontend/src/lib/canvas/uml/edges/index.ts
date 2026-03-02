@@ -6,6 +6,7 @@ import CompositionEdge from './CompositionEdge.svelte';
 import DependencyEdge from './DependencyEdge.svelte';
 import RealizationEdge from './RealizationEdge.svelte';
 import GeneralizationEdge from './GeneralizationEdge.svelte';
+import UsageEdge from './UsageEdge.svelte';
 
 export const umlEdgeTypes = {
 	association: AssociationEdge,
@@ -14,4 +15,5 @@ export const umlEdgeTypes = {
 	dependency: DependencyEdge,
 	realization: RealizationEdge,
 	generalization: GeneralizationEdge,
+	usage: UsageEdge,
 } as const;

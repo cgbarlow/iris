@@ -38,20 +38,20 @@ describe('FullViewCanvas type registries', () => {
 		}
 	});
 
-	it('UML has 6 node types', () => {
-		expect(Object.keys(umlNodeTypes)).toHaveLength(6);
+	it('UML has 11 node types', () => {
+		expect(Object.keys(umlNodeTypes)).toHaveLength(11);
 	});
 
-	it('UML has 6 edge types', () => {
-		expect(Object.keys(umlEdgeTypes)).toHaveLength(6);
+	it('UML has 7 edge types', () => {
+		expect(Object.keys(umlEdgeTypes)).toHaveLength(7);
 	});
 
-	it('ArchiMate has 11 node types', () => {
-		expect(Object.keys(archimateNodeTypes)).toHaveLength(11);
+	it('ArchiMate has 45 node types', () => {
+		expect(Object.keys(archimateNodeTypes)).toHaveLength(45);
 	});
 
-	it('ArchiMate has 8 edge types', () => {
-		expect(Object.keys(archimateEdgeTypes)).toHaveLength(8);
+	it('ArchiMate has 11 edge types', () => {
+		expect(Object.keys(archimateEdgeTypes)).toHaveLength(11);
 	});
 });
 

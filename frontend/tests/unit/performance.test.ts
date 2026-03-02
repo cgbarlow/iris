@@ -131,17 +131,17 @@ describe('Type registry completeness', () => {
 		expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(5);
 	});
 
-	it('UML has 6 entity types and 6 relationship types', () => {
-		expect(UML_ENTITY_TYPES).toHaveLength(6);
-		expect(UML_RELATIONSHIP_TYPES).toHaveLength(6);
+	it('UML has 11 entity types and 7 relationship types', () => {
+		expect(UML_ENTITY_TYPES).toHaveLength(11);
+		expect(UML_RELATIONSHIP_TYPES).toHaveLength(7);
 	});
 
-	it('ArchiMate has 11 entity types and 8 relationship types', () => {
-		expect(ARCHIMATE_ENTITY_TYPES).toHaveLength(11);
-		expect(ARCHIMATE_RELATIONSHIP_TYPES).toHaveLength(8);
+	it('ArchiMate has 45 entity types and 11 relationship types', () => {
+		expect(ARCHIMATE_ENTITY_TYPES).toHaveLength(45);
+		expect(ARCHIMATE_RELATIONSHIP_TYPES).toHaveLength(11);
 	});
 
-	it('total type count: 24 entity types + 19 relationship types', () => {
+	it('total type count: 63 entity types + 23 relationship types', () => {
 		const totalEntityTypes =
 			SIMPLE_ENTITY_TYPES.length + UML_ENTITY_TYPES.length + ARCHIMATE_ENTITY_TYPES.length;
 		const totalRelTypes =
@@ -149,7 +149,7 @@ describe('Type registry completeness', () => {
 			UML_RELATIONSHIP_TYPES.length +
 			ARCHIMATE_RELATIONSHIP_TYPES.length;
 
-		expect(totalEntityTypes).toBe(24);
-		expect(totalRelTypes).toBe(19);
+		expect(totalEntityTypes).toBe(63);
+		expect(totalRelTypes).toBe(23);
 	});
 });
