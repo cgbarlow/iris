@@ -105,6 +105,7 @@
 	let treeSearchQuery = $state('');
 	let showCreateChildDialog = $state(false);
 	let showParentPicker = $state(false);
+	let treeModelsOnly = $state(false);
 
 	// Export menu state
 	let showExportMenu = $state(false);
@@ -1037,6 +1038,15 @@
 						+ Child
 					</button>
 					<button
+						onclick={() => (treeModelsOnly = !treeModelsOnly)}
+						class="rounded px-2 py-1 text-xs"
+						style="border: 1px solid {treeModelsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeModelsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {treeModelsOnly ? 'var(--color-surface, transparent)' : 'transparent'}"
+						title="Show only items with child models"
+						aria-pressed={treeModelsOnly}
+					>
+						Models
+					</button>
+					<button
 						onclick={() => (sidebarOpen = false)}
 						class="rounded p-1 text-xs"
 						style="color: var(--color-muted)"
@@ -1064,7 +1074,7 @@
 				{:else}
 					<ul role="tree">
 						{#each hierarchyTree as node (node.id)}
-							<TreeNode {node} currentModelId={model.id} searchQuery={treeSearchQuery} />
+							<TreeNode {node} currentModelId={model.id} searchQuery={treeSearchQuery} showModelsOnly={treeModelsOnly} />
 						{/each}
 					</ul>
 				{/if}

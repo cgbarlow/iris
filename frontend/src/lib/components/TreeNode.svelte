@@ -7,9 +7,10 @@
 		depth?: number;
 		currentModelId?: string;
 		searchQuery?: string;
+		showModelsOnly?: boolean;
 	}
 
-	let { node, depth = 0, currentModelId = '', searchQuery = '' }: Props = $props();
+	let { node, depth = 0, currentModelId = '', searchQuery = '', showModelsOnly = false }: Props = $props();
 
 	let expanded = $state(depth < 2);
 
@@ -26,7 +27,20 @@
 					(c.children ?? []).length > 0
 			)
 	);
-	const visible = $derived(matchesSearch || childMatchesSearch);
+
+	/** Recursively check if a node or any descendant has children. */
+	function hasModelsDeep(n: ModelHierarchyNode): boolean {
+		if (n.children && n.children.length > 0) return true;
+		return false;
+	}
+	function descendantHasModels(n: ModelHierarchyNode): boolean {
+		return (n.children ?? []).some((c) => hasModelsDeep(c) || descendantHasModels(c));
+	}
+
+	const passesModelFilter = $derived(
+		!showModelsOnly || hasChildren || descendantHasModels(node)
+	);
+	const visible = $derived((matchesSearch || childMatchesSearch) && passesModelFilter);
 
 	function toggleExpand() {
 		expanded = !expanded;
@@ -72,6 +86,9 @@
 				class="tree-node__link"
 				onkeydown={handleKeydown}
 			>
+				{#if hasChildren}
+					<span class="tree-node__model-indicator" aria-hidden="true"></span>
+				{/if}
 				<span class="tree-node__name">{node.name}</span>
 				<span class="tree-node__type">{node.model_type}</span>
 			</a>
@@ -84,6 +101,7 @@
 						depth={depth + 1}
 						{currentModelId}
 						{searchQuery}
+						{showModelsOnly}
 					/>
 				{/each}
 			</ul>
@@ -133,6 +151,14 @@
 		flex: 1;
 		min-width: 0;
 		padding: 2px 0;
+	}
+	.tree-node__model-indicator {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		background-color: var(--color-primary);
+		flex-shrink: 0;
 	}
 	.tree-node__name {
 		overflow: hidden;
