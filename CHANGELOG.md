@@ -5,6 +5,11 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-03-02
+
+### Fixed
+- Centre-point connector persistence: edges connected via centre handles disappeared on save/reload because only a `type="source"` handle existed — @xyflow couldn't match `targetHandle: "center"` on the target node. Added matching `type="target"` centre handle to all 15 node components (ADR-053)
+
 ## [1.5.1] - 2026-03-02
 
 ### Added
