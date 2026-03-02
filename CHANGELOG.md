@@ -5,6 +5,20 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-03-02
+
+### Added
+- Centre-point connector mode: invisible centre Handle on all 15 node components (8 Simple View, 6 UML, 1 ArchiMate) enabling straight centre-to-centre connections; visible on hover with enlarged hit area (ADR-053, SPEC-053-A)
+- ADR-053: Centre-Point Connection Mode
+- SPEC-053-A: Centre-Point Handle Implementation
+- ADR-054: ArchiMate Seed Data Node Type Mapping
+- SPEC-054-A: ArchiMate Seed Data Fix
+
+### Fixed
+- Seed model node overlap: increased vertical spacing in all seed model builders to 250px row gaps, preventing node overlap with multi-line descriptions
+- Seed model descriptions: replaced abbreviated hardcoded descriptions with full entity descriptions from `_ENTITIES` via `_ENTITY_DESCRIPTIONS` lookup dict
+- ArchiMate Enterprise View rendering: seed data now uses correct ArchiMate node types (business_actor, application_component, etc.) with `layer` and `archimateType` data fields so ArchimateNode.svelte renders properly with coloured layer badges (ADR-054, SPEC-054-A)
+
 ## [1.5.0] - 2026-03-01
 
 ### Added

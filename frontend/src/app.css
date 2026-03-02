@@ -246,6 +246,19 @@ a {
 	stroke: var(--color-primary);
 }
 
+/* ── Centre-point connection handle ── */
+.svelte-flow .svelte-flow__handle.center-handle {
+	opacity: 0;
+	width: 16px;
+	height: 16px;
+	pointer-events: all;
+}
+
+.svelte-flow .svelte-flow__node:hover .svelte-flow__handle.center-handle {
+	opacity: 0.6;
+	background: var(--color-primary);
+}
+
 /* ── Edge endpoint handles ── */
 .svelte-flow .svelte-flow__handle:hover {
 	width: 12px;
