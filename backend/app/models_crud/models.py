@@ -12,6 +12,7 @@ class ModelCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
+    parent_model_id: str | None = None
 
 
 class ModelUpdate(BaseModel):
@@ -37,7 +38,18 @@ class ModelResponse(BaseModel):
     created_by_username: str = "Unknown"
     updated_at: str
     is_deleted: bool = False
+    parent_model_id: str | None = None
     tags: list[str] = Field(default_factory=list)
+
+
+class ModelHierarchyNode(BaseModel):
+    """A node in the model hierarchy tree."""
+
+    id: str
+    name: str
+    model_type: str
+    parent_model_id: str | None = None
+    children: list[ModelHierarchyNode] = Field(default_factory=list)
 
 
 class ModelVersionResponse(BaseModel):

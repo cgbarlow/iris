@@ -92,6 +92,9 @@
 	let showAddParticipant = $state(false);
 	let showAddMessage = $state(false);
 
+	// Hierarchy breadcrumb state
+	let ancestors = $state<{ id: string; name: string; model_type: string }[]>([]);
+
 	// Focus view state
 	let focusMode = $state(false);
 
@@ -170,6 +173,7 @@
 			loadBookmarkStatus(id);
 			loadInheritedTags();
 			loadAllTags();
+			loadAncestors(id);
 		} catch (e) {
 			error = e instanceof ApiError && e.status === 404
 				? 'Model not found'
@@ -246,6 +250,16 @@
 			allTags = await apiFetch<string[]>('/api/entities/tags/all');
 		} catch {
 			allTags = [];
+		}
+	}
+
+	async function loadAncestors(id: string) {
+		try {
+			ancestors = await apiFetch<{ id: string; name: string; model_type: string }[]>(
+				`/api/models/${id}/ancestors`
+			);
+		} catch {
+			ancestors = [];
 		}
 	}
 
@@ -868,6 +882,23 @@
 		{error}
 	</div>
 {:else if model}
+	{#if ancestors.length > 0}
+		<nav aria-label="Model hierarchy breadcrumb" class="mb-2">
+			<ol class="flex items-center gap-1 text-sm" style="color: var(--color-muted)">
+				<li><a href="/models" style="color: var(--color-primary)">Models</a></li>
+				{#each ancestors as ancestor}
+					<li class="flex items-center gap-1">
+						<span aria-hidden="true">/</span>
+						<a href="/models/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
+					</li>
+				{/each}
+				<li class="flex items-center gap-1">
+					<span aria-hidden="true">/</span>
+					<span aria-current="page">{model.name}</span>
+				</li>
+			</ol>
+		</nav>
+	{/if}
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>

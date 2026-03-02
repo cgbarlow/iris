@@ -11,6 +11,7 @@ from fastapi.responses import Response as FastAPIResponse
 from app.auth.dependencies import get_current_user
 from app.models_crud.models import (
     ModelCreate,
+    ModelHierarchyNode,
     ModelListResponse,
     ModelResponse,
     ModelUpdate,
@@ -18,9 +19,13 @@ from app.models_crud.models import (
 )
 from app.models_crud.service import (
     create_model,
+    get_ancestors,
+    get_children,
     get_model,
+    get_model_hierarchy,
     get_model_versions,
     list_models,
+    set_model_parent,
     soft_delete_model,
     update_model,
 )
@@ -63,8 +68,21 @@ async def create(
         description=body.description,
         data=body.data,
         created_by=current_user["id"],
+        parent_model_id=body.parent_model_id,
     )
     return ModelResponse(**result)
+
+
+@router.get("/hierarchy", response_model=list[ModelHierarchyNode])
+async def hierarchy(
+    request: Request,
+    root_id: str | None = None,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[ModelHierarchyNode]:
+    """Get the model hierarchy tree."""
+    db = request.app.state.db_manager.main_db
+    tree = await get_model_hierarchy(db, root_id=root_id)
+    return [ModelHierarchyNode(**node) for node in tree]
 
 
 @router.get("", response_model=ModelListResponse)
@@ -166,6 +184,50 @@ async def delete(
     )
     if not deleted:
         raise HTTPException(status_code=409, detail="Version conflict or not found")
+
+
+@router.get("/{model_id}/ancestors")
+async def get_model_ancestors(
+    model_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[dict[str, Any]]:
+    """Get ancestor chain for breadcrumb navigation (root first)."""
+    db = request.app.state.db_manager.main_db
+    return await get_ancestors(db, model_id)
+
+
+@router.get("/{model_id}/children")
+async def get_model_children(
+    model_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[dict[str, Any]]:
+    """Get direct children of a model."""
+    db = request.app.state.db_manager.main_db
+    return await get_children(db, model_id)
+
+
+@router.put("/{model_id}/parent")
+async def set_parent(
+    model_id: str,
+    body: dict[str, Any],
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, Any]:
+    """Set or unset the parent model."""
+    db = request.app.state.db_manager.main_db
+    parent_id = body.get("parent_model_id")
+    result = await set_model_parent(
+        db, model_id, parent_id, updated_by=_current_user["id"],
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Model or parent not found")
+    if result.get("error") == "cycle":
+        raise HTTPException(
+            status_code=400, detail="Cannot set parent: would create a cycle"
+        )
+    return result
 
 
 @router.get(

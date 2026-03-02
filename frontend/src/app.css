@@ -479,6 +479,30 @@ a {
 	background: #22c55e;
 }
 
+.archimate-node--motivation {
+	border-left: 4px solid #9b59b6;
+	background: #f5eef8;
+}
+.archimate-node--motivation .archimate-node__layer-badge {
+	background: #9b59b6;
+}
+
+.archimate-node--strategy {
+	border-left: 4px solid #f39c12;
+	background: #fef9e7;
+}
+.archimate-node--strategy .archimate-node__layer-badge {
+	background: #f39c12;
+}
+
+.archimate-node--implementation_migration {
+	border-left: 4px solid #27ae60;
+	background: #eafaf1;
+}
+.archimate-node--implementation_migration .archimate-node__layer-badge {
+	background: #27ae60;
+}
+
 /* ── Browse mode ── */
 .model-canvas--browse {
 	cursor: default;

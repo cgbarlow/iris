@@ -6,6 +6,11 @@ import UseCaseNode from './UseCaseNode.svelte';
 import StateNode from './StateNode.svelte';
 import ActivityNode from './ActivityNode.svelte';
 import DeploymentNode from './DeploymentNode.svelte';
+import InterfaceNode from './InterfaceNode.svelte';
+import EnumNode from './EnumNode.svelte';
+import AbstractClassNode from './AbstractClassNode.svelte';
+import UmlComponentNode from './UmlComponentNode.svelte';
+import UmlPackageNode from './UmlPackageNode.svelte';
 
 export const umlNodeTypes = {
 	class: ClassNode,
@@ -14,4 +19,9 @@ export const umlNodeTypes = {
 	state: StateNode,
 	activity: ActivityNode,
 	node: DeploymentNode,
+	interface_uml: InterfaceNode,
+	enumeration: EnumNode,
+	abstract_class: AbstractClassNode,
+	component_uml: UmlComponentNode,
+	package_uml: UmlPackageNode,
 } as const;

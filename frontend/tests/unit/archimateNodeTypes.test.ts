@@ -27,8 +27,8 @@ describe('ArchiMate seed data node types (ADR-054)', () => {
 		},
 	);
 
-	it('archimateNodeTypes registry has all 11 ArchiMate types', () => {
-		expect(Object.keys(archimateNodeTypes)).toHaveLength(11);
+	it('archimateNodeTypes registry has all 45 ArchiMate types', () => {
+		expect(Object.keys(archimateNodeTypes)).toHaveLength(45);
 	});
 
 	it('all enterprise model types are a subset of the registry', () => {

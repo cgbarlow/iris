@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
-	import type { Model, PaginatedResponse } from '$lib/types/api';
+	import type { Model, PaginatedResponse, ModelHierarchyNode } from '$lib/types/api';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
 	import ModelThumbnail from '$lib/components/ModelThumbnail.svelte';
+	import TreeNode from '$lib/components/TreeNode.svelte';
 
 	let models = $state<Model[]>([]);
+	let hierarchyTree = $state<ModelHierarchyNode[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
@@ -15,8 +17,8 @@
 	let availableTags = $state<string[]>([]);
 	let templateFilter = $state(false);
 	let showCreateDialog = $state(false);
-	let viewMode = $state<'list' | 'gallery'>(
-		(typeof window !== 'undefined' && localStorage.getItem('iris-models-view') as 'list' | 'gallery') || 'list'
+	let viewMode = $state<'list' | 'gallery' | 'tree'>(
+		(typeof window !== 'undefined' && localStorage.getItem('iris-models-view') as 'list' | 'gallery' | 'tree') || 'list'
 	);
 	let cardSize = $state<number>(
 		(typeof window !== 'undefined' && Number(localStorage.getItem('iris-models-card-size'))) || 250
@@ -58,16 +60,33 @@
 		}
 	});
 
+	$effect(() => {
+		if (viewMode === 'tree' && hierarchyTree.length === 0 && !loading) {
+			loadHierarchy();
+		}
+	});
+
 	async function loadModels() {
 		loading = true;
 		try {
 			const data = await apiFetch<PaginatedResponse<Model>>('/api/models');
 			models = data.items;
 			loadAvailableTags();
+			if (viewMode === 'tree') {
+				await loadHierarchy();
+			}
 		} catch {
 			error = 'Failed to load models';
 		}
 		loading = false;
+	}
+
+	async function loadHierarchy() {
+		try {
+			hierarchyTree = await apiFetch<ModelHierarchyNode[]>('/api/models/hierarchy');
+		} catch {
+			hierarchyTree = [];
+		}
 	}
 
 	async function loadAvailableTags() {
@@ -225,6 +244,15 @@
 		>
 			▦
 		</button>
+		<button
+			onclick={() => (viewMode = 'tree')}
+			aria-label="Tree view"
+			aria-pressed={viewMode === 'tree'}
+			class="rounded border px-2 py-2 text-sm"
+			style="border-color: var(--color-border); {viewMode === 'tree' ? 'background: var(--color-primary); color: white' : 'background: var(--color-bg); color: var(--color-fg)'}"
+		>
+			⊞
+		</button>
 	</div>
 	<button
 		onclick={() => (templateFilter = !templateFilter)}
@@ -266,7 +294,17 @@
 		<p class="mb-3 text-sm" style="color: var(--color-muted)">
 			{filteredModels.length} model{filteredModels.length === 1 ? '' : 's'}
 		</p>
-		{#if viewMode === 'list'}
+		{#if viewMode === 'tree'}
+			<ul role="tree" aria-label="Model hierarchy" class="tree-view" data-testid="models-tree">
+				{#if hierarchyTree.length === 0}
+					<li style="color: var(--color-muted); padding: 8px">No models found.</li>
+				{:else}
+					{#each hierarchyTree as node (node.id)}
+						<TreeNode {node} searchQuery={searchQuery} />
+					{/each}
+				{/if}
+			</ul>
+		{:else if viewMode === 'list'}
 			<ul class="flex flex-col gap-2" data-testid="models-list">
 				{#each filteredModels as model}
 					<li>

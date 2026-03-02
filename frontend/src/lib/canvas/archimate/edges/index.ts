@@ -11,4 +11,7 @@ export const archimateEdgeTypes = {
 	archimate_realization: ArchimateEdge,
 	archimate_composition: ArchimateEdge,
 	archimate_aggregation: ArchimateEdge,
+	specialization: ArchimateEdge,
+	assignment: ArchimateEdge,
+	association_archimate: ArchimateEdge,
 } as const;

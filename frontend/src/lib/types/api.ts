@@ -42,7 +42,16 @@ export interface Model {
 	created_by_username?: string;
 	updated_at: string;
 	is_deleted: boolean;
+	parent_model_id?: string | null;
 	tags?: string[];
+}
+
+export interface ModelHierarchyNode {
+	id: string;
+	name: string;
+	model_type: string;
+	parent_model_id: string | null;
+	children: ModelHierarchyNode[];
 }
 
 export interface SearchResult {

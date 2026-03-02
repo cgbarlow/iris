@@ -5,6 +5,21 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-02
+
+### Added
+- Model Hierarchy: parent/child relationships for models via `parent_model_id` column; API endpoints for hierarchy tree, ancestors, children, and parent assignment with cycle validation (ADR-055, WP-1)
+- Tree View: hierarchical model navigation on the Models page alongside list and gallery views; recursive TreeNode component with expand/collapse, search filtering, and keyboard support (WP-2)
+- Breadcrumbs: ancestor chain navigation on model detail pages showing path from root to current model (WP-2)
+- ArchiMate Full Specification: expanded from 11 to 45 entity types across 6 layers (business, application, technology, motivation, strategy, implementation & migration); 3 new relationship types (specialization, assignment, association); layer-specific CSS styling (ADR-056, WP-3)
+- UML Type Expansion: 5 new node types (Interface, Enumeration, Abstract Class, Component, Package) with dedicated Svelte components; Usage edge type (ADR-057, WP-4)
+- SparxEA Import: backend module to read `.qea` SQLite files (EA 16+) and import elements, connectors, diagrams, and package hierarchy into Iris; type mapping for UML/ArchiMate; coordinate conversion; `POST /api/import/sparx` endpoint (ADR-059, WP-5)
+- Import UI: drag-and-drop upload page for `.qea` files with progress indicator and results summary; Import link in sidebar navigation (WP-6)
+- BPMN Deferral: ADR-058 documenting decision to defer BPMN support to a future phase
+- ADR-055 through ADR-059 and corresponding specs
+- 20 backend tests for model hierarchy (create with parent, hierarchy tree, ancestors, children, cycle prevention, deleted model exclusion)
+- 42 backend tests for SparxEA import (reader, mapper, converter, full import, API endpoint)
+
 ## [1.5.2] - 2026-03-02
 
 ### Added
