@@ -1030,14 +1030,6 @@
 				<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
 				<div class="flex items-center gap-1">
 					<button
-						onclick={() => (showCreateChildDialog = true)}
-						class="rounded px-2 py-1 text-xs"
-						style="background: var(--color-primary); color: white"
-						title="Create child model"
-					>
-						+ Child
-					</button>
-					<button
 						onclick={() => (treeModelsOnly = !treeModelsOnly)}
 						class="rounded px-2 py-1 text-xs"
 						style="border: 1px solid {treeModelsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeModelsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {treeModelsOnly ? 'var(--color-surface, transparent)' : 'transparent'}"
@@ -1045,6 +1037,14 @@
 						aria-pressed={treeModelsOnly}
 					>
 						Models
+					</button>
+					<button
+						onclick={() => (showCreateChildDialog = true)}
+						class="rounded px-2 py-1 text-xs"
+						style="background: var(--color-primary); color: white"
+						title="Create child model"
+					>
+						+ Child
 					</button>
 					<button
 						onclick={() => (sidebarOpen = false)}
