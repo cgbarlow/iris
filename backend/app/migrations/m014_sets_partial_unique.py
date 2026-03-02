@@ -23,6 +23,12 @@ async def up(db: aiosqlite.Connection) -> None:
     if await cursor.fetchone():
         return
 
+    # Disable FK checks for table recreation
+    await db.execute("PRAGMA foreign_keys = OFF")
+
+    # Clean up any leftover temp table from a previous interrupted run
+    await db.execute("DROP TABLE IF EXISTS sets_new")
+
     # 1. Create new table without UNIQUE on name
     await db.execute(
         "CREATE TABLE sets_new ("
@@ -64,3 +70,6 @@ async def up(db: aiosqlite.Connection) -> None:
     )
 
     await db.commit()
+
+    # Re-enable FK checks
+    await db.execute("PRAGMA foreign_keys = ON")
