@@ -985,18 +985,12 @@
 			</div>
 			<button
 				onclick={toggleSidebar}
-				class="rounded p-2 text-sm"
+				class="rounded px-3 py-1.5 text-sm"
 				style="border: 1px solid var(--color-border); color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}"
 				aria-label="Toggle hierarchy sidebar"
 				aria-pressed={sidebarOpen}
-				title="Show model hierarchy"
 			>
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" opacity="0.3"/>
-					<line x1="7" y1="10" x2="7" y2="14"/>
-					<line x1="7" y1="7" x2="17" y2="7"/>
-					<line x1="17" y1="7" x2="17" y2="14"/>
-				</svg>
+				Hierarchy
 			</button>
 		</div>
 		<div class="flex gap-2">
