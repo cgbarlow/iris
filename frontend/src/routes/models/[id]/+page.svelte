@@ -978,20 +978,9 @@
 		</ol>
 	</nav>
 	<div class="flex items-center justify-between">
-		<div class="flex items-center gap-3">
-			<div>
-				<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
-				<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
-			</div>
-			<button
-				onclick={toggleSidebar}
-				class="rounded px-3 py-1.5 text-sm"
-				style="border: 1px solid var(--color-border); color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}"
-				aria-label="Toggle hierarchy sidebar"
-				aria-pressed={sidebarOpen}
-			>
-				Hierarchy
-			</button>
+		<div>
+			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
 		</div>
 		<div class="flex gap-2">
 			<button
@@ -1087,6 +1076,15 @@
 	<div class="min-w-0 flex-1">
 	<!-- Tab navigation -->
 	<div class="flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
+		<button
+			onclick={toggleSidebar}
+			class="px-4 py-2 text-sm"
+			style="color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {sidebarOpen ? 'var(--color-primary)' : 'transparent'}"
+			aria-label="Toggle hierarchy sidebar"
+			aria-pressed={sidebarOpen}
+		>
+			Hierarchy
+		</button>
 		<button
 			role="tab"
 			aria-selected={activeTab === 'overview'}
