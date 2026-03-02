@@ -78,11 +78,12 @@ async def create(
 async def hierarchy(
     request: Request,
     root_id: str | None = None,
+    set_id: str | None = None,
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> list[ModelHierarchyNode]:
     """Get the model hierarchy tree."""
     db = request.app.state.db_manager.main_db
-    tree = await get_model_hierarchy(db, root_id=root_id)
+    tree = await get_model_hierarchy(db, root_id=root_id, set_id=set_id)
     return [ModelHierarchyNode(**node) for node in tree]
 
 

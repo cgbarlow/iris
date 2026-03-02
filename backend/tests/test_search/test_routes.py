@@ -241,3 +241,96 @@ class TestSearchEndpoint:
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1
         assert resp.json()["results"][0]["name"] == "Generic Service"
+
+    async def test_search_filters_by_set_id(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        # Create a custom set
+        set_resp = await client.post(
+            "/api/sets",
+            json={"name": "Search Test Set", "description": "For search filtering"},
+            headers=headers,
+        )
+        set_id = set_resp.json()["id"]
+
+        # Create entity in the custom set
+        await client.post(
+            "/api/entities",
+            json={
+                "entity_type": "application",
+                "name": "Scoped Widget",
+                "description": "In custom set",
+                "set_id": set_id,
+            },
+            headers=headers,
+        )
+        # Create entity in default set (no set_id)
+        await client.post(
+            "/api/entities",
+            json={
+                "entity_type": "application",
+                "name": "Unscoped Widget",
+                "description": "In default set",
+            },
+            headers=headers,
+        )
+
+        # Search without set_id — should find both
+        resp = await client.get(
+            "/api/search?q=widget", headers=headers,
+        )
+        assert resp.status_code == 200
+        names = {r["name"] for r in resp.json()["results"]}
+        assert "Scoped Widget" in names
+        assert "Unscoped Widget" in names
+
+        # Search with set_id — should only find the scoped one
+        resp = await client.get(
+            f"/api/search?q=widget&set_id={set_id}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["results"][0]["name"] == "Scoped Widget"
+
+    async def test_search_set_id_filters_models(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        # Create a custom set
+        set_resp = await client.post(
+            "/api/sets",
+            json={"name": "Model Search Set"},
+            headers=headers,
+        )
+        set_id = set_resp.json()["id"]
+
+        # Create model in the custom set
+        await client.post(
+            "/api/models",
+            json={
+                "model_type": "simple",
+                "name": "Scoped Architecture",
+                "set_id": set_id,
+            },
+            headers=headers,
+        )
+        # Create model in default set
+        await client.post(
+            "/api/models",
+            json={
+                "model_type": "simple",
+                "name": "Unscoped Architecture",
+            },
+            headers=headers,
+        )
+
+        # Search with set_id — only scoped model
+        resp = await client.get(
+            f"/api/search?q=architecture&set_id={set_id}", headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["results"][0]["name"] == "Scoped Architecture"

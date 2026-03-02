@@ -107,10 +107,12 @@ async def search(
     query: str,
     *,
     limit: int = 50,
+    set_id: str | None = None,
 ) -> list[dict[str, object]]:
     """Search entities and models using FTS5.
 
     Returns combined results sorted by relevance rank.
+    When set_id is provided, only results belonging to that set are returned.
     """
     results: list[dict[str, object]] = []
 
@@ -120,12 +122,22 @@ async def search(
         return results
 
     # Search entities
-    cursor = await db.execute(
-        "SELECT entity_id, name, entity_type, description, rank "
-        "FROM entities_fts WHERE entities_fts MATCH ? "
-        "ORDER BY rank LIMIT ?",
-        (safe_query, limit),
-    )
+    if set_id:
+        cursor = await db.execute(
+            "SELECT f.entity_id, f.name, f.entity_type, f.description, f.rank "
+            "FROM entities_fts f "
+            "JOIN entities e ON e.id = f.entity_id "
+            "WHERE entities_fts MATCH ? AND e.set_id = ? "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, set_id, limit),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT entity_id, name, entity_type, description, rank "
+            "FROM entities_fts WHERE entities_fts MATCH ? "
+            "ORDER BY rank LIMIT ?",
+            (safe_query, limit),
+        )
     entity_rows = await cursor.fetchall()
     results.extend(
         {
@@ -141,12 +153,22 @@ async def search(
     )
 
     # Search models
-    cursor = await db.execute(
-        "SELECT model_id, name, model_type, description, rank "
-        "FROM models_fts WHERE models_fts MATCH ? "
-        "ORDER BY rank LIMIT ?",
-        (safe_query, limit),
-    )
+    if set_id:
+        cursor = await db.execute(
+            "SELECT f.model_id, f.name, f.model_type, f.description, f.rank "
+            "FROM models_fts f "
+            "JOIN models m ON m.id = f.model_id "
+            "WHERE models_fts MATCH ? AND m.set_id = ? "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, set_id, limit),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT model_id, name, model_type, description, rank "
+            "FROM models_fts WHERE models_fts MATCH ? "
+            "ORDER BY rank LIMIT ?",
+            (safe_query, limit),
+        )
     model_rows = await cursor.fetchall()
     results.extend(
         {

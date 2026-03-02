@@ -5,6 +5,25 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-03-02
+
+### Fixed
+- Pagination Prev/Next buttons now show visual disabled state (`opacity-50`, `cursor-not-allowed`) when on first/last page (ADR-063)
+- Audit log page pagination buttons also receive disabled styling
+- Soft-deleted set names no longer block creation of new sets with the same name — partial unique index replaces full UNIQUE constraint (migration m014)
+
+### Added
+- Model detail page: collapsible hierarchy tree sidebar showing set-scoped model tree with search filtering (ADR-063, SPEC-063-A)
+- Model detail page: "Add Child" button in sidebar to create child models with pre-set parent and set
+- Model detail page: "Parent" field in overview tab with "Change" (ModelPicker) and "Remove" actions for reparenting models
+- Hierarchy toggle button next to model title with visual state indication
+- Set-scoped hierarchy API: `GET /api/models/hierarchy?set_id=` optional query parameter
+- Database migration m014: partial unique index on sets.name for active rows only
+- ADR-063: Pagination Disabled Styling, Set Name Uniqueness Fix, Model Tree Explorer
+- SPEC-063-A: Pagination, Set Uniqueness, Tree Explorer specification
+- 3 integration tests for set-filtered hierarchy
+- 2 integration tests for soft-deleted set name reuse
+
 ## [1.7.0] - 2026-03-02
 
 ### Added

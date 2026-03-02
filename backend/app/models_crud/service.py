@@ -510,21 +510,28 @@ async def get_children(
 async def get_model_hierarchy(
     db: aiosqlite.Connection,
     root_id: str | None = None,
+    set_id: str | None = None,
 ) -> list[dict[str, object]]:
     """Get the model hierarchy as a tree.
 
     If root_id is given, returns subtree rooted at that model.
+    If set_id is given, only includes models from that set.
     Otherwise returns all root models with their children.
     """
-    # Fetch all non-deleted models
-    cursor = await db.execute(
+    # Fetch all non-deleted models (optionally filtered by set)
+    query = (
         "SELECT m.id, mv.name, m.model_type, m.parent_model_id "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
         "WHERE m.is_deleted = 0 "
-        "ORDER BY mv.name",
     )
+    params: list[str] = []
+    if set_id is not None:
+        query += "AND m.set_id = ? "
+        params.append(set_id)
+    query += "ORDER BY mv.name"
+    cursor = await db.execute(query, params)
     rows = await cursor.fetchall()
 
     # Build lookup structures

@@ -18,11 +18,12 @@ async def search_endpoint(
     request: Request,
     q: str = Query(min_length=1, max_length=200),
     limit: int = Query(default=50, ge=1, le=200),
+    set_id: str | None = Query(default=None),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> SearchResponse:
     """Search entities and models by text query."""
     db = request.app.state.db_manager.main_db
-    results = await search(db, q, limit=limit)
+    results = await search(db, q, limit=limit, set_id=set_id)
     return SearchResponse(
         query=q,
         results=[SearchResult(**r) for r in results],

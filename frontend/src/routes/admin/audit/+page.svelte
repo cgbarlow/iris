@@ -255,7 +255,7 @@
 				<button
 					onclick={() => goToPage(currentPage - 1)}
 					disabled={currentPage <= 1}
-					class="rounded border px-3 py-1 text-sm"
+					class="rounded border px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
 					style="border-color: var(--color-border); color: {currentPage <= 1 ? 'var(--color-muted)' : 'var(--color-primary)'}"
 				>
 					Previous
@@ -277,7 +277,7 @@
 				<button
 					onclick={() => goToPage(currentPage + 1)}
 					disabled={currentPage >= totalPages}
-					class="rounded border px-3 py-1 text-sm"
+					class="rounded border px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
 					style="border-color: var(--color-border); color: {currentPage >= totalPages ? 'var(--color-muted)' : 'var(--color-primary)'}"
 				>
 					Next
