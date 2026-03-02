@@ -54,7 +54,7 @@
 		<button
 			onclick={() => onpagechange(page - 1)}
 			disabled={page <= 1}
-			class="rounded border px-3 py-1 text-sm"
+			class="rounded border px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 			aria-label="Previous page"
 		>
@@ -83,7 +83,7 @@
 		<button
 			onclick={() => onpagechange(page + 1)}
 			disabled={page >= totalPages}
-			class="rounded border px-3 py-1 text-sm"
+			class="rounded border px-3 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 			aria-label="Next page"
 		>

@@ -175,6 +175,48 @@ class TestDeleteSet:
         assert resp.status_code == 409
 
 
+class TestSoftDeletedNameReuse:
+    async def test_create_set_with_name_of_deleted_set(self, client: httpx.AsyncClient) -> None:
+        """After soft-deleting a set, creating a new set with the same name should succeed."""
+        headers = await _auth_headers(client)
+        # Create and delete a set
+        create_resp = await client.post(
+            "/api/sets",
+            json={"name": "sparx"},
+            headers=headers,
+        )
+        assert create_resp.status_code == 201
+        set_id = create_resp.json()["id"]
+        delete_resp = await client.delete(f"/api/sets/{set_id}", headers=headers)
+        assert delete_resp.status_code == 204
+
+        # Create a new set with the same name — should succeed
+        resp = await client.post(
+            "/api/sets",
+            json={"name": "sparx"},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["name"] == "sparx"
+        assert resp.json()["id"] != set_id
+
+    async def test_duplicate_active_name_still_blocked(self, client: httpx.AsyncClient) -> None:
+        """Two active sets with the same name should still be rejected."""
+        headers = await _auth_headers(client)
+        resp1 = await client.post(
+            "/api/sets",
+            json={"name": "unique-active"},
+            headers=headers,
+        )
+        assert resp1.status_code == 201
+        resp2 = await client.post(
+            "/api/sets",
+            json={"name": "unique-active"},
+            headers=headers,
+        )
+        assert resp2.status_code == 409
+
+
 class TestSetTags:
     async def test_get_scoped_tags(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)

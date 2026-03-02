@@ -23,8 +23,9 @@
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import EntityPicker from '$lib/components/EntityPicker.svelte';
 	import ModelPicker from '$lib/components/ModelPicker.svelte';
+	import TreeNode from '$lib/components/TreeNode.svelte';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
-	import type { Entity } from '$lib/types/api';
+	import type { Entity, ModelHierarchyNode } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
 	import type { SimpleEntityType, SimpleRelationshipType, EdgeRoutingType } from '$lib/types/canvas';
 	import {
@@ -97,6 +98,14 @@
 	// Focus view state
 	let focusMode = $state(false);
 
+	// Hierarchy tree sidebar state
+	let sidebarOpen = $state(false);
+	let hierarchyTree = $state<ModelHierarchyNode[]>([]);
+	let hierarchyLoading = $state(false);
+	let treeSearchQuery = $state('');
+	let showCreateChildDialog = $state(false);
+	let showParentPicker = $state(false);
+
 	// Export menu state
 	let showExportMenu = $state(false);
 
@@ -108,9 +117,19 @@
 
 	// Version rollback — not available for models (only entities have rollback API).
 
+	let prevSetId = $state<string | undefined>(undefined);
+
 	$effect(() => {
 		const id = page.params.id;
 		if (id) loadModel(id);
+	});
+
+	// Reload hierarchy tree when navigating to a model with a different set_id
+	$effect(() => {
+		if (model && sidebarOpen && model.set_id !== prevSetId) {
+			prevSetId = model.set_id;
+			loadHierarchyTree();
+		}
 	});
 
 	// Listen for edge label edit events from EdgeLabel component (WP-3)
@@ -240,6 +259,77 @@
 			);
 		} catch {
 			ancestors = [];
+		}
+	}
+
+	async function loadHierarchyTree() {
+		if (!model?.set_id) return;
+		hierarchyLoading = true;
+		try {
+			hierarchyTree = await apiFetch<ModelHierarchyNode[]>(
+				`/api/models/hierarchy?set_id=${model.set_id}`
+			);
+		} catch {
+			hierarchyTree = [];
+		}
+		hierarchyLoading = false;
+	}
+
+	function toggleSidebar() {
+		sidebarOpen = !sidebarOpen;
+		if (sidebarOpen && hierarchyTree.length === 0) {
+			loadHierarchyTree();
+		}
+	}
+
+	async function handleCreateChild(name: string, modelType: string, description: string) {
+		if (!model) return;
+		try {
+			const created = await apiFetch<Model>('/api/models', {
+				method: 'POST',
+				body: JSON.stringify({
+					model_type: modelType,
+					name,
+					description,
+					data: {},
+					parent_model_id: model.id,
+					set_id: model.set_id,
+				}),
+			});
+			showCreateChildDialog = false;
+			await loadHierarchyTree();
+			await goto(`/models/${created.id}`);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create child model';
+		}
+	}
+
+	async function handleSetParent(parentModel: Model) {
+		if (!model) return;
+		showParentPicker = false;
+		try {
+			await apiFetch(`/api/models/${model.id}/parent`, {
+				method: 'PUT',
+				body: JSON.stringify({ parent_model_id: parentModel.id }),
+			});
+			await loadModel(model.id);
+			if (sidebarOpen) await loadHierarchyTree();
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to set parent';
+		}
+	}
+
+	async function handleRemoveParent() {
+		if (!model) return;
+		try {
+			await apiFetch(`/api/models/${model.id}/parent`, {
+				method: 'PUT',
+				body: JSON.stringify({ parent_model_id: null }),
+			});
+			await loadModel(model.id);
+			if (sidebarOpen) await loadHierarchyTree();
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to remove parent';
 		}
 	}
 
@@ -888,9 +978,26 @@
 		</ol>
 	</nav>
 	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
-			<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
+		<div class="flex items-center gap-3">
+			<div>
+				<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
+				<p class="mt-1 text-sm" style="color: var(--color-muted)">{model.model_type}</p>
+			</div>
+			<button
+				onclick={toggleSidebar}
+				class="rounded p-2 text-sm"
+				style="border: 1px solid var(--color-border); color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}"
+				aria-label="Toggle hierarchy sidebar"
+				aria-pressed={sidebarOpen}
+				title="Show model hierarchy"
+			>
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" opacity="0.3"/>
+					<line x1="7" y1="10" x2="7" y2="14"/>
+					<line x1="7" y1="7" x2="17" y2="7"/>
+					<line x1="17" y1="7" x2="17" y2="14"/>
+				</svg>
+			</button>
 		</div>
 		<div class="flex gap-2">
 			<button
@@ -925,8 +1032,67 @@
 		</div>
 	</div>
 
+	<div class="mt-6 flex gap-4">
+	<!-- Collapsible hierarchy sidebar -->
+	{#if sidebarOpen}
+		<aside
+			style="width: 280px; max-height: calc(100vh - 80px); flex-shrink: 0"
+			class="overflow-y-auto rounded border"
+			style:border-color="var(--color-border)"
+			style:background-color="var(--color-surface)"
+			aria-label="Model hierarchy"
+		>
+			<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border)">
+				<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
+				<div class="flex items-center gap-1">
+					<button
+						onclick={() => (showCreateChildDialog = true)}
+						class="rounded px-2 py-1 text-xs"
+						style="background: var(--color-primary); color: white"
+						title="Create child model"
+					>
+						+ Child
+					</button>
+					<button
+						onclick={() => (sidebarOpen = false)}
+						class="rounded p-1 text-xs"
+						style="color: var(--color-muted)"
+						aria-label="Close sidebar"
+					>
+						✕
+					</button>
+				</div>
+			</div>
+			<div class="p-2">
+				<input
+					type="search"
+					placeholder="Search tree..."
+					bind:value={treeSearchQuery}
+					class="w-full rounded border px-2 py-1 text-xs"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					aria-label="Search hierarchy"
+				/>
+			</div>
+			<div class="px-2 pb-2">
+				{#if hierarchyLoading}
+					<p class="p-2 text-xs" style="color: var(--color-muted)">Loading...</p>
+				{:else if hierarchyTree.length === 0}
+					<p class="p-2 text-xs" style="color: var(--color-muted)">No models in this set.</p>
+				{:else}
+					<ul role="tree">
+						{#each hierarchyTree as node (node.id)}
+							<TreeNode {node} currentModelId={model.id} searchQuery={treeSearchQuery} />
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		</aside>
+	{/if}
+
+	<!-- Main content -->
+	<div class="min-w-0 flex-1">
 	<!-- Tab navigation -->
-	<div class="mt-6 flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
+	<div class="flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
 		<button
 			role="tab"
 			aria-selected={activeTab === 'overview'}
@@ -982,6 +1148,36 @@
 					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
 						{model.set_name ?? 'Default'}
 					</span>
+				</dd>
+
+				<dt class="text-sm font-medium" style="color: var(--color-muted)">Parent</dt>
+				<dd class="flex items-center gap-2">
+					{#if model.parent_model_id}
+						{@const parentAncestor = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null}
+						{#if parentAncestor}
+							<a href="/models/{parentAncestor.id}" style="color: var(--color-primary)" class="text-sm">{parentAncestor.name}</a>
+						{:else}
+							<span class="text-sm" style="color: var(--color-fg)">{model.parent_model_id.slice(0, 8)}...</span>
+						{/if}
+					{:else}
+						<span class="text-sm" style="color: var(--color-muted)">None — root model</span>
+					{/if}
+					<button
+						onclick={() => (showParentPicker = true)}
+						class="rounded px-2 py-0.5 text-xs"
+						style="border: 1px solid var(--color-border); color: var(--color-primary)"
+					>
+						Change
+					</button>
+					{#if model.parent_model_id}
+						<button
+							onclick={handleRemoveParent}
+							class="rounded px-2 py-0.5 text-xs"
+							style="border: 1px solid var(--color-border); color: var(--color-danger)"
+						>
+							Remove
+						</button>
+					{/if}
 				</dd>
 
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">Template</dt>
@@ -1502,6 +1698,25 @@
 	<section class="mt-8">
 		<CommentsPanel targetType="model" targetId={model.id} />
 	</section>
+	</div><!-- end main content flex-1 -->
+	</div><!-- end sidebar + content flex wrapper -->
+
+	<ModelDialog
+		open={showCreateChildDialog}
+		mode="create"
+		initialName=""
+		initialType={model.model_type}
+		initialDescription=""
+		onsave={handleCreateChild}
+		oncancel={() => (showCreateChildDialog = false)}
+	/>
+
+	<ModelPicker
+		open={showParentPicker}
+		onselect={handleSetParent}
+		oncancel={() => (showParentPicker = false)}
+		excludeModelId={model?.id}
+	/>
 
 	<ModelDialog
 		open={showEditDialog}

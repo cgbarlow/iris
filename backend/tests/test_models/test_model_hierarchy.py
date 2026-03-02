@@ -336,6 +336,62 @@ class TestCyclePrevention:
         assert resp.status_code == 400
 
 
+class TestSetFilteredHierarchy:
+    """Verify hierarchy can be filtered by set_id (ADR-063)."""
+
+    async def test_hierarchy_filtered_by_set(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        # Create two sets
+        s1 = (await client.post("/api/sets", json={"name": "Set1"}, headers=headers)).json()
+        s2 = (await client.post("/api/sets", json={"name": "Set2"}, headers=headers)).json()
+        # Create models in different sets
+        body1: dict[str, object] = {"model_type": "simple", "name": "M1", "data": {}, "set_id": s1["id"]}
+        body2: dict[str, object] = {"model_type": "simple", "name": "M2", "data": {}, "set_id": s2["id"]}
+        await client.post("/api/models", json=body1, headers=headers)
+        await client.post("/api/models", json=body2, headers=headers)
+
+        # Filter by set1 — only M1 should appear
+        resp = await client.get(f"/api/models/hierarchy?set_id={s1['id']}", headers=headers)
+        tree = resp.json()
+        names = [n["name"] for n in tree]
+        assert "M1" in names
+        assert "M2" not in names
+
+    async def test_hierarchy_no_set_filter_returns_all(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        s1 = (await client.post("/api/sets", json={"name": "SetA"}, headers=headers)).json()
+        s2 = (await client.post("/api/sets", json={"name": "SetB"}, headers=headers)).json()
+        body1: dict[str, object] = {"model_type": "simple", "name": "MA", "data": {}, "set_id": s1["id"]}
+        body2: dict[str, object] = {"model_type": "simple", "name": "MB", "data": {}, "set_id": s2["id"]}
+        await client.post("/api/models", json=body1, headers=headers)
+        await client.post("/api/models", json=body2, headers=headers)
+
+        # No filter — both models should appear
+        resp = await client.get("/api/models/hierarchy", headers=headers)
+        tree = resp.json()
+        names = [n["name"] for n in tree]
+        assert "MA" in names
+        assert "MB" in names
+
+    async def test_hierarchy_set_filter_with_parent_child(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        s1 = (await client.post("/api/sets", json={"name": "HierSet"}, headers=headers)).json()
+        body_parent: dict[str, object] = {"model_type": "simple", "name": "Parent", "data": {}, "set_id": s1["id"]}
+        parent = (await client.post("/api/models", json=body_parent, headers=headers)).json()
+        body_child: dict[str, object] = {
+            "model_type": "simple", "name": "Child", "data": {},
+            "set_id": s1["id"], "parent_model_id": parent["id"],
+        }
+        await client.post("/api/models", json=body_child, headers=headers)
+
+        resp = await client.get(f"/api/models/hierarchy?set_id={s1['id']}", headers=headers)
+        tree = resp.json()
+        assert len(tree) == 1
+        assert tree[0]["name"] == "Parent"
+        assert len(tree[0]["children"]) == 1
+        assert tree[0]["children"][0]["name"] == "Child"
+
+
 class TestDeletedModelHierarchy:
     """Verify deleted models are excluded from hierarchy."""
 
