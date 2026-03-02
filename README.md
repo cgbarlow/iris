@@ -142,7 +142,25 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Python 3.12+ with [uv](https://docs.astral.sh/uv/)
 - Node.js 20+ with npm
 
-### Backend
+### Quick Start (Dev Script)
+
+```sh
+# Start both backend and frontend
+./scripts/dev.sh start
+
+# Check status
+./scripts/dev.sh status
+
+# Stop both
+./scripts/dev.sh stop
+
+# Full restart
+./scripts/dev.sh restart
+```
+
+### Manual Setup
+
+#### Backend
 
 ```sh
 cd backend
@@ -152,7 +170,7 @@ uv run python -m app.main
 
 The API server starts on `http://localhost:8000`.
 
-### Frontend
+#### Frontend
 
 ```sh
 cd frontend
@@ -165,11 +183,11 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 ### Running Tests
 
 ```sh
-# Backend (357 tests)
+# Backend (377 tests)
 cd backend
 uv run python -m pytest
 
-# Frontend unit tests
+# Frontend unit tests (453 tests)
 cd frontend
 npm test
 
