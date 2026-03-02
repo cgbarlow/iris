@@ -42,7 +42,7 @@
 	let versions = $state<ModelVersion[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state<'overview' | 'canvas' | 'versions'>('overview');
+	let activeTab = $state<'overview' | 'canvas' | 'versions'>('canvas');
 	let versionsLoading = $state(false);
 
 	let showEditDialog = $state(false);
@@ -867,38 +867,42 @@
 	<title>{model?.name ?? 'Model Detail'} — Iris</title>
 </svelte:head>
 
-<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-	<ol class="flex gap-1">
-		<li><a href="/models" style="color: var(--color-primary)">Models</a></li>
-		<li aria-hidden="true">/</li>
-		<li aria-current="page">{model?.name ?? page.params.id}</li>
-	</ol>
-</nav>
-
 {#if loading}
+	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
+		<ol class="flex gap-1">
+			<li><a href="/models" style="color: var(--color-primary)">Models</a></li>
+			<li aria-hidden="true">/</li>
+			<li aria-current="page">{page.params.id}</li>
+		</ol>
+	</nav>
 	<p style="color: var(--color-muted)">Loading model...</p>
 {:else if error}
+	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
+		<ol class="flex gap-1">
+			<li><a href="/models" style="color: var(--color-primary)">Models</a></li>
+			<li aria-hidden="true">/</li>
+			<li aria-current="page">{page.params.id}</li>
+		</ol>
+	</nav>
 	<div role="alert" class="rounded border p-4" style="border-color: var(--color-danger); color: var(--color-danger)">
 		{error}
 	</div>
 {:else if model}
-	{#if ancestors.length > 0}
-		<nav aria-label="Model hierarchy breadcrumb" class="mb-2">
-			<ol class="flex items-center gap-1 text-sm" style="color: var(--color-muted)">
-				<li><a href="/models" style="color: var(--color-primary)">Models</a></li>
-				{#each ancestors as ancestor}
-					<li class="flex items-center gap-1">
-						<span aria-hidden="true">/</span>
-						<a href="/models/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
-					</li>
-				{/each}
+	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
+		<ol class="flex items-center gap-1">
+			<li><a href="/models" style="color: var(--color-primary)">Models</a></li>
+			{#each ancestors as ancestor}
 				<li class="flex items-center gap-1">
 					<span aria-hidden="true">/</span>
-					<span aria-current="page">{model.name}</span>
+					<a href="/models/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
 				</li>
-			</ol>
-		</nav>
-	{/if}
+			{/each}
+			<li class="flex items-center gap-1">
+				<span aria-hidden="true">/</span>
+				<span aria-current="page">{model.name}</span>
+			</li>
+		</ol>
+	</nav>
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{model.name}</h1>
@@ -988,6 +992,13 @@
 
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified</dt>
 				<dd style="color: var(--color-fg)">{model.updated_at ?? 'N/A'}</dd>
+
+				<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
+				<dd>
+					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
+						{model.set_name ?? 'Default'}
+					</span>
+				</dd>
 
 				{#if model.description}
 					<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>

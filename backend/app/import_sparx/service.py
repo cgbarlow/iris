@@ -68,7 +68,10 @@ def _build_element_index(elements: list[QeaElement]) -> dict[int, QeaElement]:
 
 
 async def import_sparx_file(
-    db: aiosqlite.Connection, qea_path: str, imported_by: str
+    db: aiosqlite.Connection,
+    qea_path: str,
+    imported_by: str,
+    set_id: str | None = None,
 ) -> ImportSummary:
     """Import a SparxEA .qea file into Iris."""
     summary = ImportSummary()
@@ -98,6 +101,7 @@ async def import_sparx_file(
             data={},
             created_by=imported_by,
             parent_model_id=parent_iris_id,
+            set_id=set_id,
         )
         package_model_map[pkg.Package_ID] = model["id"]  # type: ignore[assignment]
         summary.models_created += 1
@@ -139,6 +143,7 @@ async def import_sparx_file(
             description=elem.Note,
             data=entity_data,
             created_by=imported_by,
+            set_id=set_id,
         )
         element_entity_map[elem.Object_ID] = entity["id"]  # type: ignore[assignment]
         summary.entities_created += 1
@@ -218,8 +223,10 @@ async def import_sparx_file(
                     "entityType": iris_type_str or "component",
                     "entityId": entity_id,
                 },
-                "width": pos["width"],
-                "height": pos["height"],
+                "measured": {
+                    "width": pos["width"],
+                    "height": pos["height"],
+                },
             })
 
         # Build edges from connectors that connect nodes on this diagram
@@ -265,6 +272,7 @@ async def import_sparx_file(
             data=model_data,
             created_by=imported_by,
             parent_model_id=parent_iris_id,
+            set_id=set_id,
         )
         summary.diagrams_created += 1
 

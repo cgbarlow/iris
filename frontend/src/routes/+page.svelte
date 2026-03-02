@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { page } from '$app/state';
+	import { apiFetch } from '$lib/utils/api';
 	import type {
 		PaginatedResponse,
 		Entity,
@@ -7,16 +8,21 @@
 		Bookmark,
 		SearchResult,
 		SearchResponse,
+		IrisSet,
 	} from '$lib/types/api';
 
 	let entityCount = $state(0);
 	let modelCount = $state(0);
+	let setCount = $state(0);
+	let activeSet = $state<IrisSet | null>(null);
 	let bookmarkedModels = $state<Model[]>([]);
 	let searchQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
 	let searching = $state(false);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+
+	let setId = $derived(page.url.searchParams.get('set_id') || '');
 
 	$effect(() => {
 		loadDashboard();
@@ -26,13 +32,24 @@
 		loading = true;
 		error = null;
 		try {
-			const [entitiesData, modelsData, bookmarks] = await Promise.all([
-				apiFetch<PaginatedResponse<Entity>>('/api/entities?page_size=1'),
-				apiFetch<PaginatedResponse<Model>>('/api/models?page_size=1'),
+			const setFilter = setId ? `&set_id=${setId}` : '';
+
+			const [entitiesData, modelsData, bookmarks, setsData] = await Promise.all([
+				apiFetch<PaginatedResponse<Entity>>(`/api/entities?page_size=1${setFilter}`),
+				apiFetch<PaginatedResponse<Model>>(`/api/models?page_size=1${setFilter}`),
 				apiFetch<Bookmark[]>('/api/bookmarks'),
+				apiFetch<{ items: IrisSet[] }>('/api/sets'),
 			]);
 			entityCount = entitiesData.total;
 			modelCount = modelsData.total;
+			setCount = setsData.items.length;
+
+			// Resolve active set if filtering
+			if (setId) {
+				activeSet = setsData.items.find((s) => s.id === setId) ?? null;
+			} else {
+				activeSet = null;
+			}
 
 			// Resolve bookmarked models
 			const modelPromises = bookmarks.map((b) =>
@@ -83,23 +100,44 @@
 {:else}
 
 	<!-- Stats -->
-	<div class="mt-6 grid grid-cols-2 gap-4" style="max-width: 400px">
+	<div class="mt-6 grid grid-cols-3 gap-4" style="max-width: 600px">
 		<a
-			href="/entities"
+			href={setId ? `/entities?set_id=${setId}` : '/entities'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
 			<div class="text-3xl font-bold" style="color: var(--color-primary)">{entityCount}</div>
-			<div class="mt-1 text-sm" style="color: var(--color-muted)">Entities</div>
+			<div class="mt-1 text-sm" style="color: var(--color-muted)">
+				Entities{#if activeSet} (filtered){/if}
+			</div>
 		</a>
 		<a
-			href="/models"
+			href={setId ? `/models?set_id=${setId}` : '/models'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
 			<div class="text-3xl font-bold" style="color: var(--color-primary)">{modelCount}</div>
-			<div class="mt-1 text-sm" style="color: var(--color-muted)">Models</div>
+			<div class="mt-1 text-sm" style="color: var(--color-muted)">
+				Models{#if activeSet} (filtered){/if}
+			</div>
 		</a>
+		<div
+			class="rounded border p-4 text-center"
+			style="border-color: var(--color-border); color: var(--color-fg)"
+		>
+			{#if activeSet}
+				<div class="text-sm font-medium" style="color: var(--color-primary)">{activeSet.name}</div>
+				<div class="mt-1 text-sm" style="color: var(--color-muted)">Set selected</div>
+				<a href="/" class="mt-1 inline-block text-xs" style="color: var(--color-primary)">
+					Reset filter
+				</a>
+			{:else}
+				<a href="/sets" style="color: inherit; text-decoration: none">
+					<div class="text-3xl font-bold" style="color: var(--color-primary)">{setCount}</div>
+					<div class="mt-1 text-sm" style="color: var(--color-muted)">Sets</div>
+				</a>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Search -->

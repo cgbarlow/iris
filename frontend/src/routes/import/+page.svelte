@@ -2,6 +2,7 @@
 	/** SparxEA import page — upload .qea files to import models, entities, and relationships. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
+	import SetSelector from '$lib/components/SetSelector.svelte';
 
 	interface ImportWarning {
 		category: string;
@@ -25,6 +26,7 @@
 	let summary = $state<ImportSummary | null>(null);
 	let selectedFile = $state<File | null>(null);
 	let fileInputEl: HTMLInputElement | undefined = $state();
+	let importSetId = $state('');
 
 	function handleDragOver(event: DragEvent) {
 		event.preventDefault();
@@ -71,6 +73,7 @@
 		try {
 			const formData = new FormData();
 			formData.append('file', selectedFile);
+			if (importSetId) formData.append('set_id', importSetId);
 
 			progress = 20;
 
@@ -214,6 +217,14 @@
 	</div>
 
 	{#if selectedFile}
+		<div class="mt-4">
+			<SetSelector
+				value={importSetId}
+				onchange={(id) => (importSetId = id)}
+				showAll={false}
+				label="Import into set"
+			/>
+		</div>
 		<div class="mt-4 flex items-center gap-4">
 			<button
 				onclick={uploadFile}

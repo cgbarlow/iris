@@ -100,6 +100,27 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Card size slider (200px–400px) adjusts card width in gallery mode
 - View mode and card size persist in localStorage across sessions
 
+### Sets & Workspace Grouping
+
+- **Sets** — top-level workspace grouping; each model and entity belongs to exactly one set (like folders, not labels)
+- **Default Set** — all existing items belong to the Default set; it cannot be deleted
+- **Set-scoped Tags** — tags are independent per set; "v1.0" in Set A is isolated from "v1.0" in Set B
+- **Auto-membership** — saving a model's canvas automatically moves referenced entities into the model's set
+- **Set Selector** — dropdown on models, entities, and import pages for filtering and assignment
+
+### Batch Operations
+
+- Select mode toggle on models and entities list pages with checkboxes on each item
+- Batch toolbar with Clone, Move to Set, Tags, and Delete actions (up to 100 items per request)
+- Batch set dialog for moving items between sets
+- Batch tag dialog for adding/removing tags across multiple items
+
+### Pagination
+
+- Page size selector (25, 50, 100 items per page) on models and entities list pages
+- Previous/Next navigation with page number links
+- Total items count display
+
 ### Entity & Model Management
 
 - Entity CRUD with edit and delete on detail page (optimistic concurrency via If-Match)
@@ -144,7 +165,7 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 ### Running Tests
 
 ```sh
-# Backend (217 tests)
+# Backend (357 tests)
 cd backend
 uv run python -m pytest
 
@@ -195,8 +216,8 @@ npm run test:all-e2e
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 12 Architecture Decision Records |
-| `docs/adrs/specs/` | 21 implementation specifications |
+| `docs/adrs/` | 13 Architecture Decision Records |
+| `docs/adrs/specs/` | 22 implementation specifications |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 

@@ -22,6 +22,7 @@ from app.entities.service import (
 from app.migrations.m001_roles_users import up as m001_up
 from app.migrations.m002_entities_relationships_models import up as m002_up
 from app.migrations.m005_search import up as m005_up
+from app.migrations.m012_sets import up as m012_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import search
 
@@ -34,6 +35,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await m001_up(db)
     await m002_up(db)
     await m005_up(db)
+    await m012_up(db)
     await seed_roles_and_permissions(db)
 
 

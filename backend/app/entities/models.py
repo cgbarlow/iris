@@ -12,6 +12,7 @@ class EntityCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
+    set_id: str | None = None
 
 
 class EntityUpdate(BaseModel):
@@ -46,6 +47,8 @@ class EntityResponse(BaseModel):
     tags: list[str] = Field(default_factory=list)
     relationship_count: int = 0
     model_usage_count: int = 0
+    set_id: str | None = None
+    set_name: str | None = None
 
 
 class EntityVersionResponse(BaseModel):

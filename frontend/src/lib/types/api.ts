@@ -28,6 +28,8 @@ export interface Entity {
 	tags?: string[];
 	relationship_count?: number;
 	model_usage_count?: number;
+	set_id?: string;
+	set_name?: string;
 }
 
 export interface Model {
@@ -44,6 +46,8 @@ export interface Model {
 	is_deleted: boolean;
 	parent_model_id?: string | null;
 	tags?: string[];
+	set_id?: string;
+	set_name?: string;
 }
 
 export interface ModelHierarchyNode {
@@ -183,4 +187,25 @@ export interface EntityModelRef {
 export interface EntityStats {
 	relationship_count: number;
 	model_usage_count: number;
+}
+
+export interface IrisSet {
+	id: string;
+	name: string;
+	description: string | null;
+	created_at: string;
+	created_by: string;
+	updated_at: string;
+	is_deleted: boolean;
+	model_count: number;
+	entity_count: number;
+	thumbnail_source: 'model' | 'image' | null;
+	thumbnail_model_id: string | null;
+	has_thumbnail_image: boolean;
+}
+
+export interface BatchResult {
+	succeeded: number;
+	failed: number;
+	errors: string[];
 }

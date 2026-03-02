@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 
 from app.auth.dependencies import get_current_user
 from app.import_sparx.service import import_sparx_file
@@ -18,6 +18,7 @@ async def import_sparx(
     file: UploadFile,
     request: Request,
     current_user: dict = Depends(get_current_user),  # noqa: B008
+    set_id: str | None = Form(default=None),  # noqa: B008
 ) -> dict:
     """Import a SparxEA .qea file."""
     if not file.filename or not file.filename.endswith(".qea"):
@@ -31,7 +32,17 @@ async def import_sparx(
 
     try:
         db = request.app.state.db_manager.main_db
-        summary = await import_sparx_file(db, tmp_path, imported_by=current_user["id"])
+        # Validate set_id if provided
+        if set_id:
+            cursor = await db.execute(
+                "SELECT id FROM sets WHERE id = ? AND is_deleted = 0",
+                (set_id,),
+            )
+            if await cursor.fetchone() is None:
+                raise HTTPException(status_code=400, detail="Invalid set_id")
+        summary = await import_sparx_file(
+            db, tmp_path, imported_by=current_user["id"], set_id=set_id,
+        )
         return {
             "models_created": summary.models_created,
             "entities_created": summary.entities_created,

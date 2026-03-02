@@ -1,10 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
-	import type { Model, PaginatedResponse, ModelHierarchyNode } from '$lib/types/api';
+	import type { Model, PaginatedResponse, ModelHierarchyNode, BatchResult } from '$lib/types/api';
 	import ModelDialog from '$lib/components/ModelDialog.svelte';
 	import ModelThumbnail from '$lib/components/ModelThumbnail.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
+	import SetSelector from '$lib/components/SetSelector.svelte';
+	import BatchToolbar from '$lib/components/BatchToolbar.svelte';
+	import BatchSetDialog from '$lib/components/BatchSetDialog.svelte';
+	import BatchTagDialog from '$lib/components/BatchTagDialog.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let models = $state<Model[]>([]);
 	let hierarchyTree = $state<ModelHierarchyNode[]>([]);
@@ -26,6 +32,22 @@
 	let thumbnailMode = $state<'svg' | 'png'>('svg');
 	let thumbnailErrors = $state<Set<string>>(new Set());
 	let currentTheme = $state<'light' | 'dark' | 'high-contrast'>('dark');
+
+	// Pagination state
+	let page = $state(1);
+	let pageSize = $state(50);
+	let total = $state(0);
+
+	// Set filter state
+	let currentSetId = $state('');
+
+	// Batch selection state
+	let selectMode = $state(false);
+	let selectedIds = $state<Set<string>>(new Set());
+	let lastSelectedId = $state<string | null>(null);
+	let showBatchSetDialog = $state(false);
+	let showBatchTagDialog = $state(false);
+	let showBatchDeleteConfirm = $state(false);
 
 	$effect(() => {
 		loadModels();
@@ -60,23 +82,40 @@
 		}
 	});
 
+	let hierarchyLoaded = $state(false);
 	$effect(() => {
-		if (viewMode === 'tree' && hierarchyTree.length === 0 && !loading) {
+		if (viewMode === 'tree' && !hierarchyLoaded && !loading) {
 			loadHierarchy();
 		}
 	});
 
 	async function loadModels() {
 		loading = true;
+		hierarchyLoaded = false;
 		try {
-			const data = await apiFetch<PaginatedResponse<Model>>('/api/models');
+			const params = new URLSearchParams();
+			params.set('page', String(page));
+			params.set('page_size', String(pageSize));
+			if (currentSetId) params.set('set_id', currentSetId);
+			const data = await apiFetch<PaginatedResponse<Model>>(`/api/models?${params}`);
 			models = data.items;
+			total = data.total;
 			loadAvailableTags();
 			if (viewMode === 'tree') {
 				await loadHierarchy();
 			}
-		} catch {
-			error = 'Failed to load models';
+		} catch (e) {
+			if (e instanceof ApiError) {
+				if (e.status === 429) {
+					error = 'The server is busy right now. Please wait a moment and try again.';
+				} else if (e.status === 401 || e.status === 403) {
+					error = 'You need to log in to view models.';
+				} else {
+					error = 'Something went wrong loading models. Please try again.';
+				}
+			} else {
+				error = 'Unable to connect to the server. Please check your connection and try again.';
+			}
 		}
 		loading = false;
 	}
@@ -84,6 +123,7 @@
 	async function loadHierarchy() {
 		try {
 			hierarchyTree = await apiFetch<ModelHierarchyNode[]>('/api/models/hierarchy');
+			hierarchyLoaded = true;
 		} catch {
 			hierarchyTree = [];
 		}
@@ -91,7 +131,8 @@
 
 	async function loadAvailableTags() {
 		try {
-			availableTags = await apiFetch<string[]>('/api/entities/tags/all');
+			const params = currentSetId ? `?set_id=${currentSetId}` : '';
+			availableTags = await apiFetch<string[]>(`/api/entities/tags/all${params}`);
 		} catch {
 			availableTags = [];
 		}
@@ -109,19 +150,131 @@
 
 	async function handleCreate(name: string, modelType: string, description: string) {
 		try {
+			const body: Record<string, unknown> = {
+				model_type: modelType,
+				name,
+				description,
+				data: {},
+			};
+			if (currentSetId) body.set_id = currentSetId;
 			const created = await apiFetch<Model>('/api/models', {
 				method: 'POST',
-				body: JSON.stringify({
-					model_type: modelType,
-					name,
-					description,
-					data: {},
-				}),
+				body: JSON.stringify(body),
 			});
 			showCreateDialog = false;
 			await goto(`/models/${created.id}`);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create model';
+		}
+	}
+
+	function handleSetChange(setId: string) {
+		currentSetId = setId;
+		page = 1;
+		loadModels();
+	}
+
+	function handlePageChange(newPage: number) {
+		page = newPage;
+		loadModels();
+	}
+
+	function handlePageSizeChange(newSize: number) {
+		pageSize = newSize;
+		page = 1;
+		loadModels();
+	}
+
+	function handleItemClick(id: string, event: MouseEvent) {
+		const next = new Set(selectedIds);
+		if (event.shiftKey && lastSelectedId) {
+			const ids = filteredModels.map(m => m.id);
+			const lastIdx = ids.indexOf(lastSelectedId);
+			const currentIdx = ids.indexOf(id);
+			if (lastIdx !== -1 && currentIdx !== -1) {
+				const start = Math.min(lastIdx, currentIdx);
+				const end = Math.max(lastIdx, currentIdx);
+				for (let i = start; i <= end; i++) {
+					next.add(ids[i]);
+				}
+			}
+		} else {
+			if (next.has(id)) {
+				next.delete(id);
+			} else {
+				next.add(id);
+			}
+		}
+		lastSelectedId = id;
+		selectedIds = next;
+	}
+
+	function toggleSelectAll() {
+		if (allSelected) {
+			selectedIds = new Set();
+		} else {
+			selectedIds = new Set(filteredModels.map(m => m.id));
+		}
+	}
+
+	function cancelSelection() {
+		selectMode = false;
+		selectedIds = new Set();
+		lastSelectedId = null;
+	}
+
+	async function handleBatchDelete() {
+		showBatchDeleteConfirm = false;
+		try {
+			await apiFetch<BatchResult>('/api/batch/models/delete', {
+				method: 'POST',
+				body: JSON.stringify({ ids: [...selectedIds] }),
+			});
+			cancelSelection();
+			await loadModels();
+		} catch (e) {
+			error = e instanceof ApiError ? `Batch delete failed: ${e.message}` : 'Batch delete failed';
+		}
+	}
+
+	async function handleBatchClone() {
+		try {
+			await apiFetch<BatchResult>('/api/batch/models/clone', {
+				method: 'POST',
+				body: JSON.stringify({ ids: [...selectedIds] }),
+			});
+			cancelSelection();
+			await loadModels();
+		} catch (e) {
+			error = e instanceof ApiError ? `Batch clone failed: ${e.message}` : 'Batch clone failed';
+		}
+	}
+
+	async function handleBatchMoveSet(setId: string) {
+		showBatchSetDialog = false;
+		try {
+			await apiFetch<BatchResult>('/api/batch/models/set', {
+				method: 'POST',
+				body: JSON.stringify({ ids: [...selectedIds], set_id: setId }),
+			});
+			cancelSelection();
+			await loadModels();
+		} catch (e) {
+			error = e instanceof ApiError ? `Batch move failed: ${e.message}` : 'Batch move failed';
+		}
+	}
+
+	async function handleBatchTags(addTags: string[], removeTags: string[]) {
+		showBatchTagDialog = false;
+		try {
+			await apiFetch<BatchResult>('/api/batch/models/tags', {
+				method: 'POST',
+				body: JSON.stringify({ ids: [...selectedIds], add_tags: addTags, remove_tags: removeTags }),
+			});
+			cancelSelection();
+			await loadModels();
+		} catch (e) {
+			error = e instanceof ApiError ? `Batch tag update failed: ${e.message}` : 'Batch tag update failed';
 		}
 	}
 
@@ -148,6 +301,10 @@
 				return (b.updated_at ?? '').localeCompare(a.updated_at ?? '');
 			}),
 	);
+
+	const allSelected = $derived(
+		filteredModels.length > 0 && filteredModels.every(m => selectedIds.has(m.id))
+	);
 </script>
 
 <svelte:head>
@@ -159,17 +316,27 @@
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Models</h1>
 		<p class="mt-2" style="color: var(--color-muted)">Browse and manage architectural models.</p>
 	</div>
-	<button
-		onclick={() => (showCreateDialog = true)}
-		class="rounded px-4 py-2 text-sm text-white"
-		style="background-color: var(--color-primary)"
-	>
-		New Model
-	</button>
+	<div class="flex items-center gap-2">
+		<button
+			onclick={() => { selectMode = !selectMode; if (!selectMode) cancelSelection(); }}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); {selectMode ? 'background: var(--color-primary); color: white' : 'color: var(--color-fg)'}"
+		>
+			{selectMode ? 'Cancel Select' : 'Select'}
+		</button>
+		<button
+			onclick={() => (showCreateDialog = true)}
+			class="rounded px-4 py-2 text-sm text-white"
+			style="background-color: var(--color-primary)"
+		>
+			New Model
+		</button>
+	</div>
 </div>
 
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3">
+	<SetSelector value={currentSetId} onchange={handleSetChange} />
 	<div>
 		<label for="model-search" class="sr-only">Search models</label>
 		<input
@@ -233,7 +400,7 @@
 			class="rounded border px-2 py-2 text-sm"
 			style="border-color: var(--color-border); {viewMode === 'list' ? 'background: var(--color-primary); color: white' : 'background: var(--color-bg); color: var(--color-fg)'}"
 		>
-			☰
+			&#9776;
 		</button>
 		<button
 			onclick={() => (viewMode = 'gallery')}
@@ -242,7 +409,7 @@
 			class="rounded border px-2 py-2 text-sm"
 			style="border-color: var(--color-border); {viewMode === 'gallery' ? 'background: var(--color-primary); color: white' : 'background: var(--color-bg); color: var(--color-fg)'}"
 		>
-			▦
+			&#9638;
 		</button>
 		<button
 			onclick={() => (viewMode = 'tree')}
@@ -251,7 +418,7 @@
 			class="rounded border px-2 py-2 text-sm"
 			style="border-color: var(--color-border); {viewMode === 'tree' ? 'background: var(--color-primary); color: white' : 'background: var(--color-bg); color: var(--color-fg)'}"
 		>
-			⊞
+			&#8862;
 		</button>
 	</div>
 	<button
@@ -287,13 +454,36 @@
 	{#if loading}
 		<p style="color: var(--color-muted)">Loading models...</p>
 	{:else if error}
-		<div role="alert" style="color: var(--color-danger)">{error}</div>
+		<div role="alert" style="color: var(--color-danger)">
+			<p>{error}</p>
+			<button
+				onclick={() => { error = null; loadModels(); }}
+				class="mt-2 rounded border px-3 py-1 text-sm"
+				style="border-color: var(--color-border); color: var(--color-fg)"
+			>
+				Retry
+			</button>
+		</div>
 	{:else if filteredModels.length === 0}
 		<p style="color: var(--color-muted)">No models found.</p>
 	{:else}
-		<p class="mb-3 text-sm" style="color: var(--color-muted)">
-			{filteredModels.length} model{filteredModels.length === 1 ? '' : 's'}
-		</p>
+		<div class="mb-3 flex items-center gap-3">
+			{#if selectMode}
+				<label class="flex items-center gap-1.5 text-sm cursor-pointer" style="color: var(--color-fg)">
+					<input
+						type="checkbox"
+						checked={allSelected}
+						onclick={toggleSelectAll}
+						aria-label="Select all models"
+						class="h-4 w-4"
+					/>
+					Select all
+				</label>
+			{/if}
+			<p class="text-sm" style="color: var(--color-muted)">
+				{filteredModels.length} model{filteredModels.length === 1 ? '' : 's'}
+			</p>
+		</div>
 		{#if viewMode === 'tree'}
 			<ul role="tree" aria-label="Model hierarchy" class="tree-view" data-testid="models-tree">
 				{#if hierarchyTree.length === 0}
@@ -308,78 +498,146 @@
 			<ul class="flex flex-col gap-2" data-testid="models-list">
 				{#each filteredModels as model}
 					<li>
-						<a
-							href="/models/{model.id}"
-							class="flex items-center gap-3 rounded border p-3"
-							style="border-color: var(--color-border); color: var(--color-fg)"
-						>
-							<span class="text-sm font-medium" style="color: var(--color-primary)">
-								{model.name}
-							</span>
-							<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-								{model.model_type}
-							</span>
-							{#if (model.tags ?? []).includes('template')}
-								<span class="rounded px-2 py-0.5 text-xs font-medium" style="background: var(--color-success, #16a34a); color: white">Template</span>
+						<div class="flex items-center gap-2">
+							{#if selectMode}
+								<input
+									type="checkbox"
+									checked={selectedIds.has(model.id)}
+									onclick={(e: MouseEvent) => handleItemClick(model.id, e)}
+									aria-label="Select {model.name}"
+									class="h-4 w-4"
+								/>
 							{/if}
-							{#if model.tags && model.tags.length > 0}
-								{#each model.tags.filter(t => t !== 'template') as tag}
-									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
-								{/each}
-							{/if}
-							{#if model.description}
-								<span class="text-xs" style="color: var(--color-muted)">
-									{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}
+							<a
+								href="/models/{model.id}"
+								class="flex flex-1 items-center gap-3 rounded border p-3"
+								style="border-color: var(--color-border); color: var(--color-fg)"
+							>
+								<span class="text-sm font-medium" style="color: var(--color-primary)">
+									{model.name}
 								</span>
-							{/if}
-						</a>
+								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+									{model.model_type}
+								</span>
+								{#if model.set_name}
+									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+										{model.set_name}
+									</span>
+								{/if}
+								{#if (model.tags ?? []).includes('template')}
+									<span class="rounded px-2 py-0.5 text-xs font-medium" style="background: var(--color-success, #16a34a); color: white">Template</span>
+								{/if}
+								{#if model.tags && model.tags.length > 0}
+									{#each model.tags.filter(t => t !== 'template') as tag}
+										<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+									{/each}
+								{/if}
+								{#if model.description}
+									<span class="text-xs" style="color: var(--color-muted)">
+										{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}
+									</span>
+								{/if}
+							</a>
+						</div>
 					</li>
 				{/each}
 			</ul>
 		{:else}
 			<div class="grid gap-4" data-testid="models-gallery" style="grid-template-columns: repeat(auto-fill, minmax({cardSize}px, 1fr))">
 				{#each filteredModels as model}
-					<a
-						href="/models/{model.id}"
-						class="flex flex-col rounded border overflow-hidden"
-						style="border-color: var(--color-border); color: var(--color-fg)"
-					>
-						<div class="flex h-28 items-center justify-center overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
-							{#if thumbnailMode === 'png' && !thumbnailErrors.has(model.id)}
-								<img
-									src="/api/models/{model.id}/thumbnail?theme={currentTheme}"
-									alt="Thumbnail for {model.name}"
-									class="h-full w-full object-contain"
-									loading="lazy"
-									onerror={() => { thumbnailErrors = new Set([...thumbnailErrors, model.id]); }}
+					<div class="relative flex flex-col rounded border overflow-hidden" style="border-color: var(--color-border); color: var(--color-fg)">
+						{#if selectMode}
+							<div class="absolute top-2 left-2 z-10">
+								<input
+									type="checkbox"
+									checked={selectedIds.has(model.id)}
+									onclick={(e: MouseEvent) => handleItemClick(model.id, e)}
+									aria-label="Select {model.name}"
+									class="h-4 w-4"
 								/>
-							{:else}
-								<ModelThumbnail data={model.data} modelType={model.model_type} />
-							{/if}
-						</div>
-						<div class="flex flex-col gap-2 p-4">
-							<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
-							<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
-							{#if (model.tags ?? []).includes('template')}
-								<span class="rounded px-2 py-0.5 text-xs font-medium w-fit" style="background: var(--color-success, #16a34a); color: white">Template</span>
-							{/if}
-							{#if model.description}
-								<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
-							{/if}
-							<span class="text-xs mt-auto" style="color: var(--color-muted)">
-								Updated {new Date(model.updated_at).toLocaleDateString()}
-							</span>
-						</div>
-					</a>
+							</div>
+						{/if}
+						<a href="/models/{model.id}" class="flex flex-col">
+							<div class="flex h-28 items-center justify-center overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
+								{#if thumbnailMode === 'png' && !thumbnailErrors.has(model.id)}
+									<img
+										src="/api/models/{model.id}/thumbnail?theme={currentTheme}"
+										alt="Thumbnail for {model.name}"
+										class="h-full w-full object-contain"
+										loading="lazy"
+										onerror={() => { thumbnailErrors = new Set([...thumbnailErrors, model.id]); }}
+									/>
+								{:else}
+									<ModelThumbnail data={model.data} modelType={model.model_type} />
+								{/if}
+							</div>
+							<div class="flex flex-col gap-2 p-4">
+								<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
+								<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
+								{#if (model.tags ?? []).includes('template')}
+									<span class="rounded px-2 py-0.5 text-xs font-medium w-fit" style="background: var(--color-success, #16a34a); color: white">Template</span>
+								{/if}
+								{#if model.description}
+									<p class="text-sm" style="color: var(--color-muted)">{model.description}</p>
+								{/if}
+								<span class="text-xs mt-auto" style="color: var(--color-muted)">
+									Updated {new Date(model.updated_at).toLocaleDateString()}
+								</span>
+							</div>
+						</a>
+					</div>
 				{/each}
 			</div>
 		{/if}
+
+		<!-- Pagination -->
+		<Pagination
+			{page}
+			{pageSize}
+			{total}
+			onpagechange={handlePageChange}
+			onpagesizechange={handlePageSizeChange}
+		/>
 	{/if}
 </div>
 
+<!-- Batch toolbar -->
+{#if selectMode && selectedIds.size > 0}
+	<BatchToolbar
+		selectedCount={selectedIds.size}
+		ondelete={() => (showBatchDeleteConfirm = true)}
+		onclone={handleBatchClone}
+		onmoveset={() => (showBatchSetDialog = true)}
+		ontags={() => (showBatchTagDialog = true)}
+		oncancel={cancelSelection}
+	/>
+{/if}
+
+<!-- Dialogs -->
 <ModelDialog
 	open={showCreateDialog}
 	mode="create"
 	onsave={handleCreate}
 	oncancel={() => (showCreateDialog = false)}
+/>
+
+<BatchSetDialog
+	open={showBatchSetDialog}
+	onconfirm={handleBatchMoveSet}
+	oncancel={() => (showBatchSetDialog = false)}
+/>
+
+<BatchTagDialog
+	open={showBatchTagDialog}
+	onconfirm={handleBatchTags}
+	oncancel={() => (showBatchTagDialog = false)}
+/>
+
+<ConfirmDialog
+	open={showBatchDeleteConfirm}
+	title="Delete Selected Models"
+	message="Are you sure you want to delete {selectedIds.size} model{selectedIds.size !== 1 ? 's' : ''}? This action can be undone."
+	confirmLabel="Delete"
+	onconfirm={handleBatchDelete}
+	oncancel={() => (showBatchDeleteConfirm = false)}
 />

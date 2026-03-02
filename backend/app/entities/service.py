@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.migrations.m012_sets import DEFAULT_SET_ID
 from app.search.service import index_entity as _index_entity
 from app.search.service import remove_entity_index as _remove_entity_index
 
@@ -22,16 +23,18 @@ async def create_entity(
     description: str | None,
     data: dict[str, object],
     created_by: str,
+    set_id: str | None = None,
 ) -> dict[str, object]:
     """Create a new entity with initial version."""
     entity_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
+    effective_set_id = set_id or DEFAULT_SET_ID
 
     await db.execute(
         "INSERT INTO entities (id, entity_type, current_version, "
-        "created_at, created_by, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
-        (entity_id, entity_type, now, created_by, now),
+        "created_at, created_by, updated_at, set_id) VALUES (?, ?, 1, ?, ?, ?, ?)",
+        (entity_id, entity_type, now, created_by, now, effective_set_id),
     )
     await db.execute(
         "INSERT INTO entity_versions (entity_id, version, name, description, "
@@ -57,6 +60,7 @@ async def create_entity(
         "created_by": created_by,
         "updated_at": now,
         "is_deleted": False,
+        "set_id": effective_set_id,
     }
 
 
@@ -69,11 +73,12 @@ async def get_entity(
         "SELECT e.id, e.entity_type, e.current_version, "
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "u.username "
+        "u.username, e.set_id, s.name "
         "FROM entities e "
         "JOIN entity_versions ev ON e.id = ev.entity_id "
         "AND e.current_version = ev.version "
         "LEFT JOIN users u ON e.created_by = u.id "
+        "LEFT JOIN sets s ON e.set_id = s.id "
         "WHERE e.id = ? AND e.is_deleted = 0",
         (entity_id,),
     )
@@ -93,6 +98,8 @@ async def get_entity(
         "updated_at": row[8],
         "is_deleted": bool(row[9]),
         "created_by_username": row[10] or "Unknown",
+        "set_id": row[11],
+        "set_name": row[12],
     }
 
     # Enrich with tags
@@ -110,6 +117,7 @@ async def list_entities(
     db: aiosqlite.Connection,
     *,
     entity_type: str | None = None,
+    set_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
@@ -120,6 +128,10 @@ async def list_entities(
     if entity_type:
         where_clauses.append("e.entity_type = ?")
         params.append(entity_type)
+
+    if set_id:
+        where_clauses.append("e.set_id = ?")
+        params.append(set_id)
 
     where_sql = " AND ".join(where_clauses)
 
@@ -136,10 +148,12 @@ async def list_entities(
     cursor = await db.execute(
         f"SELECT e.id, e.entity_type, e.current_version, "  # noqa: S608
         "ev.name, ev.description, ev.data, "
-        "e.created_at, e.created_by, e.updated_at, e.is_deleted "
+        "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
+        "e.set_id, s.name "
         "FROM entities e "
         "JOIN entity_versions ev ON e.id = ev.entity_id "
         "AND e.current_version = ev.version "
+        "LEFT JOIN sets s ON e.set_id = s.id "
         f"WHERE {where_sql} "
         "ORDER BY e.updated_at DESC LIMIT ? OFFSET ?",
         [*params, page_size, offset],
@@ -158,6 +172,8 @@ async def list_entities(
             "created_by": r[7],
             "updated_at": r[8],
             "is_deleted": bool(r[9]),
+            "set_id": r[10],
+            "set_name": r[11],
         }
         for r in rows
     ]

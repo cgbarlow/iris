@@ -13,6 +13,7 @@ class ModelCreate(BaseModel):
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     parent_model_id: str | None = None
+    set_id: str | None = None
 
 
 class ModelUpdate(BaseModel):
@@ -40,6 +41,8 @@ class ModelResponse(BaseModel):
     is_deleted: bool = False
     parent_model_id: str | None = None
     tags: list[str] = Field(default_factory=list)
+    set_id: str | None = None
+    set_name: str | None = None
 
 
 class ModelHierarchyNode(BaseModel):

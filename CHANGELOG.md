@@ -5,6 +5,38 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-03-02
+
+### Added
+- Sets: top-level workspace grouping — each model/entity belongs to exactly one set; Default set (well-known UUID) created on migration with all existing items backfilled (ADR-060, SPEC-060-A)
+- Sets CRUD API: `POST/GET/PUT/DELETE /api/sets`, `GET /api/sets/{id}/tags` for scoped tag listing; 409 on non-empty delete, 403 on Default set delete
+- Set-scoped tags: tags are stored the same way but filtered per-set in UI and API — "v1.0" in Set A is independent from "v1.0" in Set B
+- Auto-membership: saving a model's canvas automatically moves referenced entities into the model's set
+- Batch operations API: 8 endpoints under `/api/batch/{models,entities}/{delete,clone,set,tags}` for bulk actions on up to 100 items per request; all return `{ succeeded, failed, errors }`
+- Pagination controls: `Pagination.svelte` component with page size selector (25/50/100), prev/next buttons, and page number links on models and entities list pages
+- Set selector: `SetSelector.svelte` dropdown on models page, entities page, and import page for filtering and assignment
+- Batch toolbar: select mode toggle with checkboxes on list/gallery items; sticky `BatchToolbar.svelte` with Clone, Move to Set, Tags, Delete actions; `BatchSetDialog.svelte` and `BatchTagDialog.svelte` for batch move and tag operations
+- Import set assignment: set selector on import page sends `set_id` form field with upload; all imported items assigned to chosen set
+- Set name display on model detail overview tab
+- `set_id` and `set_name` fields on model and entity API responses (JOIN to sets table)
+- `set_id` query parameter on `GET /api/models`, `GET /api/entities`, and `GET /api/entities/tags/all` for set-scoped filtering
+- ADR-060: Sets, Batch Operations & Pagination
+- SPEC-060-A: Sets, Batch Operations & Pagination specification
+- Database migration m012: sets table, set_id columns on models/entities with indexes and backfill
+- 20 integration tests for sets CRUD (default set, create, get, update, delete protection, tag scoping, model/entity set integration)
+- 11 integration tests for batch operations (delete, clone, set reassignment, tag modification, validation, auth)
+- Sets page: dedicated `/sets` page with list and gallery views, client-side search, edit mode toggle, and create dialog (ADR-061, SPEC-061-A)
+- Dashboard integration: `?set_id=` URL parameter filters entity/model counts with "(filtered)" labels, 3-column stats grid with Sets card and reset filter link
+- Set edit page: `/sets/[id]` with name/description editing, thumbnail management (none/model/image), and force-delete with confirmation
+- Set thumbnails: `POST/GET /api/sets/{id}/thumbnail` endpoints for image upload and retrieval; model thumbnail proxy; 2 MB limit, PNG/JPG only
+- Force-delete sets: `DELETE /api/sets/{id}?force=true` soft-deletes all models, entities, and search indexes; returns deletion counts
+- Sidebar: Sets navigation item between Entities and Import; `aria-current` fix for sub-page highlighting
+- Database migration m013: `thumbnail_source`, `thumbnail_model_id`, and `thumbnail_image` columns on sets table
+- ADR-061: Sets Page & Dashboard Integration
+- SPEC-061-A: Sets Page & Dashboard Integration specification
+- 5 integration tests for force-delete (empty set, non-empty set with counts, default set protection, nonexistent, regular delete non-empty)
+- 8 integration tests for set thumbnails (upload PNG, JPG, oversized rejection, invalid type, GET retrieval, 404 handling, model source, model-in-set validation)
+
 ## [1.6.0] - 2026-03-02
 
 ### Added

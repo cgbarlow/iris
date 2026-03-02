@@ -45,6 +45,7 @@ async def create(
         description=body.description,
         data=body.data,
         created_by=current_user["id"],
+        set_id=body.set_id,
     )
     return EntityResponse(**result)
 
@@ -53,14 +54,15 @@ async def create(
 async def list_all(
     request: Request,
     entity_type: str | None = None,
+    set_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> EntityListResponse:
-    """List entities with optional type filter and pagination."""
+    """List entities with optional type/set filter and pagination."""
     db = request.app.state.db_manager.main_db
     items, total = await list_entities(
-        db, entity_type=entity_type, page=page, page_size=page_size,
+        db, entity_type=entity_type, set_id=set_id, page=page, page_size=page_size,
     )
     return EntityListResponse(
         items=[EntityResponse(**item) for item in items],
@@ -73,17 +75,32 @@ async def list_all(
 @router.get("/tags/all")
 async def list_all_tags(
     request: Request,
+    set_id: str | None = None,
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> list[str]:
-    """List all unique tags from entities and models."""
+    """List all unique tags from entities and models, optionally scoped by set."""
     db = request.app.state.db_manager.main_db
-    cursor = await db.execute(
-        "SELECT DISTINCT tag FROM ("
-        "  SELECT tag FROM entity_tags"
-        "  UNION"
-        "  SELECT tag FROM model_tags"
-        ") ORDER BY tag"
-    )
+    if set_id:
+        cursor = await db.execute(
+            "SELECT DISTINCT tag FROM ("
+            "  SELECT et.tag FROM entity_tags et"
+            "  JOIN entities e ON et.entity_id = e.id"
+            "  WHERE e.set_id = ? AND e.is_deleted = 0"
+            "  UNION"
+            "  SELECT mt.tag FROM model_tags mt"
+            "  JOIN models m ON mt.model_id = m.id"
+            "  WHERE m.set_id = ? AND m.is_deleted = 0"
+            ") ORDER BY tag",
+            (set_id, set_id),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT DISTINCT tag FROM ("
+            "  SELECT tag FROM entity_tags"
+            "  UNION"
+            "  SELECT tag FROM model_tags"
+            ") ORDER BY tag"
+        )
     rows = await cursor.fetchall()
     return [row[0] for row in rows]
 

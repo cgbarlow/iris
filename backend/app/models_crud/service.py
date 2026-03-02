@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.migrations.m012_sets import DEFAULT_SET_ID
 from app.models_crud.thumbnail import VALID_THEMES, generate_and_store_thumbnail
 from app.relationships.service import create_relationship
 from app.search.service import index_model as _index_model
@@ -25,16 +26,19 @@ async def create_model(
     data: dict[str, object],
     created_by: str,
     parent_model_id: str | None = None,
+    set_id: str | None = None,
 ) -> dict[str, object]:
     """Create a new model with initial version."""
     model_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
+    effective_set_id = set_id or DEFAULT_SET_ID
 
     await db.execute(
         "INSERT INTO models (id, model_type, current_version, "
-        "created_at, created_by, updated_at, parent_model_id) VALUES (?, ?, 1, ?, ?, ?, ?)",
-        (model_id, model_type, now, created_by, now, parent_model_id),
+        "created_at, created_by, updated_at, parent_model_id, set_id) "
+        "VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
+        (model_id, model_type, now, created_by, now, parent_model_id, effective_set_id),
     )
     await db.execute(
         "INSERT INTO model_versions (model_id, version, name, description, "
@@ -64,6 +68,7 @@ async def create_model(
         "updated_at": now,
         "is_deleted": False,
         "parent_model_id": parent_model_id,
+        "set_id": effective_set_id,
     }
 
 
@@ -76,11 +81,12 @@ async def get_model(
         "SELECT m.id, m.model_type, m.current_version, "
         "mv.name, mv.description, mv.data, "
         "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
-        "u.username, m.parent_model_id "
+        "u.username, m.parent_model_id, m.set_id, s.name "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
         "LEFT JOIN users u ON m.created_by = u.id "
+        "LEFT JOIN sets s ON m.set_id = s.id "
         "WHERE m.id = ? AND m.is_deleted = 0",
         (model_id,),
     )
@@ -110,6 +116,8 @@ async def get_model(
         "created_by_username": row[10] or "Unknown",
         "parent_model_id": row[11],
         "tags": tags,
+        "set_id": row[12],
+        "set_name": row[13],
     }
 
 
@@ -117,6 +125,7 @@ async def list_models(
     db: aiosqlite.Connection,
     *,
     model_type: str | None = None,
+    set_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
@@ -127,6 +136,10 @@ async def list_models(
     if model_type:
         where_clauses.append("m.model_type = ?")
         params.append(model_type)
+
+    if set_id:
+        where_clauses.append("m.set_id = ?")
+        params.append(set_id)
 
     where_sql = " AND ".join(where_clauses)
 
@@ -142,10 +155,11 @@ async def list_models(
         f"SELECT m.id, m.model_type, m.current_version, "  # noqa: S608
         "mv.name, mv.description, mv.data, "
         "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
-        "m.parent_model_id "
+        "m.parent_model_id, m.set_id, s.name "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
+        "LEFT JOIN sets s ON m.set_id = s.id "
         f"WHERE {where_sql} "
         "ORDER BY m.updated_at DESC LIMIT ? OFFSET ?",
         [*params, page_size, offset],
@@ -179,6 +193,8 @@ async def list_models(
             "is_deleted": bool(r[9]),
             "parent_model_id": r[10],
             "tags": tags_by_model.get(r[0], []),
+            "set_id": r[11],
+            "set_name": r[12],
         }
         for r in rows
     ]
@@ -238,6 +254,27 @@ async def update_model(
     if type_row:
         for theme in VALID_THEMES:
             await generate_and_store_thumbnail(db, model_id, data, type_row[0], theme=theme)
+
+    # Auto-membership: move canvas entities to this model's set
+    try:
+        model_set_cursor = await db.execute(
+            "SELECT set_id FROM models WHERE id = ?", (model_id,),
+        )
+        model_set_row = await model_set_cursor.fetchone()
+        if model_set_row and model_set_row[0]:
+            model_set_id = model_set_row[0]
+            nodes_for_set = data.get("nodes", []) if isinstance(data, dict) else []
+            for node in nodes_for_set:
+                if isinstance(node, dict) and isinstance(node.get("data"), dict):
+                    eid = node["data"].get("entityId")
+                    if eid:
+                        await db.execute(
+                            "UPDATE entities SET set_id = ? WHERE id = ? AND set_id != ?",
+                            (model_set_id, eid, model_set_id),
+                        )
+            await db.commit()
+    except Exception:
+        pass  # Don't fail model save if auto-membership fails
 
     # Auto-create entity relationships from canvas edges
     try:

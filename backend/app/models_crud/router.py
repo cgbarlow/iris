@@ -69,6 +69,7 @@ async def create(
         data=body.data,
         created_by=current_user["id"],
         parent_model_id=body.parent_model_id,
+        set_id=body.set_id,
     )
     return ModelResponse(**result)
 
@@ -89,14 +90,15 @@ async def hierarchy(
 async def list_all(
     request: Request,
     model_type: str | None = None,
+    set_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> ModelListResponse:
-    """List models with optional type filter and pagination."""
+    """List models with optional type/set filter and pagination."""
     db = request.app.state.db_manager.main_db
     items, total = await list_models(
-        db, model_type=model_type, page=page, page_size=page_size,
+        db, model_type=model_type, set_id=set_id, page=page, page_size=page_size,
     )
     return ModelListResponse(
         items=[ModelResponse(**item) for item in items],

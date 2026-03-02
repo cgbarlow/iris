@@ -11,6 +11,7 @@
 		{ href: '/', label: 'Dashboard', shortcut: 'H' },
 		{ href: '/models', label: 'Models', shortcut: 'M' },
 		{ href: '/entities', label: 'Entities', shortcut: 'E' },
+		{ href: '/sets', label: 'Sets', shortcut: 'T' },
 		{ href: '/import', label: 'Import', shortcut: 'I' },
 		{ href: '/bookmarks', label: 'Bookmarks', shortcut: 'B' },
 		{ href: '/settings', label: 'Settings', shortcut: 'S' },
@@ -86,8 +87,8 @@
 							<a
 								href={item.href}
 								class="sidebar-link block rounded px-3 py-2 text-sm transition-colors"
-								style="color: var(--color-fg){page.url.pathname === item.href ? '; background-color: var(--color-bg)' : ''}"
-								aria-current={page.url.pathname === item.href ? 'page' : undefined}
+								style="color: var(--color-fg){(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? '; background-color: var(--color-bg)' : ''}"
+								aria-current={(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? 'page' : undefined}
 								title="{item.label} ({item.shortcut})"
 							>
 								{item.label}
