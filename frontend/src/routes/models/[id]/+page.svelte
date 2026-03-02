@@ -1078,8 +1078,8 @@
 	<div class="flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
 		<button
 			onclick={toggleSidebar}
-			class="px-4 py-2 text-sm"
-			style="color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {sidebarOpen ? 'var(--color-primary)' : 'transparent'}"
+			class="mr-2 rounded px-3 py-1.5 text-sm"
+			style="border: 1px solid {sidebarOpen ? 'var(--color-primary)' : 'var(--color-border)'}; color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {sidebarOpen ? 'var(--color-surface, transparent)' : 'transparent'}"
 			aria-label="Toggle hierarchy sidebar"
 			aria-pressed={sidebarOpen}
 		>
