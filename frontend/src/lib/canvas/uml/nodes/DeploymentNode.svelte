@@ -22,4 +22,5 @@
 	<Handle type="source" position={Position.Bottom} id="bottom" />
 	<Handle type="target" position={Position.Left} id="left" />
 	<Handle type="source" position={Position.Right} id="right" />
+	<Handle type="source" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 </div>

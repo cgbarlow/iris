@@ -1,10 +1,11 @@
 """Idempotent seed: example models demonstrating Iris's own architecture.
 
-Creates entities representing the Iris system and four models:
+Creates entities representing the Iris system and five models:
   1. Iris Architecture (component) — core component overview
   2. API Request Flow (sequence) — login and data fetch sequence
   3. Data Layer (component) — database, versioning, and search internals
   4. Iris Enterprise View (archimate) — high-level enterprise architecture
+  5. Iris System Overview (component) — model-in-model view referencing all above
 
 All entities are tagged with 'iris' and 'example'; models are tagged with
 'iris', 'example', and 'template'.
@@ -61,6 +62,8 @@ _ENTITIES = [
     ("n15", "package", "Middleware Stack",
      "CORS, rate limiting, security headers, and audit middleware layers"),
 ]
+
+_ENTITY_DESCRIPTIONS = {node_id: desc for node_id, _, _, desc in _ENTITIES}
 
 _ENTITY_TAGS = ["iris", "example"]
 _MODEL_TAGS = ["iris", "example", "template"]
@@ -120,45 +123,50 @@ def _gen_id(prefix: str, index: int) -> str:
 # ── Model 1: Iris Architecture (component) ──────────────────────────────────
 
 def _build_architecture_model(
-    eids: dict[str, str], rids: dict[str, str],
+    eids: dict[str, str], rids: dict[str, str], **_kw: object,
 ) -> dict[str, object]:
     """Core component overview with Frontend, Backend, DB, Auth, Canvas."""
     nodes = [
         {"id": "n10", "type": "actor",
          "position": {"x": 400, "y": 0},
          "data": {"label": "User", "entityType": "actor",
-                  "description": "Web browser user", "entityId": eids["n10"]}},
+                  "description": _ENTITY_DESCRIPTIONS["n10"],
+                  "entityId": eids["n10"]}},
         {"id": "n1", "type": "component",
-         "position": {"x": 350, "y": 150},
+         "position": {"x": 350, "y": 250},
          "data": {"label": "Frontend", "entityType": "component",
-                  "description": "SvelteKit + Svelte 5 runes application",
+                  "description": _ENTITY_DESCRIPTIONS["n1"],
                   "entityId": eids["n1"]}},
         {"id": "n9", "type": "interface",
-         "position": {"x": 370, "y": 330},
+         "position": {"x": 370, "y": 500},
          "data": {"label": "REST API", "entityType": "interface",
-                  "description": "/api/* JSON endpoints", "entityId": eids["n9"]}},
+                  "description": _ENTITY_DESCRIPTIONS["n9"],
+                  "entityId": eids["n9"]}},
         {"id": "n2", "type": "component",
-         "position": {"x": 350, "y": 480},
+         "position": {"x": 350, "y": 750},
          "data": {"label": "Backend", "entityType": "component",
-                  "description": "FastAPI REST API with RBAC",
+                  "description": _ENTITY_DESCRIPTIONS["n2"],
                   "entityId": eids["n2"]}},
         {"id": "n4", "type": "service",
-         "position": {"x": 60, "y": 480},
+         "position": {"x": 60, "y": 750},
          "data": {"label": "Auth Service", "entityType": "service",
-                  "description": "JWT + Argon2id", "entityId": eids["n4"]}},
+                  "description": _ENTITY_DESCRIPTIONS["n4"],
+                  "entityId": eids["n4"]}},
         {"id": "n5", "type": "component",
-         "position": {"x": 650, "y": 150},
+         "position": {"x": 650, "y": 250},
          "data": {"label": "Canvas Engine", "entityType": "component",
-                  "description": "@xyflow/svelte editor",
+                  "description": _ENTITY_DESCRIPTIONS["n5"],
                   "entityId": eids["n5"]}},
         {"id": "n14", "type": "component",
-         "position": {"x": 650, "y": 330},
+         "position": {"x": 650, "y": 500},
          "data": {"label": "Export Engine", "entityType": "component",
-                  "description": "SVG/PNG/PDF export", "entityId": eids["n14"]}},
+                  "description": _ENTITY_DESCRIPTIONS["n14"],
+                  "entityId": eids["n14"]}},
         {"id": "n3", "type": "database",
-         "position": {"x": 370, "y": 650},
+         "position": {"x": 370, "y": 1000},
          "data": {"label": "Database", "entityType": "database",
-                  "description": "SQLite + WAL + FTS5", "entityId": eids["n3"]}},
+                  "description": _ENTITY_DESCRIPTIONS["n3"],
+                  "entityId": eids["n3"]}},
     ]
     edges = [
         {"id": "e10-1", "source": "n10", "target": "n1", "type": "uses",
@@ -192,7 +200,7 @@ def _build_architecture_model(
 # ── Model 2: API Request Flow (sequence) ────────────────────────────────────
 
 def _build_sequence_model(
-    eids: dict[str, str], rids: dict[str, str],
+    eids: dict[str, str], rids: dict[str, str], **_kw: object,
 ) -> dict[str, object]:
     """Sequence diagram: user login then fetch model data."""
     participants = [
@@ -251,44 +259,44 @@ def _build_sequence_model(
 # ── Model 3: Data Layer (component) ─────────────────────────────────────────
 
 def _build_data_layer_model(
-    eids: dict[str, str], rids: dict[str, str],
+    eids: dict[str, str], rids: dict[str, str], **_kw: object,
 ) -> dict[str, object]:
     """Component model showing database, versioning, search, and audit."""
     nodes = [
         {"id": "n2", "type": "component",
          "position": {"x": 350, "y": 50},
          "data": {"label": "Backend", "entityType": "component",
-                  "description": "FastAPI application server",
+                  "description": _ENTITY_DESCRIPTIONS["n2"],
                   "entityId": eids["n2"]}},
         {"id": "n12", "type": "component",
-         "position": {"x": 60, "y": 230},
+         "position": {"x": 60, "y": 300},
          "data": {"label": "Version Control", "entityType": "component",
-                  "description": "Optimistic concurrency with ETags",
+                  "description": _ENTITY_DESCRIPTIONS["n12"],
                   "entityId": eids["n12"]}},
         {"id": "n6", "type": "service",
-         "position": {"x": 350, "y": 230},
+         "position": {"x": 350, "y": 300},
          "data": {"label": "Search Service", "entityType": "service",
-                  "description": "FTS5 full-text search with ranking",
+                  "description": _ENTITY_DESCRIPTIONS["n6"],
                   "entityId": eids["n6"]}},
         {"id": "n7", "type": "service",
-         "position": {"x": 640, "y": 230},
+         "position": {"x": 640, "y": 300},
          "data": {"label": "Audit Service", "entityType": "service",
-                  "description": "Middleware-based operation logging",
+                  "description": _ENTITY_DESCRIPTIONS["n7"],
                   "entityId": eids["n7"]}},
         {"id": "n8", "type": "component",
-         "position": {"x": 60, "y": 430},
+         "position": {"x": 60, "y": 550},
          "data": {"label": "Model Renderer", "entityType": "component",
-                  "description": "SVG thumbnail generation",
+                  "description": _ENTITY_DESCRIPTIONS["n8"],
                   "entityId": eids["n8"]}},
         {"id": "n3", "type": "database",
-         "position": {"x": 350, "y": 430},
+         "position": {"x": 350, "y": 550},
          "data": {"label": "Database", "entityType": "database",
-                  "description": "SQLite + WAL + FTS5 + migrations",
+                  "description": _ENTITY_DESCRIPTIONS["n3"],
                   "entityId": eids["n3"]}},
         {"id": "n13", "type": "queue",
-         "position": {"x": 640, "y": 430},
+         "position": {"x": 640, "y": 550},
          "data": {"label": "Event Bus", "entityType": "queue",
-                  "description": "Internal event dispatch",
+                  "description": _ENTITY_DESCRIPTIONS["n13"],
                   "entityId": eids["n13"]}},
     ]
     edges = [
@@ -323,47 +331,57 @@ def _build_data_layer_model(
 # ── Model 4: Enterprise View (archimate) ────────────────────────────────────
 
 def _build_enterprise_model(
-    eids: dict[str, str], rids: dict[str, str],
+    eids: dict[str, str], rids: dict[str, str], **_kw: object,
 ) -> dict[str, object]:
     """ArchiMate-style enterprise view of Iris."""
     nodes = [
-        {"id": "n10", "type": "actor",
+        {"id": "n10", "type": "business_actor",
          "position": {"x": 60, "y": 50},
          "data": {"label": "User", "entityType": "actor",
-                  "description": "End user", "entityId": eids["n10"]}},
-        {"id": "n11", "type": "actor",
-         "position": {"x": 350, "y": 50},
+                  "layer": "business", "archimateType": "Business Actor",
+                  "description": _ENTITY_DESCRIPTIONS["n10"],
+                  "entityId": eids["n10"]}},
+        {"id": "n11", "type": "business_actor",
+         "position": {"x": 400, "y": 50},
          "data": {"label": "Admin", "entityType": "actor",
-                  "description": "System administrator", "entityId": eids["n11"]}},
-        {"id": "n1", "type": "component",
-         "position": {"x": 60, "y": 230},
+                  "layer": "business", "archimateType": "Business Actor",
+                  "description": _ENTITY_DESCRIPTIONS["n11"],
+                  "entityId": eids["n11"]}},
+        {"id": "n1", "type": "application_component",
+         "position": {"x": 60, "y": 300},
          "data": {"label": "Frontend", "entityType": "component",
-                  "description": "SvelteKit web application",
+                  "layer": "application", "archimateType": "Application Component",
+                  "description": _ENTITY_DESCRIPTIONS["n1"],
                   "entityId": eids["n1"]}},
-        {"id": "n15", "type": "package",
-         "position": {"x": 350, "y": 230},
+        {"id": "n15", "type": "technology_node",
+         "position": {"x": 400, "y": 300},
          "data": {"label": "Middleware Stack", "entityType": "package",
-                  "description": "CORS, rate limits, security headers, audit",
+                  "layer": "technology", "archimateType": "Technology Node",
+                  "description": _ENTITY_DESCRIPTIONS["n15"],
                   "entityId": eids["n15"]}},
-        {"id": "n2", "type": "component",
-         "position": {"x": 60, "y": 430},
+        {"id": "n2", "type": "application_component",
+         "position": {"x": 60, "y": 550},
          "data": {"label": "Backend", "entityType": "component",
-                  "description": "FastAPI application",
+                  "layer": "application", "archimateType": "Application Component",
+                  "description": _ENTITY_DESCRIPTIONS["n2"],
                   "entityId": eids["n2"]}},
-        {"id": "n4", "type": "service",
-         "position": {"x": 350, "y": 430},
+        {"id": "n4", "type": "application_service",
+         "position": {"x": 400, "y": 550},
          "data": {"label": "Auth Service", "entityType": "service",
-                  "description": "Authentication and authorization",
+                  "layer": "application", "archimateType": "Application Service",
+                  "description": _ENTITY_DESCRIPTIONS["n4"],
                   "entityId": eids["n4"]}},
-        {"id": "n3", "type": "database",
-         "position": {"x": 60, "y": 620},
+        {"id": "n3", "type": "technology_node",
+         "position": {"x": 60, "y": 800},
          "data": {"label": "Database", "entityType": "database",
-                  "description": "SQLite persistent storage",
+                  "layer": "technology", "archimateType": "Technology Node",
+                  "description": _ENTITY_DESCRIPTIONS["n3"],
                   "entityId": eids["n3"]}},
-        {"id": "n6", "type": "service",
-         "position": {"x": 350, "y": 620},
+        {"id": "n6", "type": "technology_service",
+         "position": {"x": 400, "y": 800},
          "data": {"label": "Search Service", "entityType": "service",
-                  "description": "Full-text search",
+                  "layer": "technology", "archimateType": "Technology Service",
+                  "description": _ENTITY_DESCRIPTIONS["n6"],
                   "entityId": eids["n6"]}},
     ]
     edges = [
@@ -394,6 +412,72 @@ def _build_enterprise_model(
         {"id": "ea9", "source": "n4", "target": "n3", "type": "uses",
          "data": {"relationshipType": "uses", "label": "User credentials",
                   "relationshipId": rids["r9"]}},
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+
+# ── Model 5: System Overview (model-in-model) ────────────────────────────────
+
+def _build_system_overview_model(
+    eids: dict[str, str],
+    rids: dict[str, str],
+    mids: dict[int, str] | None = None,
+) -> dict[str, object]:
+    """Top-level overview with modelref nodes for all four sub-models plus key entities."""
+    mids = mids or {}
+    nodes = [
+        # Model references — the four sub-models
+        {"id": "mr0", "type": "modelref",
+         "position": {"x": 60, "y": 50},
+         "data": {"label": "Iris Architecture", "entityType": "component",
+                  "description": "Core component overview: Frontend, Backend, DB, Auth, Canvas",
+                  "linkedModelId": mids.get(0, "")}},
+        {"id": "mr1", "type": "modelref",
+         "position": {"x": 350, "y": 50},
+         "data": {"label": "API Request Flow", "entityType": "component",
+                  "description": "Login and model fetch sequence diagram",
+                  "linkedModelId": mids.get(1, "")}},
+        {"id": "mr2", "type": "modelref",
+         "position": {"x": 60, "y": 300},
+         "data": {"label": "Data Layer", "entityType": "component",
+                  "description": "Versioning, search, audit, and event bus internals",
+                  "linkedModelId": mids.get(2, "")}},
+        {"id": "mr3", "type": "modelref",
+         "position": {"x": 350, "y": 300},
+         "data": {"label": "Iris Enterprise View", "entityType": "component",
+                  "description": "ArchiMate enterprise architecture view",
+                  "linkedModelId": mids.get(3, "")}},
+        # Key entities providing context
+        {"id": "n10", "type": "actor",
+         "position": {"x": 640, "y": 50},
+         "data": {"label": "User", "entityType": "actor",
+                  "description": _ENTITY_DESCRIPTIONS["n10"],
+                  "entityId": eids["n10"]}},
+        {"id": "n11", "type": "actor",
+         "position": {"x": 640, "y": 300},
+         "data": {"label": "Admin", "entityType": "actor",
+                  "description": _ENTITY_DESCRIPTIONS["n11"],
+                  "entityId": eids["n11"]}},
+    ]
+    edges = [
+        # User interacts with Architecture and API flow
+        {"id": "eo1", "source": "n10", "target": "mr0", "type": "uses",
+         "data": {"relationshipType": "uses", "label": "Uses system"}},
+        {"id": "eo2", "source": "n10", "target": "mr1", "type": "uses",
+         "data": {"relationshipType": "uses", "label": "API interactions"}},
+        # Admin manages enterprise view and data layer
+        {"id": "eo3", "source": "n11", "target": "mr3", "type": "uses",
+         "data": {"relationshipType": "uses", "label": "Manages"}},
+        {"id": "eo4", "source": "n11", "target": "mr2", "type": "uses",
+         "data": {"relationshipType": "uses", "label": "Configures"}},
+        # Architecture depends on Data Layer
+        {"id": "eo5", "source": "mr0", "target": "mr2", "type": "depends_on",
+         "data": {"relationshipType": "depends_on", "label": "Persistence layer"}},
+        # Enterprise view composes Architecture and Data Layer
+        {"id": "eo6", "source": "mr3", "target": "mr0", "type": "composes",
+         "data": {"relationshipType": "composes", "label": "Includes"}},
+        {"id": "eo7", "source": "mr3", "target": "mr2", "type": "composes",
+         "data": {"relationshipType": "composes", "label": "Includes"}},
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -447,6 +531,19 @@ _MODELS = [
             "services across technology layers."
         ),
         "builder": _build_enterprise_model,
+        "tags": _MODEL_TAGS,
+    },
+    {
+        "index": 4,
+        "model_type": "component",
+        "name": "Iris System Overview",
+        "description": (
+            "Top-level overview model using model-in-model references to "
+            "all four Iris sub-models (Architecture, API Flow, Data Layer, "
+            "Enterprise View), showing how they relate to each other and "
+            "to key actors."
+        ),
+        "builder": _build_system_overview_model,
         "tags": _MODEL_TAGS,
     },
 ]
@@ -542,9 +639,14 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         )
 
     # --- Create models --------------------------------------------------------
+    # Pre-compute all model IDs so the overview model can reference them
+    model_id_map: dict[int, str] = {}
     for model_def in _MODELS:
-        model_id = _gen_id("model", model_def["index"])
-        model_data = model_def["builder"](entity_ids, rel_ids)
+        model_id_map[model_def["index"]] = _gen_id("model", model_def["index"])
+
+    for model_def in _MODELS:
+        model_id = model_id_map[model_def["index"]]
+        model_data = model_def["builder"](entity_ids, rel_ids, mids=model_id_map)
         model_data_json = json.dumps(model_data)
 
         await db.execute(
