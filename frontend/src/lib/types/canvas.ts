@@ -68,6 +68,14 @@ export interface CanvasEdgeData {
 	labelOffsetX?: number;
 	labelOffsetY?: number;
 	labelRotation?: number;
+	/** SparxEA connector metadata (ADR-070). */
+	sourceCardinality?: string;
+	targetCardinality?: string;
+	sourceRole?: string;
+	targetRole?: string;
+	stereotype?: string;
+	direction?: string;
+	technology?: string;
 	[key: string]: unknown;
 }
 
