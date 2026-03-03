@@ -10,9 +10,10 @@
 		onselect: (model: Model) => void;
 		oncancel: () => void;
 		excludeModelId?: string;
+		title?: string;
 	}
 
-	let { open, onselect, oncancel, excludeModelId }: Props = $props();
+	let { open, onselect, oncancel, excludeModelId, title = 'Insert Model' }: Props = $props();
 
 	let models = $state<Model[]>([]);
 	let search = $state('');
@@ -67,7 +68,7 @@
 		class="rounded-lg p-6 shadow-lg backdrop:bg-black/50"
 		style="background-color: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); min-width: 400px; max-height: 500px"
 	>
-		<h2 id="model-picker-title" class="text-lg font-bold">Insert Model</h2>
+		<h2 id="model-picker-title" class="text-lg font-bold">{title}</h2>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Search and select a model to insert as a component.</p>
 
 		<div class="mt-3">

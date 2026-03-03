@@ -22,6 +22,8 @@ OBJECT_TYPE_MAP: dict[str, str] = {
     "ArchiMate_BusinessProcess": "business_process",
     "ArchiMate_BusinessService": "business_service",
     "ArchiMate_TechnologyNode": "technology_node",
+    "Note": "note",
+    "Boundary": "boundary",
 }
 
 CONNECTOR_TYPE_MAP: dict[str, str] = {
@@ -32,11 +34,13 @@ CONNECTOR_TYPE_MAP: dict[str, str] = {
     "Realisation": "realization",
     "Dependency": "dependency",
     "Usage": "usage",
+    "NoteLink": "note_link",
+    "Notelink": "note_link",
 }
 
-SKIP_OBJECT_TYPES: set[str] = {"Note", "Boundary", "Text", "UMLDiagram", "Constraint"}
+SKIP_OBJECT_TYPES: set[str] = {"Text", "UMLDiagram", "Constraint"}
 
-SKIP_CONNECTOR_TYPES: set[str] = {"NoteLink", "Notelink"}
+SKIP_CONNECTOR_TYPES: set[str] = set()
 
 DIAGRAM_TYPE_MAP: dict[str, str] = {
     "Logical": "uml",

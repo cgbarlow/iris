@@ -9,9 +9,11 @@
 		open: boolean;
 		onselect: (entity: Entity) => void;
 		oncancel: () => void;
+		title?: string;
+		subtitle?: string;
 	}
 
-	let { open, onselect, oncancel }: Props = $props();
+	let { open, onselect, oncancel, title = 'Link Existing Entity', subtitle = 'Search and select an entity to add to the canvas.' }: Props = $props();
 
 	let entities = $state<Entity[]>([]);
 	let search = $state('');
@@ -66,8 +68,8 @@
 		class="rounded-lg p-6 shadow-lg backdrop:bg-black/50"
 		style="background-color: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); min-width: 400px; max-height: 500px"
 	>
-		<h2 id="entity-picker-title" class="text-lg font-bold">Link Existing Entity</h2>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Search and select an entity to add to the canvas.</p>
+		<h2 id="entity-picker-title" class="text-lg font-bold">{title}</h2>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">{subtitle}</p>
 
 		<div class="mt-3">
 			<label for="entity-picker-search" class="sr-only">Search entities</label>

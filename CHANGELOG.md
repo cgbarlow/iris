@@ -19,11 +19,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 7 new backend tests for extended import fields (4 reader, 3 import)
 - ADR-065: Inline Edit, Entity Detail Revamp, Extended Import
 - SPEC-065-A: Inline Edit, Entity Detail Revamp specification
+- First-class model relationships: `model_relationships` DB table, REST API (`POST/GET /api/models/{id}/relationships`, `DELETE /api/model-relationships/{id}`), and Relationships tab on model detail page (ADR-066, SPEC-066-A)
+- `note` and `boundary` entity types for SparxEA Note/Boundary elements — previously skipped during import
+- NoteNode canvas component: yellow background, folded corner CSS, DOMPurify-sanitized HTML content
+- BoundaryNode canvas component: dashed border, transparent background
+- `note_link` relationship type with NoteLinkEdge canvas component (dotted line)
+- Self-referencing relationship support with SelfLoopEdge canvas component (cubic bezier loop)
+- SparxEA import: Package-to-Package dependencies imported as model relationships
+- Import change summary in version history — entities show "Imported from SparxEA (Class)", models show "Imported from SparxEA (PackageName)"
+- Migration m015 for `model_relationships` table with unique constraint and cascade indexes
+- Create entity and model relationships from Relationships tab with multi-step picker flow (ADR-067, SPEC-067-A)
+- "Add to canvas?" prompt after creating relationships from the Relationships tab
+- Canvas modelref-to-modelref connections auto-create backend `model_relationships` records
+- Node removal dialog (`NodeDeleteDialog`): "Remove from this model" or "Delete entity and all relationships"
+- Cascade entity deletion (`DELETE /api/entities/{id}?cascade=true`) removes entity from all model canvases and soft-deletes all relationships
+- "Remove" button in canvas toolbar when a node is selected in edit mode
+- 7 new model relationship backend tests, 4 new cascade delete tests, 5 new import tests
+- ADR-066: Import All Skipped Items
+- SPEC-066-A: Import All Skipped Items specification
+- ADR-067: Unified Relationship Management & Entity Removal
+- SPEC-067-A: Unified Relationships & Entity Removal specification
+
+### Fixed
+- Smart tab default on model detail page: `userSelectedTab` now resets when navigating between models, ensuring empty models default to Details tab and populated models default to Canvas
 
 ### Changed
 - Model detail tab renamed from "Overview" to "Details"
 - SparxEA attribute import format changed from strings to objects (backward-compatible in canvas nodes)
 - Model and entity detail accordion changed from multiple to single selection mode
+- "Edit Metadata" button renamed to "Edit Details" on model and entity detail pages
+- Accordion "Summary" group renamed to "Overview" on model and entity detail pages
+- Entity editing from model canvas now navigates to entity detail page in edit mode (via `?edit=true`)
+- SparxEA import no longer skips Note, Boundary, NoteLink, self-references, or Package-to-Package dependencies
+- `SKIP_OBJECT_TYPES` reduced to `{Text, UMLDiagram, Constraint}`; `SKIP_CONNECTOR_TYPES` is now empty
+- `create_entity()` and `create_model()` accept optional `change_summary` parameter for initial version
+- `EntityPicker` and `ModelPicker` accept optional `title`/`subtitle` props for reuse in different contexts
+- Canvas Delete/Backspace key now opens confirmation dialog instead of direct node removal
+- `CanvasEdgeData` includes optional `modelRelationshipId` field
 
 ## [1.7.2] - 2026-03-03
 

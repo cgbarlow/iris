@@ -39,7 +39,7 @@ iris/
 
 | View | Entity Types | Relationship Types |
 |------|-------------|-------------------|
-| **Simple View** | Component, Service, Interface, Package, Actor, Database, Queue | Uses, Depends On, Composes, Implements, Contains |
+| **Simple View** | Component, Service, Interface, Package, Actor, Database, Queue, Note, Boundary | Uses, Depends On, Composes, Implements, Contains, Note Link, Self Loop |
 | **UML** | Class, Object, Use Case, State, Activity, Deployment | Association, Aggregation, Composition, Dependency, Realization, Generalization |
 | **ArchiMate** | 11 types across Business, Application, Technology layers | Serving, Composition, Aggregation, Assignment, Realization, Access, Influence, Triggering |
 | **Sequence** | Participants with lifelines | Sync, Async, Reply messages with activation boxes |
@@ -127,6 +127,12 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Entity and model detail pages with accordion layout (Summary, Details, Extended groups)
 - Entity clone button on detail page
 - Extended metadata display for imported entities (scope, abstract, persistence, author, dates, tagged values)
+- Model relationships: inter-model dependency tracking with dedicated Relationships tab, create from tab or canvas
+- Unified relationship management: create entity and model relationships from Relationships tab with "Add to canvas?" prompt
+- Canvas modelref-to-modelref connections auto-create backend model relationships
+- Node removal dialog: "Remove from this model" or "Delete entity and all relationships" (cascade deletion)
+- SparxEA import: full coverage — Note/Boundary elements, NoteLink connectors, self-references, Package-to-Package dependencies as model relationships
+- Import change summary in version history ("Imported from SparxEA")
 - Entity CRUD with optimistic concurrency via If-Match headers
 - Model CRUD with type filter on list page (Simple, Component, Sequence, UML, ArchiMate)
 - Bookmark toggle on model detail page
@@ -187,7 +193,7 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 ### Running Tests
 
 ```sh
-# Backend (399 tests)
+# Backend (415 tests)
 cd backend
 uv run python -m pytest
 
@@ -238,8 +244,8 @@ npm run test:all-e2e
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 13 Architecture Decision Records |
-| `docs/adrs/specs/` | 22 implementation specifications |
+| `docs/adrs/` | 67 Architecture Decision Records |
+| `docs/adrs/specs/` | 82 implementation specifications |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 

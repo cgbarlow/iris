@@ -20,6 +20,7 @@ from app.import_sparx.reader import (
     read_packages,
     read_tagged_values,
 )
+from app.model_relationships.service import create_model_relationship
 from app.models_crud.service import create_model
 from app.relationships.service import create_relationship
 
@@ -41,6 +42,7 @@ class ImportSummary:
     diagrams_created: int = 0
     elements_skipped: int = 0
     connectors_skipped: int = 0
+    model_relationships_created: int = 0
     warnings: list[ImportWarning] = field(default_factory=list)
 
 
@@ -102,6 +104,12 @@ async def import_sparx_file(
         if elem.Object_Type == "Package":
             pkg_type_elements[elem.Package_ID] = elem
 
+    # Build reverse map: element Object_ID -> Package_ID (for Package→Package deps)
+    element_to_package: dict[int, int] = {}
+    for elem in elements:
+        if elem.Object_Type == "Package":
+            element_to_package[elem.Object_ID] = elem.Package_ID
+
     # 2. Build package hierarchy -> create Iris models for packages
     # Map ea_package_id -> iris_model_id
     package_model_map: dict[int, str] = {}
@@ -130,6 +138,7 @@ async def import_sparx_file(
             parent_model_id=parent_iris_id,
             set_id=set_id,
             metadata=pkg_metadata,
+            change_summary=f"Imported from SparxEA ({pkg.Name})",
         )
         package_model_map[pkg.Package_ID] = model["id"]  # type: ignore[assignment]
         summary.models_created += 1
@@ -215,6 +224,7 @@ async def import_sparx_file(
             created_by=imported_by,
             set_id=set_id,
             metadata=entity_metadata,
+            change_summary=f"Imported from SparxEA ({elem.Object_Type})",
         )
         element_entity_map[elem.Object_ID] = entity["id"]  # type: ignore[assignment]
         summary.entities_created += 1
@@ -233,9 +243,28 @@ async def import_sparx_file(
         source_id = element_entity_map.get(conn.Start_Object_ID)
         target_id = element_entity_map.get(conn.End_Object_ID)
         if not source_id or not target_id:
-            summary.connectors_skipped += 1
-            continue
-        if source_id == target_id:
+            # Check if this is a Package→Package connector (model relationship)
+            source_pkg = element_to_package.get(conn.Start_Object_ID)
+            target_pkg = element_to_package.get(conn.End_Object_ID)
+            if source_pkg and target_pkg:
+                source_model = package_model_map.get(source_pkg)
+                target_model = package_model_map.get(target_pkg)
+                if source_model and target_model:
+                    try:
+                        await create_model_relationship(
+                            db,
+                            source_model_id=source_model,
+                            target_model_id=target_model,
+                            relationship_type=iris_type,
+                            label=conn.Name,
+                            description=conn.Notes,
+                            created_by=imported_by,
+                        )
+                        summary.model_relationships_created += 1
+                    except Exception:
+                        # Duplicate — relationship already exists, not a skip
+                        summary.model_relationships_created += 1
+                    continue
             summary.connectors_skipped += 1
             continue
 
@@ -290,7 +319,7 @@ async def import_sparx_file(
                 "type": iris_type_str or "component",
                 "position": {"x": pos["x"], "y": pos["y"]},
                 "data": {
-                    "label": elem.Name if elem else "Unknown",
+                    "label": (elem.Name or "Unknown") if elem else "Unknown",
                     "entityType": iris_type_str or "component",
                     "entityId": entity_id,
                 },
@@ -322,16 +351,32 @@ async def import_sparx_file(
             iris_conn_type = (
                 map_connector_type(conn.Connector_Type) if conn.Connector_Type else "association"
             ) or "association"
-            edges.append({
-                "id": str(uuid.uuid4()),
-                "source": source_node,
-                "target": target_node,
-                "type": iris_conn_type,
-                "data": {
-                    "relationshipType": iris_conn_type,
-                    "label": conn.Name or "",
-                },
-            })
+
+            # Self-loop edge
+            if source_node == target_node:
+                edges.append({
+                    "id": str(uuid.uuid4()),
+                    "source": source_node,
+                    "target": target_node,
+                    "type": "self_loop",
+                    "sourceHandle": "right",
+                    "targetHandle": "top",
+                    "data": {
+                        "relationshipType": iris_conn_type,
+                        "label": conn.Name or "",
+                    },
+                })
+            else:
+                edges.append({
+                    "id": str(uuid.uuid4()),
+                    "source": source_node,
+                    "target": target_node,
+                    "type": iris_conn_type,
+                    "data": {
+                        "relationshipType": iris_conn_type,
+                        "label": conn.Name or "",
+                    },
+                })
 
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
@@ -344,6 +389,7 @@ async def import_sparx_file(
             created_by=imported_by,
             parent_model_id=parent_iris_id,
             set_id=set_id,
+            change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
         )
         summary.diagrams_created += 1
 

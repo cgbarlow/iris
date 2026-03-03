@@ -23,6 +23,7 @@
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import EntityPicker from '$lib/components/EntityPicker.svelte';
 	import ModelPicker from '$lib/components/ModelPicker.svelte';
+	import NodeDeleteDialog from '$lib/components/NodeDeleteDialog.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import { Accordion } from 'bits-ui';
@@ -45,9 +46,38 @@
 	let versions = $state<ModelVersion[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state<'details' | 'canvas' | 'versions'>('canvas');
+	let activeTab = $state<'details' | 'canvas' | 'relationships' | 'versions'>('canvas');
 	let userSelectedTab = $state(false);
 	let versionsLoading = $state(false);
+
+	// Model relationships state
+	interface ModelRelationship {
+		id: string;
+		source_model_id: string;
+		target_model_id: string;
+		relationship_type: string;
+		label: string | null;
+		description: string | null;
+		created_by: string;
+		created_at: string;
+		source_name: string;
+		target_name: string;
+	}
+	interface EntityRelationship {
+		id: string;
+		source_entity_id: string;
+		target_entity_id: string;
+		relationship_type: string;
+		label: string | null;
+		description: string | null;
+		created_by: string;
+		created_at: string;
+		source_name: string;
+		target_name: string;
+	}
+	let modelRelationships = $state<ModelRelationship[]>([]);
+	let entityRelationships = $state<EntityRelationship[]>([]);
+	let relationshipsLoading = $state(false);
 
 	let showDeleteDialog = $state(false);
 	let showCloneDialog = $state(false);
@@ -129,13 +159,42 @@
 	// Model picker state (insert model as component)
 	let showModelPicker = $state(false);
 
+	// Node delete dialog state
+	let showNodeDeleteDialog = $state(false);
+	let deleteNodeId = $state<string | null>(null);
+	let deleteNodeName = $state('');
+	let deleteNodeIsModelRef = $state(false);
+
+	// Add entity relationship from tab state
+	let addEntityRelStep = $state<'source' | 'target' | 'details' | null>(null);
+	let addEntityRelSource = $state<Entity | null>(null);
+	let addEntityRelTarget = $state<Entity | null>(null);
+
+	// Add model relationship from tab state
+	let showAddModelRelPicker = $state(false);
+	let showAddModelRelDialog = $state(false);
+	let addModelRelTarget = $state<{ id: string; name: string } | null>(null);
+
+	// "Add to canvas?" prompt state
+	let showAddToCanvasPrompt = $state(false);
+	let addToCanvasRelType = $state<'entity' | 'model'>('entity');
+	let addToCanvasRelData = $state<{
+		sourceEntityId?: string; targetEntityId?: string;
+		sourceName?: string; targetName?: string;
+		targetModelId?: string; targetModelName?: string;
+		relationshipType?: string;
+	} | null>(null);
+
 	// Version rollback — not available for models (only entities have rollback API).
 
 	let prevSetId = $state<string | undefined>(undefined);
 
 	$effect(() => {
 		const id = page.params.id;
-		if (id) loadModel(id);
+		if (id) {
+			userSelectedTab = false;
+			loadModel(id);
+		}
 	});
 
 	// Reload hierarchy tree when navigating to a model with a different set_id
@@ -387,6 +446,32 @@
 		versionsLoading = false;
 	}
 
+	async function loadModelRelationships(id: string) {
+		relationshipsLoading = true;
+		try {
+			const result = await apiFetch<{
+				model_relationships: ModelRelationship[];
+				entity_relationships: EntityRelationship[];
+			}>(`/api/models/${id}/relationships`);
+			modelRelationships = result.model_relationships;
+			entityRelationships = result.entity_relationships;
+		} catch {
+			modelRelationships = [];
+			entityRelationships = [];
+		}
+		relationshipsLoading = false;
+	}
+
+	async function deleteModelRelationship(relId: string) {
+		if (!model) return;
+		try {
+			await apiFetch(`/api/model-relationships/${relId}`, { method: 'DELETE' });
+			modelRelationships = modelRelationships.filter((r) => r.id !== relId);
+		} catch {
+			// ignore
+		}
+	}
+
 	async function loadBookmarkStatus(id: string) {
 		try {
 			const bookmarks = await apiFetch<Bookmark[]>('/api/bookmarks');
@@ -594,10 +679,50 @@
 	}
 
 	function handleDeleteNode(nodeId: string) {
+		const node = canvasNodes.find((n) => n.id === nodeId);
+		if (!node) return;
+		deleteNodeId = nodeId;
+		deleteNodeName = node.data?.label ?? 'Unknown';
+		deleteNodeIsModelRef = !!node.data?.linkedModelId;
+		showNodeDeleteDialog = true;
+	}
+
+	function handleRemoveNodeFromCanvas() {
+		if (!deleteNodeId) return;
 		history.pushState(canvasNodes, canvasEdges);
-		canvasNodes = canvasNodes.filter((n) => n.id !== nodeId);
-		canvasEdges = canvasEdges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+		canvasNodes = canvasNodes.filter((n) => n.id !== deleteNodeId);
+		canvasEdges = canvasEdges.filter((e) => e.source !== deleteNodeId && e.target !== deleteNodeId);
 		canvasDirty = true;
+		showNodeDeleteDialog = false;
+		deleteNodeId = null;
+	}
+
+	async function handleCascadeDeleteEntity() {
+		if (!deleteNodeId) return;
+		const node = canvasNodes.find((n) => n.id === deleteNodeId);
+		const entityId = node?.data?.entityId;
+		if (!entityId) return;
+
+		try {
+			// Fetch entity to get current version for OCC
+			const entity = await apiFetch<Entity>(`/api/entities/${entityId}`);
+			await apiFetch(`/api/entities/${entityId}?cascade=true`, {
+				method: 'DELETE',
+				headers: { 'If-Match': String(entity.current_version) },
+			});
+			// Remove node from local canvas state
+			history.pushState(canvasNodes, canvasEdges);
+			canvasNodes = canvasNodes.filter((n) => n.id !== deleteNodeId);
+			canvasEdges = canvasEdges.filter((e) => e.source !== deleteNodeId && e.target !== deleteNodeId);
+			canvasDirty = true;
+			showNodeDeleteDialog = false;
+			deleteNodeId = null;
+			// Reload model (canvas data may have changed server-side)
+			if (model) await loadModel(model.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to delete entity';
+			showNodeDeleteDialog = false;
+		}
 	}
 
 	function handleDeleteEdge(edgeId: string) {
@@ -647,17 +772,12 @@
 		return !!node?.data?.entityId;
 	});
 
-	/** Open the edit entity dialog by fetching the entity from the API. */
-	async function handleEditEntityClick() {
+	/** Navigate to the entity page in edit mode. */
+	function handleEditEntityClick() {
 		if (!selectedEditNodeId) return;
 		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
 		if (!node?.data?.entityId) return;
-		try {
-			editEntityData = await apiFetch<Entity>(`/api/entities/${node.data.entityId}`);
-			showEditEntity = true;
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'Failed to load entity for editing';
-		}
+		goto(`/entities/${node.data.entityId}?edit=true`);
 	}
 
 	/** Save the edited entity via PUT, then update the canvas node. */
@@ -726,6 +846,7 @@
 		let relationshipId: string | undefined;
 
 		// Create a real relationship record if both nodes are linked to entities
+		let modelRelationshipId: string | undefined;
 		if (sourceEntityId && targetEntityId) {
 			try {
 				const rel = await apiFetch<{ id: string }>('/api/relationships', {
@@ -742,6 +863,21 @@
 			} catch {
 				// Non-fatal: edge still works visually without a DB relationship
 			}
+		} else if (sourceNode?.data?.linkedModelId && targetNode?.data?.linkedModelId && model) {
+			// Both nodes are modelrefs — create a model relationship
+			try {
+				const rel = await apiFetch<{ id: string }>(`/api/models/${sourceNode.data.linkedModelId}/relationships`, {
+					method: 'POST',
+					body: JSON.stringify({
+						target_model_id: targetNode.data.linkedModelId,
+						relationship_type: type,
+						label: label || undefined,
+					}),
+				});
+				modelRelationshipId = rel.id;
+			} catch {
+				// Non-fatal: edge still works visually
+			}
 		}
 
 		const newEdge: CanvasEdge = {
@@ -753,6 +889,7 @@
 				relationshipType: type,
 				label: label || undefined,
 				relationshipId,
+				modelRelationshipId,
 			},
 		};
 		history.pushState(canvasNodes, canvasEdges);
@@ -852,6 +989,164 @@
 		canvasNodes = [...canvasNodes, newNode];
 		canvasDirty = true;
 		showModelPicker = false;
+	}
+
+	// --- Add entity relationship from tab ---
+	function handleStartAddEntityRel() {
+		addEntityRelStep = 'source';
+		addEntityRelSource = null;
+		addEntityRelTarget = null;
+	}
+
+	function handleEntityRelSourceSelected(entity: Entity) {
+		addEntityRelSource = entity;
+		addEntityRelStep = 'target';
+	}
+
+	function handleEntityRelTargetSelected(entity: Entity) {
+		addEntityRelTarget = entity;
+		addEntityRelStep = 'details';
+	}
+
+	async function handleEntityRelSave(type: SimpleRelationshipType, label: string) {
+		if (!addEntityRelSource || !addEntityRelTarget || !model) return;
+		try {
+			await apiFetch('/api/relationships', {
+				method: 'POST',
+				body: JSON.stringify({
+					source_entity_id: addEntityRelSource.id,
+					target_entity_id: addEntityRelTarget.id,
+					relationship_type: type,
+					label: label || type,
+					description: '',
+				}),
+			});
+			addEntityRelStep = null;
+			loadModelRelationships(model.id);
+			// Prompt to add to canvas
+			addToCanvasRelType = 'entity';
+			addToCanvasRelData = {
+				sourceEntityId: addEntityRelSource.id,
+				targetEntityId: addEntityRelTarget.id,
+				sourceName: addEntityRelSource.name,
+				targetName: addEntityRelTarget.name,
+				relationshipType: type,
+			};
+			showAddToCanvasPrompt = true;
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create relationship';
+			addEntityRelStep = null;
+		}
+	}
+
+	// --- Add model relationship from tab ---
+	function handleStartAddModelRel() {
+		showAddModelRelPicker = true;
+		addModelRelTarget = null;
+	}
+
+	function handleModelRelTargetSelected(selectedModel: Model) {
+		addModelRelTarget = { id: selectedModel.id, name: selectedModel.name };
+		showAddModelRelPicker = false;
+		showAddModelRelDialog = true;
+	}
+
+	async function handleModelRelSave(type: SimpleRelationshipType, label: string) {
+		if (!addModelRelTarget || !model) return;
+		try {
+			await apiFetch(`/api/models/${model.id}/relationships`, {
+				method: 'POST',
+				body: JSON.stringify({
+					target_model_id: addModelRelTarget.id,
+					relationship_type: type,
+					label: label || undefined,
+				}),
+			});
+			showAddModelRelDialog = false;
+			loadModelRelationships(model.id);
+			// Prompt to add to canvas
+			addToCanvasRelType = 'model';
+			addToCanvasRelData = {
+				targetModelId: addModelRelTarget.id,
+				targetModelName: addModelRelTarget.name,
+			};
+			showAddToCanvasPrompt = true;
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create model relationship';
+			showAddModelRelDialog = false;
+		}
+	}
+
+	// --- "Add to canvas?" prompt ---
+	function handleAddToCanvas() {
+		if (!addToCanvasRelData) return;
+		if (addToCanvasRelType === 'entity') {
+			const { sourceEntityId, targetEntityId, sourceName, targetName, relationshipType } = addToCanvasRelData;
+			if (!sourceEntityId || !targetEntityId) return;
+
+			history.pushState(canvasNodes, canvasEdges);
+
+			// Find or create source node
+			let sourceNodeId = canvasNodes.find((n) => n.data?.entityId === sourceEntityId)?.id;
+			if (!sourceNodeId) {
+				sourceNodeId = crypto.randomUUID();
+				canvasNodes = [...canvasNodes, {
+					id: sourceNodeId,
+					type: 'component',
+					position: findOpenPosition(),
+					data: { label: sourceName ?? 'Source', entityType: 'component' as SimpleEntityType, entityId: sourceEntityId },
+				}];
+			}
+
+			// Find or create target node
+			let targetNodeId = canvasNodes.find((n) => n.data?.entityId === targetEntityId)?.id;
+			if (!targetNodeId) {
+				targetNodeId = crypto.randomUUID();
+				canvasNodes = [...canvasNodes, {
+					id: targetNodeId,
+					type: 'component',
+					position: findOpenPosition(),
+					data: { label: targetName ?? 'Target', entityType: 'component' as SimpleEntityType, entityId: targetEntityId },
+				}];
+			}
+
+			// Add edge
+			const edgeType = (relationshipType ?? 'uses') as SimpleRelationshipType;
+			canvasEdges = [...canvasEdges, {
+				id: `e-${sourceNodeId}-${targetNodeId}`,
+				source: sourceNodeId,
+				target: targetNodeId,
+				type: edgeType,
+				data: { relationshipType: edgeType },
+			}];
+
+			canvasDirty = true;
+			activeTab = 'canvas';
+		} else if (addToCanvasRelType === 'model') {
+			const { targetModelId, targetModelName } = addToCanvasRelData;
+			if (!targetModelId) return;
+
+			// Only add target model as modelref node if not already present
+			const existing = canvasNodes.find((n) => n.data?.linkedModelId === targetModelId);
+			if (!existing) {
+				history.pushState(canvasNodes, canvasEdges);
+				canvasNodes = [...canvasNodes, {
+					id: crypto.randomUUID(),
+					type: 'modelref',
+					position: findOpenPosition(),
+					data: { label: targetModelName ?? 'Model', entityType: 'component' as SimpleEntityType, linkedModelId: targetModelId },
+				}];
+				canvasDirty = true;
+			}
+			activeTab = 'canvas';
+		}
+		showAddToCanvasPrompt = false;
+		addToCanvasRelData = null;
+	}
+
+	function handleDismissAddToCanvas() {
+		showAddToCanvasPrompt = false;
+		addToCanvasRelData = null;
 	}
 
 	function handleNodeDragStart() {
@@ -1163,6 +1458,15 @@
 			</button>
 			<button
 				role="tab"
+				aria-selected={activeTab === 'relationships'}
+				onclick={() => { activeTab = 'relationships'; userSelectedTab = true; if (model) loadModelRelationships(model.id); }}
+				class="px-4 py-2 text-sm"
+				style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}"
+			>
+				Relationships
+			</button>
+			<button
+				role="tab"
 				aria-selected={activeTab === 'versions'}
 				onclick={() => { activeTab = 'versions'; userSelectedTab = true; }}
 				class="px-4 py-2 text-sm"
@@ -1203,17 +1507,17 @@
 						class="rounded px-3 py-1.5 text-sm text-white"
 						style="background-color: var(--color-primary)"
 					>
-						Edit Metadata
+						Edit Details
 					</button>
 				{/if}
 			</div>
 
 			<Accordion.Root type="single" value="summary">
-				<!-- Summary group (open by default) -->
+				<!-- Overview group (open by default) -->
 				<Accordion.Item value="summary" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
 						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
-							Summary
+							Overview
 							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
@@ -1617,6 +1921,15 @@
 									Edit Entity
 								</button>
 							{/if}
+							{#if selectedEditNodeId}
+								<button
+									onclick={() => selectedEditNodeId && handleDeleteNode(selectedEditNodeId)}
+									class="rounded px-3 py-1.5 text-sm"
+									style="border: 1px solid var(--color-danger); color: var(--color-danger)"
+								>
+									Remove
+								</button>
+							{/if}
 							<button
 								onclick={() => selectedEdgeId && handleDeleteEdge(selectedEdgeId)}
 								disabled={!selectedEdgeId}
@@ -1877,6 +2190,112 @@
 					{/if}
 				{/if}
 			{/if}
+		{:else if activeTab === 'relationships'}
+			<!-- Add relationship buttons -->
+			<div class="mb-4 flex gap-2">
+				<button
+					onclick={handleStartAddEntityRel}
+					class="rounded px-3 py-1.5 text-sm text-white"
+					style="background-color: var(--color-primary)"
+				>
+					Add Entity Relationship
+				</button>
+				<button
+					onclick={handleStartAddModelRel}
+					class="rounded px-3 py-1.5 text-sm"
+					style="border: 1px solid var(--color-primary); color: var(--color-primary)"
+				>
+					Add Model Relationship
+				</button>
+			</div>
+
+			{#if relationshipsLoading}
+				<p style="color: var(--color-muted)">Loading relationships...</p>
+			{:else if modelRelationships.length === 0 && entityRelationships.length === 0}
+				<p style="color: var(--color-muted)">No relationships found.</p>
+			{:else}
+				<!-- Entity relationships (within this model's canvas) -->
+				{#if entityRelationships.length > 0}
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Entity Relationships ({entityRelationships.length})</h3>
+					<table class="mb-6 w-full text-sm">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<th class="py-2 text-left" style="color: var(--color-muted)">Source</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Target</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Label</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each entityRelationships as rel}
+								<tr style="border-bottom: 1px solid var(--color-border)">
+									<td class="py-2">
+										<a href="/entities/{rel.source_entity_id}" style="color: var(--color-primary)">{rel.source_name || rel.source_entity_id}</a>
+									</td>
+									<td class="py-2">
+										<a href="/entities/{rel.target_entity_id}" style="color: var(--color-primary)">{rel.target_name || rel.target_entity_id}</a>
+									</td>
+									<td class="py-2">
+										<span class="inline-block rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg)">
+											{rel.relationship_type}
+										</span>
+									</td>
+									<td class="py-2" style="color: var(--color-fg)">{rel.label ?? '—'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+
+				<!-- Model-to-model relationships -->
+				{#if modelRelationships.length > 0}
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Model Relationships ({modelRelationships.length})</h3>
+					<table class="w-full text-sm">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<th class="py-2 text-left" style="color: var(--color-muted)">Direction</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Related Model</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Label</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each modelRelationships as rel}
+								{@const isSource = rel.source_model_id === model.id}
+								<tr style="border-bottom: 1px solid var(--color-border)">
+									<td class="py-2" style="color: var(--color-fg)">{isSource ? 'Outgoing' : 'Incoming'}</td>
+									<td class="py-2">
+										<a
+											href="/models/{isSource ? rel.target_model_id : rel.source_model_id}"
+											style="color: var(--color-primary)"
+										>
+											{isSource ? rel.target_name : rel.source_name}
+										</a>
+									</td>
+									<td class="py-2">
+										<span class="inline-block rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg)">
+											{rel.relationship_type}
+										</span>
+									</td>
+									<td class="py-2" style="color: var(--color-fg)">{rel.label ?? '—'}</td>
+									<td class="py-2">
+										{#if editing}
+											<button
+												onclick={() => deleteModelRelationship(rel.id)}
+												class="text-xs"
+												style="color: var(--color-danger, #dc2626)"
+											>
+												Delete
+											</button>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+			{/if}
 		{:else if activeTab === 'versions'}
 			{#if versionsLoading}
 				<p style="color: var(--color-muted)">Loading versions...</p>
@@ -2002,5 +2421,94 @@
 		onsave={handleAddMessage}
 		oncancel={() => (showAddMessage = false)}
 	/>
+
+	<NodeDeleteDialog
+		open={showNodeDeleteDialog}
+		nodeName={deleteNodeName}
+		isModelRef={deleteNodeIsModelRef}
+		onremove={handleRemoveNodeFromCanvas}
+		ondelete={handleCascadeDeleteEntity}
+		oncancel={() => { showNodeDeleteDialog = false; deleteNodeId = null; }}
+	/>
+
+	<!-- Add entity relationship from tab: source picker -->
+	<EntityPicker
+		open={addEntityRelStep === 'source'}
+		title="Select Source Entity"
+		subtitle="Choose the source entity for the relationship."
+		onselect={handleEntityRelSourceSelected}
+		oncancel={() => (addEntityRelStep = null)}
+	/>
+
+	<!-- Add entity relationship from tab: target picker -->
+	<EntityPicker
+		open={addEntityRelStep === 'target'}
+		title="Select Target Entity"
+		subtitle="Choose the target entity for the relationship."
+		onselect={handleEntityRelTargetSelected}
+		oncancel={() => (addEntityRelStep = null)}
+	/>
+
+	<!-- Add entity relationship from tab: details dialog -->
+	<RelationshipDialog
+		open={addEntityRelStep === 'details'}
+		sourceName={addEntityRelSource?.name ?? ''}
+		targetName={addEntityRelTarget?.name ?? ''}
+		onsave={handleEntityRelSave}
+		oncancel={() => (addEntityRelStep = null)}
+	/>
+
+	<!-- Add model relationship from tab: model picker -->
+	<ModelPicker
+		open={showAddModelRelPicker}
+		title="Select Target Model"
+		onselect={handleModelRelTargetSelected}
+		oncancel={() => (showAddModelRelPicker = false)}
+		excludeModelId={model?.id}
+	/>
+
+	<!-- Add model relationship from tab: details dialog -->
+	<RelationshipDialog
+		open={showAddModelRelDialog}
+		sourceName={model?.name ?? ''}
+		targetName={addModelRelTarget?.name ?? ''}
+		onsave={handleModelRelSave}
+		oncancel={() => (showAddModelRelDialog = false)}
+	/>
+
+	<!-- "Add to canvas?" prompt -->
+	{#if showAddToCanvasPrompt}
+		<dialog
+			open
+			class="fixed inset-0 z-50 flex items-center justify-center rounded-lg p-6 shadow-lg backdrop:bg-black/50"
+			style="background-color: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); min-width: 320px"
+			aria-labelledby="add-to-canvas-title"
+		>
+			<h2 id="add-to-canvas-title" class="text-lg font-bold">Add to Canvas?</h2>
+			<p class="mt-2 text-sm" style="color: var(--color-muted)">
+				{#if addToCanvasRelType === 'entity'}
+					Would you like to add the entities and relationship to the canvas?
+				{:else}
+					Would you like to add the target model as a reference on the canvas?
+				{/if}
+			</p>
+			<div class="mt-4 flex justify-end gap-3">
+				<button
+					onclick={handleDismissAddToCanvas}
+					class="rounded px-4 py-2 text-sm"
+					style="border: 1px solid var(--color-border); color: var(--color-fg)"
+				>
+					No
+				</button>
+				<button
+					onclick={handleAddToCanvas}
+					class="rounded px-4 py-2 text-sm text-white"
+					style="background-color: var(--color-primary)"
+				>
+					Yes
+				</button>
+			</div>
+		</dialog>
+	{/if}
 
 {/if}

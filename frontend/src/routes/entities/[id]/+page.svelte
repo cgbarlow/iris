@@ -44,6 +44,13 @@
 		if (id) loadEntity(id);
 	});
 
+	// Auto-enter edit mode when ?edit=true is in the URL
+	$effect(() => {
+		if (entity && !loading && page.url.searchParams.get('edit') === 'true') {
+			enterDetailsEdit();
+		}
+	});
+
 	// Track dirty state for inline editing
 	$effect(() => {
 		if (!editingDetails || !entity) return;
@@ -333,17 +340,17 @@
 						class="rounded px-3 py-1.5 text-sm text-white"
 						style="background-color: var(--color-primary)"
 					>
-						Edit Metadata
+						Edit Details
 					</button>
 				{/if}
 			</div>
 
 			<Accordion.Root type="single" value="summary">
-				<!-- Summary group (open by default) -->
+				<!-- Overview group (open by default) -->
 				<Accordion.Item value="summary" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
 						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
-							Summary
+							Overview
 							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
@@ -441,6 +448,11 @@
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified By</dt>
 							<dd style="color: var(--color-fg)">{modifiedByUsername}</dd>
+
+							{#if (entity.metadata as Record<string, unknown> | null | undefined)?.status}
+								<dt class="text-sm font-medium" style="color: var(--color-muted)">Status</dt>
+								<dd style="color: var(--color-fg)">{(entity.metadata as Record<string, unknown>).status}</dd>
+							{/if}
 						</dl>
 					</Accordion.Content>
 				</Accordion.Item>
@@ -455,13 +467,9 @@
 					</Accordion.Header>
 					<Accordion.Content class="pb-4">
 						{@const meta = entity.metadata as Record<string, unknown> | null | undefined}
-						{@const hasMeta = !!(meta && (meta.status || meta.stereotype || meta.version || meta.scope || meta.abstract || meta.persistence || meta.author || meta.complexity || meta.phase || meta.created_date || meta.modified_date || meta.gen_type || (Array.isArray(meta.tagged_values) && (meta.tagged_values as unknown[]).length > 0)))}
+						{@const hasMeta = !!(meta && (meta.stereotype || meta.version || meta.scope || meta.abstract || meta.persistence || meta.author || meta.complexity || meta.phase || meta.created_date || meta.modified_date || meta.gen_type || (Array.isArray(meta.tagged_values) && (meta.tagged_values as unknown[]).length > 0)))}
 						{#if hasMeta}
 							<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
-								{#if meta?.status}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Status</dt>
-									<dd style="color: var(--color-fg)">{meta.status}</dd>
-								{/if}
 								{#if meta?.stereotype}
 									<dt class="text-sm font-medium" style="color: var(--color-muted)">Stereotype</dt>
 									<dd style="color: var(--color-fg)">{meta.stereotype}</dd>

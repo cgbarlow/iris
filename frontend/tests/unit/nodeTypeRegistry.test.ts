@@ -24,11 +24,11 @@ describe('Node type registry alignment', () => {
 		expect(registryKeys).not.toContain('simpleEntity');
 	});
 
-	it('simpleViewNodeTypes has exactly 8 entries', () => {
-		expect(Object.keys(simpleViewNodeTypes)).toHaveLength(8);
+	it('simpleViewNodeTypes has exactly 10 entries', () => {
+		expect(Object.keys(simpleViewNodeTypes)).toHaveLength(10);
 	});
 
-	it('simpleViewEdgeTypes has exactly 5 entries', () => {
-		expect(Object.keys(simpleViewEdgeTypes)).toHaveLength(5);
+	it('simpleViewEdgeTypes has exactly 7 entries', () => {
+		expect(Object.keys(simpleViewEdgeTypes)).toHaveLength(7);
 	});
 });

@@ -17,6 +17,7 @@ from app.entities.models import (
     EntityVersionResponse,
 )
 from app.entities.service import (
+    cascade_delete_entity,
     create_entity,
     get_entity,
     get_entity_version,
@@ -198,9 +199,10 @@ async def rollback(
 async def delete(
     entity_id: str,
     request: Request,
+    cascade: bool = False,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> None:
-    """Soft-delete an entity."""
+    """Soft-delete an entity. With cascade=true, also removes from all model canvases and deletes relationships."""
     if_match = request.headers.get("If-Match")
     if if_match is None:
         raise HTTPException(
@@ -214,10 +216,16 @@ async def delete(
         )
 
     db = request.app.state.db_manager.main_db
-    deleted = await soft_delete_entity(
-        db, entity_id, deleted_by=current_user["id"],
-        expected_version=expected_version,
-    )
+    if cascade:
+        deleted = await cascade_delete_entity(
+            db, entity_id, deleted_by=current_user["id"],
+            expected_version=expected_version,
+        )
+    else:
+        deleted = await soft_delete_entity(
+            db, entity_id, deleted_by=current_user["id"],
+            expected_version=expected_version,
+        )
     if not deleted:
         raise HTTPException(status_code=409, detail="Version conflict or not found")
 

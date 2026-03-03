@@ -10,10 +10,12 @@ export type SimpleEntityType =
 	| 'package'
 	| 'actor'
 	| 'database'
-	| 'queue';
+	| 'queue'
+	| 'note'
+	| 'boundary';
 
 /** Simple View relationship types. */
-export type SimpleRelationshipType = 'uses' | 'depends_on' | 'composes' | 'implements' | 'contains';
+export type SimpleRelationshipType = 'uses' | 'depends_on' | 'composes' | 'implements' | 'contains' | 'note_link';
 
 /** Full View UML relationship types (declared early for RelationshipTypeInfo). */
 export type UmlRelationshipType =
@@ -57,6 +59,7 @@ export type EdgeRoutingType = 'default' | 'straight' | 'step' | 'smoothstep' | '
 export interface CanvasEdgeData {
 	relationshipType: SimpleRelationshipType;
 	relationshipId?: string;
+	modelRelationshipId?: string;
 	label?: string;
 	routingType?: EdgeRoutingType;
 	labelOffsetX?: number;
@@ -114,6 +117,8 @@ export const SIMPLE_ENTITY_TYPES: EntityTypeInfo[] = [
 	{ key: 'actor', label: 'Actor', icon: '👤', description: 'A person or external system' },
 	{ key: 'database', label: 'Database', icon: '▦', description: 'A persistent data store' },
 	{ key: 'queue', label: 'Queue', icon: '≋', description: 'An asynchronous message channel' },
+	{ key: 'note', label: 'Note', icon: '📝', description: 'An annotation or documentation note' },
+	{ key: 'boundary', label: 'Boundary', icon: '▧', description: 'A visual grouping boundary' },
 ];
 
 /** Relationship type display metadata. */
@@ -130,6 +135,7 @@ export const SIMPLE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
 	{ key: 'composes', label: 'Composes', description: 'Source is composed of target' },
 	{ key: 'implements', label: 'Implements', description: 'Source implements target interface' },
 	{ key: 'contains', label: 'Contains', description: 'Source contains target (nesting)' },
+	{ key: 'note_link', label: 'Note Link', description: 'Attaches a note to an element' },
 ];
 
 /** Full View UML entity types. */

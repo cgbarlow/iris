@@ -50,6 +50,7 @@ async def import_sparx(
             "diagrams_created": summary.diagrams_created,
             "elements_skipped": summary.elements_skipped,
             "connectors_skipped": summary.connectors_skipped,
+            "model_relationships_created": summary.model_relationships_created,
             "warnings": [
                 {"category": w.category, "message": w.message} for w in summary.warnings
             ],

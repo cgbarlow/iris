@@ -17,6 +17,7 @@ from app.config import AppConfig, get_config
 from app.database import DatabaseManager
 from app.entities.router import router as entities_router
 from app.import_sparx.router import router as import_router
+from app.model_relationships.router import router as model_relationships_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.models_crud.router import admin_router as admin_thumbnails_router
@@ -111,6 +112,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(settings_router)
     app.include_router(admin_thumbnails_router)
     app.include_router(import_router)
+    app.include_router(model_relationships_router)
     app.include_router(sets_router)
     app.include_router(batch_router)
 

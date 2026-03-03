@@ -123,11 +123,13 @@
 		if (onconnectnodes) {
 			onconnectnodes(sourceId, targetId);
 		} else {
+			const isSelfLoop = sourceId === targetId;
 			const newEdge: CanvasEdge = {
 				id: `e-${sourceId}-${targetId}`,
 				source: sourceId,
 				target: targetId,
-				type: 'uses',
+				type: isSelfLoop ? 'self_loop' : 'uses',
+				...(isSelfLoop ? { sourceHandle: 'right', targetHandle: 'top' } : {}),
 				data: { relationshipType: 'uses' },
 			};
 			edges = [...edges, newEdge];

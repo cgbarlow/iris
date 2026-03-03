@@ -25,6 +25,7 @@ async def create_entity(
     created_by: str,
     set_id: str | None = None,
     metadata: dict[str, object] | None = None,
+    change_summary: str | None = None,
 ) -> dict[str, object]:
     """Create a new entity with initial version."""
     entity_id = str(uuid.uuid4())
@@ -40,9 +41,9 @@ async def create_entity(
     )
     await db.execute(
         "INSERT INTO entity_versions (entity_id, version, name, description, "
-        "data, change_type, created_at, created_by, metadata) "
-        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?, ?)",
-        (entity_id, name, description, data_json, now, created_by, metadata_json),
+        "data, change_type, change_summary, created_at, created_by, metadata) "
+        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?, ?, ?)",
+        (entity_id, name, description, data_json, change_summary, now, created_by, metadata_json),
     )
     await db.commit()
     await _index_entity(
@@ -398,6 +399,110 @@ async def soft_delete_entity(
     )
     await db.commit()
     await _remove_entity_index(db, entity_id)
+    await db.commit()
+    return True
+
+
+async def cascade_delete_entity(
+    db: aiosqlite.Connection,
+    entity_id: str,
+    *,
+    deleted_by: str,
+    expected_version: int,
+) -> bool:
+    """Cascade-delete an entity: soft-delete entity, relationships, and remove from all model canvases."""
+    # 1. Soft-delete the entity itself
+    deleted = await soft_delete_entity(
+        db, entity_id, deleted_by=deleted_by, expected_version=expected_version,
+    )
+    if not deleted:
+        return False
+
+    # 2. Soft-delete all relationships where entity is source or target
+    rel_cursor = await db.execute(
+        "SELECT id, current_version FROM relationships "
+        "WHERE (source_entity_id = ? OR target_entity_id = ?) AND is_deleted = 0",
+        (entity_id, entity_id),
+    )
+    rel_rows = await rel_cursor.fetchall()
+    for rel_row in rel_rows:
+        rel_id, rel_version = rel_row[0], rel_row[1]
+        now = datetime.now(tz=UTC).isoformat()
+        new_version = rel_version + 1
+        # Get current version data for the delete record
+        ver_cursor = await db.execute(
+            "SELECT label, description, data FROM relationship_versions "
+            "WHERE relationship_id = ? AND version = ?",
+            (rel_id, rel_version),
+        )
+        ver_row = await ver_cursor.fetchone()
+        await db.execute(
+            "UPDATE relationships SET current_version = ?, updated_at = ?, "
+            "is_deleted = 1 WHERE id = ?",
+            (new_version, now, rel_id),
+        )
+        if ver_row:
+            await db.execute(
+                "INSERT INTO relationship_versions "
+                "(relationship_id, version, label, description, data, "
+                "change_type, created_at, created_by) "
+                "VALUES (?, ?, ?, ?, ?, 'delete', ?, ?)",
+                (rel_id, new_version, ver_row[0], ver_row[1], ver_row[2], now, deleted_by),
+            )
+    await db.commit()
+
+    # 3. Remove entity from all model canvases
+    model_cursor = await db.execute(
+        "SELECT m.id, m.current_version, mv.name, mv.description, mv.data, mv.metadata "
+        "FROM models m "
+        "JOIN model_versions mv ON m.id = mv.model_id AND m.current_version = mv.version "
+        "WHERE m.is_deleted = 0 AND mv.data LIKE ?",
+        (f"%{entity_id}%",),
+    )
+    model_rows = await model_cursor.fetchall()
+    for mrow in model_rows:
+        model_id, model_version, m_name, m_desc, m_data_str, m_meta = mrow
+        try:
+            canvas = json.loads(m_data_str) if isinstance(m_data_str, str) else m_data_str
+            if not isinstance(canvas, dict):
+                continue
+            nodes = canvas.get("nodes", [])
+            edges = canvas.get("edges", [])
+            # Find node IDs that reference this entity
+            removed_node_ids = {
+                n["id"] for n in nodes
+                if isinstance(n, dict) and isinstance(n.get("data"), dict)
+                and n["data"].get("entityId") == entity_id
+            }
+            if not removed_node_ids:
+                continue
+            # Remove matching nodes and connected edges
+            new_nodes = [n for n in nodes if n.get("id") not in removed_node_ids]
+            new_edges = [
+                e for e in edges
+                if e.get("source") not in removed_node_ids
+                and e.get("target") not in removed_node_ids
+            ]
+            canvas["nodes"] = new_nodes
+            canvas["edges"] = new_edges
+
+            # Save updated canvas as new model version
+            new_model_version = model_version + 1
+            now = datetime.now(tz=UTC).isoformat()
+            data_json = json.dumps(canvas)
+            await db.execute(
+                "UPDATE models SET current_version = ?, updated_at = ? WHERE id = ?",
+                (new_model_version, now, model_id),
+            )
+            await db.execute(
+                "INSERT INTO model_versions (model_id, version, name, description, "
+                "data, change_type, change_summary, created_at, created_by, metadata) "
+                "VALUES (?, ?, ?, ?, ?, 'update', ?, ?, ?, ?)",
+                (model_id, new_model_version, m_name, m_desc, data_json,
+                 f"Removed deleted entity {entity_id}", now, deleted_by, m_meta),
+            )
+        except (json.JSONDecodeError, TypeError):
+            continue
     await db.commit()
     return True
 

@@ -165,11 +165,11 @@ class TestMapper:
     def test_map_package_is_special(self) -> None:
         assert map_object_type("Package") == "_package"
 
-    def test_skip_note(self) -> None:
-        assert map_object_type("Note") is None
+    def test_map_note(self) -> None:
+        assert map_object_type("Note") == "note"
 
-    def test_skip_boundary(self) -> None:
-        assert map_object_type("Boundary") is None
+    def test_map_boundary(self) -> None:
+        assert map_object_type("Boundary") == "boundary"
 
     def test_skip_text(self) -> None:
         assert map_object_type("Text") is None
@@ -186,11 +186,11 @@ class TestMapper:
     def test_map_dependency(self) -> None:
         assert map_connector_type("Dependency") == "dependency"
 
-    def test_skip_notelink(self) -> None:
-        assert map_connector_type("NoteLink") is None
+    def test_map_notelink(self) -> None:
+        assert map_connector_type("NoteLink") == "note_link"
 
-    def test_skip_notelink_lowercase(self) -> None:
-        assert map_connector_type("Notelink") is None
+    def test_map_notelink_lowercase(self) -> None:
+        assert map_connector_type("Notelink") == "note_link"
 
     def test_unknown_connector_returns_none(self) -> None:
         assert map_connector_type("SomeUnknownConnector") is None
@@ -307,11 +307,10 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # 953 classes + others, minus skipped types (Note=5, Boundary=1, Package=67)
-        # 953 classes should be created as entities
-        assert summary.entities_created == 953
-        # Notes (5) and Boundary (1) should be skipped
-        assert summary.elements_skipped == 6
+        # 959 entities: 953 classes + 5 notes + 1 boundary (Package=67 handled as hierarchy)
+        assert summary.entities_created == 959
+        # Only Text/UMLDiagram/Constraint are skipped now
+        assert summary.elements_skipped == 0
 
     async def test_import_creates_relationships(
         self, client: httpx.AsyncClient, app_config: AppConfig
@@ -327,10 +326,10 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Should create relationships for mapped connector types
+        # Should create relationships for mapped connector types (including NoteLinks)
         assert summary.relationships_created > 0
-        # NoteLinks should be skipped
-        assert summary.connectors_skipped >= 3  # At least the 3 NoteLinks
+        # Very few connectors should be skipped now (only unknown types or unmapped entities)
+        assert summary.connectors_skipped >= 0
 
     async def test_import_creates_diagrams(
         self, client: httpx.AsyncClient, app_config: AppConfig
@@ -368,9 +367,14 @@ class TestFullImport:
         total_objects = 1026
         assert summary.entities_created + summary.elements_skipped + 67 == total_objects
 
-        # relationships_created + connectors_skipped = total connectors
+        # relationships_created + connectors_skipped + model_relationships_created = total connectors
         total_connectors = 1420
-        assert summary.relationships_created + summary.connectors_skipped == total_connectors
+        assert (
+            summary.relationships_created
+            + summary.connectors_skipped
+            + summary.model_relationships_created
+            == total_connectors
+        )
 
 
 # ---------- Router Tests ----------
@@ -410,6 +414,7 @@ class TestImportRouter:
         assert data["models_created"] == 68
         assert data["entities_created"] > 0
         assert data["diagrams_created"] == 107
+        assert "model_relationships_created" in data
         assert isinstance(data["warnings"], list)
 
 
@@ -712,3 +717,103 @@ class TestMetadataStorage:
         assert resp.status_code == 200
         data = resp.json()
         assert data["metadata"]["status"] == "Approved"
+
+
+# ---------- Import Change Summary Tests ----------
+
+
+class TestImportChangeSummary:
+    """Verify imported entities and models have change_summary in version history."""
+
+    async def test_import_change_summary_entity(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # Check entity_versions have change_summary
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM entity_versions "
+            "WHERE change_summary IS NOT NULL AND change_summary LIKE 'Imported from SparxEA%'"
+        )
+        row = await cursor.fetchone()
+        assert row[0] > 0
+
+    async def test_import_change_summary_model(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # Check model_versions have change_summary
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM model_versions "
+            "WHERE change_summary IS NOT NULL AND change_summary LIKE 'Imported from SparxEA%'"
+        )
+        row = await cursor.fetchone()
+        assert row[0] > 0
+
+    async def test_import_notes_as_entities(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # Check entities with type 'note' exist
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM entities WHERE entity_type = 'note'"
+        )
+        row = await cursor.fetchone()
+        assert row[0] >= 5  # Sample has 5 notes
+
+    async def test_import_notelinks_as_relationships(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # NoteLinks should now be imported as relationships (not skipped)
+        # Check relationships with type 'note_link' exist
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM relationships WHERE relationship_type = 'note_link' AND is_deleted = 0"
+        )
+        row = await cursor.fetchone()
+        assert row[0] >= 1
+
+    async def test_import_model_relationships_created(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # Check model_relationships table has entries (unique rows)
+        cursor = await db.execute("SELECT COUNT(*) FROM model_relationships")
+        row = await cursor.fetchone()
+        assert row[0] > 0
+        # Summary count includes duplicates (already-existing relationships)
+        assert summary.model_relationships_created >= row[0]

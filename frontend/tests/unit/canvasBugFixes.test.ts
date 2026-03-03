@@ -27,8 +27,8 @@ describe('Canvas bug fixes', () => {
 	});
 
 	describe('Bug fix: RelationshipDialog wiring', () => {
-		it('relationship types include all 5 simple view types', () => {
-			expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(5);
+		it('relationship types include all 6 simple view types', () => {
+			expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(6);
 			const keys = SIMPLE_RELATIONSHIP_TYPES.map(t => t.key);
 			expect(keys).toContain('uses');
 			expect(keys).toContain('depends_on');

@@ -8,6 +8,8 @@ import ActorNode from './ActorNode.svelte';
 import DatabaseNode from './DatabaseNode.svelte';
 import QueueNode from './QueueNode.svelte';
 import ModelRefNode from './ModelRefNode.svelte';
+import NoteNode from './NoteNode.svelte';
+import BoundaryNode from './BoundaryNode.svelte';
 
 export const simpleViewNodeTypes = {
 	component: ComponentNode,
@@ -18,4 +20,6 @@ export const simpleViewNodeTypes = {
 	database: DatabaseNode,
 	queue: QueueNode,
 	modelref: ModelRefNode,
+	note: NoteNode,
+	boundary: BoundaryNode,
 } as const;

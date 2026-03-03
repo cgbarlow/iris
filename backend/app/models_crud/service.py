@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from app.migrations.m012_sets import DEFAULT_SET_ID
 from app.models_crud.thumbnail import VALID_THEMES, generate_and_store_thumbnail
+from app.model_relationships.service import create_model_relationship
 from app.relationships.service import create_relationship
 from app.search.service import index_model as _index_model
 from app.search.service import remove_model_index as _remove_model_index
@@ -28,6 +29,7 @@ async def create_model(
     parent_model_id: str | None = None,
     set_id: str | None = None,
     metadata: dict[str, object] | None = None,
+    change_summary: str | None = None,
 ) -> dict[str, object]:
     """Create a new model with initial version."""
     model_id = str(uuid.uuid4())
@@ -44,9 +46,9 @@ async def create_model(
     )
     await db.execute(
         "INSERT INTO model_versions (model_id, version, name, description, "
-        "data, change_type, created_at, created_by, metadata) "
-        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?, ?)",
-        (model_id, name, description, data_json, now, created_by, metadata_json),
+        "data, change_type, change_summary, created_at, created_by, metadata) "
+        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?, ?, ?)",
+        (model_id, name, description, data_json, change_summary, now, created_by, metadata_json),
     )
     await db.commit()
     await _index_model(
@@ -302,7 +304,7 @@ async def update_model(
                 continue
             source_entity = node_entity_map.get(edge.get("source", ""))
             target_entity = node_entity_map.get(edge.get("target", ""))
-            if source_entity and target_entity and source_entity != target_entity:
+            if source_entity and target_entity:
                 # Check if relationship already exists
                 cursor = await db.execute(
                     "SELECT id FROM relationships "
@@ -326,6 +328,48 @@ async def update_model(
                     )
     except Exception:
         pass  # Don't fail model save if relationship auto-creation fails
+
+    # Auto-create model relationships from canvas modelref-to-modelref edges
+    try:
+        nodes_list_mr = data.get("nodes", []) if isinstance(data, dict) else []
+        edges_list_mr = data.get("edges", []) if isinstance(data, dict) else []
+
+        # Build node_id -> linkedModelId mapping
+        node_model_map: dict[str, str] = {}
+        for node in nodes_list_mr:
+            if isinstance(node, dict) and isinstance(node.get("data"), dict):
+                linked_model_id = node["data"].get("linkedModelId")
+                if linked_model_id:
+                    node_model_map[node["id"]] = linked_model_id
+
+        # For each edge where both source and target are modelrefs, create model relationship
+        for edge in edges_list_mr:
+            if not isinstance(edge, dict):
+                continue
+            source_model = node_model_map.get(edge.get("source", ""))
+            target_model = node_model_map.get(edge.get("target", ""))
+            if source_model and target_model:
+                rel_type = "uses"
+                if isinstance(edge.get("data"), dict):
+                    rel_type = edge["data"].get("relationshipType", "uses")
+                # Check if relationship already exists
+                cursor = await db.execute(
+                    "SELECT id FROM model_relationships "
+                    "WHERE source_model_id = ? AND target_model_id = ? "
+                    "AND relationship_type = ?",
+                    (source_model, target_model, rel_type),
+                )
+                existing = await cursor.fetchone()
+                if not existing:
+                    await create_model_relationship(
+                        db,
+                        source_model_id=source_model,
+                        target_model_id=target_model,
+                        relationship_type=rel_type,
+                        created_by=updated_by,
+                    )
+    except Exception:
+        pass  # Don't fail model save if model relationship auto-creation fails
 
     return {"current_version": new_version, "updated_at": now}
 
