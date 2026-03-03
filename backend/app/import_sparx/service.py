@@ -306,6 +306,20 @@ async def import_sparx_file(
             summary.connectors_skipped += 1
             continue
 
+        rel_data: dict[str, object] = {}
+        if conn.Direction:
+            rel_data["direction"] = conn.Direction
+        if conn.SourceCard:
+            rel_data["sourceCardinality"] = conn.SourceCard
+        if conn.DestCard:
+            rel_data["targetCardinality"] = conn.DestCard
+        if conn.SourceRole:
+            rel_data["sourceRole"] = conn.SourceRole
+        if conn.DestRole:
+            rel_data["targetRole"] = conn.DestRole
+        if conn.Stereotype:
+            rel_data["stereotype"] = conn.Stereotype
+
         await create_relationship(
             db,
             source_entity_id=source_id,
@@ -313,7 +327,7 @@ async def import_sparx_file(
             relationship_type=iris_type,
             label=conn.Name,
             description=conn.Notes,
-            data={},
+            data=rel_data,
             created_by=imported_by,
         )
         summary.relationships_created += 1
@@ -401,6 +415,27 @@ async def import_sparx_file(
                 map_connector_type(conn.Connector_Type) if conn.Connector_Type else "association"
             ) or "association"
 
+            # Build edge metadata
+            route_map = {0: "bezier", 3: "step"}
+            edge_data: dict[str, object] = {
+                "relationshipType": iris_conn_type,
+                "label": conn.Name or "",
+            }
+            if conn.SourceCard:
+                edge_data["sourceCardinality"] = conn.SourceCard
+            if conn.DestCard:
+                edge_data["targetCardinality"] = conn.DestCard
+            if conn.SourceRole:
+                edge_data["sourceRole"] = conn.SourceRole
+            if conn.DestRole:
+                edge_data["targetRole"] = conn.DestRole
+            if conn.Stereotype:
+                edge_data["stereotype"] = conn.Stereotype
+            if conn.Direction:
+                edge_data["direction"] = conn.Direction
+            if conn.RouteStyle is not None:
+                edge_data["routingType"] = route_map.get(conn.RouteStyle, "bezier")
+
             # Self-loop edge
             if source_node == target_node:
                 edges.append({
@@ -410,10 +445,7 @@ async def import_sparx_file(
                     "type": "self_loop",
                     "sourceHandle": "right",
                     "targetHandle": "top",
-                    "data": {
-                        "relationshipType": iris_conn_type,
-                        "label": conn.Name or "",
-                    },
+                    "data": edge_data,
                 })
             else:
                 edges.append({
@@ -421,10 +453,7 @@ async def import_sparx_file(
                     "source": source_node,
                     "target": target_node,
                     "type": iris_conn_type,
-                    "data": {
-                        "relationshipType": iris_conn_type,
-                        "label": conn.Name or "",
-                    },
+                    "data": edge_data,
                 })
 
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}

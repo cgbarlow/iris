@@ -36,6 +36,7 @@ CONNECTOR_TYPE_MAP: dict[str, str] = {
     "Usage": "usage",
     "NoteLink": "note_link",
     "Notelink": "note_link",
+    "Nesting": "contains",
 }
 
 SKIP_OBJECT_TYPES: set[str] = {"Text", "UMLDiagram", "Constraint"}
