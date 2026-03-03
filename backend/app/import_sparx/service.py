@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -44,6 +45,34 @@ class ImportSummary:
     connectors_skipped: int = 0
     model_relationships_created: int = 0
     warnings: list[ImportWarning] = field(default_factory=list)
+
+
+def derive_note_label(html_content: str | None, fallback: str) -> str:
+    """Derive a label from HTML content for Note/Boundary elements.
+
+    Strips HTML tags, takes first non-empty line, truncates to 60 chars.
+    Returns fallback if content is None or empty after stripping.
+    """
+    if not html_content:
+        return fallback
+
+    # Replace block-level closing tags and <br> with newlines before stripping
+    text = re.sub(r"<br\s*/?>", "\n", html_content, flags=re.IGNORECASE)
+    text = re.sub(r"</(?:p|div|li|h[1-6])>", "\n", text, flags=re.IGNORECASE)
+    # Strip all remaining HTML tags
+    text = re.sub(r"<[^>]+>", "", text)
+    # Decode common HTML entities
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&nbsp;", " ")
+
+    # Take first non-empty line
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped:
+            if len(stripped) > 60:
+                return stripped[:60] + "..."
+            return stripped
+
+    return fallback
 
 
 def _topo_sort_packages(packages: list[QeaPackage]) -> list[QeaPackage]:
@@ -215,10 +244,19 @@ async def import_sparx_file(
         if em:
             entity_metadata = em
 
+        # Derive meaningful name for Note/Boundary elements with NULL Name
+        if iris_type in ("note", "boundary") and not elem.Name:
+            entity_name = derive_note_label(
+                elem.Note,
+                f"{'Note' if iris_type == 'note' else 'Boundary'} {elem.Object_ID}",
+            )
+        else:
+            entity_name = elem.Name or f"Element {elem.Object_ID}"
+
         entity = await create_entity(
             db,
             entity_type=iris_type,
-            name=elem.Name or f"Element {elem.Object_ID}",
+            name=entity_name,
             description=elem.Note,
             data=entity_data,
             created_by=imported_by,
@@ -314,15 +352,26 @@ async def import_sparx_file(
             )
 
             node_id = str(uuid.uuid4())
+            # Derive label for notes/boundaries with NULL Name
+            if elem and iris_type_str in ("note", "boundary") and not elem.Name:
+                node_label = derive_note_label(elem.Note, "Unknown")
+            else:
+                node_label = (elem.Name or "Unknown") if elem else "Unknown"
+
+            node_data: dict[str, object] = {
+                "label": node_label,
+                "entityType": iris_type_str or "component",
+                "entityId": entity_id,
+            }
+            # Always populate description from element's Note content
+            if elem and elem.Note:
+                node_data["description"] = elem.Note
+
             nodes.append({
                 "id": node_id,
                 "type": iris_type_str or "component",
                 "position": {"x": pos["x"], "y": pos["y"]},
-                "data": {
-                    "label": (elem.Name or "Unknown") if elem else "Unknown",
-                    "entityType": iris_type_str or "component",
-                    "entityId": entity_id,
-                },
+                "data": node_data,
                 "measured": {
                     "width": pos["width"],
                     "height": pos["height"],
