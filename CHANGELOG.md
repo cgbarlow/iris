@@ -5,7 +5,7 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.2] - 2026-03-03
 
 ### Added
 - SparxEA import now extracts package Notes, element Status/Stereotype/Version, diagram Notes, connector Notes, and tagged values from `.qea` files (ADR-064, SPEC-064-A)
