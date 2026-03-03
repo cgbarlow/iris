@@ -1383,12 +1383,12 @@
 						</div>
 						<button
 							onclick={() => (focusMode = true)}
-							class="rounded p-1.5"
+							class="rounded px-3 py-1.5 text-sm"
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
 							aria-label="Full screen"
 							title="Full screen"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle">
 								<polyline points="15 3 21 3 21 9"></polyline>
 								<polyline points="9 21 3 21 3 15"></polyline>
 								<polyline points="21 15 21 21 15 21"></polyline>
@@ -1608,12 +1608,12 @@
 						</div>
 						<button
 							onclick={() => (focusMode = true)}
-							class="rounded p-1.5"
+							class="rounded px-3 py-1.5 text-sm"
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
 							aria-label="Full screen"
 							title="Full screen"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle">
 								<polyline points="15 3 21 3 21 9"></polyline>
 								<polyline points="9 21 3 21 3 15"></polyline>
 								<polyline points="21 15 21 21 15 21"></polyline>
