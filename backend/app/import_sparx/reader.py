@@ -27,6 +27,15 @@ class QeaElement:
     Status: str | None = None
     Stereotype: str | None = None
     Version: str | None = None
+    Scope: str | None = None
+    Abstract: str | None = None
+    Persistence: str | None = None
+    Author: str | None = None
+    Complexity: str | None = None
+    Phase: str | None = None
+    CreatedDate: str | None = None
+    ModifiedDate: str | None = None
+    GenType: str | None = None
 
 
 @dataclass
@@ -72,6 +81,12 @@ class QeaAttribute:
     Object_ID: int
     Name: str | None
     Type: str | None
+    Notes: str | None = None
+    Default: str | None = None
+    LowerBound: str | None = None
+    UpperBound: str | None = None
+    Stereotype: str | None = None
+    Scope: str | None = None
 
 
 async def read_packages(db_path: str) -> list[QeaPackage]:
@@ -98,7 +113,8 @@ async def read_elements(db_path: str) -> list[QeaElement]:
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
             "SELECT Object_ID, Object_Type, Name, Package_ID, Note, ea_guid, "
-            "Status, Stereotype, Version "
+            "Status, Stereotype, Version, Scope, Abstract, Persistence, "
+            "Author, Complexity, Phase, CreatedDate, ModifiedDate, GenType "
             "FROM t_object"
         )
         rows = await cursor.fetchall()
@@ -113,6 +129,15 @@ async def read_elements(db_path: str) -> list[QeaElement]:
                 Status=row[6],
                 Stereotype=row[7],
                 Version=row[8],
+                Scope=row[9],
+                Abstract=row[10],
+                Persistence=row[11],
+                Author=row[12],
+                Complexity=row[13],
+                Phase=row[14],
+                CreatedDate=row[15],
+                ModifiedDate=row[16],
+                GenType=row[17],
             )
             for row in rows
         ]
@@ -187,7 +212,9 @@ async def read_attributes(db_path: str) -> list[QeaAttribute]:
     """Read all element attributes from a .qea file."""
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
-            "SELECT Object_ID, Name, Type FROM t_attribute ORDER BY Pos"
+            'SELECT Object_ID, Name, Type, Notes, "Default", '
+            "LowerBound, UpperBound, Stereotype, Scope "
+            "FROM t_attribute ORDER BY Pos"
         )
         rows = await cursor.fetchall()
         return [
@@ -195,6 +222,12 @@ async def read_attributes(db_path: str) -> list[QeaAttribute]:
                 Object_ID=row[0] or 0,
                 Name=row[1],
                 Type=row[2],
+                Notes=row[3],
+                Default=row[4],
+                LowerBound=row[5],
+                UpperBound=row[6],
+                Stereotype=row[7],
+                Scope=row[8],
             )
             for row in rows
         ]

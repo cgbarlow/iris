@@ -62,14 +62,14 @@ test.describe('Models', () => {
 		await expect(page.getByRole('heading', { name: 'E2E Test Model Alpha' })).toBeVisible();
 	});
 
-	test('Model detail Overview tab shows metadata', async ({ page }) => {
+	test('Model detail Details tab shows metadata', async ({ page }) => {
 		await loginAsAdmin(page);
 		await page.goto(`/models/${modelId}`);
 
 		// Wait for model detail to load
 		await expect(page.getByRole('heading', { name: 'E2E Test Model Alpha' })).toBeVisible({ timeout: 10_000 });
 
-		// Overview tab should be active by default — verify metadata fields
+		// Details tab should be active by default — verify metadata fields
 		await expect(page.getByText('Type')).toBeVisible();
 		await expect(page.getByText('component', { exact: true }).first()).toBeVisible();
 		await expect(page.getByText('ID')).toBeVisible();

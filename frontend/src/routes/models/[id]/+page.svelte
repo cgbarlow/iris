@@ -24,8 +24,10 @@
 	import EntityPicker from '$lib/components/EntityPicker.svelte';
 	import ModelPicker from '$lib/components/ModelPicker.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import TagInput from '$lib/components/TagInput.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
+	import DOMPurify from 'dompurify';
 	import type { Entity, ModelHierarchyNode } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
 	import type { SimpleEntityType, SimpleRelationshipType, EdgeRoutingType } from '$lib/types/canvas';
@@ -43,15 +45,23 @@
 	let versions = $state<ModelVersion[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state<'overview' | 'canvas' | 'versions'>('canvas');
+	let activeTab = $state<'details' | 'canvas' | 'versions'>('canvas');
 	let userSelectedTab = $state(false);
 	let versionsLoading = $state(false);
 
-	let showEditDialog = $state(false);
 	let showDeleteDialog = $state(false);
 	let showCloneDialog = $state(false);
 	let inheritedTags = $state<string[]>([]);
 	let allTags = $state<string[]>([]);
+
+	// Inline metadata editing state
+	let editingOverview = $state(false);
+	let overviewDirty = $state(false);
+	let savingOverview = $state(false);
+	let editName = $state('');
+	let editDescription = $state('');
+	let editTags = $state<string[]>([]);
+	let editIsTemplate = $state(false);
 
 	// Template designation (derived from tags)
 	const isTemplate = $derived((model?.tags ?? []).includes('template'));
@@ -191,12 +201,12 @@
 		try {
 			model = await apiFetch<Model>(`/api/models/${id}`);
 			parseCanvasData();
-			// Smart default tab: show overview if no canvas content
+			// Smart default tab: show details if no canvas content
 			if (!userSelectedTab) {
 				const hasContent = model.model_type === 'sequence'
 					? sequenceData.participants.length > 0
 					: canvasNodes.length > 0;
-				activeTab = hasContent ? 'canvas' : 'overview';
+				activeTab = hasContent ? 'canvas' : 'details';
 			}
 			refreshNodeDescriptions();
 			loadVersions(id);
@@ -403,53 +413,89 @@
 		bookmarkLoading = false;
 	}
 
-	async function handleEdit(name: string, _modelType: string, description: string, newTags?: string[], newIsTemplate?: boolean) {
+	function enterOverviewEdit() {
 		if (!model) return;
+		editName = model.name;
+		editDescription = model.description ?? '';
+		editTags = (model.tags ?? []).filter(t => t !== 'template');
+		editIsTemplate = isTemplate;
+		editingOverview = true;
+		overviewDirty = false;
+	}
+
+	// Track dirty state for inline editing
+	$effect(() => {
+		if (!editingOverview || !model) return;
+		const nameChanged = editName !== model.name;
+		const descChanged = editDescription !== (model.description ?? '');
+		const origTags = (model.tags ?? []).filter(t => t !== 'template');
+		const tagsChanged = JSON.stringify(editTags.slice().sort()) !== JSON.stringify(origTags.slice().sort());
+		const templateChanged = editIsTemplate !== isTemplate;
+		overviewDirty = nameChanged || descChanged || tagsChanged || templateChanged;
+	});
+
+	async function saveMetadata() {
+		if (!model) return;
+		savingOverview = true;
+		error = null;
 		try {
+			const sanitizedName = DOMPurify.sanitize(editName).trim();
+			const sanitizedDesc = DOMPurify.sanitize(editDescription).trim();
+			if (!sanitizedName) {
+				error = 'Name is required';
+				savingOverview = false;
+				return;
+			}
 			await apiFetch(`/api/models/${model.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(model.current_version) },
 				body: JSON.stringify({
-					name,
-					description,
+					name: sanitizedName,
+					description: sanitizedDesc,
 					data: model.data,
 					change_summary: 'Updated model details',
 				}),
 			});
 
-			// Sync tags if provided
-			if (newTags !== undefined) {
-				const oldTags = model.tags ?? [];
-				const toAdd = newTags.filter((t) => !oldTags.includes(t));
-				const toRemove = oldTags.filter((t) => !newTags.includes(t));
+			// Sync tags
+			const oldTags = model.tags ?? [];
+			const newTags = [...editTags];
 
-				// Handle template toggle via tags
-				if (newIsTemplate !== undefined) {
-					if (newIsTemplate && !newTags.includes('template')) {
-						toAdd.push('template');
-					} else if (!newIsTemplate && oldTags.includes('template') && !toRemove.includes('template')) {
-						toRemove.push('template');
-					}
-				}
-
-				for (const tag of toAdd) {
-					await apiFetch(`/api/models/${model.id}/tags`, {
-						method: 'POST',
-						body: JSON.stringify({ tag }),
-					});
-				}
-				for (const tag of toRemove) {
-					await apiFetch(`/api/models/${model.id}/tags/${encodeURIComponent(tag)}`, {
-						method: 'DELETE',
-					});
-				}
+			// Handle template toggle via tags
+			if (editIsTemplate && !newTags.includes('template')) {
+				newTags.push('template');
+			}
+			const fullOldTags = oldTags;
+			const toAdd = newTags.filter((t) => !fullOldTags.includes(t));
+			const toRemove = fullOldTags.filter((t) => !newTags.includes(t));
+			if (!editIsTemplate && oldTags.includes('template') && !toRemove.includes('template')) {
+				toRemove.push('template');
 			}
 
-			showEditDialog = false;
+			for (const tag of toAdd) {
+				await apiFetch(`/api/models/${model.id}/tags`, {
+					method: 'POST',
+					body: JSON.stringify({ tag }),
+				});
+			}
+			for (const tag of toRemove) {
+				await apiFetch(`/api/models/${model.id}/tags/${encodeURIComponent(tag)}`, {
+					method: 'DELETE',
+				});
+			}
+
+			editingOverview = false;
+			overviewDirty = false;
 			await loadModel(model.id);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to update model';
 		}
+		savingOverview = false;
+	}
+
+	function discardOverviewChanges() {
+		editingOverview = false;
+		overviewDirty = false;
 	}
 
 	async function handleDelete() {
@@ -1004,13 +1050,6 @@
 				{isBookmarked ? 'Bookmarked' : 'Bookmark'}
 			</button>
 			<button
-				onclick={() => (showEditDialog = true)}
-				class="rounded px-4 py-2 text-sm"
-				style="border: 1px solid var(--color-border); color: var(--color-fg)"
-			>
-				Edit
-			</button>
-			<button
 				onclick={() => (showCloneDialog = true)}
 				class="rounded px-4 py-2 text-sm"
 				style="border: 1px solid var(--color-border); color: var(--color-fg)"
@@ -1106,12 +1145,12 @@
 		<div class="flex gap-1" role="tablist" aria-label="Model sections">
 			<button
 				role="tab"
-				aria-selected={activeTab === 'overview'}
-				onclick={() => { activeTab = 'overview'; userSelectedTab = true; }}
+				aria-selected={activeTab === 'details'}
+				onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
 				class="px-4 py-2 text-sm"
-				style="color: {activeTab === 'overview' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'overview' ? 'var(--color-primary)' : 'transparent'}"
+				style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
 			>
-				Overview
+				Details
 			</button>
 			<button
 				role="tab"
@@ -1135,22 +1174,78 @@
 	</div>
 
 	<div class="mt-4" role="tabpanel">
-		{#if activeTab === 'overview'}
-			{@const hasExtended = !!(model.metadata?.stereotype || (Array.isArray(model.metadata?.tagged_values) && (model.metadata.tagged_values as unknown[]).length > 0))}
+		{#if activeTab === 'details'}
 			{@const modifiedByUsername = versions.length > 0 ? (versions[0].created_by_username ?? versions[0].created_by) : (model.created_by_username ?? model.created_by)}
-			<Accordion.Root type="multiple" value={['summary']}>
+			<!-- Inline edit toolbar -->
+			<div class="mb-3 flex items-center gap-2">
+				{#if editingOverview}
+					<button
+						onclick={saveMetadata}
+						disabled={!overviewDirty || savingOverview}
+						class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+						style="background-color: var(--color-success, #16a34a)"
+					>
+						{savingOverview ? 'Saving...' : 'Save'}
+					</button>
+					<button
+						onclick={discardOverviewChanges}
+						class="rounded px-3 py-1.5 text-sm"
+						style="border: 1px solid var(--color-border); color: var(--color-fg)"
+					>
+						Discard
+					</button>
+					{#if overviewDirty}
+						<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
+					{/if}
+				{:else}
+					<button
+						onclick={enterOverviewEdit}
+						class="rounded px-3 py-1.5 text-sm text-white"
+						style="background-color: var(--color-primary)"
+					>
+						Edit Metadata
+					</button>
+				{/if}
+			</div>
+
+			<Accordion.Root type="single" value="summary">
 				<!-- Summary group (open by default) -->
 				<Accordion.Item value="summary" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
 						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
 							Summary
-							<span class="text-xs" style="color: var(--color-muted)" aria-hidden="true">&#9662;</span>
+							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
 					<Accordion.Content class="pb-4">
 						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Name</dt>
+							<dd>
+								{#if editingOverview}
+									<input
+										type="text"
+										bind:value={editName}
+										class="w-full rounded border px-2 py-1 text-sm"
+										style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									/>
+								{:else}
+									<span style="color: var(--color-fg)">{model.name}</span>
+								{/if}
+							</dd>
+
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
-							<dd style="color: var(--color-fg)">{model.description ?? 'No description'}</dd>
+							<dd>
+								{#if editingOverview}
+									<textarea
+										bind:value={editDescription}
+										rows="3"
+										class="w-full rounded border px-2 py-1 text-sm"
+										style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									></textarea>
+								{:else}
+									<span style="color: var(--color-fg)">{model.description ?? 'No description'}</span>
+								{/if}
+							</dd>
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
 							<dd style="color: var(--color-fg)">{model.model_type}</dd>
@@ -1164,7 +1259,15 @@
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>
 							<dd>
-								{#if (model.tags ?? []).length > 0 || inheritedTags.length > 0}
+								{#if editingOverview}
+									<TagInput
+										tags={editTags}
+										onaddtag={(tag) => { editTags = [...editTags, tag]; }}
+										onremovetag={(tag) => { editTags = editTags.filter(t => t !== tag); }}
+										{inheritedTags}
+										suggestions={allTags}
+									/>
+								{:else if (model.tags ?? []).length > 0 || inheritedTags.length > 0}
 									<div class="flex flex-wrap gap-1">
 										{#each (model.tags ?? []) as tag}
 											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
@@ -1182,11 +1285,11 @@
 				</Accordion.Item>
 
 				<!-- Details group (collapsed) -->
-				<Accordion.Item value="details" class="border-b" style="border-color: var(--color-border)">
+				<Accordion.Item value="model-details" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
 						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
 							Details
-							<span class="text-xs" style="color: var(--color-muted)" aria-hidden="true">&#9662;</span>
+							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
 					<Accordion.Content class="pb-4">
@@ -1243,21 +1346,30 @@
 							<dd style="color: var(--color-fg)">{modifiedByUsername}</dd>
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Template</dt>
-							<dd style="color: var(--color-fg)">{isTemplate ? 'Yes' : 'No'}</dd>
+							<dd>
+								{#if editingOverview}
+									<label class="flex items-center gap-2 text-sm" style="color: var(--color-fg)">
+										<input type="checkbox" bind:checked={editIsTemplate} />
+										{editIsTemplate ? 'Yes' : 'No'}
+									</label>
+								{:else}
+									<span style="color: var(--color-fg)">{isTemplate ? 'Yes' : 'No'}</span>
+								{/if}
+							</dd>
 						</dl>
 					</Accordion.Content>
 				</Accordion.Item>
 
-				<!-- Extended group (collapsed, only if metadata has stereotype or tagged_values) -->
-				{#if hasExtended}
-					<Accordion.Item value="extended" class="border-b" style="border-color: var(--color-border)">
-						<Accordion.Header>
-							<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
-								Extended
-								<span class="text-xs" style="color: var(--color-muted)" aria-hidden="true">&#9662;</span>
-							</Accordion.Trigger>
-						</Accordion.Header>
-						<Accordion.Content class="pb-4">
+				<!-- Extended group (collapsed) -->
+				<Accordion.Item value="extended" class="border-b" style="border-color: var(--color-border)">
+					<Accordion.Header>
+						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+							Extended
+							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+						</Accordion.Trigger>
+					</Accordion.Header>
+					<Accordion.Content class="pb-4">
+						{#if model.metadata?.stereotype || (Array.isArray(model.metadata?.tagged_values) && (model.metadata.tagged_values as unknown[]).length > 0)}
 							<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
 								{#if model.metadata?.stereotype}
 									<dt class="text-sm font-medium" style="color: var(--color-muted)">Stereotype</dt>
@@ -1287,9 +1399,11 @@
 									</dd>
 								{/if}
 							</dl>
-						</Accordion.Content>
-					</Accordion.Item>
-				{/if}
+						{:else}
+							<p class="text-sm" style="color: var(--color-muted)">No extended metadata available.</p>
+						{/if}
+					</Accordion.Content>
+				</Accordion.Item>
 			</Accordion.Root>
 		{:else if activeTab === 'canvas'}
 			{#if canvasType === 'sequence'}
@@ -1817,20 +1931,6 @@
 		onselect={handleSetParent}
 		oncancel={() => (showParentPicker = false)}
 		excludeModelId={model?.id}
-	/>
-
-	<ModelDialog
-		open={showEditDialog}
-		mode="edit"
-		initialName={model.name}
-		initialType={model.model_type}
-		initialDescription={model.description ?? ''}
-		initialTags={(model.tags ?? []).filter(t => t !== 'template')}
-		initialIsTemplate={isTemplate}
-		suggestions={allTags}
-		{inheritedTags}
-		onsave={handleEdit}
-		oncancel={() => (showEditDialog = false)}
 	/>
 
 	<ModelDialog

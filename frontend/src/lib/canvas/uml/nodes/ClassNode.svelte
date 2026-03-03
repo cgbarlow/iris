@@ -4,7 +4,7 @@
 	interface Props {
 		data: {
 			label: string;
-			attributes?: string[];
+			attributes?: (string | { name: string; type: string })[];
 			operations?: string[];
 			[key: string]: unknown;
 		};
@@ -26,7 +26,7 @@
 	{#if data.attributes && data.attributes.length > 0}
 		<div class="uml-node__compartment">
 			{#each data.attributes as attr}
-				<div class="uml-node__item">{attr}</div>
+				<div class="uml-node__item">{typeof attr === 'string' ? attr : `${attr.name}: ${attr.type}`}</div>
 			{/each}
 		</div>
 	{/if}

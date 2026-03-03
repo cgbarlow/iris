@@ -123,7 +123,11 @@ Four colour modes with WCAG-compliant contrast ratios:
 
 ### Entity & Model Management
 
-- Entity CRUD with edit and delete on detail page (optimistic concurrency via If-Match)
+- Inline "Edit Metadata" on model and entity detail pages — in-place editing of Name, Description, Tags (replaces popup dialogs)
+- Entity and model detail pages with accordion layout (Summary, Details, Extended groups)
+- Entity clone button on detail page
+- Extended metadata display for imported entities (scope, abstract, persistence, author, dates, tagged values)
+- Entity CRUD with optimistic concurrency via If-Match headers
 - Model CRUD with type filter on list page (Simple, Component, Sequence, UML, ArchiMate)
 - Bookmark toggle on model detail page
 - Comments on model and entity detail pages (add, edit, delete)
@@ -183,7 +187,7 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 ### Running Tests
 
 ```sh
-# Backend (377 tests)
+# Backend (399 tests)
 cd backend
 uv run python -m pytest
 

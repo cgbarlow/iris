@@ -5,6 +5,26 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-03-03
+
+### Added
+- Inline "Edit Metadata" on model detail page — replaces popup dialog with in-place editing of Name, Description, Tags, and Template toggle (ADR-065, SPEC-065-A)
+- Inline "Edit Metadata" on entity detail page — replaces popup dialog with in-place editing of Name, Description, and Tags
+- Entity detail page accordion layout with Summary, Details, and Extended groups matching model page pattern
+- Entity clone button on detail page header
+- Extended metadata display for entities: scope, abstract, persistence, author, complexity, phase, EA created/modified dates, gen_type, tagged values table
+- SparxEA import: 9 additional element fields (Scope, Abstract, Persistence, Author, Complexity, Phase, CreatedDate, ModifiedDate, GenType)
+- SparxEA import: 6 additional attribute fields (Notes, Default, LowerBound, UpperBound, Stereotype, Scope)
+- Enriched attribute import format — attributes imported as structured objects (name, type, notes, default, bounds, stereotype, scope) instead of flat strings
+- 7 new backend tests for extended import fields (4 reader, 3 import)
+- ADR-065: Inline Edit, Entity Detail Revamp, Extended Import
+- SPEC-065-A: Inline Edit, Entity Detail Revamp specification
+
+### Changed
+- Model detail tab renamed from "Overview" to "Details"
+- SparxEA attribute import format changed from strings to objects (backward-compatible in canvas nodes)
+- Model and entity detail accordion changed from multiple to single selection mode
+
 ## [1.7.2] - 2026-03-03
 
 ### Added

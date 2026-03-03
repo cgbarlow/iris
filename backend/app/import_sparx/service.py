@@ -156,12 +156,21 @@ async def import_sparx_file(
             continue  # Already handled as hierarchy
 
         entity_data: dict[str, object] = {}
-        # Add class attributes if present
+        # Add class attributes if present (rich object format)
         obj_attrs = attrs_by_object.get(elem.Object_ID, [])
         if obj_attrs:
             entity_data["attributes"] = [
-                f"{a.Name}: {a.Type}" if a.Type else (a.Name or "")
-                for a in obj_attrs  # type: ignore[union-attr]
+                {
+                    "name": a.Name or "",  # type: ignore[union-attr]
+                    "type": a.Type or "",  # type: ignore[union-attr]
+                    "notes": a.Notes,  # type: ignore[union-attr]
+                    "default": a.Default,  # type: ignore[union-attr]
+                    "lower_bound": a.LowerBound,  # type: ignore[union-attr]
+                    "upper_bound": a.UpperBound,  # type: ignore[union-attr]
+                    "stereotype": a.Stereotype,  # type: ignore[union-attr]
+                    "scope": a.Scope,  # type: ignore[union-attr]
+                }
+                for a in obj_attrs
             ]
 
         # Build entity metadata
@@ -173,6 +182,24 @@ async def import_sparx_file(
             em["stereotype"] = elem.Stereotype
         if elem.Version:
             em["version"] = elem.Version
+        if elem.Scope:
+            em["scope"] = elem.Scope
+        if elem.Abstract == "1":
+            em["abstract"] = True
+        if elem.Persistence:
+            em["persistence"] = elem.Persistence
+        if elem.Author:
+            em["author"] = elem.Author
+        if elem.Complexity and elem.Complexity != "2":
+            em["complexity"] = elem.Complexity
+        if elem.Phase:
+            em["phase"] = elem.Phase
+        if elem.CreatedDate:
+            em["created_date"] = elem.CreatedDate
+        if elem.ModifiedDate:
+            em["modified_date"] = elem.ModifiedDate
+        if elem.GenType:
+            em["gen_type"] = elem.GenType
         obj_tags = tags_by_object.get(elem.Object_ID)
         if obj_tags:
             em["tagged_values"] = obj_tags

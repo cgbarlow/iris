@@ -457,6 +457,29 @@ class TestReaderMetadata:
         with_property = [tv for tv in tvs if tv.Property]
         assert len(with_property) > 0
 
+    async def test_read_elements_has_scope(self) -> None:
+        elements = await read_elements(SAMPLE_QEA)
+        non_pkg = [e for e in elements if e.Object_Type != "Package"]
+        with_scope = [e for e in non_pkg if e.Scope]
+        assert len(with_scope) >= 1
+
+    async def test_read_elements_has_created_modified_date(self) -> None:
+        elements = await read_elements(SAMPLE_QEA)
+        with_created = [e for e in elements if e.CreatedDate]
+        with_modified = [e for e in elements if e.ModifiedDate]
+        assert len(with_created) >= 100
+        assert len(with_modified) >= 100
+
+    async def test_read_elements_has_abstract(self) -> None:
+        elements = await read_elements(SAMPLE_QEA)
+        with_abstract = [e for e in elements if e.Abstract]
+        assert len(with_abstract) >= 1
+
+    async def test_read_attributes_has_notes(self) -> None:
+        attributes = await read_attributes(SAMPLE_QEA)
+        with_notes = [a for a in attributes if a.Notes]
+        assert len(with_notes) >= 100
+
 
 # ---------- Import Metadata Tests ----------
 
@@ -523,6 +546,82 @@ class TestImportMetadata:
                 found_stereotype = True
                 break
         assert found_stereotype
+
+    async def test_import_entity_metadata_has_scope(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        import json
+        cursor = await db.execute(
+            "SELECT metadata FROM entity_versions WHERE metadata IS NOT NULL"
+        )
+        rows = await cursor.fetchall()
+        found_scope = False
+        for r in rows:
+            meta = json.loads(r[0])
+            if "scope" in meta:
+                found_scope = True
+                break
+        assert found_scope
+
+    async def test_import_entity_metadata_has_created_date(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        import json
+        cursor = await db.execute(
+            "SELECT metadata FROM entity_versions WHERE metadata IS NOT NULL"
+        )
+        rows = await cursor.fetchall()
+        found_date = False
+        for r in rows:
+            meta = json.loads(r[0])
+            if "created_date" in meta:
+                found_date = True
+                break
+        assert found_date
+
+    async def test_import_attributes_include_notes(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        import json
+        cursor = await db.execute(
+            "SELECT data FROM entity_versions WHERE data IS NOT NULL"
+        )
+        rows = await cursor.fetchall()
+        found_notes = False
+        for r in rows:
+            data = json.loads(r[0])
+            attrs = data.get("attributes", [])
+            for attr in attrs:
+                if isinstance(attr, dict) and "notes" in attr:
+                    found_notes = True
+                    break
+            if found_notes:
+                break
+        assert found_notes
 
 
 # ---------- Metadata CRUD Tests ----------

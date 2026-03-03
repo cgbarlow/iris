@@ -9,10 +9,11 @@
 		RelationshipListResponse,
 		EntityModelRef,
 	} from '$lib/types/api';
-	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import type { SimpleEntityType } from '$lib/types/canvas';
+	import TagInput from '$lib/components/TagInput.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
+	import { Accordion } from 'bits-ui';
+	import DOMPurify from 'dompurify';
 
 	let entity = $state<Entity | null>(null);
 	let versions = $state<EntityVersion[]>([]);
@@ -23,8 +24,15 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'details' | 'versions' | 'relationships' | 'models'>('details');
-	let showEditDialog = $state(false);
 	let showDeleteDialog = $state(false);
+
+	// Inline metadata editing state
+	let editingDetails = $state(false);
+	let detailsDirty = $state(false);
+	let savingDetails = $state(false);
+	let editName = $state('');
+	let editDescription = $state('');
+	let editTags = $state<string[]>([]);
 
 	// Loading states per tab
 	let versionsLoading = $state(false);
@@ -34,6 +42,16 @@
 	$effect(() => {
 		const id = page.params.id;
 		if (id) loadEntity(id);
+	});
+
+	// Track dirty state for inline editing
+	$effect(() => {
+		if (!editingDetails || !entity) return;
+		const nameChanged = editName !== entity.name;
+		const descChanged = editDescription !== (entity.description ?? '');
+		const origTags = entity.tags ?? [];
+		const tagsChanged = JSON.stringify(editTags.slice().sort()) !== JSON.stringify(origTags.slice().sort());
+		detailsDirty = nameChanged || descChanged || tagsChanged;
 	});
 
 	async function loadEntity(id: string) {
@@ -107,42 +125,83 @@
 		}
 	}
 
-	async function handleEdit(name: string, type: SimpleEntityType, description: string, newTags?: string[]) {
+	function enterDetailsEdit() {
 		if (!entity) return;
+		editName = entity.name;
+		editDescription = entity.description ?? '';
+		editTags = [...(entity.tags ?? [])];
+		editingDetails = true;
+		detailsDirty = false;
+	}
+
+	async function saveEntityMetadata() {
+		if (!entity) return;
+		savingDetails = true;
+		error = null;
 		try {
+			const sanitizedName = DOMPurify.sanitize(editName).trim();
+			const sanitizedDesc = DOMPurify.sanitize(editDescription).trim();
+			if (!sanitizedName) {
+				error = 'Name is required';
+				savingDetails = false;
+				return;
+			}
 			await apiFetch(`/api/entities/${entity.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(entity.current_version) },
 				body: JSON.stringify({
-					name,
-					entity_type: type,
-					description,
+					name: sanitizedName,
+					entity_type: entity.entity_type,
+					description: sanitizedDesc,
 					change_summary: 'Updated entity details',
 				}),
 			});
 
-			// Sync tags if provided
-			if (newTags !== undefined) {
-				const oldTags = entity.tags ?? [];
-				const toAdd = newTags.filter((t) => !oldTags.includes(t));
-				const toRemove = oldTags.filter((t) => !newTags.includes(t));
-				for (const tag of toAdd) {
-					await apiFetch(`/api/entities/${entity.id}/tags`, {
-						method: 'POST',
-						body: JSON.stringify({ tag }),
-					});
-				}
-				for (const tag of toRemove) {
-					await apiFetch(`/api/entities/${entity.id}/tags/${encodeURIComponent(tag)}`, {
-						method: 'DELETE',
-					});
-				}
+			// Sync tags
+			const oldTags = entity.tags ?? [];
+			const toAdd = editTags.filter((t) => !oldTags.includes(t));
+			const toRemove = oldTags.filter((t) => !editTags.includes(t));
+			for (const tag of toAdd) {
+				await apiFetch(`/api/entities/${entity.id}/tags`, {
+					method: 'POST',
+					body: JSON.stringify({ tag }),
+				});
+			}
+			for (const tag of toRemove) {
+				await apiFetch(`/api/entities/${entity.id}/tags/${encodeURIComponent(tag)}`, {
+					method: 'DELETE',
+				});
 			}
 
-			showEditDialog = false;
+			editingDetails = false;
+			detailsDirty = false;
 			await loadEntity(entity.id);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to update entity';
+		}
+		savingDetails = false;
+	}
+
+	function discardDetailsChanges() {
+		editingDetails = false;
+		detailsDirty = false;
+	}
+
+	async function handleClone() {
+		if (!entity) return;
+		try {
+			const created = await apiFetch<Entity>('/api/entities', {
+				method: 'POST',
+				body: JSON.stringify({
+					entity_type: entity.entity_type,
+					name: `${entity.name} (Copy)`,
+					description: entity.description ?? '',
+					data: entity.data ?? {},
+				}),
+			});
+			await goto(`/entities/${created.id}`);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to clone entity';
 		}
 	}
 
@@ -187,11 +246,11 @@
 		</div>
 		<div class="flex gap-2">
 			<button
-				onclick={() => (showEditDialog = true)}
+				onclick={handleClone}
 				class="rounded px-4 py-2 text-sm"
 				style="border: 1px solid var(--color-border); color: var(--color-fg)"
 			>
-				Edit
+				Clone
 			</button>
 			<button
 				onclick={() => (showDeleteDialog = true)}
@@ -246,53 +305,237 @@
 	<!-- Tab panels -->
 	<div class="mt-4" role="tabpanel">
 		{#if activeTab === 'details'}
-			<dl class="grid gap-4" style="grid-template-columns: auto 1fr">
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">ID</dt>
-				<dd class="text-sm" style="color: var(--color-fg)">{entity.id}</dd>
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
-				<dd style="color: var(--color-fg)">{entity.entity_type}</dd>
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
-				<dd>
-					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
-						{entity.set_name ?? 'Default'}
-					</span>
-				</dd>
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Version</dt>
-				<dd style="color: var(--color-fg)">{entity.current_version ?? 'N/A'}</dd>
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Created</dt>
-				<dd style="color: var(--color-fg)">{entity.created_at ?? 'N/A'}</dd>
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Created By</dt>
-				<dd style="color: var(--color-fg)">{entity.created_by_username ?? entity.created_by}</dd>
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified</dt>
-				<dd style="color: var(--color-fg)">{entity.updated_at ?? 'N/A'}</dd>
-
-				{#if entity.description}
-					<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
-					<dd style="color: var(--color-fg)">{entity.description}</dd>
-				{/if}
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>
-				<dd>
-					{#if (entity.tags ?? []).length > 0 || inheritedTags.length > 0}
-						<div class="flex flex-wrap gap-1">
-							{#each (entity.tags ?? []) as tag}
-								<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
-							{/each}
-							{#each inheritedTags as tag}
-								<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-muted); color: white; opacity: 0.5" title="Inherited tag">{tag}</span>
-							{/each}
-						</div>
-					{:else}
-						<span style="color: var(--color-muted)">None</span>
+			{@const modifiedByUsername = versions.length > 0 ? (versions[0].created_by_username ?? versions[0].created_by) : (entity.created_by_username ?? entity.created_by)}
+			<!-- Inline edit toolbar -->
+			<div class="mb-3 flex items-center gap-2">
+				{#if editingDetails}
+					<button
+						onclick={saveEntityMetadata}
+						disabled={!detailsDirty || savingDetails}
+						class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
+						style="background-color: var(--color-success, #16a34a)"
+					>
+						{savingDetails ? 'Saving...' : 'Save'}
+					</button>
+					<button
+						onclick={discardDetailsChanges}
+						class="rounded px-3 py-1.5 text-sm"
+						style="border: 1px solid var(--color-border); color: var(--color-fg)"
+					>
+						Discard
+					</button>
+					{#if detailsDirty}
+						<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
 					{/if}
-				</dd>
-			</dl>
+				{:else}
+					<button
+						onclick={enterDetailsEdit}
+						class="rounded px-3 py-1.5 text-sm text-white"
+						style="background-color: var(--color-primary)"
+					>
+						Edit Metadata
+					</button>
+				{/if}
+			</div>
+
+			<Accordion.Root type="single" value="summary">
+				<!-- Summary group (open by default) -->
+				<Accordion.Item value="summary" class="border-b" style="border-color: var(--color-border)">
+					<Accordion.Header>
+						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+							Summary
+							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+						</Accordion.Trigger>
+					</Accordion.Header>
+					<Accordion.Content class="pb-4">
+						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Name</dt>
+							<dd>
+								{#if editingDetails}
+									<input
+										type="text"
+										bind:value={editName}
+										class="w-full rounded border px-2 py-1 text-sm"
+										style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									/>
+								{:else}
+									<span style="color: var(--color-fg)">{entity.name}</span>
+								{/if}
+							</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
+							<dd>
+								{#if editingDetails}
+									<textarea
+										bind:value={editDescription}
+										rows="3"
+										class="w-full rounded border px-2 py-1 text-sm"
+										style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									></textarea>
+								{:else}
+									<span style="color: var(--color-fg)">{entity.description ?? 'No description'}</span>
+								{/if}
+							</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
+							<dd style="color: var(--color-fg)">{entity.entity_type}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
+							<dd>
+								<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
+									{entity.set_name ?? 'Default'}
+								</span>
+							</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>
+							<dd>
+								{#if editingDetails}
+									<TagInput
+										tags={editTags}
+										onaddtag={(tag) => { editTags = [...editTags, tag]; }}
+										onremovetag={(tag) => { editTags = editTags.filter(t => t !== tag); }}
+										{inheritedTags}
+										suggestions={allTags}
+									/>
+								{:else if (entity.tags ?? []).length > 0 || inheritedTags.length > 0}
+									<div class="flex flex-wrap gap-1">
+										{#each (entity.tags ?? []) as tag}
+											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+										{/each}
+										{#each inheritedTags as tag}
+											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-muted); color: white; opacity: 0.5" title="Inherited tag">{tag}</span>
+										{/each}
+									</div>
+								{:else}
+									<span style="color: var(--color-muted)">None</span>
+								{/if}
+							</dd>
+						</dl>
+					</Accordion.Content>
+				</Accordion.Item>
+
+				<!-- Details group (collapsed) -->
+				<Accordion.Item value="entity-details" class="border-b" style="border-color: var(--color-border)">
+					<Accordion.Header>
+						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+							Details
+							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+						</Accordion.Trigger>
+					</Accordion.Header>
+					<Accordion.Content class="pb-4">
+						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">ID</dt>
+							<dd class="text-sm" style="color: var(--color-fg)">{entity.id}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Version</dt>
+							<dd style="color: var(--color-fg)">{entity.current_version ?? 'N/A'}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Created</dt>
+							<dd style="color: var(--color-fg)">{entity.created_at ?? 'N/A'}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Created By</dt>
+							<dd style="color: var(--color-fg)">{entity.created_by_username ?? entity.created_by}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified</dt>
+							<dd style="color: var(--color-fg)">{entity.updated_at ?? 'N/A'}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified By</dt>
+							<dd style="color: var(--color-fg)">{modifiedByUsername}</dd>
+						</dl>
+					</Accordion.Content>
+				</Accordion.Item>
+
+				<!-- Extended group (collapsed) -->
+				<Accordion.Item value="extended" class="border-b" style="border-color: var(--color-border)">
+					<Accordion.Header>
+						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+							Extended
+							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+						</Accordion.Trigger>
+					</Accordion.Header>
+					<Accordion.Content class="pb-4">
+						{@const meta = entity.metadata as Record<string, unknown> | null | undefined}
+						{@const hasMeta = !!(meta && (meta.status || meta.stereotype || meta.version || meta.scope || meta.abstract || meta.persistence || meta.author || meta.complexity || meta.phase || meta.created_date || meta.modified_date || meta.gen_type || (Array.isArray(meta.tagged_values) && (meta.tagged_values as unknown[]).length > 0)))}
+						{#if hasMeta}
+							<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+								{#if meta?.status}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Status</dt>
+									<dd style="color: var(--color-fg)">{meta.status}</dd>
+								{/if}
+								{#if meta?.stereotype}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Stereotype</dt>
+									<dd style="color: var(--color-fg)">{meta.stereotype}</dd>
+								{/if}
+								{#if meta?.version}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Metadata Version</dt>
+									<dd style="color: var(--color-fg)">{meta.version}</dd>
+								{/if}
+								{#if meta?.scope}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Scope</dt>
+									<dd style="color: var(--color-fg)">{meta.scope}</dd>
+								{/if}
+								{#if meta?.abstract}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Abstract</dt>
+									<dd style="color: var(--color-fg)">Yes</dd>
+								{/if}
+								{#if meta?.persistence}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Persistence</dt>
+									<dd style="color: var(--color-fg)">{meta.persistence}</dd>
+								{/if}
+								{#if meta?.author}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Author</dt>
+									<dd style="color: var(--color-fg)">{meta.author}</dd>
+								{/if}
+								{#if meta?.complexity}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Complexity</dt>
+									<dd style="color: var(--color-fg)">{meta.complexity}</dd>
+								{/if}
+								{#if meta?.phase}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Phase</dt>
+									<dd style="color: var(--color-fg)">{meta.phase}</dd>
+								{/if}
+								{#if meta?.created_date}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">EA Created Date</dt>
+									<dd style="color: var(--color-fg)">{meta.created_date}</dd>
+								{/if}
+								{#if meta?.modified_date}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">EA Modified Date</dt>
+									<dd style="color: var(--color-fg)">{meta.modified_date}</dd>
+								{/if}
+								{#if meta?.gen_type}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Gen Type</dt>
+									<dd style="color: var(--color-fg)">{meta.gen_type}</dd>
+								{/if}
+
+								{#if Array.isArray(meta?.tagged_values) && (meta.tagged_values as unknown[]).length > 0}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Tagged Values</dt>
+									<dd>
+										<table class="w-full text-sm" style="color: var(--color-fg)">
+											<thead>
+												<tr style="border-bottom: 1px solid var(--color-border)">
+													<th class="py-1 pr-4 text-left font-medium" style="color: var(--color-muted)">Property</th>
+													<th class="py-1 text-left font-medium" style="color: var(--color-muted)">Value</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each meta.tagged_values as tv}
+													{@const tvObj = tv as {property?: string; value?: string}}
+													<tr style="border-bottom: 1px solid var(--color-border)">
+														<td class="py-1 pr-4">{tvObj.property ?? ''}</td>
+														<td class="py-1">{tvObj.value ?? ''}</td>
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+									</dd>
+								{/if}
+							</dl>
+						{:else}
+							<p class="text-sm" style="color: var(--color-muted)">No extended metadata available.</p>
+						{/if}
+					</Accordion.Content>
+				</Accordion.Item>
+			</Accordion.Root>
 		{:else if activeTab === 'models'}
 			{#if modelsLoading}
 				<p style="color: var(--color-muted)">Loading models...</p>
@@ -387,19 +630,6 @@
 	<section class="mt-8">
 		<CommentsPanel targetType="entity" targetId={entity.id} />
 	</section>
-
-	<EntityDialog
-		open={showEditDialog}
-		mode="edit"
-		initialName={entity.name}
-		initialType={entity.entity_type as SimpleEntityType}
-		initialDescription={entity.description ?? ''}
-		initialTags={entity.tags ?? []}
-		suggestions={allTags}
-		{inheritedTags}
-		onsave={handleEdit}
-		oncancel={() => (showEditDialog = false)}
-	/>
 
 	<ConfirmDialog
 		open={showDeleteDialog}
