@@ -4,9 +4,7 @@
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { exportToSvg, exportToPng, exportToPdf } from '$lib/utils/export';
 	import type { Model, ModelVersion, Bookmark } from '$lib/types/api';
-	import BrowseCanvas from '$lib/canvas/BrowseCanvas.svelte';
-	import ModelCanvas from '$lib/canvas/ModelCanvas.svelte';
-	import FullViewCanvas from '$lib/canvas/FullViewCanvas.svelte';
+	import UnifiedCanvas from '$lib/canvas/UnifiedCanvas.svelte';
 	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
 	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
 	import ParticipantDialog from '$lib/canvas/sequence/ParticipantDialog.svelte';
@@ -31,7 +29,7 @@
 	import DOMPurify from 'dompurify';
 	import type { Entity, ModelHierarchyNode } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
-	import type { SimpleEntityType, SimpleRelationshipType, EdgeRoutingType } from '$lib/types/canvas';
+	import type { SimpleEntityType, SimpleRelationshipType, EdgeRoutingType, NotationType } from '$lib/types/canvas';
 	import {
 		SIMPLE_ENTITY_TYPES,
 		UML_ENTITY_TYPES,
@@ -233,12 +231,13 @@
 		if (mt === 'sequence') return 'sequence';
 		if (mt === 'uml') return 'uml';
 		if (mt === 'archimate') return 'archimate';
+		if (mt === 'c4' || mt === 'c4_landscape' || mt === 'c4_dynamic' || mt === 'c4_deployment') return 'c4';
 		if (mt === 'roadmap') return 'simple';
 		return 'simple'; // 'simple' and 'component' both use simple view
 	});
 
-	/** Get the Full View type for FullViewCanvas. */
-	const fullViewType = $derived(canvasType === 'uml' ? 'uml' : 'archimate') as 'uml' | 'archimate';
+	/** Notation for UnifiedCanvas context. */
+	const notation = $derived<NotationType>(canvasType === 'sequence' ? 'simple' : canvasType as NotationType);
 
 	/** Source node name for RelationshipDialog display. */
 	const pendingSourceName = $derived.by(() => {
@@ -1516,9 +1515,9 @@
 				<!-- Overview group (open by default) -->
 				<Accordion.Item value="summary" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
-						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+						<Accordion.Trigger class="group flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
 							Overview
-							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+							<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
 					<Accordion.Content class="pb-4">
@@ -1591,9 +1590,9 @@
 				<!-- Details group (collapsed) -->
 				<Accordion.Item value="model-details" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
-						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+						<Accordion.Trigger class="group flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
 							Details
-							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+							<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
 					<Accordion.Content class="pb-4">
@@ -1667,9 +1666,9 @@
 				<!-- Extended group (collapsed) -->
 				<Accordion.Item value="extended" class="border-b" style="border-color: var(--color-border)">
 					<Accordion.Header>
-						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+						<Accordion.Trigger class="group flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
 							Extended
-							<span class="transition-transform duration-200" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+							<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
 					<Accordion.Content class="pb-4">
@@ -2075,75 +2074,41 @@
 									</div>
 								</div>
 								<div style="flex: 1; border: 1px solid var(--color-border); overflow: hidden">
-									{#if canvasType === 'uml' || canvasType === 'archimate'}
-										<FullViewCanvas
-											viewType={fullViewType}
-											bind:nodes={canvasNodes}
-											bind:edges={canvasEdges}
-											oncreatenode={() => (showAddEntity = true)}
-											ondeletenode={handleDeleteNode}
-											onconnectnodes={handleConnectNodes}
-											ondeleteedge={handleDeleteEdge}
-											onreconnectedge={handleReconnectEdge}
-											onedgeselect={handleEdgeSelect}
-											onnodeselect={handleNodeSelect}
-											onundo={handleUndo}
-											onredo={handleRedo}
-											onnodedragstart={handleNodeDragStart}
-										/>
-									{:else}
-										<ModelCanvas
-											bind:nodes={canvasNodes}
-											bind:edges={canvasEdges}
-											oncreatenode={() => (showAddEntity = true)}
-											ondeletenode={handleDeleteNode}
-											onconnectnodes={handleConnectNodes}
-											ondeleteedge={handleDeleteEdge}
-											onreconnectedge={handleReconnectEdge}
-											onedgeselect={handleEdgeSelect}
-											onnodeselect={handleNodeSelect}
-											onundo={handleUndo}
-											onredo={handleRedo}
-											onnodedragstart={handleNodeDragStart}
-										/>
-									{/if}
+									<UnifiedCanvas
+										{notation}
+										bind:nodes={canvasNodes}
+										bind:edges={canvasEdges}
+										oncreatenode={() => (showAddEntity = true)}
+										ondeletenode={handleDeleteNode}
+										onconnectnodes={handleConnectNodes}
+										ondeleteedge={handleDeleteEdge}
+										onreconnectedge={handleReconnectEdge}
+										onedgeselect={handleEdgeSelect}
+										onnodeselect={handleNodeSelect}
+										onundo={handleUndo}
+										onredo={handleRedo}
+										onnodedragstart={handleNodeDragStart}
+									/>
 								</div>
 							</div>
 						</FocusView>
 					{:else}
 					<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-						{#if canvasType === 'uml' || canvasType === 'archimate'}
-							<FullViewCanvas
-								viewType={fullViewType}
-								bind:nodes={canvasNodes}
-								bind:edges={canvasEdges}
-								oncreatenode={() => (showAddEntity = true)}
-								ondeletenode={handleDeleteNode}
-								onconnectnodes={handleConnectNodes}
-								ondeleteedge={handleDeleteEdge}
-								onreconnectedge={handleReconnectEdge}
-								onedgeselect={handleEdgeSelect}
-								onnodeselect={handleNodeSelect}
-								onundo={handleUndo}
-								onredo={handleRedo}
-								onnodedragstart={handleNodeDragStart}
-							/>
-						{:else}
-							<ModelCanvas
-								bind:nodes={canvasNodes}
-								bind:edges={canvasEdges}
-								oncreatenode={() => (showAddEntity = true)}
-								ondeletenode={handleDeleteNode}
-								onconnectnodes={handleConnectNodes}
-								ondeleteedge={handleDeleteEdge}
-								onreconnectedge={handleReconnectEdge}
-								onedgeselect={handleEdgeSelect}
-								onnodeselect={handleNodeSelect}
-								onundo={handleUndo}
-								onredo={handleRedo}
-								onnodedragstart={handleNodeDragStart}
-							/>
-						{/if}
+						<UnifiedCanvas
+							{notation}
+							bind:nodes={canvasNodes}
+							bind:edges={canvasEdges}
+							oncreatenode={() => (showAddEntity = true)}
+							ondeletenode={handleDeleteNode}
+							onconnectnodes={handleConnectNodes}
+							ondeleteedge={handleDeleteEdge}
+							onreconnectedge={handleReconnectEdge}
+							onedgeselect={handleEdgeSelect}
+							onnodeselect={handleNodeSelect}
+							onundo={handleUndo}
+							onredo={handleRedo}
+							onnodedragstart={handleNodeDragStart}
+						/>
 					</div>
 					{/if}
 				{:else if canvasNodes.length === 0}
@@ -2161,9 +2126,11 @@
 					{#if focusMode}
 						<FocusView onexit={() => (focusMode = false)}>
 							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden">
-								<BrowseCanvas
+								<UnifiedCanvas
+									{notation}
 									nodes={canvasNodes}
 									edges={canvasEdges}
+									browseMode={true}
 									onnodeselect={handleBrowseNodeSelect}
 								/>
 							</div>
@@ -2171,9 +2138,11 @@
 					{:else}
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-							<BrowseCanvas
+							<UnifiedCanvas
+								{notation}
 								nodes={canvasNodes}
 								edges={canvasEdges}
+								browseMode={true}
 								onnodeselect={handleBrowseNodeSelect}
 							/>
 						</div>
