@@ -24,6 +24,7 @@
 	import EntityPicker from '$lib/components/EntityPicker.svelte';
 	import ModelPicker from '$lib/components/ModelPicker.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import type { Entity, ModelHierarchyNode } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
@@ -43,6 +44,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'overview' | 'canvas' | 'versions'>('canvas');
+	let userSelectedTab = $state(false);
 	let versionsLoading = $state(false);
 
 	let showEditDialog = $state(false);
@@ -106,6 +108,7 @@
 	let showCreateChildDialog = $state(false);
 	let showParentPicker = $state(false);
 	let treeModelsOnly = $state(false);
+	let treeExpandedIds = $state(new Set<string>());
 
 	// Export menu state
 	let showExportMenu = $state(false);
@@ -129,6 +132,7 @@
 	$effect(() => {
 		if (model && sidebarOpen && model.set_id !== prevSetId) {
 			prevSetId = model.set_id;
+			treeExpandedIds = new Set<string>();
 			loadHierarchyTree();
 		}
 	});
@@ -187,6 +191,13 @@
 		try {
 			model = await apiFetch<Model>(`/api/models/${id}`);
 			parseCanvasData();
+			// Smart default tab: show overview if no canvas content
+			if (!userSelectedTab) {
+				const hasContent = model.model_type === 'sequence'
+					? sequenceData.participants.length > 0
+					: canvasNodes.length > 0;
+				activeTab = hasContent ? 'canvas' : 'overview';
+			}
 			refreshNodeDescriptions();
 			loadVersions(id);
 			loadBookmarkStatus(id);
@@ -1074,7 +1085,7 @@
 				{:else}
 					<ul role="tree">
 						{#each hierarchyTree as node (node.id)}
-							<TreeNode {node} currentModelId={model.id} searchQuery={treeSearchQuery} showModelsOnly={treeModelsOnly} />
+							<TreeNode {node} currentModelId={model.id} searchQuery={treeSearchQuery} showModelsOnly={treeModelsOnly} expandedIds={treeExpandedIds} />
 						{/each}
 					</ul>
 				{/if}
@@ -1084,132 +1095,206 @@
 
 	<!-- Main content -->
 	<div class="min-w-0 flex-1">
-	<!-- Tab navigation -->
-	<div class="flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Model sections">
-		<button
-			role="tab"
-			aria-selected={activeTab === 'overview'}
-			onclick={() => (activeTab = 'overview')}
-			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'overview' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'overview' ? 'var(--color-primary)' : 'transparent'}"
-		>
-			Overview
+	<!-- Tab navigation with hierarchy toggle -->
+	<div class="flex items-center gap-1 border-b" style="border-color: var(--color-border)">
+		<button onclick={toggleSidebar} aria-label="Toggle hierarchy sidebar" aria-pressed={sidebarOpen} class="rounded p-1">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="20" height="20"
+				style="color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-muted)'}">
+				<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
+			</svg>
 		</button>
-		<button
-			role="tab"
-			aria-selected={activeTab === 'canvas'}
-			onclick={() => (activeTab = 'canvas')}
-			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'canvas' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'canvas' ? 'var(--color-primary)' : 'transparent'}"
-		>
-			Canvas
-		</button>
-		<button
-			role="tab"
-			aria-selected={activeTab === 'versions'}
-			onclick={() => (activeTab = 'versions')}
-			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'versions' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'versions' ? 'var(--color-primary)' : 'transparent'}"
-		>
-			Version History
-		</button>
+		<div class="flex gap-1" role="tablist" aria-label="Model sections">
+			<button
+				role="tab"
+				aria-selected={activeTab === 'overview'}
+				onclick={() => { activeTab = 'overview'; userSelectedTab = true; }}
+				class="px-4 py-2 text-sm"
+				style="color: {activeTab === 'overview' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'overview' ? 'var(--color-primary)' : 'transparent'}"
+			>
+				Overview
+			</button>
+			<button
+				role="tab"
+				aria-selected={activeTab === 'canvas'}
+				onclick={() => { activeTab = 'canvas'; userSelectedTab = true; }}
+				class="px-4 py-2 text-sm"
+				style="color: {activeTab === 'canvas' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'canvas' ? 'var(--color-primary)' : 'transparent'}"
+			>
+				Canvas
+			</button>
+			<button
+				role="tab"
+				aria-selected={activeTab === 'versions'}
+				onclick={() => { activeTab = 'versions'; userSelectedTab = true; }}
+				class="px-4 py-2 text-sm"
+				style="color: {activeTab === 'versions' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'versions' ? 'var(--color-primary)' : 'transparent'}"
+			>
+				Version History
+			</button>
+		</div>
 	</div>
 
 	<div class="mt-4" role="tabpanel">
 		{#if activeTab === 'overview'}
-			<dl class="grid gap-4" style="grid-template-columns: auto 1fr">
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">ID</dt>
-				<dd class="text-sm" style="color: var(--color-fg)">{model.id}</dd>
+			{@const hasExtended = !!(model.metadata?.stereotype || (Array.isArray(model.metadata?.tagged_values) && (model.metadata.tagged_values as unknown[]).length > 0))}
+			{@const modifiedByUsername = versions.length > 0 ? (versions[0].created_by_username ?? versions[0].created_by) : (model.created_by_username ?? model.created_by)}
+			<Accordion.Root type="multiple" value={['summary']}>
+				<!-- Summary group (open by default) -->
+				<Accordion.Item value="summary" class="border-b" style="border-color: var(--color-border)">
+					<Accordion.Header>
+						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+							Summary
+							<span class="text-xs" style="color: var(--color-muted)" aria-hidden="true">&#9662;</span>
+						</Accordion.Trigger>
+					</Accordion.Header>
+					<Accordion.Content class="pb-4">
+						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
+							<dd style="color: var(--color-fg)">{model.description ?? 'No description'}</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
-				<dd style="color: var(--color-fg)">{model.model_type}</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
+							<dd style="color: var(--color-fg)">{model.model_type}</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Version</dt>
-				<dd style="color: var(--color-fg)">{model.current_version ?? 'N/A'}</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
+							<dd>
+								<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
+									{model.set_name ?? 'Default'}
+								</span>
+							</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Created</dt>
-				<dd style="color: var(--color-fg)">{model.created_at ?? 'N/A'}</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>
+							<dd>
+								{#if (model.tags ?? []).length > 0 || inheritedTags.length > 0}
+									<div class="flex flex-wrap gap-1">
+										{#each (model.tags ?? []) as tag}
+											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
+										{/each}
+										{#each inheritedTags as tag}
+											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-muted); color: white; opacity: 0.5" title="Inherited tag">{tag}</span>
+										{/each}
+									</div>
+								{:else}
+									<span style="color: var(--color-muted)">None</span>
+								{/if}
+							</dd>
+						</dl>
+					</Accordion.Content>
+				</Accordion.Item>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Created By</dt>
-				<dd style="color: var(--color-fg)">{model.created_by_username ?? model.created_by}</dd>
+				<!-- Details group (collapsed) -->
+				<Accordion.Item value="details" class="border-b" style="border-color: var(--color-border)">
+					<Accordion.Header>
+						<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+							Details
+							<span class="text-xs" style="color: var(--color-muted)" aria-hidden="true">&#9662;</span>
+						</Accordion.Trigger>
+					</Accordion.Header>
+					<Accordion.Content class="pb-4">
+						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">ID</dt>
+							<dd class="text-sm" style="color: var(--color-fg)">{model.id}</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified</dt>
-				<dd style="color: var(--color-fg)">{model.updated_at ?? 'N/A'}</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Version</dt>
+							<dd style="color: var(--color-fg)">{model.current_version ?? 'N/A'}</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
-				<dd>
-					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
-						{model.set_name ?? 'Default'}
-					</span>
-				</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Status</dt>
+							<dd style="color: var(--color-fg)">{(model.metadata?.status as string) ?? '—'}</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Parent</dt>
-				<dd class="flex items-center gap-2">
-					{#if model.parent_model_id}
-						{@const parentAncestor = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null}
-						{#if parentAncestor}
-							<a href="/models/{parentAncestor.id}" style="color: var(--color-primary)" class="text-sm">{parentAncestor.name}</a>
-						{:else}
-							<span class="text-sm" style="color: var(--color-fg)">{model.parent_model_id.slice(0, 8)}...</span>
-						{/if}
-					{:else}
-						<span class="text-sm" style="color: var(--color-muted)">None — root model</span>
-					{/if}
-					<button
-						onclick={() => (showParentPicker = true)}
-						class="rounded px-2 py-0.5 text-xs"
-						style="border: 1px solid var(--color-border); color: var(--color-primary)"
-					>
-						Change
-					</button>
-					{#if model.parent_model_id}
-						<button
-							onclick={handleRemoveParent}
-							class="rounded px-2 py-0.5 text-xs"
-							style="border: 1px solid var(--color-border); color: var(--color-danger)"
-						>
-							Remove
-						</button>
-					{/if}
-				</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Parent</dt>
+							<dd class="flex items-center gap-2">
+								{#if model.parent_model_id}
+									{@const parentAncestor = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null}
+									{#if parentAncestor}
+										<a href="/models/{parentAncestor.id}" style="color: var(--color-primary)" class="text-sm">{parentAncestor.name}</a>
+									{:else}
+										<span class="text-sm" style="color: var(--color-fg)">{model.parent_model_id.slice(0, 8)}...</span>
+									{/if}
+								{:else}
+									<span class="text-sm" style="color: var(--color-muted)">None — root model</span>
+								{/if}
+								<button
+									onclick={() => (showParentPicker = true)}
+									class="rounded px-2 py-0.5 text-xs"
+									style="border: 1px solid var(--color-border); color: var(--color-primary)"
+								>
+									Change
+								</button>
+								{#if model.parent_model_id}
+									<button
+										onclick={handleRemoveParent}
+										class="rounded px-2 py-0.5 text-xs"
+										style="border: 1px solid var(--color-border); color: var(--color-danger)"
+									>
+										Remove
+									</button>
+								{/if}
+							</dd>
 
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Template</dt>
-				<dd style="color: var(--color-fg)">{isTemplate ? 'Yes' : 'No'}</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Created</dt>
+							<dd style="color: var(--color-fg)">{model.created_at ?? 'N/A'}</dd>
 
-				{#if model.description}
-					<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
-					<dd style="color: var(--color-fg)">{model.description}</dd>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Created By</dt>
+							<dd style="color: var(--color-fg)">{model.created_by_username ?? model.created_by}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified</dt>
+							<dd style="color: var(--color-fg)">{model.updated_at ?? 'N/A'}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified By</dt>
+							<dd style="color: var(--color-fg)">{modifiedByUsername}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Template</dt>
+							<dd style="color: var(--color-fg)">{isTemplate ? 'Yes' : 'No'}</dd>
+						</dl>
+					</Accordion.Content>
+				</Accordion.Item>
+
+				<!-- Extended group (collapsed, only if metadata has stereotype or tagged_values) -->
+				{#if hasExtended}
+					<Accordion.Item value="extended" class="border-b" style="border-color: var(--color-border)">
+						<Accordion.Header>
+							<Accordion.Trigger class="flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+								Extended
+								<span class="text-xs" style="color: var(--color-muted)" aria-hidden="true">&#9662;</span>
+							</Accordion.Trigger>
+						</Accordion.Header>
+						<Accordion.Content class="pb-4">
+							<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+								{#if model.metadata?.stereotype}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Stereotype</dt>
+									<dd style="color: var(--color-fg)">{model.metadata.stereotype}</dd>
+								{/if}
+
+								{#if Array.isArray(model.metadata?.tagged_values) && (model.metadata.tagged_values as unknown[]).length > 0}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Tagged Values</dt>
+									<dd>
+										<table class="w-full text-sm" style="color: var(--color-fg)">
+											<thead>
+												<tr style="border-bottom: 1px solid var(--color-border)">
+													<th class="py-1 pr-4 text-left font-medium" style="color: var(--color-muted)">Property</th>
+													<th class="py-1 text-left font-medium" style="color: var(--color-muted)">Value</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each model.metadata.tagged_values as tv}
+													{@const tvObj = tv as {property?: string; value?: string}}
+													<tr style="border-bottom: 1px solid var(--color-border)">
+														<td class="py-1 pr-4">{tvObj.property ?? ''}</td>
+														<td class="py-1">{tvObj.value ?? ''}</td>
+													</tr>
+												{/each}
+											</tbody>
+										</table>
+									</dd>
+								{/if}
+							</dl>
+						</Accordion.Content>
+					</Accordion.Item>
 				{/if}
-
-				<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>
-				<dd>
-					{#if (model.tags ?? []).length > 0 || inheritedTags.length > 0}
-						<div class="flex flex-wrap gap-1">
-							{#each (model.tags ?? []) as tag}
-								<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-primary); color: white">{tag}</span>
-							{/each}
-							{#each inheritedTags as tag}
-								<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-muted); color: white; opacity: 0.5" title="Inherited tag">{tag}</span>
-							{/each}
-						</div>
-					{:else}
-						<span style="color: var(--color-muted)">None</span>
-					{/if}
-				</dd>
-			</dl>
+			</Accordion.Root>
 		{:else if activeTab === 'canvas'}
 			{#if canvasType === 'sequence'}
 				<!-- Sequence diagram toolbar -->
-				<div class="mb-3 flex items-center gap-4">
-					<button
-						onclick={toggleSidebar}
-						class="rounded px-3 py-1.5 text-sm"
-						style="border: 1px solid {sidebarOpen ? 'var(--color-primary)' : 'var(--color-border)'}; color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {sidebarOpen ? 'var(--color-surface, transparent)' : 'transparent'}"
-						aria-label="Toggle hierarchy sidebar"
-						aria-pressed={sidebarOpen}
-					>
-						Hierarchy
-					</button>
+				<div class="mb-3 flex flex-wrap items-center gap-2 gap-y-2">
 					{#if editing}
 						<!-- Create group -->
 						<div class="flex items-center gap-2">
@@ -1298,10 +1383,17 @@
 						</div>
 						<button
 							onclick={() => (focusMode = true)}
-							class="rounded px-3 py-1.5 text-sm"
+							class="rounded p-1.5"
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							aria-label="Full screen"
+							title="Full screen"
 						>
-							Focus
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="15 3 21 3 21 9"></polyline>
+								<polyline points="9 21 3 21 3 15"></polyline>
+								<polyline points="21 15 21 21 15 21"></polyline>
+								<polyline points="3 9 3 3 9 3"></polyline>
+							</svg>
 						</button>
 					</div>
 				</div>
@@ -1374,16 +1466,7 @@
 				{/if}
 			{:else}
 				<!-- Canvas toolbar -->
-				<div class="mb-3 flex items-center gap-4">
-					<button
-						onclick={toggleSidebar}
-						class="rounded px-3 py-1.5 text-sm"
-						style="border: 1px solid {sidebarOpen ? 'var(--color-primary)' : 'var(--color-border)'}; color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {sidebarOpen ? 'var(--color-surface, transparent)' : 'transparent'}"
-						aria-label="Toggle hierarchy sidebar"
-						aria-pressed={sidebarOpen}
-					>
-						Hierarchy
-					</button>
+				<div class="mb-3 flex flex-wrap items-center gap-2 gap-y-2">
 					{#if editing}
 						<!-- Create group -->
 						<div class="flex items-center gap-2">
@@ -1525,10 +1608,17 @@
 						</div>
 						<button
 							onclick={() => (focusMode = true)}
-							class="rounded px-3 py-1.5 text-sm"
+							class="rounded p-1.5"
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+							aria-label="Full screen"
+							title="Full screen"
 						>
-							Focus
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="15 3 21 3 21 9"></polyline>
+								<polyline points="9 21 3 21 3 15"></polyline>
+								<polyline points="21 15 21 21 15 21"></polyline>
+								<polyline points="3 9 3 3 9 3"></polyline>
+							</svg>
 						</button>
 					</div>
 				</div>

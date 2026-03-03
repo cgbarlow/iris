@@ -8,11 +8,19 @@
 		currentModelId?: string;
 		searchQuery?: string;
 		showModelsOnly?: boolean;
+		expandedIds?: Set<string>;
 	}
 
-	let { node, depth = 0, currentModelId = '', searchQuery = '', showModelsOnly = false }: Props = $props();
+	let {
+		node,
+		depth = 0,
+		currentModelId = '',
+		searchQuery = '',
+		showModelsOnly = false,
+		expandedIds = new Set<string>(),
+	}: Props = $props();
 
-	let expanded = $state(depth < 2);
+	let expanded = $state(expandedIds.has(node.id) || depth < 2);
 
 	const hasChildren = $derived(node.children && node.children.length > 0);
 	const isCurrent = $derived(currentModelId === node.id);
@@ -28,31 +36,50 @@
 			)
 	);
 
-	/** Recursively check if a node or any descendant has children. */
-	function hasModelsDeep(n: ModelHierarchyNode): boolean {
-		if (n.children && n.children.length > 0) return true;
-		return false;
-	}
-	function descendantHasModels(n: ModelHierarchyNode): boolean {
-		return (n.children ?? []).some((c) => hasModelsDeep(c) || descendantHasModels(c));
+	/** Recursively check if this node or any descendant has canvas content. */
+	function descendantHasContent(n: ModelHierarchyNode): boolean {
+		return (n.children ?? []).some(
+			(c) => c.has_content || descendantHasContent(c)
+		);
 	}
 
+	/**
+	 * Indicator type:
+	 * - 'solid': node has canvas content (entities/participants on its canvas)
+	 * - 'hollow': node has no content itself but a descendant does (organizational container)
+	 * - 'none': no content anywhere in this subtree
+	 */
+	const indicatorType = $derived<'solid' | 'hollow' | 'none'>(
+		node.has_content
+			? 'solid'
+			: descendantHasContent(node)
+				? 'hollow'
+				: 'none'
+	);
+
 	const passesModelFilter = $derived(
-		!showModelsOnly || hasChildren || descendantHasModels(node)
+		!showModelsOnly || node.has_content || descendantHasContent(node)
 	);
 	const visible = $derived((matchesSearch || childMatchesSearch) && passesModelFilter);
 
 	function toggleExpand() {
 		expanded = !expanded;
+		if (expanded) {
+			expandedIds.add(node.id);
+		} else {
+			expandedIds.delete(node.id);
+		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'ArrowRight' && hasChildren && !expanded) {
 			event.preventDefault();
 			expanded = true;
+			expandedIds.add(node.id);
 		} else if (event.key === 'ArrowLeft' && expanded) {
 			event.preventDefault();
 			expanded = false;
+			expandedIds.delete(node.id);
 		}
 	}
 </script>
@@ -86,8 +113,10 @@
 				class="tree-node__link"
 				onkeydown={handleKeydown}
 			>
-				{#if hasChildren}
-					<span class="tree-node__model-indicator" aria-hidden="true"></span>
+				{#if indicatorType === 'solid'}
+					<span class="tree-node__model-indicator tree-node__model-indicator--solid" aria-hidden="true"></span>
+				{:else if indicatorType === 'hollow'}
+					<span class="tree-node__model-indicator tree-node__model-indicator--hollow" aria-hidden="true"></span>
 				{/if}
 				<span class="tree-node__name">{node.name}</span>
 				<span class="tree-node__type">{node.model_type}</span>
@@ -102,6 +131,7 @@
 						{currentModelId}
 						{searchQuery}
 						{showModelsOnly}
+						{expandedIds}
 					/>
 				{/each}
 			</ul>
@@ -157,8 +187,14 @@
 		width: 8px;
 		height: 8px;
 		border-radius: 2px;
-		background-color: var(--color-primary);
 		flex-shrink: 0;
+	}
+	.tree-node__model-indicator--solid {
+		background-color: var(--color-primary);
+	}
+	.tree-node__model-indicator--hollow {
+		background-color: transparent;
+		border: 1.5px solid var(--color-primary);
 	}
 	.tree-node__name {
 		overflow: hidden;

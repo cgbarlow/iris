@@ -14,6 +14,7 @@ class ModelCreate(BaseModel):
     data: dict[str, object] = Field(default_factory=dict)
     parent_model_id: str | None = None
     set_id: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class ModelUpdate(BaseModel):
@@ -23,6 +24,7 @@ class ModelUpdate(BaseModel):
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     change_summary: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class ModelResponse(BaseModel):
@@ -43,6 +45,7 @@ class ModelResponse(BaseModel):
     tags: list[str] = Field(default_factory=list)
     set_id: str | None = None
     set_name: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class ModelHierarchyNode(BaseModel):
@@ -52,6 +55,7 @@ class ModelHierarchyNode(BaseModel):
     name: str
     model_type: str
     parent_model_id: str | None = None
+    has_content: bool = False
     children: list[ModelHierarchyNode] = Field(default_factory=list)
 
 
@@ -69,6 +73,7 @@ class ModelVersionResponse(BaseModel):
     created_at: str
     created_by: str
     created_by_username: str = "Unknown"
+    metadata: dict[str, object] | None = None
 
 
 class ModelListResponse(BaseModel):

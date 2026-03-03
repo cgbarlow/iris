@@ -70,6 +70,7 @@ async def create(
         created_by=current_user["id"],
         parent_model_id=body.parent_model_id,
         set_id=body.set_id,
+        metadata=body.metadata,
     )
     return ModelResponse(**result)
 
@@ -152,6 +153,7 @@ async def update(
         change_summary=body.change_summary,
         updated_by=current_user["id"],
         expected_version=expected_version,
+        metadata=body.metadata,
     )
     if result is None:
         raise HTTPException(status_code=409, detail="Version conflict")

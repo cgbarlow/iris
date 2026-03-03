@@ -5,6 +5,28 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- SparxEA import now extracts package Notes, element Status/Stereotype/Version, diagram Notes, connector Notes, and tagged values from `.qea` files (ADR-064, SPEC-064-A)
+- Metadata field (`metadata: dict | null`) threaded through model and entity CRUD (create/get/update/list/versions) using existing `metadata TEXT` column in version tables
+- Model overview: accordion-based layout with Summary (open by default), Details (collapsed), and Extended (collapsed, conditional) groups using bits-ui Accordion
+- Model overview: Extended group shows Stereotype and Tagged Values table when metadata is present
+- Model overview: Details group shows Status (from metadata), Modified By (from latest version), and all previous fields
+- Smart default tab: models with no canvas content default to Overview tab instead of Canvas
+- Hierarchy toggle icon (tree-view SVG) positioned left of tab bar, visible on all three tabs (Overview, Canvas, Version History)
+- Fullscreen icon replaces "Focus" text on canvas toolbar buttons
+- 15 new backend tests: 7 reader metadata, 3 import metadata, 5 metadata CRUD
+- ADR-064: Sparx EA Import Metadata & Accordion Overview
+- SPEC-064-A: Sparx Import Metadata & Accordion specification
+
+### Changed
+- Canvas toolbars use `flex-wrap` for responsive wrapping on narrow windows
+- SparxEA import: package Notes passed as model description (was `None`)
+- SparxEA import: diagram Notes passed as diagram model description (was `None`)
+- SparxEA import: connector Notes passed as relationship description (was `None`)
+- SparxEA import: element metadata (status, stereotype, version, tagged values) stored as entity metadata JSON
+
 ## [1.7.1] - 2026-03-02
 
 ### Fixed

@@ -13,6 +13,7 @@ class QeaPackage:
     Name: str | None
     Parent_ID: int
     ea_guid: str | None
+    Notes: str | None = None
 
 
 @dataclass
@@ -23,6 +24,9 @@ class QeaElement:
     Package_ID: int
     Note: str | None
     ea_guid: str | None
+    Status: str | None = None
+    Stereotype: str | None = None
+    Version: str | None = None
 
 
 @dataclass
@@ -33,6 +37,7 @@ class QeaConnector:
     Start_Object_ID: int
     End_Object_ID: int
     ea_guid: str | None
+    Notes: str | None = None
 
 
 @dataclass
@@ -42,6 +47,7 @@ class QeaDiagram:
     Diagram_Type: str | None
     Package_ID: int
     ea_guid: str | None
+    Notes: str | None = None
 
 
 @dataclass
@@ -55,6 +61,13 @@ class QeaDiagramObject:
 
 
 @dataclass
+class QeaTaggedValue:
+    Object_ID: int
+    Property: str | None
+    Value: str | None
+
+
+@dataclass
 class QeaAttribute:
     Object_ID: int
     Name: str | None
@@ -65,7 +78,7 @@ async def read_packages(db_path: str) -> list[QeaPackage]:
     """Read all packages from a .qea file."""
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
-            "SELECT Package_ID, Name, Parent_ID, ea_guid FROM t_package"
+            "SELECT Package_ID, Name, Parent_ID, ea_guid, Notes FROM t_package"
         )
         rows = await cursor.fetchall()
         return [
@@ -74,6 +87,7 @@ async def read_packages(db_path: str) -> list[QeaPackage]:
                 Name=row[1],
                 Parent_ID=row[2] or 0,
                 ea_guid=row[3],
+                Notes=row[4],
             )
             for row in rows
         ]
@@ -83,7 +97,8 @@ async def read_elements(db_path: str) -> list[QeaElement]:
     """Read all elements from a .qea file."""
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
-            "SELECT Object_ID, Object_Type, Name, Package_ID, Note, ea_guid "
+            "SELECT Object_ID, Object_Type, Name, Package_ID, Note, ea_guid, "
+            "Status, Stereotype, Version "
             "FROM t_object"
         )
         rows = await cursor.fetchall()
@@ -95,6 +110,9 @@ async def read_elements(db_path: str) -> list[QeaElement]:
                 Package_ID=row[3] or 0,
                 Note=row[4],
                 ea_guid=row[5],
+                Status=row[6],
+                Stereotype=row[7],
+                Version=row[8],
             )
             for row in rows
         ]
@@ -105,7 +123,7 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
             "SELECT Connector_ID, Connector_Type, Name, "
-            "Start_Object_ID, End_Object_ID, ea_guid "
+            "Start_Object_ID, End_Object_ID, ea_guid, Notes "
             "FROM t_connector"
         )
         rows = await cursor.fetchall()
@@ -117,6 +135,7 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
                 Start_Object_ID=row[3] or 0,
                 End_Object_ID=row[4] or 0,
                 ea_guid=row[5],
+                Notes=row[6],
             )
             for row in rows
         ]
@@ -126,7 +145,7 @@ async def read_diagrams(db_path: str) -> list[QeaDiagram]:
     """Read all diagrams from a .qea file."""
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
-            "SELECT Diagram_ID, Name, Diagram_Type, Package_ID, ea_guid "
+            "SELECT Diagram_ID, Name, Diagram_Type, Package_ID, ea_guid, Notes "
             "FROM t_diagram"
         )
         rows = await cursor.fetchall()
@@ -137,6 +156,7 @@ async def read_diagrams(db_path: str) -> list[QeaDiagram]:
                 Diagram_Type=row[2],
                 Package_ID=row[3] or 0,
                 ea_guid=row[4],
+                Notes=row[5],
             )
             for row in rows
         ]
@@ -175,6 +195,23 @@ async def read_attributes(db_path: str) -> list[QeaAttribute]:
                 Object_ID=row[0] or 0,
                 Name=row[1],
                 Type=row[2],
+            )
+            for row in rows
+        ]
+
+
+async def read_tagged_values(db_path: str) -> list[QeaTaggedValue]:
+    """Read all tagged values from a .qea file."""
+    async with aiosqlite.connect(db_path) as db:
+        cursor = await db.execute(
+            "SELECT Object_ID, Property, Value FROM t_objectproperties"
+        )
+        rows = await cursor.fetchall()
+        return [
+            QeaTaggedValue(
+                Object_ID=row[0] or 0,
+                Property=row[1],
+                Value=row[2],
             )
             for row in rows
         ]

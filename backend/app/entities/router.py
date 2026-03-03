@@ -46,6 +46,7 @@ async def create(
         data=body.data,
         created_by=current_user["id"],
         set_id=body.set_id,
+        metadata=body.metadata,
     )
     return EntityResponse(**result)
 
@@ -149,6 +150,7 @@ async def update(
         change_summary=body.change_summary,
         updated_by=current_user["id"],
         expected_version=expected_version,
+        metadata=body.metadata,
     )
     if result is None:
         raise HTTPException(status_code=409, detail="Version conflict")

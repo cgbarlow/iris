@@ -30,6 +30,7 @@ export interface Entity {
 	model_usage_count?: number;
 	set_id?: string;
 	set_name?: string;
+	metadata?: Record<string, unknown> | null;
 }
 
 export interface Model {
@@ -48,6 +49,7 @@ export interface Model {
 	tags?: string[];
 	set_id?: string;
 	set_name?: string;
+	metadata?: Record<string, unknown> | null;
 }
 
 export interface ModelHierarchyNode {
@@ -55,6 +57,7 @@ export interface ModelHierarchyNode {
 	name: string;
 	model_type: string;
 	parent_model_id: string | null;
+	has_content: boolean;
 	children: ModelHierarchyNode[];
 }
 
@@ -108,6 +111,7 @@ export interface EntityVersion {
 	created_at: string;
 	created_by: string;
 	created_by_username?: string;
+	metadata?: Record<string, unknown> | null;
 }
 
 export interface ModelVersion {
@@ -122,6 +126,7 @@ export interface ModelVersion {
 	created_at: string;
 	created_by: string;
 	created_by_username?: string;
+	metadata?: Record<string, unknown> | null;
 }
 
 export interface Relationship {

@@ -23,6 +23,7 @@ from app.import_sparx.reader import (
     read_diagrams,
     read_elements,
     read_packages,
+    read_tagged_values,
 )
 from app.import_sparx.service import import_sparx_file
 from app.main import create_app
@@ -410,3 +411,205 @@ class TestImportRouter:
         assert data["entities_created"] > 0
         assert data["diagrams_created"] == 107
         assert isinstance(data["warnings"], list)
+
+
+# ---------- Reader Metadata Tests ----------
+
+
+class TestReaderMetadata:
+    """Verify the reader extracts metadata fields from the sample .qea file."""
+
+    async def test_read_packages_has_notes(self) -> None:
+        packages = await read_packages(SAMPLE_QEA)
+        with_notes = [p for p in packages if p.Notes]
+        assert len(with_notes) >= 64
+
+    async def test_read_elements_has_status(self) -> None:
+        elements = await read_elements(SAMPLE_QEA)
+        non_pkg = [e for e in elements if e.Object_Type != "Package"]
+        with_status = [e for e in non_pkg if e.Status]
+        assert len(with_status) >= 588
+
+    async def test_read_elements_has_stereotype(self) -> None:
+        elements = await read_elements(SAMPLE_QEA)
+        non_pkg = [e for e in elements if e.Object_Type != "Package"]
+        with_stereo = [e for e in non_pkg if e.Stereotype]
+        assert len(with_stereo) >= 1
+
+    async def test_read_diagrams_has_notes(self) -> None:
+        diagrams = await read_diagrams(SAMPLE_QEA)
+        with_notes = [d for d in diagrams if d.Notes]
+        assert len(with_notes) >= 1
+
+    async def test_read_connectors_has_notes(self) -> None:
+        connectors = await read_connectors(SAMPLE_QEA)
+        with_notes = [c for c in connectors if c.Notes]
+        assert len(with_notes) >= 1
+
+    async def test_read_tagged_values(self) -> None:
+        tvs = await read_tagged_values(SAMPLE_QEA)
+        assert len(tvs) > 0
+        distinct_objects = {tv.Object_ID for tv in tvs}
+        assert len(distinct_objects) >= 100
+
+    async def test_read_tagged_values_has_property_and_value(self) -> None:
+        tvs = await read_tagged_values(SAMPLE_QEA)
+        with_property = [tv for tv in tvs if tv.Property]
+        assert len(with_property) > 0
+
+
+# ---------- Import Metadata Tests ----------
+
+
+class TestImportMetadata:
+    """Verify the import populates descriptions and metadata."""
+
+    async def test_import_populates_package_descriptions(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # Check model_versions have descriptions (from package Notes)
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM model_versions WHERE description IS NOT NULL AND description != ''"
+        )
+        row = await cursor.fetchone()
+        assert row[0] >= 64
+
+    async def test_import_populates_entity_metadata(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        # Check entity_versions have metadata
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM entity_versions WHERE metadata IS NOT NULL"
+        )
+        row = await cursor.fetchone()
+        assert row[0] > 0
+
+    async def test_import_metadata_contains_stereotype(
+        self, client: httpx.AsyncClient, app_config: AppConfig
+    ) -> None:
+        headers = await _auth_headers(client)
+        db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
+        db = db_manager.main_db
+        cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
+        row = await cursor.fetchone()
+        user_id = row[0]
+        await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
+
+        import json
+        cursor = await db.execute(
+            "SELECT metadata FROM entity_versions WHERE metadata IS NOT NULL LIMIT 10"
+        )
+        rows = await cursor.fetchall()
+        found_stereotype = False
+        for r in rows:
+            meta = json.loads(r[0])
+            if "stereotype" in meta or "status" in meta or "tagged_values" in meta:
+                found_stereotype = True
+                break
+        assert found_stereotype
+
+
+# ---------- Metadata CRUD Tests ----------
+
+
+class TestMetadataStorage:
+    """Verify metadata field flows through model and entity CRUD."""
+
+    async def test_create_model_with_metadata(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/models",
+            json={
+                "model_type": "uml",
+                "name": "MetadataModel",
+                "metadata": {"status": "Proposed", "stereotype": "DataType"},
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["metadata"] is not None
+        assert data["metadata"]["status"] == "Proposed"
+        assert data["metadata"]["stereotype"] == "DataType"
+
+    async def test_get_model_returns_metadata(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/models",
+            json={
+                "model_type": "uml",
+                "name": "MetadataGetModel",
+                "metadata": {"status": "Approved"},
+            },
+            headers=headers,
+        )
+        model_id = create_resp.json()["id"]
+        resp = await client.get(f"/api/models/{model_id}", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["metadata"]["status"] == "Approved"
+
+    async def test_model_without_metadata_returns_null(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/models",
+            json={"model_type": "uml", "name": "NoMetadataModel"},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["metadata"] is None
+
+    async def test_create_entity_with_metadata(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/entities",
+            json={
+                "entity_type": "class",
+                "name": "MetadataEntity",
+                "metadata": {"status": "Proposed", "version": "1.0"},
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["metadata"]["status"] == "Proposed"
+        assert data["metadata"]["version"] == "1.0"
+
+    async def test_update_model_preserves_metadata(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/models",
+            json={
+                "model_type": "uml",
+                "name": "UpdateMetaModel",
+                "metadata": {"status": "Draft"},
+            },
+            headers=headers,
+        )
+        model_id = create_resp.json()["id"]
+        resp = await client.put(
+            f"/api/models/{model_id}",
+            json={
+                "name": "UpdateMetaModel v2",
+                "metadata": {"status": "Approved"},
+            },
+            headers={**headers, "If-Match": "1"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["metadata"]["status"] == "Approved"

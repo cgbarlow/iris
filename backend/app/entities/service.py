@@ -24,11 +24,13 @@ async def create_entity(
     data: dict[str, object],
     created_by: str,
     set_id: str | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Create a new entity with initial version."""
     entity_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
+    metadata_json = json.dumps(metadata) if metadata else None
     effective_set_id = set_id or DEFAULT_SET_ID
 
     await db.execute(
@@ -38,9 +40,9 @@ async def create_entity(
     )
     await db.execute(
         "INSERT INTO entity_versions (entity_id, version, name, description, "
-        "data, change_type, created_at, created_by) "
-        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
-        (entity_id, name, description, data_json, now, created_by),
+        "data, change_type, created_at, created_by, metadata) "
+        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?, ?)",
+        (entity_id, name, description, data_json, now, created_by, metadata_json),
     )
     await db.commit()
     await _index_entity(
@@ -61,6 +63,7 @@ async def create_entity(
         "updated_at": now,
         "is_deleted": False,
         "set_id": effective_set_id,
+        "metadata": metadata,
     }
 
 
@@ -73,7 +76,7 @@ async def get_entity(
         "SELECT e.id, e.entity_type, e.current_version, "
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "u.username, e.set_id, s.name "
+        "u.username, e.set_id, s.name, ev.metadata "
         "FROM entities e "
         "JOIN entity_versions ev ON e.id = ev.entity_id "
         "AND e.current_version = ev.version "
@@ -100,6 +103,7 @@ async def get_entity(
         "created_by_username": row[10] or "Unknown",
         "set_id": row[11],
         "set_name": row[12],
+        "metadata": json.loads(row[13]) if row[13] else None,
     }
 
     # Enrich with tags
@@ -149,7 +153,7 @@ async def list_entities(
         f"SELECT e.id, e.entity_type, e.current_version, "  # noqa: S608
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "e.set_id, s.name "
+        "e.set_id, s.name, ev.metadata "
         "FROM entities e "
         "JOIN entity_versions ev ON e.id = ev.entity_id "
         "AND e.current_version = ev.version "
@@ -174,6 +178,7 @@ async def list_entities(
             "is_deleted": bool(r[9]),
             "set_id": r[10],
             "set_name": r[11],
+            "metadata": json.loads(r[12]) if r[12] else None,
         }
         for r in rows
     ]
@@ -222,6 +227,7 @@ async def update_entity(
     change_summary: str | None,
     updated_by: str,
     expected_version: int,
+    metadata: dict[str, object] | None = None,
 ) -> dict[str, object] | None:
     """Update an entity with optimistic concurrency. Returns None on conflict."""
     # Check current version (OCC)
@@ -240,6 +246,7 @@ async def update_entity(
     new_version = current_version + 1
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
+    metadata_json = json.dumps(metadata) if metadata else None
 
     await db.execute(
         "UPDATE entities SET current_version = ?, updated_at = ? WHERE id = ?",
@@ -247,10 +254,10 @@ async def update_entity(
     )
     await db.execute(
         "INSERT INTO entity_versions (entity_id, version, name, description, "
-        "data, change_type, change_summary, created_at, created_by) "
-        "VALUES (?, ?, ?, ?, ?, 'update', ?, ?, ?)",
+        "data, change_type, change_summary, created_at, created_by, metadata) "
+        "VALUES (?, ?, ?, ?, ?, 'update', ?, ?, ?, ?)",
         (entity_id, new_version, name, description, data_json,
-         change_summary, now, updated_by),
+         change_summary, now, updated_by, metadata_json),
     )
     await db.commit()
 
@@ -404,7 +411,7 @@ async def get_entity_versions(
         "SELECT ev.entity_id, ev.version, ev.name, ev.description, ev.data, "
         "ev.change_type, ev.change_summary, ev.rollback_to, "
         "ev.created_at, ev.created_by, "
-        "u.username "
+        "u.username, ev.metadata "
         "FROM entity_versions ev "
         "LEFT JOIN users u ON ev.created_by = u.id "
         "WHERE ev.entity_id = ? "
@@ -425,6 +432,7 @@ async def get_entity_versions(
             "created_at": r[8],
             "created_by": r[9],
             "created_by_username": r[10] or "Unknown",
+            "metadata": json.loads(r[11]) if r[11] else None,
         }
         for r in rows
     ]

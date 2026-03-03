@@ -27,11 +27,13 @@ async def create_model(
     created_by: str,
     parent_model_id: str | None = None,
     set_id: str | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Create a new model with initial version."""
     model_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
+    metadata_json = json.dumps(metadata) if metadata else None
     effective_set_id = set_id or DEFAULT_SET_ID
 
     await db.execute(
@@ -42,9 +44,9 @@ async def create_model(
     )
     await db.execute(
         "INSERT INTO model_versions (model_id, version, name, description, "
-        "data, change_type, created_at, created_by) "
-        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
-        (model_id, name, description, data_json, now, created_by),
+        "data, change_type, created_at, created_by, metadata) "
+        "VALUES (?, 1, ?, ?, ?, 'create', ?, ?, ?)",
+        (model_id, name, description, data_json, now, created_by, metadata_json),
     )
     await db.commit()
     await _index_model(
@@ -69,6 +71,7 @@ async def create_model(
         "is_deleted": False,
         "parent_model_id": parent_model_id,
         "set_id": effective_set_id,
+        "metadata": metadata,
     }
 
 
@@ -81,7 +84,7 @@ async def get_model(
         "SELECT m.id, m.model_type, m.current_version, "
         "mv.name, mv.description, mv.data, "
         "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
-        "u.username, m.parent_model_id, m.set_id, s.name "
+        "u.username, m.parent_model_id, m.set_id, s.name, mv.metadata "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
@@ -118,6 +121,7 @@ async def get_model(
         "tags": tags,
         "set_id": row[12],
         "set_name": row[13],
+        "metadata": json.loads(row[14]) if row[14] else None,
     }
 
 
@@ -155,7 +159,7 @@ async def list_models(
         f"SELECT m.id, m.model_type, m.current_version, "  # noqa: S608
         "mv.name, mv.description, mv.data, "
         "m.created_at, m.created_by, m.updated_at, m.is_deleted, "
-        "m.parent_model_id, m.set_id, s.name "
+        "m.parent_model_id, m.set_id, s.name, mv.metadata "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
@@ -195,6 +199,7 @@ async def list_models(
             "tags": tags_by_model.get(r[0], []),
             "set_id": r[11],
             "set_name": r[12],
+            "metadata": json.loads(r[13]) if r[13] else None,
         }
         for r in rows
     ]
@@ -211,6 +216,7 @@ async def update_model(
     change_summary: str | None,
     updated_by: str,
     expected_version: int,
+    metadata: dict[str, object] | None = None,
 ) -> dict[str, object] | None:
     """Update a model with OCC."""
     cursor = await db.execute(
@@ -224,6 +230,7 @@ async def update_model(
     new_version = row[0] + 1
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
+    metadata_json = json.dumps(metadata) if metadata else None
 
     await db.execute(
         "UPDATE models SET current_version = ?, updated_at = ? WHERE id = ?",
@@ -231,10 +238,10 @@ async def update_model(
     )
     await db.execute(
         "INSERT INTO model_versions (model_id, version, name, description, "
-        "data, change_type, change_summary, created_at, created_by) "
-        "VALUES (?, ?, ?, ?, ?, 'update', ?, ?, ?)",
+        "data, change_type, change_summary, created_at, created_by, metadata) "
+        "VALUES (?, ?, ?, ?, ?, 'update', ?, ?, ?, ?)",
         (model_id, new_version, name, description, data_json,
-         change_summary, now, updated_by),
+         change_summary, now, updated_by, metadata_json),
     )
     await db.commit()
 
@@ -520,7 +527,7 @@ async def get_model_hierarchy(
     """
     # Fetch all non-deleted models (optionally filtered by set)
     query = (
-        "SELECT m.id, mv.name, m.model_type, m.parent_model_id "
+        "SELECT m.id, mv.name, m.model_type, m.parent_model_id, mv.data "
         "FROM models m "
         "JOIN model_versions mv ON m.id = mv.model_id "
         "AND m.current_version = mv.version "
@@ -537,11 +544,20 @@ async def get_model_hierarchy(
     # Build lookup structures
     nodes: dict[str, dict[str, object]] = {}
     for r in rows:
+        # Determine if model has canvas content (non-empty nodes or participants)
+        has_content = False
+        try:
+            data = json.loads(r[4]) if r[4] else {}
+            if isinstance(data, dict):
+                has_content = bool(data.get("nodes")) or bool(data.get("participants"))
+        except (json.JSONDecodeError, TypeError):
+            pass
         nodes[r[0]] = {
             "id": r[0],
             "name": r[1],
             "model_type": r[2],
             "parent_model_id": r[3],
+            "has_content": has_content,
             "children": [],
         }
 
@@ -573,7 +589,7 @@ async def get_model_versions(
         "SELECT mv.model_id, mv.version, mv.name, mv.description, mv.data, "
         "mv.change_type, mv.change_summary, mv.rollback_to, "
         "mv.created_at, mv.created_by, "
-        "u.username "
+        "u.username, mv.metadata "
         "FROM model_versions mv "
         "LEFT JOIN users u ON mv.created_by = u.id "
         "WHERE mv.model_id = ? "
@@ -594,6 +610,7 @@ async def get_model_versions(
             "created_at": r[8],
             "created_by": r[9],
             "created_by_username": r[10] or "Unknown",
+            "metadata": json.loads(r[11]) if r[11] else None,
         }
         for r in rows
     ]

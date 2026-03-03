@@ -13,6 +13,7 @@ class EntityCreate(BaseModel):
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     set_id: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class EntityUpdate(BaseModel):
@@ -22,6 +23,7 @@ class EntityUpdate(BaseModel):
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     change_summary: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class EntityRollback(BaseModel):
@@ -49,6 +51,7 @@ class EntityResponse(BaseModel):
     model_usage_count: int = 0
     set_id: str | None = None
     set_name: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 class EntityVersionResponse(BaseModel):
@@ -65,6 +68,7 @@ class EntityVersionResponse(BaseModel):
     created_at: str
     created_by: str
     created_by_username: str = "Unknown"
+    metadata: dict[str, object] | None = None
 
 
 class EntityListResponse(BaseModel):

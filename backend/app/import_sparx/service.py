@@ -18,6 +18,7 @@ from app.import_sparx.reader import (
     read_diagrams,
     read_elements,
     read_packages,
+    read_tagged_values,
 )
 from app.models_crud.service import create_model
 from app.relationships.service import create_relationship
@@ -83,9 +84,23 @@ async def import_sparx_file(
     diagrams = await read_diagrams(qea_path)
     diagram_objects = await read_diagram_objects(qea_path)
     attributes = await read_attributes(qea_path)
+    tagged_values = await read_tagged_values(qea_path)
 
     # Build element index for fast lookups
     element_index = _build_element_index(elements)
+
+    # Build tagged values lookup by Object_ID
+    tags_by_object: dict[int, list[dict[str, str | None]]] = {}
+    for tv in tagged_values:
+        tags_by_object.setdefault(tv.Object_ID, []).append(
+            {"property": tv.Property, "value": tv.Value}
+        )
+
+    # Build package-type element lookup (for Status/Stereotype on packages)
+    pkg_type_elements: dict[int, QeaElement] = {}
+    for elem in elements:
+        if elem.Object_Type == "Package":
+            pkg_type_elements[elem.Package_ID] = elem
 
     # 2. Build package hierarchy -> create Iris models for packages
     # Map ea_package_id -> iris_model_id
@@ -93,15 +108,28 @@ async def import_sparx_file(
 
     for pkg in _topo_sort_packages(packages):
         parent_iris_id = package_model_map.get(pkg.Parent_ID)
+        # Build metadata from package-type element (Status/Stereotype)
+        pkg_metadata: dict[str, object] | None = None
+        pkg_elem = pkg_type_elements.get(pkg.Package_ID)
+        if pkg_elem:
+            md: dict[str, object] = {}
+            if pkg_elem.Status:
+                md["status"] = pkg_elem.Status
+            if pkg_elem.Stereotype:
+                md["stereotype"] = pkg_elem.Stereotype
+            if md:
+                pkg_metadata = md
+
         model = await create_model(
             db,
             model_type="uml",
             name=pkg.Name or f"Package {pkg.Package_ID}",
-            description=None,
+            description=pkg.Notes,
             data={},
             created_by=imported_by,
             parent_model_id=parent_iris_id,
             set_id=set_id,
+            metadata=pkg_metadata,
         )
         package_model_map[pkg.Package_ID] = model["id"]  # type: ignore[assignment]
         summary.models_created += 1
@@ -136,6 +164,21 @@ async def import_sparx_file(
                 for a in obj_attrs  # type: ignore[union-attr]
             ]
 
+        # Build entity metadata
+        entity_metadata: dict[str, object] | None = None
+        em: dict[str, object] = {}
+        if elem.Status:
+            em["status"] = elem.Status
+        if elem.Stereotype:
+            em["stereotype"] = elem.Stereotype
+        if elem.Version:
+            em["version"] = elem.Version
+        obj_tags = tags_by_object.get(elem.Object_ID)
+        if obj_tags:
+            em["tagged_values"] = obj_tags
+        if em:
+            entity_metadata = em
+
         entity = await create_entity(
             db,
             entity_type=iris_type,
@@ -144,6 +187,7 @@ async def import_sparx_file(
             data=entity_data,
             created_by=imported_by,
             set_id=set_id,
+            metadata=entity_metadata,
         )
         element_entity_map[elem.Object_ID] = entity["id"]  # type: ignore[assignment]
         summary.entities_created += 1
@@ -174,7 +218,7 @@ async def import_sparx_file(
             target_entity_id=target_id,
             relationship_type=iris_type,
             label=conn.Name,
-            description=None,
+            description=conn.Notes,
             data={},
             created_by=imported_by,
         )
@@ -268,7 +312,7 @@ async def import_sparx_file(
             db,
             model_type=model_type,
             name=diag.Name or f"Diagram {diag.Diagram_ID}",
-            description=None,
+            description=diag.Notes,
             data=model_data,
             created_by=imported_by,
             parent_model_id=parent_iris_id,

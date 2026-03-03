@@ -256,6 +256,9 @@
 				<div class="mt-1 text-xs" style="color: var(--color-muted)">
 					{set.model_count} model{set.model_count !== 1 ? 's' : ''}, {set.entity_count} entit{set.entity_count !== 1 ? 'ies' : 'y'}
 				</div>
+				{#if set.description}
+					<div class="mt-1 text-xs" style="color: var(--color-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">{set.description}</div>
+				{/if}
 				{#if editMode}
 					<span class="mt-1 text-xs" style="color: var(--color-primary)">Edit</span>
 				{/if}
