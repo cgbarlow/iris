@@ -32,7 +32,7 @@
 		<div class="archimate-node__description">{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
-		<a href="/entities/{data.entityId}" class="canvas-node__browse-link" aria-label="View {data.label} details">
+		<a href="/elements/{data.entityId}" class="canvas-node__browse-link" aria-label="View {data.label} details">
 			View details
 		</a>
 	{/if}

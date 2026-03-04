@@ -5,6 +5,35 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-04
+
+### Changed
+- **BREAKING:** Entity → Element rename throughout: database tables (`elements`, `element_versions`, `element_tags`), API routes (`/api/elements/`), frontend routes (`/elements/`), types, and UI labels (ADR-071)
+- **BREAKING:** Model → Diagram + Package split: `models` table split into `diagrams` and `packages` tables with dedicated API routes (`/api/diagrams/`, `/api/packages/`), frontend routes (`/diagrams/`), and UI labels (ADR-071)
+- **BREAKING:** Model relationships → Package relationships: `model_relationships` table renamed to `package_relationships` with API route `/api/packages/{id}/relationships` (ADR-071)
+- Migration m016: renames tables, splits models into diagrams + packages, rebuilds FTS5 indexes, migrates all foreign keys (ADR-071)
+- Migrations m002-m015 now skip safely on re-init after m016 has run
+- UnifiedCanvas split into separate browse/edit SvelteFlow instances to fix Svelte 5 duplicate attribute error
+- Canvas node browse-mode links updated: `/entities/` → `/elements/`, `/models/` → `/diagrams/`
+- Import summary shows Packages count instead of Sparx Diagrams count
+- Sets thumbnail source accepts both "model" and "diagram" values for backward compatibility
+
+### Added
+- Package as first-class concept with dedicated `packages` and `package_versions` tables
+- `backend/app/elements/` module (renamed from `entities/`)
+- `backend/app/diagrams/` module (renamed from `models_crud/`)
+- `backend/app/packages/` module (new, for package CRUD)
+- `backend/app/package_relationships/` module (renamed from `model_relationships/`)
+- Backward-compatible type aliases in `api.ts`: `Entity = Element`, `Model = Diagram`, etc.
+- `DiagramDialog`, `DiagramPicker`, `DiagramThumbnail`, `ElementPicker` frontend components
+
+### Removed
+- `backend/app/entities/` module (replaced by `elements/`)
+- `backend/app/models_crud/` module (replaced by `diagrams/` and `packages/`)
+- `backend/app/model_relationships/` module (replaced by `package_relationships/`)
+- `ModelDialog`, `ModelPicker`, `ModelThumbnail`, `EntityPicker` frontend components
+- Old frontend routes: `/entities/`, `/models/`
+
 ## [1.8.0] - 2026-03-03
 
 ### Added

@@ -246,9 +246,9 @@ class TestCanvasEdgeData:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Diagram models have canvas data with edges
+        # Diagrams have canvas data with edges
         cursor = await db.execute(
-            "SELECT data FROM model_versions WHERE data IS NOT NULL AND data != '{}'"
+            "SELECT data FROM diagram_versions WHERE data IS NOT NULL AND data != '{}'"
         )
         rows = await cursor.fetchall()
         found_routing = False
@@ -279,7 +279,7 @@ class TestCanvasEdgeData:
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
         cursor = await db.execute(
-            "SELECT data FROM model_versions WHERE data IS NOT NULL AND data != '{}'"
+            "SELECT data FROM diagram_versions WHERE data IS NOT NULL AND data != '{}'"
         )
         rows = await cursor.fetchall()
         routing_values: set[str] = set()
@@ -306,7 +306,7 @@ class TestCanvasEdgeData:
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
         cursor = await db.execute(
-            "SELECT data FROM model_versions WHERE data IS NOT NULL AND data != '{}'"
+            "SELECT data FROM diagram_versions WHERE data IS NOT NULL AND data != '{}'"
         )
         rows = await cursor.fetchall()
         found_cardinality = False
@@ -339,7 +339,7 @@ class TestCanvasEdgeData:
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
         cursor = await db.execute(
-            "SELECT data FROM model_versions WHERE data IS NOT NULL AND data != '{}'"
+            "SELECT data FROM diagram_versions WHERE data IS NOT NULL AND data != '{}'"
         )
         rows = await cursor.fetchall()
         found_direction = False

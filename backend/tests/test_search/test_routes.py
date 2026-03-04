@@ -88,15 +88,15 @@ class TestSearchEndpoint:
         assert data["results"] == []
         assert data["total"] == 0
 
-    async def test_search_finds_entities(
+    async def test_search_finds_elements(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        # Create an entity
+        # Create an element
         await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "application",
+                "element_type": "application",
                 "name": "Payment Gateway",
                 "description": "Handles payment processing",
             },
@@ -111,19 +111,19 @@ class TestSearchEndpoint:
         data = resp.json()
         assert data["total"] >= 1
         result = data["results"][0]
-        assert result["result_type"] == "entity"
+        assert result["result_type"] == "element"
         assert result["name"] == "Payment Gateway"
-        assert result["deep_link"].startswith("/entities/")
+        assert result["deep_link"].startswith("/elements/")
 
-    async def test_search_finds_models(
+    async def test_search_finds_diagrams(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        # Create a model
+        # Create a diagram
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple",
+                "diagram_type": "simple",
                 "name": "Network Architecture",
                 "description": "Core network topology",
             },
@@ -138,29 +138,29 @@ class TestSearchEndpoint:
         data = resp.json()
         assert data["total"] >= 1
         result = data["results"][0]
-        assert result["result_type"] == "model"
+        assert result["result_type"] == "diagram"
         assert result["name"] == "Network Architecture"
-        assert result["deep_link"].startswith("/models/")
+        assert result["deep_link"].startswith("/diagrams/")
 
     async def test_search_finds_both_types(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        # Create entity and model with overlapping terms
+        # Create element and diagram with overlapping terms
         await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "application",
+                "element_type": "application",
                 "name": "Security Scanner",
                 "description": "Scans for vulnerabilities",
             },
             headers=headers,
         )
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple",
-                "name": "Security Model",
+                "diagram_type": "simple",
+                "name": "Security Diagram",
                 "description": "Security architecture overview",
             },
             headers=headers,
@@ -173,18 +173,18 @@ class TestSearchEndpoint:
         data = resp.json()
         assert data["total"] == 2
         types = {r["result_type"] for r in data["results"]}
-        assert types == {"entity", "model"}
+        assert types == {"element", "diagram"}
 
     async def test_search_respects_limit(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        # Create multiple entities
+        # Create multiple elements
         for i in range(5):
             await client.post(
-                "/api/entities",
+                "/api/elements",
                 json={
-                    "entity_type": "application",
+                    "element_type": "application",
                     "name": f"Widget Service {i}",
                 },
                 headers=headers,
@@ -196,22 +196,22 @@ class TestSearchEndpoint:
         assert resp.status_code == 200
         assert resp.json()["total"] <= 2
 
-    async def test_search_excludes_deleted_entities(
+    async def test_search_excludes_deleted_elements(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        # Create then delete an entity
+        # Create then delete an element
         create_resp = await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "application",
+                "element_type": "application",
                 "name": "Ephemeral Thing",
             },
             headers=headers,
         )
-        entity_id = create_resp.json()["id"]
+        element_id = create_resp.json()["id"]
         await client.delete(
-            f"/api/entities/{entity_id}",
+            f"/api/elements/{element_id}",
             headers={**headers, "If-Match": "1"},
         )
 
@@ -226,9 +226,9 @@ class TestSearchEndpoint:
     ) -> None:
         headers = await _admin_headers(client)
         await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "application",
+                "element_type": "application",
                 "name": "Generic Service",
                 "description": "Handles cryptographic operations",
             },
@@ -254,22 +254,22 @@ class TestSearchEndpoint:
         )
         set_id = set_resp.json()["id"]
 
-        # Create entity in the custom set
+        # Create element in the custom set
         await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "application",
+                "element_type": "application",
                 "name": "Scoped Widget",
                 "description": "In custom set",
                 "set_id": set_id,
             },
             headers=headers,
         )
-        # Create entity in default set (no set_id)
+        # Create element in default set (no set_id)
         await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "application",
+                "element_type": "application",
                 "name": "Unscoped Widget",
                 "description": "In default set",
             },
@@ -294,39 +294,39 @@ class TestSearchEndpoint:
         assert data["total"] == 1
         assert data["results"][0]["name"] == "Scoped Widget"
 
-    async def test_search_set_id_filters_models(
+    async def test_search_set_id_filters_diagrams(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
         # Create a custom set
         set_resp = await client.post(
             "/api/sets",
-            json={"name": "Model Search Set"},
+            json={"name": "Diagram Search Set"},
             headers=headers,
         )
         set_id = set_resp.json()["id"]
 
-        # Create model in the custom set
+        # Create diagram in the custom set
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple",
+                "diagram_type": "simple",
                 "name": "Scoped Architecture",
                 "set_id": set_id,
             },
             headers=headers,
         )
-        # Create model in default set
+        # Create diagram in default set
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple",
+                "diagram_type": "simple",
                 "name": "Unscoped Architecture",
             },
             headers=headers,
         )
 
-        # Search with set_id — only scoped model
+        # Search with set_id — only scoped diagram
         resp = await client.get(
             f"/api/search?q=architecture&set_id={set_id}", headers=headers,
         )

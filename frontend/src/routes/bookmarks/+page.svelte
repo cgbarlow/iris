@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
-	import type { Bookmark, Model } from '$lib/types/api';
+	import type { Bookmark, Diagram } from '$lib/types/api';
 
-	interface BookmarkWithModel {
+	interface BookmarkWithDiagram {
 		bookmark: Bookmark;
-		model: Model | null;
+		diagram: Diagram | null;
 	}
 
-	let bookmarks = $state<BookmarkWithModel[]>([]);
+	let bookmarks = $state<BookmarkWithDiagram[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -23,10 +23,10 @@
 			const resolved = await Promise.all(
 				bms.map(async (b) => {
 					try {
-						const model = await apiFetch<Model>(`/api/models/${b.model_id}`);
-						return { bookmark: b, model };
+						const diagram = await apiFetch<Diagram>(`/api/diagrams/${b.diagram_id}`);
+						return { bookmark: b, diagram };
 					} catch {
-						return { bookmark: b, model: null };
+						return { bookmark: b, diagram: null };
 					}
 				}),
 			);
@@ -37,10 +37,10 @@
 		loading = false;
 	}
 
-	async function removeBookmark(modelId: string) {
+	async function removeBookmark(diagramId: string) {
 		try {
-			await apiFetch(`/api/models/${modelId}/bookmark`, { method: 'DELETE' });
-			bookmarks = bookmarks.filter((b) => b.bookmark.model_id !== modelId);
+			await apiFetch(`/api/diagrams/${diagramId}/bookmark`, { method: 'DELETE' });
+			bookmarks = bookmarks.filter((b) => b.bookmark.diagram_id !== diagramId);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to remove bookmark';
 		}
@@ -53,7 +53,7 @@
 
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Bookmarks</h1>
-	<p class="mt-2" style="color: var(--color-muted)">Your bookmarked models.</p>
+	<p class="mt-2" style="color: var(--color-muted)">Your bookmarked diagrams.</p>
 </div>
 
 <div class="mt-4" aria-live="polite">
@@ -62,29 +62,29 @@
 	{:else if error}
 		<div role="alert" style="color: var(--color-danger)">{error}</div>
 	{:else if bookmarks.length === 0}
-		<p style="color: var(--color-muted)">No bookmarked models yet. Bookmark a model from its detail page.</p>
+		<p style="color: var(--color-muted)">No bookmarked diagrams yet. Bookmark a diagram from its detail page.</p>
 	{:else}
 		<ul class="flex flex-col gap-2">
-			{#each bookmarks as { bookmark, model }}
+			{#each bookmarks as { bookmark, diagram }}
 				<li class="flex items-center gap-3 rounded border p-3" style="border-color: var(--color-border)">
-					{#if model}
-						<a href="/models/{model.id}" class="flex-1" style="color: var(--color-primary)">
-							<span class="font-medium">{model.name}</span>
-							<span class="ml-2 rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">{model.model_type}</span>
-							{#if model.description}
-								<span class="ml-2 text-sm" style="color: var(--color-muted)">{model.description.slice(0, 60)}{model.description.length > 60 ? '...' : ''}</span>
+					{#if diagram}
+						<a href="/diagrams/{diagram.id}" class="flex-1" style="color: var(--color-primary)">
+							<span class="font-medium">{diagram.name}</span>
+							<span class="ml-2 rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">{diagram.diagram_type}</span>
+							{#if diagram.description}
+								<span class="ml-2 text-sm" style="color: var(--color-muted)">{diagram.description.slice(0, 60)}{diagram.description.length > 60 ? '...' : ''}</span>
 							{/if}
 						</a>
 						<span class="text-xs" style="color: var(--color-muted)">
-							Updated {new Date(model.updated_at).toLocaleDateString()}
+							Updated {new Date(diagram.updated_at).toLocaleDateString()}
 						</span>
 					{:else}
 						<span class="flex-1 text-sm" style="color: var(--color-muted)">
-							Model {bookmark.model_id} (unavailable)
+							Diagram {bookmark.diagram_id} (unavailable)
 						</span>
 					{/if}
 					<button
-						onclick={() => removeBookmark(bookmark.model_id)}
+						onclick={() => removeBookmark(bookmark.diagram_id)}
 						class="rounded px-3 py-1 text-sm"
 						style="border: 1px solid var(--color-border); color: var(--color-danger)"
 					>

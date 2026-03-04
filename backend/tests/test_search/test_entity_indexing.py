@@ -1,10 +1,10 @@
-"""Tests for entity search indexing during CRUD operations.
+"""Tests for element search indexing during CRUD operations.
 
-Verifies SPEC-033-A: Entities are indexed in FTS immediately when created,
+Verifies SPEC-033-A: Elements are indexed in FTS immediately when created,
 updated, or deleted via the service layer -- without requiring a full
 rebuild_search_index() call.
 
-This covers the incremental indexing gap: entities created after application
+This covers the incremental indexing gap: elements created after application
 startup must be searchable immediately, and updates/deletes must be reflected
 in search results without restart.
 """
@@ -14,15 +14,25 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from app.entities.service import (
-    create_entity,
-    soft_delete_entity,
-    update_entity,
+from app.elements.service import (
+    create_element,
+    soft_delete_element,
+    update_element,
 )
 from app.migrations.m001_roles_users import up as m001_up
 from app.migrations.m002_entities_relationships_models import up as m002_up
+from app.migrations.m004_comments_bookmarks import up as m004_up
 from app.migrations.m005_search import up as m005_up
+from app.migrations.m007_thumbnails import up as m007_up
+from app.migrations.m008_entity_tags import up as m008_up
+from app.migrations.m009_model_tags import up as m009_up
+from app.migrations.m010_thumbnail_themes import up as m010_up
+from app.migrations.m011_model_hierarchy import up as m011_up
 from app.migrations.m012_sets import up as m012_up
+from app.migrations.m013_set_thumbnails import up as m013_up
+from app.migrations.m014_sets_partial_unique import up as m014_up
+from app.migrations.m015_model_relationships import up as m015_up
+from app.migrations.m016_naming_rename import up as m016_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import search
 
@@ -34,8 +44,18 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     """Run all required migrations for search tests."""
     await m001_up(db)
     await m002_up(db)
+    await m004_up(db)
     await m005_up(db)
+    await m007_up(db)
+    await m008_up(db)
+    await m009_up(db)
+    await m010_up(db)
+    await m011_up(db)
     await m012_up(db)
+    await m013_up(db)
+    await m014_up(db)
+    await m015_up(db)
+    await m016_up(db)
     await seed_roles_and_permissions(db)
 
 
@@ -50,20 +70,20 @@ async def _create_test_user(db: aiosqlite.Connection) -> str:
     return user_id
 
 
-class TestEntityCrudIndexing:
-    """Verify entities are indexed immediately during CRUD operations."""
+class TestElementCrudIndexing:
+    """Verify elements are indexed immediately during CRUD operations."""
 
-    async def test_create_entity_indexes_for_search(
+    async def test_create_element_indexes_for_search(
         self, main_db: aiosqlite.Connection,
     ) -> None:
-        """Creating an entity via the service layer makes it immediately searchable."""
+        """Creating an element via the service layer makes it immediately searchable."""
         await _run_migrations(main_db)
         user_id = await _create_test_user(main_db)
 
-        # Create entity via service (not direct SQL insert)
-        await create_entity(
+        # Create element via service (not direct SQL insert)
+        await create_element(
             main_db,
-            entity_type="application",
+            element_type="application",
             name="Inventory Tracker",
             description="Tracks warehouse inventory levels",
             data={},
@@ -74,19 +94,19 @@ class TestEntityCrudIndexing:
         results = await search(main_db, "Inventory")
         assert len(results) == 1
         assert results[0]["name"] == "Inventory Tracker"
-        assert results[0]["result_type"] == "entity"
+        assert results[0]["result_type"] == "element"
         assert results[0]["type_detail"] == "application"
 
-    async def test_create_entity_searchable_by_description(
+    async def test_create_element_searchable_by_description(
         self, main_db: aiosqlite.Connection,
     ) -> None:
-        """Entity description is searchable immediately after creation."""
+        """Element description is searchable immediately after creation."""
         await _run_migrations(main_db)
         user_id = await _create_test_user(main_db)
 
-        await create_entity(
+        await create_element(
             main_db,
-            entity_type="database",
+            element_type="database",
             name="Central DB",
             description="Stores financial transaction records",
             data={},
@@ -97,31 +117,31 @@ class TestEntityCrudIndexing:
         assert len(results) == 1
         assert results[0]["name"] == "Central DB"
 
-    async def test_update_entity_updates_search_index(
+    async def test_update_element_updates_search_index(
         self, main_db: aiosqlite.Connection,
     ) -> None:
-        """Updating an entity name updates the search index immediately."""
+        """Updating an element name updates the search index immediately."""
         await _run_migrations(main_db)
         user_id = await _create_test_user(main_db)
 
-        entity = await create_entity(
+        element = await create_element(
             main_db,
-            entity_type="service",
+            element_type="service",
             name="Alpha Service",
             description="Original service",
             data={},
             created_by=user_id,
         )
-        entity_id: str = entity["id"]  # type: ignore[assignment]
+        element_id: str = element["id"]  # type: ignore[assignment]
 
         # Verify original name is searchable
         results = await search(main_db, "Alpha Service")
         assert len(results) == 1
 
         # Update the name
-        await update_entity(
+        await update_element(
             main_db,
-            entity_id,
+            element_id,
             name="Beta Service",
             description="Renamed service",
             data={},
@@ -139,31 +159,31 @@ class TestEntityCrudIndexing:
         old_results = await search(main_db, "Alpha Service")
         assert len(old_results) == 0
 
-    async def test_delete_entity_removes_from_search_index(
+    async def test_delete_element_removes_from_search_index(
         self, main_db: aiosqlite.Connection,
     ) -> None:
-        """Soft-deleting an entity removes it from the search index."""
+        """Soft-deleting an element removes it from the search index."""
         await _run_migrations(main_db)
         user_id = await _create_test_user(main_db)
 
-        entity = await create_entity(
+        element = await create_element(
             main_db,
-            entity_type="application",
+            element_type="application",
             name="Temporary Widget",
             description="Will be deleted",
             data={},
             created_by=user_id,
         )
-        entity_id: str = entity["id"]  # type: ignore[assignment]
+        element_id: str = element["id"]  # type: ignore[assignment]
 
         # Verify it's searchable
         results = await search(main_db, "Temporary Widget")
         assert len(results) == 1
 
         # Delete it
-        deleted = await soft_delete_entity(
+        deleted = await soft_delete_element(
             main_db,
-            entity_id,
+            element_id,
             deleted_by=user_id,
             expected_version=1,
         )
@@ -173,10 +193,10 @@ class TestEntityCrudIndexing:
         results_after = await search(main_db, "Temporary Widget")
         assert len(results_after) == 0
 
-    async def test_multiple_entities_all_searchable(
+    async def test_multiple_elements_all_searchable(
         self, main_db: aiosqlite.Connection,
     ) -> None:
-        """Multiple entities created via the service are all searchable."""
+        """Multiple elements created via the service are all searchable."""
         await _run_migrations(main_db)
         user_id = await _create_test_user(main_db)
 
@@ -186,9 +206,9 @@ class TestEntityCrudIndexing:
             "Procurement API Gateway",
         ]
         for name in names:
-            await create_entity(
+            await create_element(
                 main_db,
-                entity_type="application",
+                element_type="application",
                 name=name,
                 description=None,
                 data={},
@@ -200,23 +220,23 @@ class TestEntityCrudIndexing:
         result_names = {r["name"] for r in results}
         assert result_names == set(names)
 
-    async def test_entity_deep_link_format(
+    async def test_element_deep_link_format(
         self, main_db: aiosqlite.Connection,
     ) -> None:
-        """Search results for entities include correct deep_link format."""
+        """Search results for elements include correct deep_link format."""
         await _run_migrations(main_db)
         user_id = await _create_test_user(main_db)
 
-        entity = await create_entity(
+        element = await create_element(
             main_db,
-            entity_type="application",
-            name="Deep Link Test Entity",
+            element_type="application",
+            name="Deep Link Test Element",
             description=None,
             data={},
             created_by=user_id,
         )
-        entity_id: str = entity["id"]  # type: ignore[assignment]
+        element_id: str = element["id"]  # type: ignore[assignment]
 
         results = await search(main_db, "Deep Link Test")
         assert len(results) == 1
-        assert results[0]["deep_link"] == f"/entities/{entity_id}"
+        assert results[0]["deep_link"] == f"/elements/{element_id}"

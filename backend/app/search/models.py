@@ -9,10 +9,10 @@ class SearchResult(BaseModel):
     """A single search result."""
 
     id: str
-    result_type: str  # "entity" or "model"
+    result_type: str  # "element" or "diagram"
     name: str
     description: str | None = None
-    type_detail: str  # entity_type or model_type
+    type_detail: str  # element_type or diagram_type
     rank: float = 0.0
     deep_link: str
 

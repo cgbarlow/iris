@@ -15,12 +15,12 @@ import type { EdgeRoutingType } from '$lib/types/canvas';
  * 3. All 5 Simple View edge components import all required path functions
  * 4. All 5 Simple View edge components read data.routingType
  * 5. Routing type change integrates with undo/redo history
- * 6. Model detail page contains routing type dropdown markup
+ * 6. Diagram detail page contains routing type dropdown markup
  */
 
 const FRONTEND_SRC = resolve(import.meta.dirname, '../../src/lib/canvas');
 const TYPES_FILE = resolve(import.meta.dirname, '../../src/lib/types/canvas.ts');
-const PAGE_FILE = resolve(import.meta.dirname, '../../src/routes/models/[id]/+page.svelte');
+const PAGE_FILE = resolve(import.meta.dirname, '../../src/routes/diagrams/[id]/+page.svelte');
 
 const simpleEdgeFiles = [
 	'edges/UsesEdge.svelte',
@@ -255,7 +255,7 @@ describe('Routing type undo/redo integration', () => {
 	});
 });
 
-describe('Model detail page routing type UI', () => {
+describe('Diagram detail page routing type UI', () => {
 	it('page contains routing type select dropdown', () => {
 		const content = readFileSync(PAGE_FILE, 'utf-8');
 		expect(content).toContain('aria-label="Edge routing type"');

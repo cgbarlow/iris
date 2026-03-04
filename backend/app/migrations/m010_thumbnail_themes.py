@@ -14,6 +14,13 @@ async def up(db: aiosqlite.Connection) -> None:
     create a new table, copy existing rows (defaulting theme to 'dark'),
     drop the old table, and rename.
     """
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
+
     # Check if migration already applied (theme column exists)
     cursor = await db.execute("PRAGMA table_info(model_thumbnails)")
     columns = [row[1] for row in await cursor.fetchall()]

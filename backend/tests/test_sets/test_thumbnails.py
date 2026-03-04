@@ -203,25 +203,25 @@ class TestGetThumbnail:
         assert resp.status_code == 404
 
 
-class TestModelThumbnailSource:
-    async def test_set_model_thumbnail_source(
+class TestDiagramThumbnailSource:
+    async def test_set_diagram_thumbnail_source(
         self, client: httpx.AsyncClient
     ) -> None:
         headers = await _auth_headers(client)
         s = (
             await client.post(
-                "/api/sets", json={"name": "Model Thumb Set"}, headers=headers
+                "/api/sets", json={"name": "Diagram Thumb Set"}, headers=headers
             )
         ).json()
         set_id = s["id"]
 
-        # Create a model in this set
+        # Create a diagram in this set
         m = (
             await client.post(
-                "/api/models",
+                "/api/diagrams",
                 json={
-                    "model_type": "simple-view",
-                    "name": "Thumb Model",
+                    "diagram_type": "simple-view",
+                    "name": "Thumb Diagram",
                     "data": {},
                     "set_id": set_id,
                 },
@@ -229,38 +229,38 @@ class TestModelThumbnailSource:
             )
         ).json()
 
-        # Update set to use model thumbnail
+        # Update set to use diagram thumbnail
         resp = await client.put(
             f"/api/sets/{set_id}",
             json={
-                "name": "Model Thumb Set",
-                "thumbnail_source": "model",
-                "thumbnail_model_id": m["id"],
+                "name": "Diagram Thumb Set",
+                "thumbnail_source": "diagram",
+                "thumbnail_diagram_id": m["id"],
             },
             headers=headers,
         )
         assert resp.status_code == 200
-        assert resp.json()["thumbnail_source"] == "model"
-        assert resp.json()["thumbnail_model_id"] == m["id"]
+        assert resp.json()["thumbnail_source"] == "diagram"
+        assert resp.json()["thumbnail_diagram_id"] == m["id"]
 
-    async def test_model_not_in_set_returns_400(
+    async def test_diagram_not_in_set_returns_400(
         self, client: httpx.AsyncClient
     ) -> None:
         headers = await _auth_headers(client)
         s = (
             await client.post(
-                "/api/sets", json={"name": "Wrong Model Set"}, headers=headers
+                "/api/sets", json={"name": "Wrong Diagram Set"}, headers=headers
             )
         ).json()
         set_id = s["id"]
 
-        # Create a model in the default set (not this set)
+        # Create a diagram in the default set (not this set)
         m = (
             await client.post(
-                "/api/models",
+                "/api/diagrams",
                 json={
-                    "model_type": "simple-view",
-                    "name": "Other Model",
+                    "diagram_type": "simple-view",
+                    "name": "Other Diagram",
                     "data": {},
                 },
                 headers=headers,
@@ -271,9 +271,9 @@ class TestModelThumbnailSource:
         resp = await client.put(
             f"/api/sets/{set_id}",
             json={
-                "name": "Wrong Model Set",
-                "thumbnail_source": "model",
-                "thumbnail_model_id": m["id"],
+                "name": "Wrong Diagram Set",
+                "thumbnail_source": "diagram",
+                "thumbnail_diagram_id": m["id"],
             },
             headers=headers,
         )

@@ -4,26 +4,26 @@
 
 <h1 class="text-2xl font-bold" style="color: var(--color-fg)">Help</h1>
 <p class="mt-2" style="color: var(--color-muted)">
-	Iris is an architectural modelling tool for managing entities, relationships, and models.
+	Iris is an architectural modelling tool for managing elements, relationships, and diagrams.
 </p>
 
 <section class="mt-6">
 	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Keyboard Shortcuts</h2>
 	<dl class="mt-3 grid gap-2" style="grid-template-columns: auto 1fr">
 		<dt class="font-mono text-sm" style="color: var(--color-muted)">Tab / Shift+Tab</dt>
-		<dd style="color: var(--color-fg)">Navigate between canvas entities</dd>
+		<dd style="color: var(--color-fg)">Navigate between canvas elements</dd>
 
 		<dt class="font-mono text-sm" style="color: var(--color-muted)">Arrow keys</dt>
-		<dd style="color: var(--color-fg)">Move selected entity (Shift for larger steps)</dd>
+		<dd style="color: var(--color-fg)">Move selected element (Shift for larger steps)</dd>
 
 		<dt class="font-mono text-sm" style="color: var(--color-muted)">Ctrl+N</dt>
-		<dd style="color: var(--color-fg)">Create a new entity</dd>
+		<dd style="color: var(--color-fg)">Create a new element</dd>
 
 		<dt class="font-mono text-sm" style="color: var(--color-muted)">C</dt>
 		<dd style="color: var(--color-fg)">Toggle connect mode to draw relationships</dd>
 
 		<dt class="font-mono text-sm" style="color: var(--color-muted)">Delete</dt>
-		<dd style="color: var(--color-fg)">Delete selected entity</dd>
+		<dd style="color: var(--color-fg)">Delete selected element</dd>
 
 		<dt class="font-mono text-sm" style="color: var(--color-muted)">Escape</dt>
 		<dd style="color: var(--color-fg)">Deselect or cancel current operation</dd>
@@ -39,8 +39,8 @@
 <section class="mt-6">
 	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Navigation</h2>
 	<ul class="mt-2 list-inside list-disc" style="color: var(--color-fg)">
-		<li><a href="/models" style="color: var(--color-primary)">Models</a> — Browse and manage architectural models</li>
-		<li><a href="/entities" style="color: var(--color-primary)">Entities</a> — Browse and manage architectural entities</li>
+		<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a> — Browse and manage architectural diagrams</li>
+		<li><a href="/elements" style="color: var(--color-primary)">Elements</a> — Browse and manage architectural elements</li>
 	</ul>
 </section>
 

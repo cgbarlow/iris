@@ -60,32 +60,32 @@ describe('TagInput autocomplete', () => {
 	});
 });
 
-describe('Entity page passes suggestions to TagInput', () => {
-	const entityPageSrc = readFileSync(
-		resolve(__dirname, '../../src/routes/entities/[id]/+page.svelte'),
+describe('Element page passes suggestions to TagInput', () => {
+	const elementPageSrc = readFileSync(
+		resolve(__dirname, '../../src/routes/elements/[id]/+page.svelte'),
 		'utf-8',
 	);
 
 	it('fetches all tags for suggestions', () => {
-		expect(entityPageSrc).toContain('/api/entities/tags/all');
+		expect(elementPageSrc).toContain('/api/elements/tags/all');
 	});
 
 	it('passes suggestions prop to TagInput', () => {
-		expect(entityPageSrc).toContain('suggestions={allTags}');
+		expect(elementPageSrc).toContain('suggestions={allTags}');
 	});
 });
 
-describe('Model page passes suggestions to TagInput', () => {
-	const modelPageSrc = readFileSync(
-		resolve(__dirname, '../../src/routes/models/[id]/+page.svelte'),
+describe('Diagram page passes suggestions to TagInput', () => {
+	const diagramPageSrc = readFileSync(
+		resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte'),
 		'utf-8',
 	);
 
 	it('fetches all tags for suggestions', () => {
-		expect(modelPageSrc).toContain('/api/entities/tags/all');
+		expect(diagramPageSrc).toContain('/api/elements/tags/all');
 	});
 
 	it('passes suggestions prop to TagInput', () => {
-		expect(modelPageSrc).toContain('suggestions={allTags}');
+		expect(diagramPageSrc).toContain('suggestions={allTags}');
 	});
 });

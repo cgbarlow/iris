@@ -13,6 +13,13 @@ if TYPE_CHECKING:
 
 async def up(db: aiosqlite.Connection) -> None:
     """Add parent_model_id column and index to models table."""
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
+
     cursor = await db.execute("PRAGMA table_info(models)")
     columns = [row[1] for row in await cursor.fetchall()]
     if "parent_model_id" in columns:

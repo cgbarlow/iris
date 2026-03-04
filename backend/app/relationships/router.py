@@ -30,12 +30,12 @@ async def create(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> RelationshipResponse:
-    """Create a new relationship between entities."""
+    """Create a new relationship between elements."""
     db = request.app.state.db_manager.main_db
     result = await create_relationship(
         db,
-        source_entity_id=body.source_entity_id,
-        target_entity_id=body.target_entity_id,
+        source_element_id=body.source_element_id,
+        target_element_id=body.target_element_id,
         relationship_type=body.relationship_type,
         label=body.label,
         description=body.description,
@@ -48,15 +48,15 @@ async def create(
 @router.get("", response_model=RelationshipListResponse)
 async def list_all(
     request: Request,
-    entity_id: str | None = None,
+    element_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> RelationshipListResponse:
-    """List relationships, optionally filtered by entity."""
+    """List relationships, optionally filtered by element."""
     db = request.app.state.db_manager.main_db
     items, total = await list_relationships(
-        db, entity_id=entity_id, page=page, page_size=page_size,
+        db, element_id=element_id, page=page, page_size=page_size,
     )
     return RelationshipListResponse(
         items=[RelationshipResponse(**item) for item in items],

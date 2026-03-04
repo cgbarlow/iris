@@ -211,28 +211,42 @@
 	aria-roledescription="interactive diagram{browseMode ? ', read-only' : ''}"
 	onkeydown={browseMode ? undefined : handleKeydown}
 >
-	<SvelteFlow
-		bind:nodes={browseMode ? undefined : nodes}
-		nodes={browseMode ? displayNodes : undefined}
-		bind:edges={browseMode ? undefined : edges}
-		edges={browseMode ? edges : undefined}
-		nodeTypes={unifiedNodeTypes}
-		edgeTypes={unifiedEdgeTypes}
-		fitView
-		connectionMode={browseMode ? undefined : ConnectionMode.Loose}
-		onnodeclick={handleNodeClick}
-		onedgeclick={browseMode ? undefined : handleEdgeClick}
-		onreconnect={browseMode ? undefined : handleReconnect}
-		onnodedragstart={browseMode ? undefined : () => onnodedragstart?.()}
-		proOptions={{ hideAttribution: true }}
-		defaultEdgeOptions={browseMode ? undefined : { type: defaultEdgeType }}
-		nodesDraggable={!browseMode}
-		nodesConnectable={!browseMode}
-		elementsSelectable={true}
-	>
-		<Controls showLock={false} />
-		<Background />
-		{#if !browseMode}
+	{#if browseMode}
+		<SvelteFlow
+			nodes={displayNodes}
+			edges={edges}
+			nodeTypes={unifiedNodeTypes}
+			edgeTypes={unifiedEdgeTypes}
+			fitView
+			onnodeclick={handleNodeClick}
+			proOptions={{ hideAttribution: true }}
+			nodesDraggable={false}
+			nodesConnectable={false}
+			elementsSelectable={true}
+		>
+			<Controls showLock={false} />
+			<Background />
+		</SvelteFlow>
+	{:else}
+		<SvelteFlow
+			bind:nodes
+			bind:edges
+			nodeTypes={unifiedNodeTypes}
+			edgeTypes={unifiedEdgeTypes}
+			fitView
+			connectionMode={ConnectionMode.Loose}
+			onnodeclick={handleNodeClick}
+			onedgeclick={handleEdgeClick}
+			onreconnect={handleReconnect}
+			onnodedragstart={() => onnodedragstart?.()}
+			proOptions={{ hideAttribution: true }}
+			defaultEdgeOptions={{ type: defaultEdgeType }}
+			nodesDraggable={true}
+			nodesConnectable={!connectMode}
+			elementsSelectable={true}
+		>
+			<Controls showLock={false} />
+			<Background />
 			<KeyboardHandler
 				bind:this={keyboardHandler}
 				{nodes}
@@ -252,8 +266,8 @@
 				{onundo}
 				{onredo}
 			/>
-		{/if}
-	</SvelteFlow>
+		</SvelteFlow>
+	{/if}
 
 	{#if connectMode}
 		<div class="canvas-connect-indicator" aria-live="assertive">

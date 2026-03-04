@@ -46,7 +46,7 @@ class TestInitializeDatabases:
         assert row[0] == 4
         await manager.close()
 
-    async def test_entities_table_exists_after_init(
+    async def test_elements_table_exists_after_init(
         self, tmp_path: Path
     ) -> None:
         data_dir = tmp_path / "data"
@@ -60,7 +60,7 @@ class TestInitializeDatabases:
         await initialize_databases(manager)
         cursor = await manager.main_db.execute(
             "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name='entities'"
+            "WHERE type='table' AND name='elements'"
         )
         assert await cursor.fetchone() is not None
         await manager.close()

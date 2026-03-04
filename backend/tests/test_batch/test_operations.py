@@ -58,35 +58,35 @@ async def _auth_headers(client: httpx.AsyncClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-async def _create_model(
+async def _create_diagram(
     client: httpx.AsyncClient, headers: dict[str, str], *, name: str = "Test"
 ) -> dict:
     resp = await client.post(
-        "/api/models",
-        json={"model_type": "simple-view", "name": name, "data": {}},
+        "/api/diagrams",
+        json={"diagram_type": "simple-view", "name": name, "data": {}},
         headers=headers,
     )
     return resp.json()
 
 
-async def _create_entity(
+async def _create_element(
     client: httpx.AsyncClient, headers: dict[str, str], *, name: str = "Test"
 ) -> dict:
     resp = await client.post(
-        "/api/entities",
-        json={"entity_type": "component", "name": name, "data": {}},
+        "/api/elements",
+        json={"element_type": "component", "name": name, "data": {}},
         headers=headers,
     )
     return resp.json()
 
 
-class TestBatchDeleteModels:
-    async def test_delete_multiple_models(self, client: httpx.AsyncClient) -> None:
+class TestBatchDeleteDiagrams:
+    async def test_delete_multiple_diagrams(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        m1 = await _create_model(client, headers, name="Del1")
-        m2 = await _create_model(client, headers, name="Del2")
+        m1 = await _create_diagram(client, headers, name="Del1")
+        m2 = await _create_diagram(client, headers, name="Del2")
         resp = await client.post(
-            "/api/batch/models/delete",
+            "/api/batch/diagrams/delete",
             json={"ids": [m1["id"], m2["id"]]},
             headers=headers,
         )
@@ -97,9 +97,9 @@ class TestBatchDeleteModels:
 
     async def test_partial_failure(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        m1 = await _create_model(client, headers, name="Real")
+        m1 = await _create_diagram(client, headers, name="Real")
         resp = await client.post(
-            "/api/batch/models/delete",
+            "/api/batch/diagrams/delete",
             json={"ids": [m1["id"], "nonexistent"]},
             headers=headers,
         )
@@ -108,12 +108,12 @@ class TestBatchDeleteModels:
         assert data["failed"] == 1
 
 
-class TestBatchCloneModels:
-    async def test_clone_models(self, client: httpx.AsyncClient) -> None:
+class TestBatchCloneDiagrams:
+    async def test_clone_diagrams(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        m1 = await _create_model(client, headers, name="Original")
+        m1 = await _create_diagram(client, headers, name="Original")
         resp = await client.post(
-            "/api/batch/models/clone",
+            "/api/batch/diagrams/clone",
             json={"ids": [m1["id"]]},
             headers=headers,
         )
@@ -121,32 +121,32 @@ class TestBatchCloneModels:
         assert resp.json()["succeeded"] == 1
 
         # Verify clone exists
-        list_resp = await client.get("/api/models", headers=headers)
+        list_resp = await client.get("/api/diagrams", headers=headers)
         names = [m["name"] for m in list_resp.json()["items"]]
         assert "Original (Copy)" in names
 
 
-class TestBatchSetModels:
-    async def test_move_models_to_set(self, client: httpx.AsyncClient) -> None:
+class TestBatchSetDiagrams:
+    async def test_move_diagrams_to_set(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         s = (await client.post("/api/sets", json={"name": "Target"}, headers=headers)).json()
-        m1 = await _create_model(client, headers, name="ToMove")
+        m1 = await _create_diagram(client, headers, name="ToMove")
         resp = await client.post(
-            "/api/batch/models/set",
+            "/api/batch/diagrams/set",
             json={"ids": [m1["id"]], "set_id": s["id"]},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 1
 
-        # Verify model is now in target set
-        model_resp = await client.get(f"/api/models/{m1['id']}", headers=headers)
-        assert model_resp.json()["set_id"] == s["id"]
+        # Verify diagram is now in target set
+        diagram_resp = await client.get(f"/api/diagrams/{m1['id']}", headers=headers)
+        assert diagram_resp.json()["set_id"] == s["id"]
 
     async def test_invalid_set_returns_all_failed(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        m1 = await _create_model(client, headers, name="M")
+        m1 = await _create_diagram(client, headers, name="M")
         resp = await client.post(
-            "/api/batch/models/set",
+            "/api/batch/diagrams/set",
             json={"ids": [m1["id"]], "set_id": "nonexistent"},
             headers=headers,
         )
@@ -155,105 +155,105 @@ class TestBatchSetModels:
         assert data["succeeded"] == 0
 
 
-class TestBatchTagsModels:
+class TestBatchTagsDiagrams:
     async def test_add_tags(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        m1 = await _create_model(client, headers, name="TagMe")
+        m1 = await _create_diagram(client, headers, name="TagMe")
         resp = await client.post(
-            "/api/batch/models/tags",
+            "/api/batch/diagrams/tags",
             json={"ids": [m1["id"]], "add_tags": ["v1.0", "release"], "remove_tags": []},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 1
 
         # Verify tags
-        model_resp = await client.get(f"/api/models/{m1['id']}", headers=headers)
-        tags = model_resp.json()["tags"]
+        diagram_resp = await client.get(f"/api/diagrams/{m1['id']}", headers=headers)
+        tags = diagram_resp.json()["tags"]
         assert "v1.0" in tags
         assert "release" in tags
 
     async def test_remove_tags(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        m1 = await _create_model(client, headers, name="UntagMe")
+        m1 = await _create_diagram(client, headers, name="UntagMe")
         # Add tags first
         await client.post(
-            f"/api/models/{m1['id']}/tags",
+            f"/api/diagrams/{m1['id']}/tags",
             json={"tag": "old"},
             headers=headers,
         )
         resp = await client.post(
-            "/api/batch/models/tags",
+            "/api/batch/diagrams/tags",
             json={"ids": [m1["id"]], "add_tags": [], "remove_tags": ["old"]},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 1
-        model_resp = await client.get(f"/api/models/{m1['id']}", headers=headers)
-        assert "old" not in model_resp.json()["tags"]
+        diagram_resp = await client.get(f"/api/diagrams/{m1['id']}", headers=headers)
+        assert "old" not in diagram_resp.json()["tags"]
 
 
-class TestBatchDeleteEntities:
-    async def test_delete_entities(self, client: httpx.AsyncClient) -> None:
+class TestBatchDeleteElements:
+    async def test_delete_elements(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        e1 = await _create_entity(client, headers, name="EDel1")
-        e2 = await _create_entity(client, headers, name="EDel2")
+        e1 = await _create_element(client, headers, name="EDel1")
+        e2 = await _create_element(client, headers, name="EDel2")
         resp = await client.post(
-            "/api/batch/entities/delete",
+            "/api/batch/elements/delete",
             json={"ids": [e1["id"], e2["id"]]},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 2
 
 
-class TestBatchCloneEntities:
-    async def test_clone_entities(self, client: httpx.AsyncClient) -> None:
+class TestBatchCloneElements:
+    async def test_clone_elements(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        e1 = await _create_entity(client, headers, name="EOriginal")
+        e1 = await _create_element(client, headers, name="EOriginal")
         resp = await client.post(
-            "/api/batch/entities/clone",
+            "/api/batch/elements/clone",
             json={"ids": [e1["id"]]},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 1
 
-        list_resp = await client.get("/api/entities", headers=headers)
+        list_resp = await client.get("/api/elements", headers=headers)
         names = [e["name"] for e in list_resp.json()["items"]]
         assert "EOriginal (Copy)" in names
 
 
-class TestBatchSetEntities:
-    async def test_move_entities_to_set(self, client: httpx.AsyncClient) -> None:
+class TestBatchSetElements:
+    async def test_move_elements_to_set(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         s = (await client.post("/api/sets", json={"name": "ETarget"}, headers=headers)).json()
-        e1 = await _create_entity(client, headers, name="EToMove")
+        e1 = await _create_element(client, headers, name="EToMove")
         resp = await client.post(
-            "/api/batch/entities/set",
+            "/api/batch/elements/set",
             json={"ids": [e1["id"]], "set_id": s["id"]},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 1
 
-        entity_resp = await client.get(f"/api/entities/{e1['id']}", headers=headers)
-        assert entity_resp.json()["set_id"] == s["id"]
+        element_resp = await client.get(f"/api/elements/{e1['id']}", headers=headers)
+        assert element_resp.json()["set_id"] == s["id"]
 
 
-class TestBatchTagsEntities:
+class TestBatchTagsElements:
     async def test_add_and_remove_tags(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        e1 = await _create_entity(client, headers, name="ETagMe")
+        e1 = await _create_element(client, headers, name="ETagMe")
         # Add a tag first
         await client.post(
-            f"/api/entities/{e1['id']}/tags",
+            f"/api/elements/{e1['id']}/tags",
             json={"tag": "remove-me"},
             headers=headers,
         )
         resp = await client.post(
-            "/api/batch/entities/tags",
+            "/api/batch/elements/tags",
             json={"ids": [e1["id"]], "add_tags": ["new-tag"], "remove_tags": ["remove-me"]},
             headers=headers,
         )
         assert resp.json()["succeeded"] == 1
-        entity_resp = await client.get(f"/api/entities/{e1['id']}", headers=headers)
-        tags = entity_resp.json()["tags"]
+        element_resp = await client.get(f"/api/elements/{e1['id']}", headers=headers)
+        tags = element_resp.json()["tags"]
         assert "new-tag" in tags
         assert "remove-me" not in tags
 
@@ -262,7 +262,7 @@ class TestBatchValidation:
     async def test_empty_ids_returns_422(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         resp = await client.post(
-            "/api/batch/models/delete",
+            "/api/batch/diagrams/delete",
             json={"ids": []},
             headers=headers,
         )
@@ -270,7 +270,7 @@ class TestBatchValidation:
 
     async def test_requires_auth(self, client: httpx.AsyncClient) -> None:
         resp = await client.post(
-            "/api/batch/models/delete",
+            "/api/batch/diagrams/delete",
             json={"ids": ["test"]},
         )
         assert resp.status_code == 401

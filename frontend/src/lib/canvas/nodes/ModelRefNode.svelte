@@ -13,7 +13,7 @@
 <div
 	class="canvas-node canvas-node--modelref"
 	class:canvas-node--selected={selected}
-	aria-label="{data.label}, Model Reference"
+	aria-label="{data.label}, Diagram Reference"
 >
 	<!-- Stacked squares visual: two offset background layers -->
 	<div class="canvas-node--modelref__stack" aria-hidden="true"></div>
@@ -26,15 +26,15 @@
 	{/if}
 	{#if data.browseMode && data.linkedModelId}
 		<a
-			href="/models/{data.linkedModelId}"
+			href="/diagrams/{data.linkedModelId}"
 			class="canvas-node__browse-link"
-			aria-label="View {data.label} model"
+			aria-label="View {data.label} diagram"
 		>
-			View model
+			View diagram
 		</a>
 	{:else if data.browseMode && data.entityId}
 		<a
-			href="/entities/{data.entityId}"
+			href="/elements/{data.entityId}"
 			class="canvas-node__browse-link"
 			aria-label="View {data.label} details"
 		>

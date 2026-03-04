@@ -24,7 +24,7 @@
 	{/if}
 	{#if data.browseMode && data.entityId}
 		<a
-			href="/entities/{data.entityId}"
+			href="/elements/{data.entityId}"
 			class="canvas-node__browse-link"
 			aria-label="View {data.label} details"
 		>

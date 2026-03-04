@@ -119,9 +119,9 @@ class TestDeriveNoteLabel:
 
 
 class TestNoteImportLabels:
-    """Verify Note entities get content-derived names after import."""
+    """Verify Note elements get content-derived names after import."""
 
-    async def test_note_entity_gets_content_derived_name(
+    async def test_note_element_gets_content_derived_name(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -132,11 +132,11 @@ class TestNoteImportLabels:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check note entities don't have generic "Element N" names
+        # Check note elements don't have generic "Element N" names
         cursor = await db.execute(
-            "SELECT ev.name FROM entities e "
-            "JOIN entity_versions ev ON e.id = ev.entity_id AND e.current_version = ev.version "
-            "WHERE e.entity_type = 'note'"
+            "SELECT ev.name FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            "WHERE e.element_type = 'note'"
         )
         rows = await cursor.fetchall()
         assert len(rows) >= 5
@@ -156,9 +156,9 @@ class TestNoteImportLabels:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check model_versions with canvas data have nodes with descriptions
+        # Check diagram_versions with canvas data have nodes with descriptions
         cursor = await db.execute(
-            "SELECT data FROM model_versions WHERE data IS NOT NULL AND data != '{}'"
+            "SELECT data FROM diagram_versions WHERE data IS NOT NULL AND data != '{}'"
         )
         rows = await cursor.fetchall()
         found_description = False
@@ -174,7 +174,7 @@ class TestNoteImportLabels:
                 break
         assert found_description, "No canvas nodes have description populated"
 
-    async def test_boundary_entity_gets_meaningful_name(
+    async def test_boundary_element_gets_meaningful_name(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -185,11 +185,11 @@ class TestNoteImportLabels:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check boundary entities exist and have meaningful names
+        # Check boundary elements exist and have meaningful names
         cursor = await db.execute(
-            "SELECT ev.name FROM entities e "
-            "JOIN entity_versions ev ON e.id = ev.entity_id AND e.current_version = ev.version "
-            "WHERE e.entity_type = 'boundary'"
+            "SELECT ev.name FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            "WHERE e.element_type = 'boundary'"
         )
         rows = await cursor.fetchall()
         assert len(rows) >= 1

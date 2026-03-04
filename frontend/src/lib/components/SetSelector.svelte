@@ -66,7 +66,7 @@
 			<option value="">All sets</option>
 		{/if}
 		{#each sets as s}
-			<option value={s.id}>{s.name} ({s.model_count + s.entity_count})</option>
+			<option value={s.id}>{s.name} ({s.diagram_count + s.element_count})</option>
 		{/each}
 		{#if showNewSet}
 			<option value="__new__">+ New Set...</option>

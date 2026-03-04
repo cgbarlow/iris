@@ -21,33 +21,33 @@ async def list_bookmarks(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> list[BookmarkResponse]:
-    """List current user's bookmarked models."""
+    """List current user's bookmarked diagrams."""
     db = request.app.state.db_manager.main_db
     cursor = await db.execute(
-        "SELECT model_id, created_at FROM bookmarks "
+        "SELECT diagram_id, created_at FROM bookmarks "
         "WHERE user_id = ? ORDER BY created_at DESC",
         (current_user["id"],),
     )
     rows = await cursor.fetchall()
-    return [BookmarkResponse(model_id=r[0], created_at=r[1]) for r in rows]
+    return [BookmarkResponse(diagram_id=r[0], created_at=r[1]) for r in rows]
 
 
 @router.post(
-    "/api/models/{model_id}/bookmark",
+    "/api/diagrams/{diagram_id}/bookmark",
     response_model=BookmarkResponse,
     status_code=201,
 )
-async def bookmark_model(
-    model_id: str,
+async def bookmark_diagram(
+    diagram_id: str,
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> BookmarkResponse:
-    """Bookmark a model for the current user."""
+    """Bookmark a diagram for the current user."""
     db = request.app.state.db_manager.main_db
     # Check if already bookmarked
     cursor = await db.execute(
-        "SELECT created_at FROM bookmarks WHERE user_id = ? AND model_id = ?",
-        (current_user["id"], model_id),
+        "SELECT created_at FROM bookmarks WHERE user_id = ? AND diagram_id = ?",
+        (current_user["id"], diagram_id),
     )
     existing = await cursor.fetchone()
     if existing:
@@ -55,30 +55,30 @@ async def bookmark_model(
 
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
-        "INSERT INTO bookmarks (user_id, model_id, created_at) VALUES (?, ?, ?)",
-        (current_user["id"], model_id, now),
+        "INSERT INTO bookmarks (user_id, diagram_id, created_at) VALUES (?, ?, ?)",
+        (current_user["id"], diagram_id, now),
     )
     await db.commit()
-    return BookmarkResponse(model_id=model_id, created_at=now)
+    return BookmarkResponse(diagram_id=diagram_id, created_at=now)
 
 
-@router.delete("/api/models/{model_id}/bookmark", status_code=204)
-async def unbookmark_model(
-    model_id: str,
+@router.delete("/api/diagrams/{diagram_id}/bookmark", status_code=204)
+async def unbookmark_diagram(
+    diagram_id: str,
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> None:
-    """Remove a model bookmark for the current user."""
+    """Remove a diagram bookmark for the current user."""
     db = request.app.state.db_manager.main_db
     cursor = await db.execute(
-        "SELECT 1 FROM bookmarks WHERE user_id = ? AND model_id = ?",
-        (current_user["id"], model_id),
+        "SELECT 1 FROM bookmarks WHERE user_id = ? AND diagram_id = ?",
+        (current_user["id"], diagram_id),
     )
     if await cursor.fetchone() is None:
         raise HTTPException(status_code=404, detail="Bookmark not found")
 
     await db.execute(
-        "DELETE FROM bookmarks WHERE user_id = ? AND model_id = ?",
-        (current_user["id"], model_id),
+        "DELETE FROM bookmarks WHERE user_id = ? AND diagram_id = ?",
+        (current_user["id"], diagram_id),
     )
     await db.commit()

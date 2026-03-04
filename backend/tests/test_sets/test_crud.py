@@ -88,8 +88,8 @@ class TestCreateSet:
         data = resp.json()
         assert data["name"] == "Sprint 1"
         assert data["description"] == "First sprint"
-        assert data["model_count"] == 0
-        assert data["entity_count"] == 0
+        assert data["diagram_count"] == 0
+        assert data["element_count"] == 0
 
     async def test_duplicate_name_returns_409(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
@@ -160,14 +160,14 @@ class TestDeleteSet:
         # Create a set
         create_resp = await client.post(
             "/api/sets",
-            json={"name": "Has Models"},
+            json={"name": "Has Diagrams"},
             headers=headers,
         )
         set_id = create_resp.json()["id"]
-        # Create a model in this set
+        # Create a diagram in this set
         await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "M1", "data": {}, "set_id": set_id},
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "M1", "data": {}, "set_id": set_id},
             headers=headers,
         )
         # Try to delete
@@ -224,25 +224,25 @@ class TestSetTags:
         s1 = (await client.post("/api/sets", json={"name": "Set A"}, headers=headers)).json()
         s2 = (await client.post("/api/sets", json={"name": "Set B"}, headers=headers)).json()
 
-        # Create a model in each set and tag them
+        # Create a diagram in each set and tag them
         m1 = (await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "M1", "data": {}, "set_id": s1["id"]},
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "M1", "data": {}, "set_id": s1["id"]},
             headers=headers,
         )).json()
         m2 = (await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "M2", "data": {}, "set_id": s2["id"]},
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "M2", "data": {}, "set_id": s2["id"]},
             headers=headers,
         )).json()
 
         await client.post(
-            f"/api/models/{m1['id']}/tags",
+            f"/api/diagrams/{m1['id']}/tags",
             json={"tag": "v1.0"},
             headers=headers,
         )
         await client.post(
-            f"/api/models/{m2['id']}/tags",
+            f"/api/diagrams/{m2['id']}/tags",
             json={"tag": "v2.0"},
             headers=headers,
         )
@@ -254,8 +254,8 @@ class TestSetTags:
         assert "v2.0" not in resp.json()
 
 
-class TestModelSetIntegration:
-    async def test_model_created_with_set_id(self, client: httpx.AsyncClient) -> None:
+class TestDiagramSetIntegration:
+    async def test_diagram_created_with_set_id(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         create_resp = await client.post(
             "/api/sets",
@@ -263,79 +263,79 @@ class TestModelSetIntegration:
             headers=headers,
         )
         set_id = create_resp.json()["id"]
-        model_resp = await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "M1", "data": {}, "set_id": set_id},
+        diagram_resp = await client.post(
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "M1", "data": {}, "set_id": set_id},
             headers=headers,
         )
-        assert model_resp.status_code == 201
-        assert model_resp.json()["set_id"] == set_id
+        assert diagram_resp.status_code == 201
+        assert diagram_resp.json()["set_id"] == set_id
 
-    async def test_model_defaults_to_default_set(self, client: httpx.AsyncClient) -> None:
+    async def test_diagram_defaults_to_default_set(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
-        model_resp = await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "M2", "data": {}},
+        diagram_resp = await client.post(
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "M2", "data": {}},
             headers=headers,
         )
-        assert model_resp.json()["set_id"] == DEFAULT_SET_ID
+        assert diagram_resp.json()["set_id"] == DEFAULT_SET_ID
 
-    async def test_list_models_filtered_by_set(self, client: httpx.AsyncClient) -> None:
+    async def test_list_diagrams_filtered_by_set(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         s = (await client.post("/api/sets", json={"name": "Filter Set"}, headers=headers)).json()
         await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "InSet", "data": {}, "set_id": s["id"]},
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "InSet", "data": {}, "set_id": s["id"]},
             headers=headers,
         )
         await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "NotInSet", "data": {}},
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "NotInSet", "data": {}},
             headers=headers,
         )
-        resp = await client.get(f"/api/models?set_id={s['id']}", headers=headers)
+        resp = await client.get(f"/api/diagrams?set_id={s['id']}", headers=headers)
         items = resp.json()["items"]
         assert len(items) == 1
         assert items[0]["name"] == "InSet"
 
-    async def test_set_counts_reflect_models(self, client: httpx.AsyncClient) -> None:
+    async def test_set_counts_reflect_diagrams(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         s = (await client.post("/api/sets", json={"name": "Count Set"}, headers=headers)).json()
         await client.post(
-            "/api/models",
-            json={"model_type": "simple-view", "name": "MC1", "data": {}, "set_id": s["id"]},
+            "/api/diagrams",
+            json={"diagram_type": "simple-view", "name": "MC1", "data": {}, "set_id": s["id"]},
             headers=headers,
         )
         resp = await client.get(f"/api/sets/{s['id']}", headers=headers)
-        assert resp.json()["model_count"] == 1
+        assert resp.json()["diagram_count"] == 1
 
 
-class TestEntitySetIntegration:
-    async def test_entity_created_with_set_id(self, client: httpx.AsyncClient) -> None:
+class TestElementSetIntegration:
+    async def test_element_created_with_set_id(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         s = (await client.post("/api/sets", json={"name": "E Set"}, headers=headers)).json()
         resp = await client.post(
-            "/api/entities",
-            json={"entity_type": "component", "name": "E1", "data": {}, "set_id": s["id"]},
+            "/api/elements",
+            json={"element_type": "component", "name": "E1", "data": {}, "set_id": s["id"]},
             headers=headers,
         )
         assert resp.status_code == 201
         assert resp.json()["set_id"] == s["id"]
 
-    async def test_list_entities_filtered_by_set(self, client: httpx.AsyncClient) -> None:
+    async def test_list_elements_filtered_by_set(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         s = (await client.post("/api/sets", json={"name": "EFilter"}, headers=headers)).json()
         await client.post(
-            "/api/entities",
-            json={"entity_type": "component", "name": "InSet", "data": {}, "set_id": s["id"]},
+            "/api/elements",
+            json={"element_type": "component", "name": "InSet", "data": {}, "set_id": s["id"]},
             headers=headers,
         )
         await client.post(
-            "/api/entities",
-            json={"entity_type": "component", "name": "NotInSet", "data": {}},
+            "/api/elements",
+            json={"element_type": "component", "name": "NotInSet", "data": {}},
             headers=headers,
         )
-        resp = await client.get(f"/api/entities?set_id={s['id']}", headers=headers)
+        resp = await client.get(f"/api/elements?set_id={s['id']}", headers=headers)
         items = resp.json()["items"]
         assert len(items) == 1
         assert items[0]["name"] == "InSet"
@@ -346,20 +346,20 @@ class TestEntitySetIntegration:
         s2 = (await client.post("/api/sets", json={"name": "TagScope2"}, headers=headers)).json()
 
         e1 = (await client.post(
-            "/api/entities",
-            json={"entity_type": "component", "name": "E1", "data": {}, "set_id": s1["id"]},
+            "/api/elements",
+            json={"element_type": "component", "name": "E1", "data": {}, "set_id": s1["id"]},
             headers=headers,
         )).json()
         e2 = (await client.post(
-            "/api/entities",
-            json={"entity_type": "component", "name": "E2", "data": {}, "set_id": s2["id"]},
+            "/api/elements",
+            json={"element_type": "component", "name": "E2", "data": {}, "set_id": s2["id"]},
             headers=headers,
         )).json()
 
-        await client.post(f"/api/entities/{e1['id']}/tags", json={"tag": "alpha"}, headers=headers)
-        await client.post(f"/api/entities/{e2['id']}/tags", json={"tag": "beta"}, headers=headers)
+        await client.post(f"/api/elements/{e1['id']}/tags", json={"tag": "alpha"}, headers=headers)
+        await client.post(f"/api/elements/{e2['id']}/tags", json={"tag": "beta"}, headers=headers)
 
-        resp = await client.get(f"/api/entities/tags/all?set_id={s1['id']}", headers=headers)
+        resp = await client.get(f"/api/elements/tags/all?set_id={s1['id']}", headers=headers)
         tags = resp.json()
         assert "alpha" in tags
         assert "beta" not in tags

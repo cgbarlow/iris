@@ -37,87 +37,87 @@ async def _list_comments(
     ]
 
 
-# Entity comments
+# Element comments
 @router.get(
-    "/api/entities/{entity_id}/comments",
+    "/api/elements/{element_id}/comments",
     response_model=list[CommentResponse],
 )
-async def list_entity_comments(
-    entity_id: str,
+async def list_element_comments(
+    element_id: str,
     request: Request,
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> list[CommentResponse]:
-    """List comments on an entity."""
+    """List comments on an element."""
     db = request.app.state.db_manager.main_db
-    return await _list_comments(db, "entity", entity_id)
+    return await _list_comments(db, "element", element_id)
 
 
 @router.post(
-    "/api/entities/{entity_id}/comments",
+    "/api/elements/{element_id}/comments",
     response_model=CommentResponse,
     status_code=201,
 )
-async def create_entity_comment(
-    entity_id: str,
+async def create_element_comment(
+    element_id: str,
     body: CommentCreate,
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> CommentResponse:
-    """Add a comment on an entity."""
+    """Add a comment on an element."""
     db = request.app.state.db_manager.main_db
     comment_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
         "INSERT INTO comments (id, target_type, target_id, user_id, "
-        "content, created_at, updated_at) VALUES (?, 'entity', ?, ?, ?, ?, ?)",
-        (comment_id, entity_id, current_user["id"], body.content, now, now),
+        "content, created_at, updated_at) VALUES (?, 'element', ?, ?, ?, ?, ?)",
+        (comment_id, element_id, current_user["id"], body.content, now, now),
     )
     await db.commit()
     return CommentResponse(
-        id=comment_id, target_type="entity", target_id=entity_id,
+        id=comment_id, target_type="element", target_id=element_id,
         user_id=current_user["id"], content=body.content,
         created_at=now, updated_at=now,
     )
 
 
-# Model comments
+# Diagram comments
 @router.get(
-    "/api/models/{model_id}/comments",
+    "/api/diagrams/{diagram_id}/comments",
     response_model=list[CommentResponse],
 )
-async def list_model_comments(
-    model_id: str,
+async def list_diagram_comments(
+    diagram_id: str,
     request: Request,
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> list[CommentResponse]:
-    """List comments on a model."""
+    """List comments on a diagram."""
     db = request.app.state.db_manager.main_db
-    return await _list_comments(db, "model", model_id)
+    return await _list_comments(db, "diagram", diagram_id)
 
 
 @router.post(
-    "/api/models/{model_id}/comments",
+    "/api/diagrams/{diagram_id}/comments",
     response_model=CommentResponse,
     status_code=201,
 )
-async def create_model_comment(
-    model_id: str,
+async def create_diagram_comment(
+    diagram_id: str,
     body: CommentCreate,
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> CommentResponse:
-    """Add a comment on a model."""
+    """Add a comment on a diagram."""
     db = request.app.state.db_manager.main_db
     comment_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
         "INSERT INTO comments (id, target_type, target_id, user_id, "
-        "content, created_at, updated_at) VALUES (?, 'model', ?, ?, ?, ?, ?)",
-        (comment_id, model_id, current_user["id"], body.content, now, now),
+        "content, created_at, updated_at) VALUES (?, 'diagram', ?, ?, ?, ?, ?)",
+        (comment_id, diagram_id, current_user["id"], body.content, now, now),
     )
     await db.commit()
     return CommentResponse(
-        id=comment_id, target_type="model", target_id=model_id,
+        id=comment_id, target_type="diagram", target_id=diagram_id,
         user_id=current_user["id"], content=body.content,
         created_at=now, updated_at=now,
     )

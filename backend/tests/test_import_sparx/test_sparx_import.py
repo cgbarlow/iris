@@ -273,7 +273,7 @@ class TestConverter:
 class TestFullImport:
     """Verify the full import pipeline using the sample .qea file."""
 
-    async def test_import_creates_models_for_packages(
+    async def test_import_creates_diagrams_for_packages(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -288,12 +288,12 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # 68 packages should create 68 models
-        assert summary.models_created == 68
-        assert summary.entities_created > 0
+        # 68 packages should create 68 packages
+        assert summary.packages_created == 68
+        assert summary.elements_created > 0
         assert summary.diagrams_created > 0
 
-    async def test_import_creates_entities_for_classes(
+    async def test_import_creates_elements_for_classes(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -307,8 +307,8 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # 959 entities: 953 classes + 5 notes + 1 boundary (Package=67 handled as hierarchy)
-        assert summary.entities_created == 959
+        # 959 elements: 953 classes + 5 notes + 1 boundary (Package=67 handled as hierarchy)
+        assert summary.elements_created == 959
         # Only Text/UMLDiagram/Constraint are skipped now
         assert summary.elements_skipped == 0
 
@@ -362,17 +362,17 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # entities_created + elements_skipped + packages = total objects
+        # elements_created + elements_skipped + packages = total objects
         # Packages are 67 in t_object (Object_Type='Package')
         total_objects = 1026
-        assert summary.entities_created + summary.elements_skipped + 67 == total_objects
+        assert summary.elements_created + summary.elements_skipped + 67 == total_objects
 
-        # relationships_created + connectors_skipped + model_relationships_created = total connectors
+        # relationships_created + connectors_skipped + package_relationships_created = total connectors
         total_connectors = 1420
         assert (
             summary.relationships_created
             + summary.connectors_skipped
-            + summary.model_relationships_created
+            + summary.package_relationships_created
             == total_connectors
         )
 
@@ -411,10 +411,10 @@ class TestImportRouter:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["models_created"] == 68
-        assert data["entities_created"] > 0
+        assert data["packages_created"] == 68
+        assert data["elements_created"] > 0
         assert data["diagrams_created"] == 107
-        assert "model_relationships_created" in data
+        assert "package_relationships_created" in data
         assert isinstance(data["warnings"], list)
 
 
@@ -503,14 +503,16 @@ class TestImportMetadata:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check model_versions have descriptions (from package Notes)
+        # Check diagram_versions + package_versions have descriptions
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM model_versions WHERE description IS NOT NULL AND description != ''"
+            "SELECT "
+            "(SELECT COUNT(*) FROM diagram_versions WHERE description IS NOT NULL AND description != '') + "
+            "(SELECT COUNT(*) FROM package_versions WHERE description IS NOT NULL AND description != '')"
         )
         row = await cursor.fetchone()
         assert row[0] >= 64
 
-    async def test_import_populates_entity_metadata(
+    async def test_import_populates_element_metadata(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -521,9 +523,9 @@ class TestImportMetadata:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check entity_versions have metadata
+        # Check element_versions have metadata
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM entity_versions WHERE metadata IS NOT NULL"
+            "SELECT COUNT(*) FROM element_versions WHERE metadata IS NOT NULL"
         )
         row = await cursor.fetchone()
         assert row[0] > 0
@@ -541,7 +543,7 @@ class TestImportMetadata:
 
         import json
         cursor = await db.execute(
-            "SELECT metadata FROM entity_versions WHERE metadata IS NOT NULL LIMIT 10"
+            "SELECT metadata FROM element_versions WHERE metadata IS NOT NULL LIMIT 10"
         )
         rows = await cursor.fetchall()
         found_stereotype = False
@@ -552,7 +554,7 @@ class TestImportMetadata:
                 break
         assert found_stereotype
 
-    async def test_import_entity_metadata_has_scope(
+    async def test_import_element_metadata_has_scope(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -565,7 +567,7 @@ class TestImportMetadata:
 
         import json
         cursor = await db.execute(
-            "SELECT metadata FROM entity_versions WHERE metadata IS NOT NULL"
+            "SELECT metadata FROM element_versions WHERE metadata IS NOT NULL"
         )
         rows = await cursor.fetchall()
         found_scope = False
@@ -576,7 +578,7 @@ class TestImportMetadata:
                 break
         assert found_scope
 
-    async def test_import_entity_metadata_has_created_date(
+    async def test_import_element_metadata_has_created_date(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -589,7 +591,7 @@ class TestImportMetadata:
 
         import json
         cursor = await db.execute(
-            "SELECT metadata FROM entity_versions WHERE metadata IS NOT NULL"
+            "SELECT metadata FROM element_versions WHERE metadata IS NOT NULL"
         )
         rows = await cursor.fetchall()
         found_date = False
@@ -613,7 +615,7 @@ class TestImportMetadata:
 
         import json
         cursor = await db.execute(
-            "SELECT data FROM entity_versions WHERE data IS NOT NULL"
+            "SELECT data FROM element_versions WHERE data IS NOT NULL"
         )
         rows = await cursor.fetchall()
         found_notes = False
@@ -633,15 +635,15 @@ class TestImportMetadata:
 
 
 class TestMetadataStorage:
-    """Verify metadata field flows through model and entity CRUD."""
+    """Verify metadata field flows through diagram and element CRUD."""
 
-    async def test_create_model_with_metadata(self, client: httpx.AsyncClient) -> None:
+    async def test_create_diagram_with_metadata(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         resp = await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "uml",
-                "name": "MetadataModel",
+                "diagram_type": "uml",
+                "name": "MetadataDiagram",
                 "metadata": {"status": "Proposed", "stereotype": "DataType"},
             },
             headers=headers,
@@ -652,39 +654,39 @@ class TestMetadataStorage:
         assert data["metadata"]["status"] == "Proposed"
         assert data["metadata"]["stereotype"] == "DataType"
 
-    async def test_get_model_returns_metadata(self, client: httpx.AsyncClient) -> None:
+    async def test_get_diagram_returns_metadata(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         create_resp = await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "uml",
-                "name": "MetadataGetModel",
+                "diagram_type": "uml",
+                "name": "MetadataGetDiagram",
                 "metadata": {"status": "Approved"},
             },
             headers=headers,
         )
-        model_id = create_resp.json()["id"]
-        resp = await client.get(f"/api/models/{model_id}", headers=headers)
+        diagram_id = create_resp.json()["id"]
+        resp = await client.get(f"/api/diagrams/{diagram_id}", headers=headers)
         assert resp.status_code == 200
         assert resp.json()["metadata"]["status"] == "Approved"
 
-    async def test_model_without_metadata_returns_null(self, client: httpx.AsyncClient) -> None:
+    async def test_diagram_without_metadata_returns_null(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         resp = await client.post(
-            "/api/models",
-            json={"model_type": "uml", "name": "NoMetadataModel"},
+            "/api/diagrams",
+            json={"diagram_type": "uml", "name": "NoMetadataDiagram"},
             headers=headers,
         )
         assert resp.status_code == 201
         assert resp.json()["metadata"] is None
 
-    async def test_create_entity_with_metadata(self, client: httpx.AsyncClient) -> None:
+    async def test_create_element_with_metadata(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         resp = await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "class",
-                "name": "MetadataEntity",
+                "element_type": "class",
+                "name": "MetadataElement",
                 "metadata": {"status": "Proposed", "version": "1.0"},
             },
             headers=headers,
@@ -694,20 +696,20 @@ class TestMetadataStorage:
         assert data["metadata"]["status"] == "Proposed"
         assert data["metadata"]["version"] == "1.0"
 
-    async def test_update_model_preserves_metadata(self, client: httpx.AsyncClient) -> None:
+    async def test_update_diagram_preserves_metadata(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
         create_resp = await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "uml",
-                "name": "UpdateMetaModel",
+                "diagram_type": "uml",
+                "name": "UpdateMetaDiagram",
                 "metadata": {"status": "Draft"},
             },
             headers=headers,
         )
-        model_id = create_resp.json()["id"]
+        diagram_id = create_resp.json()["id"]
         resp = await client.put(
-            f"/api/models/{model_id}",
+            f"/api/diagrams/{diagram_id}",
             json={
                 "name": "UpdateMetaModel v2",
                 "metadata": {"status": "Approved"},
@@ -723,9 +725,9 @@ class TestMetadataStorage:
 
 
 class TestImportChangeSummary:
-    """Verify imported entities and models have change_summary in version history."""
+    """Verify imported elements and diagrams have change_summary in version history."""
 
-    async def test_import_change_summary_entity(
+    async def test_import_change_summary_element(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -736,15 +738,15 @@ class TestImportChangeSummary:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check entity_versions have change_summary
+        # Check element_versions have change_summary
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM entity_versions "
+            "SELECT COUNT(*) FROM element_versions "
             "WHERE change_summary IS NOT NULL AND change_summary LIKE 'Imported from SparxEA%'"
         )
         row = await cursor.fetchone()
         assert row[0] > 0
 
-    async def test_import_change_summary_model(
+    async def test_import_change_summary_diagram(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -755,15 +757,15 @@ class TestImportChangeSummary:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check model_versions have change_summary
+        # Check diagram_versions have change_summary
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM model_versions "
+            "SELECT COUNT(*) FROM diagram_versions "
             "WHERE change_summary IS NOT NULL AND change_summary LIKE 'Imported from SparxEA%'"
         )
         row = await cursor.fetchone()
         assert row[0] > 0
 
-    async def test_import_notes_as_entities(
+    async def test_import_notes_as_elements(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -774,9 +776,9 @@ class TestImportChangeSummary:
         user_id = row[0]
         await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check entities with type 'note' exist
+        # Check elements with type 'note' exist
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM entities WHERE entity_type = 'note'"
+            "SELECT COUNT(*) FROM elements WHERE element_type = 'note'"
         )
         row = await cursor.fetchone()
         assert row[0] >= 5  # Sample has 5 notes
@@ -800,7 +802,7 @@ class TestImportChangeSummary:
         row = await cursor.fetchone()
         assert row[0] >= 1
 
-    async def test_import_model_relationships_created(
+    async def test_import_package_relationships_created(
         self, client: httpx.AsyncClient, app_config: AppConfig
     ) -> None:
         headers = await _auth_headers(client)
@@ -811,9 +813,9 @@ class TestImportChangeSummary:
         user_id = row[0]
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check model_relationships table has entries (unique rows)
-        cursor = await db.execute("SELECT COUNT(*) FROM model_relationships")
+        # Check package_relationships table has entries (unique rows)
+        cursor = await db.execute("SELECT COUNT(*) FROM package_relationships")
         row = await cursor.fetchone()
         assert row[0] > 0
         # Summary count includes duplicates (already-existing relationships)
-        assert summary.model_relationships_created >= row[0]
+        assert summary.package_relationships_created >= row[0]

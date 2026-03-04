@@ -120,5 +120,11 @@ CREATE INDEX IF NOT EXISTS idx_model_versions_created_by ON model_versions(creat
 
 async def up(db: aiosqlite.Connection) -> None:
     """Run migration up."""
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
     await db.executescript(UP_SQL)
     await db.commit()

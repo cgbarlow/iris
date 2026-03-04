@@ -4,19 +4,19 @@
 	import { setActiveSet, clearActiveSet, getActiveSetId } from '$lib/stores/activeSet.svelte.js';
 	import type {
 		PaginatedResponse,
-		Entity,
-		Model,
+		Element,
+		Diagram,
 		Bookmark,
 		SearchResult,
 		SearchResponse,
 		IrisSet,
 	} from '$lib/types/api';
 
-	let entityCount = $state(0);
-	let modelCount = $state(0);
+	let elementCount = $state(0);
+	let diagramCount = $state(0);
 	let setCount = $state(0);
 	let activeSet = $state<IrisSet | null>(null);
-	let bookmarkedModels = $state<Model[]>([]);
+	let bookmarkedDiagrams = $state<Diagram[]>([]);
 	let searchQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
 	let searching = $state(false);
@@ -35,14 +35,14 @@
 		try {
 			const setFilter = setId ? `&set_id=${setId}` : '';
 
-			const [entitiesData, modelsData, bookmarks, setsData] = await Promise.all([
-				apiFetch<PaginatedResponse<Entity>>(`/api/entities?page_size=1${setFilter}`),
-				apiFetch<PaginatedResponse<Model>>(`/api/models?page_size=1${setFilter}`),
+			const [elementsData, diagramsData, bookmarks, setsData] = await Promise.all([
+				apiFetch<PaginatedResponse<Element>>(`/api/elements?page_size=1${setFilter}`),
+				apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?page_size=1${setFilter}`),
 				apiFetch<Bookmark[]>('/api/bookmarks'),
 				apiFetch<{ items: IrisSet[] }>('/api/sets'),
 			]);
-			entityCount = entitiesData.total;
-			modelCount = modelsData.total;
+			elementCount = elementsData.total;
+			diagramCount = diagramsData.total;
 			setCount = setsData.items.length;
 
 			// Resolve active set if filtering
@@ -53,12 +53,12 @@
 				activeSet = null;
 			}
 
-			// Resolve bookmarked models
-			const modelPromises = bookmarks.map((b) =>
-				apiFetch<Model>(`/api/models/${b.model_id}`).catch(() => null)
+			// Resolve bookmarked diagrams
+			const diagramPromises = bookmarks.map((b) =>
+				apiFetch<Diagram>(`/api/diagrams/${b.diagram_id}`).catch(() => null)
 			);
-			const resolved = await Promise.all(modelPromises);
-			bookmarkedModels = resolved.filter((m): m is Model => m !== null);
+			const resolved = await Promise.all(diagramPromises);
+			bookmarkedDiagrams = resolved.filter((d): d is Diagram => d !== null);
 		} catch {
 			error = 'Failed to load dashboard data';
 		}
@@ -125,23 +125,23 @@
 			{/if}
 		</div>
 		<a
-			href={setId ? `/models?set_id=${setId}` : '/models'}
+			href={setId ? `/diagrams?set_id=${setId}` : '/diagrams'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
-			<div class="text-3xl font-bold" style="color: var(--color-primary)">{modelCount}</div>
+			<div class="text-3xl font-bold" style="color: var(--color-primary)">{diagramCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Models{#if activeSet} (filtered){/if}
+				Diagrams{#if activeSet} (filtered){/if}
 			</div>
 		</a>
 		<a
-			href={setId ? `/entities?set_id=${setId}` : '/entities'}
+			href={setId ? `/elements?set_id=${setId}` : '/elements'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
-			<div class="text-3xl font-bold" style="color: var(--color-primary)">{entityCount}</div>
+			<div class="text-3xl font-bold" style="color: var(--color-primary)">{elementCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Entities{#if activeSet} (filtered){/if}
+				Elements{#if activeSet} (filtered){/if}
 			</div>
 		</a>
 	</div>
@@ -154,7 +154,7 @@
 			bind:value={searchQuery}
 			oninput={onSearchInput}
 			type="search"
-			placeholder="Search entities and models..."
+			placeholder="Search elements and diagrams..."
 			class="mt-1 w-full rounded border px-3 py-2 text-sm"
 			style="max-width: 500px; border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		/>
@@ -186,21 +186,21 @@
 		<p class="mt-2 text-sm" style="color: var(--color-muted)">No results found.</p>
 	{/if}
 
-	<!-- Bookmarked Models -->
-	{#if bookmarkedModels.length > 0}
+	<!-- Bookmarked Diagrams -->
+	{#if bookmarkedDiagrams.length > 0}
 		<div class="mt-6">
-			<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Bookmarked Models</h2>
+			<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Bookmarked Diagrams</h2>
 			<ul class="mt-2 flex flex-col gap-2" style="max-width: 500px">
-				{#each bookmarkedModels as model}
+				{#each bookmarkedDiagrams as diagram}
 					<li>
 						<a
-							href="/models/{model.id}"
+							href="/diagrams/{diagram.id}"
 							class="flex items-center gap-3 rounded border p-3"
 							style="border-color: var(--color-border); color: var(--color-fg)"
 						>
-							<span class="text-sm font-medium" style="color: var(--color-primary)">{model.name}</span>
+							<span class="text-sm font-medium" style="color: var(--color-primary)">{diagram.name}</span>
 							<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-								{model.model_type}
+								{diagram.diagram_type}
 							</span>
 						</a>
 					</li>

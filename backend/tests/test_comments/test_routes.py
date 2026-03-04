@@ -81,40 +81,40 @@ async def _create_viewer_headers(
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-class TestEntityComments:
-    """Verify comments on entities."""
+class TestElementComments:
+    """Verify comments on elements."""
 
     async def test_list_empty_comments(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
         resp = await client.get(
-            "/api/entities/some-entity-id/comments", headers=headers,
+            "/api/elements/some-element-id/comments", headers=headers,
         )
         assert resp.status_code == 200
         assert resp.json() == []
 
-    async def test_create_and_list_entity_comment(
+    async def test_create_and_list_element_comment(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
         # Create a comment
         resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "This is a test comment."},
             headers=headers,
         )
         assert resp.status_code == 201
         data = resp.json()
         assert data["content"] == "This is a test comment."
-        assert data["target_type"] == "entity"
-        assert data["target_id"] == "ent-1"
+        assert data["target_type"] == "element"
+        assert data["target_id"] == "elem-1"
         assert "id" in data
         assert "created_at" in data
 
         # List comments
         resp = await client.get(
-            "/api/entities/ent-1/comments", headers=headers,
+            "/api/elements/elem-1/comments", headers=headers,
         )
         assert resp.status_code == 200
         comments = resp.json()
@@ -125,30 +125,30 @@ class TestEntityComments:
         self, client: httpx.AsyncClient,
     ) -> None:
         resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "No auth"},
         )
         assert resp.status_code == 401
 
 
-class TestModelComments:
-    """Verify comments on models."""
+class TestDiagramComments:
+    """Verify comments on diagrams."""
 
-    async def test_create_and_list_model_comment(
+    async def test_create_and_list_diagram_comment(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
         resp = await client.post(
-            "/api/models/model-1/comments",
-            json={"content": "Model feedback."},
+            "/api/diagrams/diagram-1/comments",
+            json={"content": "Diagram feedback."},
             headers=headers,
         )
         assert resp.status_code == 201
-        assert resp.json()["target_type"] == "model"
-        assert resp.json()["target_id"] == "model-1"
+        assert resp.json()["target_type"] == "diagram"
+        assert resp.json()["target_id"] == "diagram-1"
 
         resp = await client.get(
-            "/api/models/model-1/comments", headers=headers,
+            "/api/diagrams/diagram-1/comments", headers=headers,
         )
         assert resp.status_code == 200
         assert len(resp.json()) == 1
@@ -162,7 +162,7 @@ class TestUpdateComment:
     ) -> None:
         headers = await _admin_headers(client)
         create_resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "Original content."},
             headers=headers,
         )
@@ -196,7 +196,7 @@ class TestUpdateComment:
         )
         # Viewer creates a comment
         create_resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "Viewer comment."},
             headers=viewer_headers,
         )
@@ -221,7 +221,7 @@ class TestUpdateComment:
             client, admin_headers,
         )
         create_resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "Viewer wrote this."},
             headers=viewer_headers,
         )
@@ -244,7 +244,7 @@ class TestDeleteComment:
     ) -> None:
         headers = await _admin_headers(client)
         create_resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "To be deleted."},
             headers=headers,
         )
@@ -257,7 +257,7 @@ class TestDeleteComment:
 
         # Deleted comment should not appear in listing
         resp = await client.get(
-            "/api/entities/ent-1/comments", headers=headers,
+            "/api/elements/elem-1/comments", headers=headers,
         )
         assert resp.status_code == 200
         assert len(resp.json()) == 0
@@ -279,7 +279,7 @@ class TestDeleteComment:
             client, admin_headers,
         )
         create_resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "Protected."},
             headers=viewer_headers,
         )
@@ -301,7 +301,7 @@ class TestDeleteComment:
             client, admin_headers,
         )
         create_resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": "Viewer comment."},
             headers=viewer_headers,
         )
@@ -321,7 +321,7 @@ class TestCommentValidation:
     ) -> None:
         headers = await _admin_headers(client)
         resp = await client.post(
-            "/api/entities/ent-1/comments",
+            "/api/elements/elem-1/comments",
             json={"content": ""},
             headers=headers,
         )

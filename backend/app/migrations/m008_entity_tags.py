@@ -9,6 +9,12 @@ if TYPE_CHECKING:
 
 async def up(db: aiosqlite.Connection) -> None:
     """Create entity_tags table."""
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
     await db.execute(
         "CREATE TABLE IF NOT EXISTS entity_tags ("
         "  entity_id TEXT NOT NULL,"

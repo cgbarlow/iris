@@ -59,37 +59,37 @@ async def _admin_headers(client: httpx.AsyncClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-async def _create_model(
+async def _create_diagram(
     client: httpx.AsyncClient,
     headers: dict[str, str],
-    name: str = "Test Model",
+    name: str = "Test Diagram",
 ) -> str:
-    """Create a model via the API and return its ID."""
+    """Create a diagram via the API and return its ID."""
     resp = await client.post(
-        "/api/models",
-        json={"model_type": "simple", "name": name},
+        "/api/diagrams",
+        json={"diagram_type": "simple", "name": name},
         headers=headers,
     )
     assert resp.status_code == 201
     return resp.json()["id"]
 
 
-class TestBookmarkModel:
-    """Verify bookmarking a model."""
+class TestBookmarkDiagram:
+    """Verify bookmarking a diagram."""
 
     async def test_bookmark_and_list(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        model_id = await _create_model(client, headers)
+        diagram_id = await _create_diagram(client, headers)
 
-        # Bookmark a model
+        # Bookmark a diagram
         resp = await client.post(
-            f"/api/models/{model_id}/bookmark", headers=headers,
+            f"/api/diagrams/{diagram_id}/bookmark", headers=headers,
         )
         assert resp.status_code == 201
         data = resp.json()
-        assert data["model_id"] == model_id
+        assert data["diagram_id"] == diagram_id
         assert "created_at" in data
 
         # List bookmarks
@@ -97,43 +97,43 @@ class TestBookmarkModel:
         assert resp.status_code == 200
         bookmarks = resp.json()
         assert len(bookmarks) == 1
-        assert bookmarks[0]["model_id"] == model_id
+        assert bookmarks[0]["diagram_id"] == diagram_id
 
     async def test_duplicate_bookmark_returns_409(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        model_id = await _create_model(client, headers)
+        diagram_id = await _create_diagram(client, headers)
 
         await client.post(
-            f"/api/models/{model_id}/bookmark", headers=headers,
+            f"/api/diagrams/{diagram_id}/bookmark", headers=headers,
         )
         resp = await client.post(
-            f"/api/models/{model_id}/bookmark", headers=headers,
+            f"/api/diagrams/{diagram_id}/bookmark", headers=headers,
         )
         assert resp.status_code == 409
 
     async def test_bookmark_requires_auth(
         self, client: httpx.AsyncClient,
     ) -> None:
-        resp = await client.post("/api/models/some-id/bookmark")
+        resp = await client.post("/api/diagrams/some-id/bookmark")
         assert resp.status_code == 401
 
 
-class TestUnbookmarkModel:
-    """Verify unbookmarking a model."""
+class TestUnbookmarkDiagram:
+    """Verify unbookmarking a diagram."""
 
     async def test_unbookmark(
         self, client: httpx.AsyncClient,
     ) -> None:
         headers = await _admin_headers(client)
-        model_id = await _create_model(client, headers)
+        diagram_id = await _create_diagram(client, headers)
 
         await client.post(
-            f"/api/models/{model_id}/bookmark", headers=headers,
+            f"/api/diagrams/{diagram_id}/bookmark", headers=headers,
         )
         resp = await client.delete(
-            f"/api/models/{model_id}/bookmark", headers=headers,
+            f"/api/diagrams/{diagram_id}/bookmark", headers=headers,
         )
         assert resp.status_code == 204
 
@@ -146,7 +146,7 @@ class TestUnbookmarkModel:
     ) -> None:
         headers = await _admin_headers(client)
         resp = await client.delete(
-            "/api/models/nonexistent/bookmark", headers=headers,
+            "/api/diagrams/nonexistent/bookmark", headers=headers,
         )
         assert resp.status_code == 404
 
@@ -159,9 +159,9 @@ class TestBookmarkIsolation:
     ) -> None:
         admin_headers = await _admin_headers(client)
 
-        # Create two models
-        model_1 = await _create_model(client, admin_headers, "Model 1")
-        model_2 = await _create_model(client, admin_headers, "Model 2")
+        # Create two diagrams
+        diagram_1 = await _create_diagram(client, admin_headers, "Diagram 1")
+        diagram_2 = await _create_diagram(client, admin_headers, "Diagram 2")
 
         # Create a second user
         await client.post(
@@ -181,22 +181,22 @@ class TestBookmarkIsolation:
             "Authorization": f"Bearer {resp.json()['access_token']}",
         }
 
-        # Admin bookmarks model_1
+        # Admin bookmarks diagram_1
         await client.post(
-            f"/api/models/{model_1}/bookmark", headers=admin_headers,
+            f"/api/diagrams/{diagram_1}/bookmark", headers=admin_headers,
         )
-        # Viewer bookmarks model_2
+        # Viewer bookmarks diagram_2
         await client.post(
-            f"/api/models/{model_2}/bookmark", headers=viewer_headers,
+            f"/api/diagrams/{diagram_2}/bookmark", headers=viewer_headers,
         )
 
         # Each user only sees their own
         resp = await client.get("/api/bookmarks", headers=admin_headers)
         admin_bookmarks = resp.json()
         assert len(admin_bookmarks) == 1
-        assert admin_bookmarks[0]["model_id"] == model_1
+        assert admin_bookmarks[0]["diagram_id"] == diagram_1
 
         resp = await client.get("/api/bookmarks", headers=viewer_headers)
         viewer_bookmarks = resp.json()
         assert len(viewer_bookmarks) == 1
-        assert viewer_bookmarks[0]["model_id"] == model_2
+        assert viewer_bookmarks[0]["diagram_id"] == diagram_2

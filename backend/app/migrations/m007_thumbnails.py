@@ -9,6 +9,12 @@ if TYPE_CHECKING:
 
 async def up(db: aiosqlite.Connection) -> None:
     """Create model_thumbnails table."""
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
     await db.execute(
         "CREATE TABLE IF NOT EXISTS model_thumbnails ("
         "  model_id TEXT PRIMARY KEY,"

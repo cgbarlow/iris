@@ -16,6 +16,13 @@ DEFAULT_SET_ID = "00000000-0000-0000-0000-000000000001"
 
 async def up(db: aiosqlite.Connection) -> None:
     """Create sets table, seed Default set, add set_id to models and entities."""
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
+
     # Create sets table
     await db.execute(
         "CREATE TABLE IF NOT EXISTS sets ("

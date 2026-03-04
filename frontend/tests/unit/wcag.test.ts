@@ -187,10 +187,10 @@ describe('WCAG 2.4.2 — Page Titled: all pages have unique titles', () => {
 	const pageTitles = [
 		{ route: '/login', title: 'Login — Iris' },
 		{ route: '/', title: 'Iris (dashboard)' },
-		{ route: '/entities', title: 'Entities — Iris' },
-		{ route: '/entities/[id]', title: '{entity.name} — Iris' },
-		{ route: '/models', title: 'Models — Iris' },
-		{ route: '/models/[id]', title: '{model.name} — Iris' },
+		{ route: '/elements', title: 'Elements — Iris' },
+		{ route: '/elements/[id]', title: '{element.name} — Iris' },
+		{ route: '/diagrams', title: 'Diagrams — Iris' },
+		{ route: '/diagrams/[id]', title: '{diagram.name} — Iris' },
 	];
 
 	it('each route has a unique page title', () => {

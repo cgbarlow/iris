@@ -95,7 +95,7 @@ async def update(
             name=body.name,
             description=body.description,
             thumbnail_source=body.thumbnail_source,
-            thumbnail_model_id=body.thumbnail_model_id,
+            thumbnail_diagram_id=body.thumbnail_diagram_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

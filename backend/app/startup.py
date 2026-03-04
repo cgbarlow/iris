@@ -21,8 +21,9 @@ from app.migrations.m012_sets import up as m012_up
 from app.migrations.m013_set_thumbnails import up as m013_up
 from app.migrations.m014_sets_partial_unique import up as m014_up
 from app.migrations.m015_model_relationships import up as m015_up
+from app.migrations.m016_naming_rename import up as m016_up
 from app.migrations.seed import seed_roles_and_permissions
-from app.models_crud.thumbnail import regenerate_all_thumbnails
+from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
 from app.seed.example_models import seed_example_models
 from app.settings.service import seed_defaults
@@ -58,6 +59,7 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
     await m013_up(db_manager.main_db)
     await m014_up(db_manager.main_db)
     await m015_up(db_manager.main_db)
+    await m016_up(db_manager.main_db)
 
     # 3b. Rebuild FTS search index from existing data
     await rebuild_search_index(db_manager.main_db)

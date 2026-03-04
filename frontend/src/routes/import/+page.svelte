@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** SparxEA import page — upload .qea files to import models, entities, and relationships. */
+	/** SparxEA import page — upload .qea files to import diagrams, elements, and relationships. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { setActiveSet } from '$lib/stores/activeSet.svelte.js';
@@ -14,8 +14,8 @@
 	}
 
 	interface ImportSummary {
-		models_created: number;
-		entities_created: number;
+		packages_created: number;
+		elements_created: number;
 		relationships_created: number;
 		diagrams_created: number;
 		elements_skipped: number;
@@ -144,7 +144,7 @@
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
 	<p class="mt-2" style="color: var(--color-muted)">
-		Import models from SparxEA (.qea) files.
+		Import diagrams from SparxEA (.qea) files.
 	</p>
 </div>
 
@@ -154,20 +154,20 @@
 		<h2 class="text-lg font-bold" style="color: var(--color-fg)">Import Complete</h2>
 		<div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.models_created}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Models</p>
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.diagrams_created}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Diagrams</p>
 			</div>
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.entities_created}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Entities</p>
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.elements_created}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Elements</p>
 			</div>
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
 				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.relationships_created}</p>
 				<p class="text-sm" style="color: var(--color-muted)">Relationships</p>
 			</div>
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.diagrams_created}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Diagrams</p>
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.packages_created}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Packages</p>
 			</div>
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
 				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.elements_skipped}</p>
@@ -192,12 +192,12 @@
 
 		<div class="mt-4 flex gap-3">
 			<a
-				href={importSetId ? `/models?set_id=${importSetId}` : '/models'}
+				href={importSetId ? `/diagrams?set_id=${importSetId}` : '/diagrams'}
 				onclick={() => { if (importSetId && importSetName) setActiveSet(importSetId, importSetName); }}
 				class="rounded px-4 py-2 text-sm text-white"
 				style="background-color: var(--color-primary)"
 			>
-				View Models
+				View Diagrams
 			</a>
 			<button
 				onclick={resetForm}

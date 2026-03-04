@@ -41,5 +41,11 @@ CREATE INDEX IF NOT EXISTS idx_bookmarks_model ON bookmarks(model_id);
 
 async def up(db: aiosqlite.Connection) -> None:
     """Run migration up."""
+    # Guard: skip if tables already exist (m016 may have recreated them)
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='comments'"
+    )
+    if await cursor.fetchone():
+        return
     await db.executescript(UP_SQL)
     await db.commit()

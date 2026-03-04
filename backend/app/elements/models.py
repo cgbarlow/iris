@@ -1,0 +1,80 @@
+"""Pydantic models for element CRUD operations."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class ElementCreate(BaseModel):
+    """Request body for creating an element."""
+
+    element_type: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    data: dict[str, object] = Field(default_factory=dict)
+    set_id: str | None = None
+    metadata: dict[str, object] | None = None
+
+
+class ElementUpdate(BaseModel):
+    """Request body for updating an element."""
+
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    data: dict[str, object] = Field(default_factory=dict)
+    change_summary: str | None = None
+    metadata: dict[str, object] | None = None
+
+
+class ElementRollback(BaseModel):
+    """Request body for rolling back an element to a previous version."""
+
+    target_version: int = Field(ge=1)
+
+
+class ElementResponse(BaseModel):
+    """Response for a single element."""
+
+    id: str
+    element_type: str
+    current_version: int
+    name: str
+    description: str | None = None
+    data: dict[str, object] = Field(default_factory=dict)
+    created_at: str
+    created_by: str
+    created_by_username: str = "Unknown"
+    updated_at: str
+    is_deleted: bool = False
+    tags: list[str] = Field(default_factory=list)
+    relationship_count: int = 0
+    diagram_usage_count: int = 0
+    set_id: str | None = None
+    set_name: str | None = None
+    metadata: dict[str, object] | None = None
+
+
+class ElementVersionResponse(BaseModel):
+    """Response for an element version."""
+
+    element_id: str
+    version: int
+    name: str
+    description: str | None = None
+    data: dict[str, object] = Field(default_factory=dict)
+    change_type: str
+    change_summary: str | None = None
+    rollback_to: int | None = None
+    created_at: str
+    created_by: str
+    created_by_username: str = "Unknown"
+    metadata: dict[str, object] | None = None
+
+
+class ElementListResponse(BaseModel):
+    """Paginated list of elements."""
+
+    items: list[ElementResponse]
+    total: int
+    page: int
+    page_size: int

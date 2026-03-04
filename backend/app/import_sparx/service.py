@@ -7,7 +7,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from app.entities.service import create_entity
+from app.diagrams.service import create_diagram
+from app.elements.service import create_element
 from app.import_sparx.converter import ea_rect_to_position
 from app.import_sparx.mapper import map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
@@ -21,8 +22,8 @@ from app.import_sparx.reader import (
     read_packages,
     read_tagged_values,
 )
-from app.model_relationships.service import create_model_relationship
-from app.models_crud.service import create_model
+from app.package_relationships.service import create_package_relationship
+from app.packages.service import create_package
 from app.relationships.service import create_relationship
 
 if TYPE_CHECKING:
@@ -37,13 +38,13 @@ class ImportWarning:
 
 @dataclass
 class ImportSummary:
-    models_created: int = 0
-    entities_created: int = 0
+    packages_created: int = 0
+    elements_created: int = 0
     relationships_created: int = 0
     diagrams_created: int = 0
     elements_skipped: int = 0
     connectors_skipped: int = 0
-    model_relationships_created: int = 0
+    package_relationships_created: int = 0
     warnings: list[ImportWarning] = field(default_factory=list)
 
 
@@ -133,18 +134,18 @@ async def import_sparx_file(
         if elem.Object_Type == "Package":
             pkg_type_elements[elem.Package_ID] = elem
 
-    # Build reverse map: element Object_ID -> Package_ID (for Package→Package deps)
+    # Build reverse map: element Object_ID -> Package_ID (for Package->Package deps)
     element_to_package: dict[int, int] = {}
     for elem in elements:
         if elem.Object_Type == "Package":
             element_to_package[elem.Object_ID] = elem.Package_ID
 
-    # 2. Build package hierarchy -> create Iris models for packages
-    # Map ea_package_id -> iris_model_id
-    package_model_map: dict[int, str] = {}
+    # 2. Build package hierarchy -> create Iris packages
+    # Map ea_package_id -> iris_package_id
+    package_map: dict[int, str] = {}
 
     for pkg in _topo_sort_packages(packages):
-        parent_iris_id = package_model_map.get(pkg.Parent_ID)
+        parent_iris_id = package_map.get(pkg.Parent_ID)
         # Build metadata from package-type element (Status/Stereotype)
         pkg_metadata: dict[str, object] | None = None
         pkg_elem = pkg_type_elements.get(pkg.Package_ID)
@@ -157,24 +158,22 @@ async def import_sparx_file(
             if md:
                 pkg_metadata = md
 
-        model = await create_model(
+        package = await create_package(
             db,
-            model_type="uml",
             name=pkg.Name or f"Package {pkg.Package_ID}",
             description=pkg.Notes,
-            data={},
             created_by=imported_by,
-            parent_model_id=parent_iris_id,
+            parent_package_id=parent_iris_id,
             set_id=set_id,
             metadata=pkg_metadata,
             change_summary=f"Imported from SparxEA ({pkg.Name})",
         )
-        package_model_map[pkg.Package_ID] = model["id"]  # type: ignore[assignment]
-        summary.models_created += 1
+        package_map[pkg.Package_ID] = package["id"]  # type: ignore[assignment]
+        summary.packages_created += 1
 
-    # 3. Create entities for elements
-    # Map ea_object_id -> iris_entity_id
-    element_entity_map: dict[int, str] = {}
+    # 3. Create elements for EA elements
+    # Map ea_object_id -> iris_element_id
+    element_map: dict[int, str] = {}
 
     # Build attribute lookup by Object_ID
     attrs_by_object: dict[int, list[object]] = {}
@@ -193,11 +192,11 @@ async def import_sparx_file(
         if iris_type == "_package":
             continue  # Already handled as hierarchy
 
-        entity_data: dict[str, object] = {}
+        element_data: dict[str, object] = {}
         # Add class attributes if present (rich object format)
         obj_attrs = attrs_by_object.get(elem.Object_ID, [])
         if obj_attrs:
-            entity_data["attributes"] = [
+            element_data["attributes"] = [
                 {
                     "name": a.Name or "",  # type: ignore[union-attr]
                     "type": a.Type or "",  # type: ignore[union-attr]
@@ -211,8 +210,8 @@ async def import_sparx_file(
                 for a in obj_attrs
             ]
 
-        # Build entity metadata
-        entity_metadata: dict[str, object] | None = None
+        # Build element metadata
+        element_metadata: dict[str, object] | None = None
         em: dict[str, object] = {}
         if elem.Status:
             em["status"] = elem.Status
@@ -242,30 +241,30 @@ async def import_sparx_file(
         if obj_tags:
             em["tagged_values"] = obj_tags
         if em:
-            entity_metadata = em
+            element_metadata = em
 
         # Derive meaningful name for Note/Boundary elements with NULL Name
         if iris_type in ("note", "boundary") and not elem.Name:
-            entity_name = derive_note_label(
+            element_name = derive_note_label(
                 elem.Note,
                 f"{'Note' if iris_type == 'note' else 'Boundary'} {elem.Object_ID}",
             )
         else:
-            entity_name = elem.Name or f"Element {elem.Object_ID}"
+            element_name = elem.Name or f"Element {elem.Object_ID}"
 
-        entity = await create_entity(
+        element = await create_element(
             db,
-            entity_type=iris_type,
-            name=entity_name,
+            element_type=iris_type,
+            name=element_name,
             description=elem.Note,
-            data=entity_data,
+            data=element_data,
             created_by=imported_by,
             set_id=set_id,
-            metadata=entity_metadata,
+            metadata=element_metadata,
             change_summary=f"Imported from SparxEA ({elem.Object_Type})",
         )
-        element_entity_map[elem.Object_ID] = entity["id"]  # type: ignore[assignment]
-        summary.entities_created += 1
+        element_map[elem.Object_ID] = element["id"]  # type: ignore[assignment]
+        summary.elements_created += 1
 
     # 4. Create relationships for connectors
     for conn in connectors:
@@ -278,30 +277,30 @@ async def import_sparx_file(
             summary.connectors_skipped += 1
             continue
 
-        source_id = element_entity_map.get(conn.Start_Object_ID)
-        target_id = element_entity_map.get(conn.End_Object_ID)
+        source_id = element_map.get(conn.Start_Object_ID)
+        target_id = element_map.get(conn.End_Object_ID)
         if not source_id or not target_id:
-            # Check if this is a Package→Package connector (model relationship)
+            # Check if this is a Package->Package connector (package relationship)
             source_pkg = element_to_package.get(conn.Start_Object_ID)
             target_pkg = element_to_package.get(conn.End_Object_ID)
             if source_pkg and target_pkg:
-                source_model = package_model_map.get(source_pkg)
-                target_model = package_model_map.get(target_pkg)
-                if source_model and target_model:
+                source_package = package_map.get(source_pkg)
+                target_package = package_map.get(target_pkg)
+                if source_package and target_package:
                     try:
-                        await create_model_relationship(
+                        await create_package_relationship(
                             db,
-                            source_model_id=source_model,
-                            target_model_id=target_model,
+                            source_package_id=source_package,
+                            target_package_id=target_package,
                             relationship_type=iris_type,
                             label=conn.Name,
                             description=conn.Notes,
                             created_by=imported_by,
                         )
-                        summary.model_relationships_created += 1
+                        summary.package_relationships_created += 1
                     except Exception:
-                        # Duplicate — relationship already exists, not a skip
-                        summary.model_relationships_created += 1
+                        # Duplicate -- relationship already exists, not a skip
+                        summary.package_relationships_created += 1
                     continue
             summary.connectors_skipped += 1
             continue
@@ -322,8 +321,8 @@ async def import_sparx_file(
 
         await create_relationship(
             db,
-            source_entity_id=source_id,
-            target_entity_id=target_id,
+            source_element_id=source_id,
+            target_element_id=target_id,
             relationship_type=iris_type,
             label=conn.Name,
             description=conn.Notes,
@@ -339,8 +338,8 @@ async def import_sparx_file(
         diag_objects_by_diagram.setdefault(dobj.Diagram_ID, []).append(dobj)
 
     for diag in diagrams:
-        model_type = map_diagram_type(diag.Diagram_Type or "")
-        parent_iris_id = package_model_map.get(diag.Package_ID)
+        diagram_type = map_diagram_type(diag.Diagram_Type or "")
+        parent_iris_id = package_map.get(diag.Package_ID)
 
         # Build canvas nodes from diagram objects
         nodes: list[dict[str, object]] = []
@@ -348,8 +347,8 @@ async def import_sparx_file(
         dobjs = diag_objects_by_diagram.get(diag.Diagram_ID, [])
 
         for dobj in dobjs:
-            entity_id = element_entity_map.get(dobj.Object_ID)  # type: ignore[union-attr]
-            if not entity_id:
+            element_id = element_map.get(dobj.Object_ID)  # type: ignore[union-attr]
+            if not element_id:
                 continue
 
             pos = ea_rect_to_position(
@@ -375,7 +374,7 @@ async def import_sparx_file(
             node_data: dict[str, object] = {
                 "label": node_label,
                 "entityType": iris_type_str or "component",
-                "entityId": entity_id,
+                "entityId": element_id,
             }
             # Always populate description from element's Note content
             if elem and elem.Note:
@@ -402,8 +401,8 @@ async def import_sparx_file(
                     node_entity_to_node_id[eid] = n["id"]  # type: ignore[assignment]
 
         for conn in connectors:
-            source_eid = element_entity_map.get(conn.Start_Object_ID)
-            target_eid = element_entity_map.get(conn.End_Object_ID)
+            source_eid = element_map.get(conn.Start_Object_ID)
+            target_eid = element_map.get(conn.End_Object_ID)
             if not source_eid or not target_eid:
                 continue
             source_node = node_entity_to_node_id.get(source_eid)
@@ -458,14 +457,14 @@ async def import_sparx_file(
 
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
-        await create_model(
+        await create_diagram(
             db,
-            model_type=model_type,
+            diagram_type=diagram_type,
             name=diag.Name or f"Diagram {diag.Diagram_ID}",
             description=diag.Notes,
             data=model_data,
             created_by=imported_by,
-            parent_model_id=parent_iris_id,
+            parent_package_id=parent_iris_id,
             set_id=set_id,
             change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
         )

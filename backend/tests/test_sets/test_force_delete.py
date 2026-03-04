@@ -73,8 +73,8 @@ class TestForceDeleteSet:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["models_deleted"] == 0
-        assert data["entities_deleted"] == 0
+        assert data["diagrams_deleted"] == 0
+        assert data["elements_deleted"] == 0
 
         # Verify set is gone
         get_resp = await client.get(f"/api/sets/{set_id}", headers=headers)
@@ -91,11 +91,11 @@ class TestForceDeleteSet:
         ).json()
         set_id = s["id"]
 
-        # Create 2 models and 1 entity in this set
+        # Create 2 diagrams and 1 element in this set
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple-view",
+                "diagram_type": "simple-view",
                 "name": "M1",
                 "data": {},
                 "set_id": set_id,
@@ -103,9 +103,9 @@ class TestForceDeleteSet:
             headers=headers,
         )
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple-view",
+                "diagram_type": "simple-view",
                 "name": "M2",
                 "data": {},
                 "set_id": set_id,
@@ -113,9 +113,9 @@ class TestForceDeleteSet:
             headers=headers,
         )
         await client.post(
-            "/api/entities",
+            "/api/elements",
             json={
-                "entity_type": "component",
+                "element_type": "component",
                 "name": "E1",
                 "data": {},
                 "set_id": set_id,
@@ -128,8 +128,8 @@ class TestForceDeleteSet:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["models_deleted"] == 2
-        assert data["entities_deleted"] == 1
+        assert data["diagrams_deleted"] == 2
+        assert data["elements_deleted"] == 1
 
     async def test_force_delete_default_set_returns_403(
         self, client: httpx.AsyncClient
@@ -160,9 +160,9 @@ class TestForceDeleteSet:
         ).json()
         set_id = s["id"]
         await client.post(
-            "/api/models",
+            "/api/diagrams",
             json={
-                "model_type": "simple-view",
+                "diagram_type": "simple-view",
                 "name": "M1",
                 "data": {},
                 "set_id": set_id,

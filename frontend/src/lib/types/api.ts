@@ -13,9 +13,9 @@ export interface User {
 	is_active: boolean;
 }
 
-export interface Entity {
+export interface Element {
 	id: string;
-	entity_type: string;
+	element_type: string;
 	current_version: number;
 	name: string;
 	description: string | null;
@@ -27,15 +27,15 @@ export interface Entity {
 	is_deleted: boolean;
 	tags?: string[];
 	relationship_count?: number;
-	model_usage_count?: number;
+	diagram_usage_count?: number;
 	set_id?: string;
 	set_name?: string;
 	metadata?: Record<string, unknown> | null;
 }
 
-export interface Model {
+export interface Diagram {
 	id: string;
-	model_type: string;
+	diagram_type: string;
 	current_version: number;
 	name: string;
 	description: string | null;
@@ -45,25 +45,25 @@ export interface Model {
 	created_by_username?: string;
 	updated_at: string;
 	is_deleted: boolean;
-	parent_model_id?: string | null;
+	parent_package_id?: string | null;
 	tags?: string[];
 	set_id?: string;
 	set_name?: string;
 	metadata?: Record<string, unknown> | null;
 }
 
-export interface ModelHierarchyNode {
+export interface DiagramHierarchyNode {
 	id: string;
 	name: string;
-	model_type: string;
-	parent_model_id: string | null;
+	diagram_type: string;
+	parent_package_id: string | null;
 	has_content: boolean;
-	children: ModelHierarchyNode[];
+	children: DiagramHierarchyNode[];
 }
 
 export interface SearchResult {
 	id: string;
-	result_type: 'entity' | 'model';
+	result_type: 'element' | 'diagram';
 	name: string;
 	description: string | null;
 	type_detail: string;
@@ -88,7 +88,7 @@ export interface Comment {
 }
 
 export interface Bookmark {
-	model_id: string;
+	diagram_id: string;
 	created_at: string;
 }
 
@@ -99,8 +99,8 @@ export interface PaginatedResponse<T> {
 	page_size: number;
 }
 
-export interface EntityVersion {
-	entity_id: string;
+export interface ElementVersion {
+	element_id: string;
 	version: number;
 	name: string;
 	description: string | null;
@@ -114,8 +114,8 @@ export interface EntityVersion {
 	metadata?: Record<string, unknown> | null;
 }
 
-export interface ModelVersion {
-	model_id: string;
+export interface DiagramVersion {
+	diagram_id: string;
 	version: number;
 	name: string;
 	description: string | null;
@@ -131,8 +131,8 @@ export interface ModelVersion {
 
 export interface Relationship {
 	id: string;
-	source_entity_id: string;
-	target_entity_id: string;
+	source_element_id: string;
+	target_element_id: string;
 	relationship_type: string;
 	current_version: number;
 	label: string | null;
@@ -142,8 +142,8 @@ export interface Relationship {
 	created_by: string;
 	updated_at: string;
 	is_deleted: boolean;
-	source_entity_name?: string;
-	target_entity_name?: string;
+	source_element_name?: string;
+	target_element_name?: string;
 }
 
 export interface RelationshipListResponse {
@@ -183,15 +183,15 @@ export interface UserDetail {
 	last_login_at: string | null;
 }
 
-export interface EntityModelRef {
-	model_id: string;
+export interface ElementDiagramRef {
+	diagram_id: string;
 	name: string;
-	model_type: string;
+	diagram_type: string;
 }
 
-export interface EntityStats {
+export interface ElementStats {
 	relationship_count: number;
-	model_usage_count: number;
+	diagram_usage_count: number;
 }
 
 export interface IrisSet {
@@ -202,10 +202,10 @@ export interface IrisSet {
 	created_by: string;
 	updated_at: string;
 	is_deleted: boolean;
-	model_count: number;
-	entity_count: number;
-	thumbnail_source: 'model' | 'image' | null;
-	thumbnail_model_id: string | null;
+	diagram_count: number;
+	element_count: number;
+	thumbnail_source: 'diagram' | 'image' | null;
+	thumbnail_diagram_id: string | null;
 	has_thumbnail_image: boolean;
 }
 
@@ -214,3 +214,18 @@ export interface BatchResult {
 	failed: number;
 	errors: string[];
 }
+
+/** @deprecated Use Element instead */
+export type Entity = Element;
+/** @deprecated Use Diagram instead */
+export type Model = Diagram;
+/** @deprecated Use DiagramHierarchyNode instead */
+export type ModelHierarchyNode = DiagramHierarchyNode;
+/** @deprecated Use ElementVersion instead */
+export type EntityVersion = ElementVersion;
+/** @deprecated Use DiagramVersion instead */
+export type ModelVersion = DiagramVersion;
+/** @deprecated Use ElementDiagramRef instead */
+export type EntityModelRef = ElementDiagramRef;
+/** @deprecated Use ElementStats instead */
+export type EntityStats = ElementStats;

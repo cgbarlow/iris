@@ -8,5 +8,5 @@ from pydantic import BaseModel
 class BookmarkResponse(BaseModel):
     """Response for a single bookmark."""
 
-    model_id: str
+    diagram_id: str
     created_at: str

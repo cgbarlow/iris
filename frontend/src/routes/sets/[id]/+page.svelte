@@ -3,12 +3,12 @@
 	import { page } from '$app/state';
 	import { apiFetch } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
-	import type { IrisSet, Model, PaginatedResponse } from '$lib/types/api';
+	import type { IrisSet, Diagram, PaginatedResponse } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import DOMPurify from 'dompurify';
 
 	let set = $state<IrisSet | null>(null);
-	let models = $state<Model[]>([]);
+	let diagrams = $state<Diagram[]>([]);
 	let loading = $state(true);
 	let saving = $state(false);
 	let error = $state<string | null>(null);
@@ -17,7 +17,7 @@
 	let name = $state('');
 	let description = $state('');
 	let thumbnailSource = $state<'model' | 'image' | null>(null);
-	let thumbnailModelId = $state<string | null>(null);
+	let thumbnailDiagramId = $state<string | null>(null);
 	let thumbnailFile = $state<File | null>(null);
 
 	let showDeleteDialog = $state(false);
@@ -33,18 +33,18 @@
 		loading = true;
 		error = null;
 		try {
-			const [setData, modelsData] = await Promise.all([
+			const [setData, diagramsData] = await Promise.all([
 				apiFetch<IrisSet>(`/api/sets/${setId}`),
-				apiFetch<PaginatedResponse<Model>>(`/api/models?set_id=${setId}&page_size=100`),
+				apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?set_id=${setId}&page_size=100`),
 			]);
 			set = setData;
-			models = modelsData.items;
+			diagrams = diagramsData.items;
 
 			// Initialize form state
 			name = setData.name;
 			description = setData.description ?? '';
 			thumbnailSource = setData.thumbnail_source;
-			thumbnailModelId = setData.thumbnail_model_id;
+			thumbnailDiagramId = setData.thumbnail_diagram_id;
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -67,7 +67,7 @@
 					name: sanitizedName,
 					description: sanitizedDesc,
 					thumbnail_source: thumbnailSource,
-					thumbnail_model_id: thumbnailSource === 'model' ? thumbnailModelId : null,
+					thumbnail_diagram_id: thumbnailSource === 'model' ? thumbnailDiagramId : null,
 				}),
 			});
 
@@ -100,7 +100,7 @@
 		deleting = true;
 		error = null;
 		try {
-			await apiFetch<{ models_deleted: number; entities_deleted: number }>(
+			await apiFetch<{ diagrams_deleted: number; elements_deleted: number }>(
 				`/api/sets/${setId}?force=true`,
 				{ method: 'DELETE' }
 			);
@@ -209,18 +209,18 @@
 						checked={thumbnailSource === 'model'}
 						onchange={() => { thumbnailSource = 'model'; }}
 					/>
-					Use model thumbnail
+					Use diagram thumbnail
 				</label>
 				{#if thumbnailSource === 'model'}
 					<div class="ml-6">
 						<select
-							bind:value={thumbnailModelId}
+							bind:value={thumbnailDiagramId}
 							class="rounded border px-3 py-1.5 text-sm"
 							style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 						>
-							<option value={null}>Select a model...</option>
-							{#each models as model}
-								<option value={model.id}>{model.name}</option>
+							<option value={null}>Select a diagram...</option>
+							{#each diagrams as diagram}
+								<option value={diagram.id}>{diagram.name}</option>
 							{/each}
 						</select>
 					</div>
@@ -265,7 +265,7 @@
 
 	<!-- Info -->
 	<div class="mt-6 text-sm" style="color: var(--color-muted); max-width: 600px">
-		<p>{set.model_count} model{set.model_count !== 1 ? 's' : ''}, {set.entity_count} entit{set.entity_count !== 1 ? 'ies' : 'y'} in this set</p>
+		<p>{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}, {set.element_count} element{set.element_count !== 1 ? 's' : ''} in this set</p>
 	</div>
 
 	<!-- Danger zone -->
@@ -275,7 +275,7 @@
 	>
 		<h2 class="text-sm font-bold" style="color: var(--color-danger)">Danger Zone</h2>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">
-			This will permanently delete this set and all {set.model_count} model{set.model_count !== 1 ? 's' : ''} and {set.entity_count} entit{set.entity_count !== 1 ? 'ies' : 'y'} within it.
+			This will permanently delete this set and all {set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''} and {set.element_count} element{set.element_count !== 1 ? 's' : ''} within it.
 		</p>
 		<button
 			onclick={() => (showDeleteDialog = true)}
@@ -289,7 +289,7 @@
 	<ConfirmDialog
 		open={showDeleteDialog}
 		title="Delete Set"
-		message="Are you sure you want to delete &quot;{set.name}&quot; and all its contents? This will delete {set.model_count} model{set.model_count !== 1 ? 's' : ''} and {set.entity_count} entit{set.entity_count !== 1 ? 'ies' : 'y'}. This action cannot be undone."
+		message="Are you sure you want to delete &quot;{set.name}&quot; and all its contents? This will delete {set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''} and {set.element_count} element{set.element_count !== 1 ? 's' : ''}. This action cannot be undone."
 		confirmLabel={deleting ? 'Deleting...' : 'Delete Everything'}
 		onconfirm={handleForceDelete}
 		oncancel={() => (showDeleteDialog = false)}

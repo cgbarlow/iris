@@ -108,7 +108,7 @@
 	}
 
 	function getThumbnailUrl(set: IrisSet): string | null {
-		if (set.thumbnail_source === 'model' && set.thumbnail_model_id) {
+		if (set.thumbnail_source === 'model' && set.thumbnail_diagram_id) {
 			return `/api/sets/${set.id}/thumbnail?theme=${currentTheme}`;
 		}
 		if (set.thumbnail_source === 'image' && set.has_thumbnail_image) {
@@ -217,8 +217,8 @@
 					{/if}
 				</div>
 				<div class="flex gap-3 text-xs" style="color: var(--color-muted)">
-					<span>{set.model_count} model{set.model_count !== 1 ? 's' : ''}</span>
-					<span>{set.entity_count} entit{set.entity_count !== 1 ? 'ies' : 'y'}</span>
+					<span>{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}</span>
+					<span>{set.element_count} element{set.element_count !== 1 ? 's' : ''}</span>
 				</div>
 				{#if editMode}
 					<span class="text-xs" style="color: var(--color-primary)">Edit</span>
@@ -254,7 +254,7 @@
 				</div>
 				<div class="mt-2 font-medium text-sm" style="color: var(--color-primary)">{set.name}</div>
 				<div class="mt-1 text-xs" style="color: var(--color-muted)">
-					{set.model_count} model{set.model_count !== 1 ? 's' : ''}, {set.entity_count} entit{set.entity_count !== 1 ? 'ies' : 'y'}
+					{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}, {set.element_count} element{set.element_count !== 1 ? 's' : ''}
 				</div>
 				{#if set.description}
 					<div class="mt-1 text-xs" style="color: var(--color-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">{set.description}</div>

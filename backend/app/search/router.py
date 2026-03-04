@@ -21,7 +21,7 @@ async def search_endpoint(
     set_id: str | None = Query(default=None),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> SearchResponse:
-    """Search entities and models by text query."""
+    """Search elements and diagrams by text query."""
     db = request.app.state.db_manager.main_db
     results = await search(db, q, limit=limit, set_id=set_id)
     return SearchResponse(

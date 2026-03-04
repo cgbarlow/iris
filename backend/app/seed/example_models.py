@@ -1,17 +1,17 @@
-"""Idempotent seed: example models demonstrating Iris's own architecture.
+"""Idempotent seed: example diagrams demonstrating Iris's own architecture.
 
-Creates entities representing the Iris system and six models:
+Creates elements representing the Iris system and six diagrams:
   1. Iris Architecture (component) — core component overview
   2. API Request Flow (sequence) — login and data fetch sequence
   3. Data Layer (component) — database, versioning, and search internals
   4. Iris Enterprise View (archimate) — high-level enterprise architecture
-  5. Iris System Overview (component) — model-in-model view referencing all above
+  5. Iris System Overview (component) — diagram-in-diagram view referencing all above
   6. Data Model (component) — complete database schema with all tables and FKs
 
-All entities are tagged with 'iris' and 'example'; models are tagged with
+All elements are tagged with 'iris' and 'example'; diagrams are tagged with
 'iris', 'example', and 'template'.
 
-Idempotency: the seed checks for existing entity_tags with tag='example'
+Idempotency: the seed checks for existing element_tags with tag='example'
 and skips entirely if any are found.
 """
 
@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
 _SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000"
 
-# ── Entity definitions ──────────────────────────────────────────────────────
-# (node_id, entity_type, name, description)
+# ── Element definitions ─────────────────────────────────────────────────────
+# (node_id, element_type, name, description)
 _ENTITIES = [
-    # Core components (used in Architecture model)
+    # Core components (used in Architecture diagram)
     ("n1", "component", "Frontend",
      "SvelteKit + Svelte 5 runes application with @xyflow/svelte canvas"),
     ("n2", "component", "Backend",
@@ -46,8 +46,8 @@ _ENTITIES = [
      "Full-text search powered by SQLite FTS5 with ranking and highlighting"),
     ("n7", "service", "Audit Service",
      "Middleware-based audit logging capturing all state-changing API operations"),
-    ("n8", "component", "Model Renderer",
-     "Thumbnail generator producing SVG previews of canvas models for gallery display"),
+    ("n8", "component", "Diagram Renderer",
+     "Thumbnail generator producing SVG previews of canvas diagrams for gallery display"),
     ("n9", "interface", "REST API",
      "JSON REST interface at /api/* with OpenAPI documentation and JWT bearer auth"),
     ("n10", "actor", "User",
@@ -55,7 +55,7 @@ _ENTITIES = [
     ("n11", "actor", "Admin",
      "Administrator with elevated privileges for user management and system settings"),
     ("n12", "component", "Version Control",
-     "Entity and model versioning with optimistic concurrency via ETags"),
+     "Element and diagram versioning with optimistic concurrency via ETags"),
     ("n13", "queue", "Event Bus",
      "Internal event dispatch for audit logging and thumbnail regeneration"),
     ("n14", "component", "Export Engine",
@@ -64,13 +64,13 @@ _ENTITIES = [
      "CORS, rate limiting, security headers, and audit middleware layers"),
 ]
 
-_ENTITY_DESCRIPTIONS = {node_id: desc for node_id, _, _, desc in _ENTITIES}
+_ELEMENT_DESCRIPTIONS = {node_id: desc for node_id, _, _, desc in _ENTITIES}
 
-_ENTITY_TAGS = ["iris", "example"]
-_MODEL_TAGS = ["iris", "example", "template"]
+_ELEMENT_TAGS = ["iris", "example"]
+_DIAGRAM_TAGS = ["iris", "example", "template"]
 
-# Relationships between entities: (index, source_node, target_node, rel_type, label, description)
-# These create actual relationship records in the DB so entity detail pages show connections.
+# Relationships between elements: (index, source_node, target_node, rel_type, label, description)
+# These create actual relationship records in the DB so element detail pages show connections.
 _RELATIONSHIPS = [
     (0, "n10", "n1", "uses", "Browses",
      "User interacts with the Frontend via web browser"),
@@ -92,8 +92,8 @@ _RELATIONSHIPS = [
      "Backend reads and writes data through SQLite"),
     (9, "n4", "n3", "uses", "User store",
      "Auth Service reads user credentials from Database"),
-    (10, "n2", "n12", "uses", "Version entities",
-     "Backend uses Version Control for entity/model versioning"),
+    (10, "n2", "n12", "uses", "Version elements",
+     "Backend uses Version Control for element/diagram versioning"),
     (11, "n2", "n6", "uses", "Query search",
      "Backend delegates full-text queries to Search Service"),
     (12, "n2", "n7", "uses", "Log operations",
@@ -106,8 +106,8 @@ _RELATIONSHIPS = [
      "Audit Service emits events to Event Bus"),
     (16, "n13", "n3", "uses", "Persist audit logs",
      "Event Bus persists audit log entries in Database"),
-    (17, "n8", "n3", "uses", "Read model data",
-     "Model Renderer reads model canvas data from Database"),
+    (17, "n8", "n3", "uses", "Read diagram data",
+     "Diagram Renderer reads diagram canvas data from Database"),
     (18, "n11", "n15", "uses", "Configures",
      "Admin configures Middleware Stack settings"),
     (19, "n15", "n2", "contains", "Wraps",
@@ -131,42 +131,42 @@ def _build_architecture_model(
         {"id": "n10", "type": "actor",
          "position": {"x": 400, "y": 0},
          "data": {"label": "User", "entityType": "actor",
-                  "description": _ENTITY_DESCRIPTIONS["n10"],
+                  "description": _ELEMENT_DESCRIPTIONS["n10"],
                   "entityId": eids["n10"]}},
         {"id": "n1", "type": "component",
          "position": {"x": 350, "y": 250},
          "data": {"label": "Frontend", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n1"],
+                  "description": _ELEMENT_DESCRIPTIONS["n1"],
                   "entityId": eids["n1"]}},
         {"id": "n9", "type": "interface",
          "position": {"x": 370, "y": 500},
          "data": {"label": "REST API", "entityType": "interface",
-                  "description": _ENTITY_DESCRIPTIONS["n9"],
+                  "description": _ELEMENT_DESCRIPTIONS["n9"],
                   "entityId": eids["n9"]}},
         {"id": "n2", "type": "component",
          "position": {"x": 350, "y": 750},
          "data": {"label": "Backend", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n2"],
+                  "description": _ELEMENT_DESCRIPTIONS["n2"],
                   "entityId": eids["n2"]}},
         {"id": "n4", "type": "service",
          "position": {"x": 60, "y": 750},
          "data": {"label": "Auth Service", "entityType": "service",
-                  "description": _ENTITY_DESCRIPTIONS["n4"],
+                  "description": _ELEMENT_DESCRIPTIONS["n4"],
                   "entityId": eids["n4"]}},
         {"id": "n5", "type": "component",
          "position": {"x": 650, "y": 250},
          "data": {"label": "Canvas Engine", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n5"],
+                  "description": _ELEMENT_DESCRIPTIONS["n5"],
                   "entityId": eids["n5"]}},
         {"id": "n14", "type": "component",
          "position": {"x": 650, "y": 500},
          "data": {"label": "Export Engine", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n14"],
+                  "description": _ELEMENT_DESCRIPTIONS["n14"],
                   "entityId": eids["n14"]}},
         {"id": "n3", "type": "database",
          "position": {"x": 370, "y": 1000},
          "data": {"label": "Database", "entityType": "database",
-                  "description": _ENTITY_DESCRIPTIONS["n3"],
+                  "description": _ELEMENT_DESCRIPTIONS["n3"],
                   "entityId": eids["n3"]}},
     ]
     edges = [
@@ -203,7 +203,7 @@ def _build_architecture_model(
 def _build_sequence_model(
     eids: dict[str, str], rids: dict[str, str], **_kw: object,
 ) -> dict[str, object]:
-    """Sequence diagram: user login then fetch model data."""
+    """Sequence diagram: user login then fetch diagram data."""
     participants = [
         {"id": "p1", "name": "Browser", "type": "actor",
          "entityId": eids["n10"]},
@@ -218,7 +218,7 @@ def _build_sequence_model(
     ]
     messages = [
         {"id": "m1", "from": "p1", "to": "p2",
-         "label": "Navigate to /models", "type": "sync", "order": 0},
+         "label": "Navigate to /diagrams", "type": "sync", "order": 0},
         {"id": "m2", "from": "p2", "to": "p3",
          "label": "POST /api/auth/login", "type": "sync", "order": 1},
         {"id": "m3", "from": "p3", "to": "p4",
@@ -232,13 +232,13 @@ def _build_sequence_model(
         {"id": "m7", "from": "p3", "to": "p2",
          "label": "200 {access_token}", "type": "reply", "order": 6},
         {"id": "m8", "from": "p2", "to": "p3",
-         "label": "GET /api/models (Bearer token)", "type": "sync", "order": 7},
+         "label": "GET /api/diagrams (Bearer token)", "type": "sync", "order": 7},
         {"id": "m9", "from": "p3", "to": "p5",
-         "label": "SELECT models with versions", "type": "sync", "order": 8},
+         "label": "SELECT diagrams with versions", "type": "sync", "order": 8},
         {"id": "m10", "from": "p5", "to": "p3",
-         "label": "Model list", "type": "reply", "order": 9},
+         "label": "Diagram list", "type": "reply", "order": 9},
         {"id": "m11", "from": "p3", "to": "p2",
-         "label": "200 [{model}, ...]", "type": "reply", "order": 10},
+         "label": "200 [{diagram}, ...]", "type": "reply", "order": 10},
         {"id": "m12", "from": "p2", "to": "p1",
          "label": "Render gallery", "type": "reply", "order": 11},
     ]
@@ -262,47 +262,47 @@ def _build_sequence_model(
 def _build_data_layer_model(
     eids: dict[str, str], rids: dict[str, str], **_kw: object,
 ) -> dict[str, object]:
-    """Component model showing database, versioning, search, and audit."""
+    """Component diagram showing database, versioning, search, and audit."""
     nodes = [
         {"id": "n2", "type": "component",
          "position": {"x": 350, "y": 50},
          "data": {"label": "Backend", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n2"],
+                  "description": _ELEMENT_DESCRIPTIONS["n2"],
                   "entityId": eids["n2"]}},
         {"id": "n12", "type": "component",
          "position": {"x": 60, "y": 300},
          "data": {"label": "Version Control", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n12"],
+                  "description": _ELEMENT_DESCRIPTIONS["n12"],
                   "entityId": eids["n12"]}},
         {"id": "n6", "type": "service",
          "position": {"x": 350, "y": 300},
          "data": {"label": "Search Service", "entityType": "service",
-                  "description": _ENTITY_DESCRIPTIONS["n6"],
+                  "description": _ELEMENT_DESCRIPTIONS["n6"],
                   "entityId": eids["n6"]}},
         {"id": "n7", "type": "service",
          "position": {"x": 640, "y": 300},
          "data": {"label": "Audit Service", "entityType": "service",
-                  "description": _ENTITY_DESCRIPTIONS["n7"],
+                  "description": _ELEMENT_DESCRIPTIONS["n7"],
                   "entityId": eids["n7"]}},
         {"id": "n8", "type": "component",
          "position": {"x": 60, "y": 550},
-         "data": {"label": "Model Renderer", "entityType": "component",
-                  "description": _ENTITY_DESCRIPTIONS["n8"],
+         "data": {"label": "Diagram Renderer", "entityType": "component",
+                  "description": _ELEMENT_DESCRIPTIONS["n8"],
                   "entityId": eids["n8"]}},
         {"id": "n3", "type": "database",
          "position": {"x": 350, "y": 550},
          "data": {"label": "Database", "entityType": "database",
-                  "description": _ENTITY_DESCRIPTIONS["n3"],
+                  "description": _ELEMENT_DESCRIPTIONS["n3"],
                   "entityId": eids["n3"]}},
         {"id": "n13", "type": "queue",
          "position": {"x": 640, "y": 550},
          "data": {"label": "Event Bus", "entityType": "queue",
-                  "description": _ENTITY_DESCRIPTIONS["n13"],
+                  "description": _ELEMENT_DESCRIPTIONS["n13"],
                   "entityId": eids["n13"]}},
     ]
     edges = [
         {"id": "e2-12", "source": "n2", "target": "n12", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Version entities",
+         "data": {"relationshipType": "uses", "label": "Version elements",
                   "relationshipId": rids["r10"]}},
         {"id": "e2-6", "source": "n2", "target": "n6", "type": "uses",
          "data": {"relationshipType": "uses", "label": "Query search",
@@ -323,7 +323,7 @@ def _build_data_layer_model(
          "data": {"relationshipType": "uses", "label": "Persist audit logs",
                   "relationshipId": rids["r16"]}},
         {"id": "e8-3", "source": "n8", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Read model data",
+         "data": {"relationshipType": "uses", "label": "Read diagram data",
                   "relationshipId": rids["r17"]}},
     ]
     return {"nodes": nodes, "edges": edges}
@@ -340,54 +340,54 @@ def _build_enterprise_model(
          "position": {"x": 60, "y": 50},
          "data": {"label": "User", "entityType": "actor",
                   "layer": "business", "archimateType": "Business Actor",
-                  "description": _ENTITY_DESCRIPTIONS["n10"],
+                  "description": _ELEMENT_DESCRIPTIONS["n10"],
                   "entityId": eids["n10"]}},
         {"id": "n11", "type": "business_actor",
          "position": {"x": 400, "y": 50},
          "data": {"label": "Admin", "entityType": "actor",
                   "layer": "business", "archimateType": "Business Actor",
-                  "description": _ENTITY_DESCRIPTIONS["n11"],
+                  "description": _ELEMENT_DESCRIPTIONS["n11"],
                   "entityId": eids["n11"]}},
         {"id": "n1", "type": "application_component",
          "position": {"x": 60, "y": 300},
          "data": {"label": "Frontend", "entityType": "component",
                   "layer": "application", "archimateType": "Application Component",
-                  "description": _ENTITY_DESCRIPTIONS["n1"],
+                  "description": _ELEMENT_DESCRIPTIONS["n1"],
                   "entityId": eids["n1"]}},
         {"id": "n15", "type": "technology_node",
          "position": {"x": 400, "y": 300},
          "data": {"label": "Middleware Stack", "entityType": "package",
                   "layer": "technology", "archimateType": "Technology Node",
-                  "description": _ENTITY_DESCRIPTIONS["n15"],
+                  "description": _ELEMENT_DESCRIPTIONS["n15"],
                   "entityId": eids["n15"]}},
         {"id": "n2", "type": "application_component",
          "position": {"x": 60, "y": 550},
          "data": {"label": "Backend", "entityType": "component",
                   "layer": "application", "archimateType": "Application Component",
-                  "description": _ENTITY_DESCRIPTIONS["n2"],
+                  "description": _ELEMENT_DESCRIPTIONS["n2"],
                   "entityId": eids["n2"]}},
         {"id": "n4", "type": "application_service",
          "position": {"x": 400, "y": 550},
          "data": {"label": "Auth Service", "entityType": "service",
                   "layer": "application", "archimateType": "Application Service",
-                  "description": _ENTITY_DESCRIPTIONS["n4"],
+                  "description": _ELEMENT_DESCRIPTIONS["n4"],
                   "entityId": eids["n4"]}},
         {"id": "n3", "type": "technology_node",
          "position": {"x": 60, "y": 800},
          "data": {"label": "Database", "entityType": "database",
                   "layer": "technology", "archimateType": "Technology Node",
-                  "description": _ENTITY_DESCRIPTIONS["n3"],
+                  "description": _ELEMENT_DESCRIPTIONS["n3"],
                   "entityId": eids["n3"]}},
         {"id": "n6", "type": "technology_service",
          "position": {"x": 400, "y": 800},
          "data": {"label": "Search Service", "entityType": "service",
                   "layer": "technology", "archimateType": "Technology Service",
-                  "description": _ENTITY_DESCRIPTIONS["n6"],
+                  "description": _ELEMENT_DESCRIPTIONS["n6"],
                   "entityId": eids["n6"]}},
     ]
     edges = [
         {"id": "ea1", "source": "n10", "target": "n1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Browses models",
+         "data": {"relationshipType": "uses", "label": "Browses diagrams",
                   "relationshipId": rids["r0"]}},
         {"id": "ea2", "source": "n11", "target": "n1", "type": "uses",
          "data": {"relationshipType": "uses", "label": "Manages system",
@@ -417,14 +417,14 @@ def _build_enterprise_model(
     return {"nodes": nodes, "edges": edges}
 
 
-# ── Model 5: System Overview (model-in-model) ────────────────────────────────
+# ── Model 5: System Overview (diagram-in-diagram) ────────────────────────────────
 
 def _build_system_overview_model(
     eids: dict[str, str],
     rids: dict[str, str],
     mids: dict[int, str] | None = None,
 ) -> dict[str, object]:
-    """Top-level overview with modelref nodes for all sub-models plus key entities."""
+    """Top-level overview with modelref nodes for all sub-diagrams plus key elements."""
     mids = mids or {}
     nodes = [
         # Model references — the sub-models
@@ -436,7 +436,7 @@ def _build_system_overview_model(
         {"id": "mr1", "type": "modelref",
          "position": {"x": 350, "y": 50},
          "data": {"label": "API Request Flow", "entityType": "component",
-                  "description": "Login and model fetch sequence diagram",
+                  "description": "Login and diagram fetch sequence diagram",
                   "linkedModelId": mids.get(1, "")}},
         {"id": "mr2", "type": "modelref",
          "position": {"x": 60, "y": 300},
@@ -457,12 +457,12 @@ def _build_system_overview_model(
         {"id": "n10", "type": "actor",
          "position": {"x": 640, "y": 50},
          "data": {"label": "User", "entityType": "actor",
-                  "description": _ENTITY_DESCRIPTIONS["n10"],
+                  "description": _ELEMENT_DESCRIPTIONS["n10"],
                   "entityId": eids["n10"]}},
         {"id": "n11", "type": "actor",
          "position": {"x": 640, "y": 300},
          "data": {"label": "Admin", "entityType": "actor",
-                  "description": _ENTITY_DESCRIPTIONS["n11"],
+                  "description": _ELEMENT_DESCRIPTIONS["n11"],
                   "entityId": eids["n11"]}},
     ]
     edges = [
@@ -529,53 +529,53 @@ def _build_data_model(
          "data": {"label": "refresh_tokens", "entityType": "database",
                   "description": "id (PK), user_id (FK\u2192users), family_id, "
                   "expires_at, used_at, revoked — token rotation with family tracking"}},
-        # ── Row 3: Core Domain – Entities (y=550) ──
-        {"id": "t_entities", "type": "database",
+        # ── Row 3: Core Domain – Elements (y=550) ──
+        {"id": "t_elements", "type": "database",
          "position": {"x": 60, "y": 550},
-         "data": {"label": "entities", "entityType": "database",
-                  "description": "id (PK), entity_type, current_version, "
+         "data": {"label": "elements", "entityType": "database",
+                  "description": "id (PK), element_type, current_version, "
                   "created_by (FK\u2192users), is_deleted — soft delete, "
                   "optimistic concurrency"}},
-        {"id": "t_entity_ver", "type": "database",
+        {"id": "t_element_ver", "type": "database",
          "position": {"x": 350, "y": 550},
-         "data": {"label": "entity_versions", "entityType": "database",
-                  "description": "entity_id (FK\u2192entities), version "
+         "data": {"label": "element_versions", "entityType": "database",
+                  "description": "element_id (FK\u2192entities), version "
                   "— composite PK, name, description, data (JSON), "
                   "change_type, rollback_to"}},
-        {"id": "t_entity_tags", "type": "database",
+        {"id": "t_element_tags", "type": "database",
          "position": {"x": 640, "y": 550},
-         "data": {"label": "entity_tags", "entityType": "database",
-                  "description": "entity_id (FK\u2192entities), tag "
+         "data": {"label": "element_tags", "entityType": "database",
+                  "description": "element_id (FK\u2192entities), tag "
                   "— composite PK, created_at, created_by"}},
         # ── Row 4: Core Domain – Relationships (y=800) ──
         {"id": "t_rels", "type": "database",
          "position": {"x": 60, "y": 800},
          "data": {"label": "relationships", "entityType": "database",
-                  "description": "id (PK), source_entity_id (FK\u2192entities), "
-                  "target_entity_id (FK\u2192entities), relationship_type, "
+                  "description": "id (PK), source_element_id (FK\u2192entities), "
+                  "target_element_id (FK\u2192entities), relationship_type, "
                   "current_version, is_deleted"}},
         {"id": "t_rel_ver", "type": "database",
          "position": {"x": 350, "y": 800},
          "data": {"label": "relationship_versions", "entityType": "database",
                   "description": "relationship_id (FK\u2192relationships), version "
                   "— composite PK, label, description, data (JSON), change_type"}},
-        # ── Row 5: Core Domain – Models (y=1050) ──
-        {"id": "t_models", "type": "database",
+        # ── Row 5: Core Domain – Diagrams (y=1050) ──
+        {"id": "t_diagrams", "type": "database",
          "position": {"x": 60, "y": 1050},
-         "data": {"label": "models", "entityType": "database",
-                  "description": "id (PK), model_type, current_version, "
+         "data": {"label": "diagrams", "entityType": "database",
+                  "description": "id (PK), diagram_type, current_version, "
                   "created_by (FK\u2192users), is_deleted — component, "
                   "sequence, archimate, roadmap"}},
-        {"id": "t_model_ver", "type": "database",
+        {"id": "t_diagram_ver", "type": "database",
          "position": {"x": 350, "y": 1050},
-         "data": {"label": "model_versions", "entityType": "database",
-                  "description": "model_id (FK\u2192models), version "
+         "data": {"label": "diagram_versions", "entityType": "database",
+                  "description": "diagram_id (FK\u2192models), version "
                   "— composite PK, name, description, data (JSON canvas), "
                   "change_type"}},
-        {"id": "t_model_tags", "type": "database",
+        {"id": "t_diagram_tags", "type": "database",
          "position": {"x": 640, "y": 1050},
-         "data": {"label": "model_tags", "entityType": "database",
-                  "description": "model_id (FK\u2192models), tag "
+         "data": {"label": "diagram_tags", "entityType": "database",
+                  "description": "diagram_id (FK\u2192models), tag "
                   "— composite PK, created_at, created_by"}},
         # ── Row 6: Features (y=1300) ──
         {"id": "t_comments", "type": "database",
@@ -587,24 +587,24 @@ def _build_data_model(
         {"id": "t_bookmarks", "type": "database",
          "position": {"x": 350, "y": 1300},
          "data": {"label": "bookmarks", "entityType": "database",
-                  "description": "user_id (FK\u2192users), model_id (FK\u2192models) "
-                  "— composite PK, per-user model bookmarks"}},
-        {"id": "t_thumbs", "type": "database",
+                  "description": "user_id (FK\u2192users), diagram_id (FK\u2192diagrams) "
+                  "— composite PK, per-user diagram bookmarks"}},
+        {"id": "t_diagram_thumbs", "type": "database",
          "position": {"x": 640, "y": 1300},
-         "data": {"label": "model_thumbnails", "entityType": "database",
-                  "description": "model_id (FK\u2192models), theme — composite PK, "
-                  "thumbnail (BLOB PNG), 3 theme variants per model"}},
+         "data": {"label": "diagram_thumbnails", "entityType": "database",
+                  "description": "diagram_id (FK\u2192models), theme — composite PK, "
+                  "thumbnail (BLOB PNG), 3 theme variants per diagram"}},
         # ── Row 7: Search & Config (y=1550) ──
-        {"id": "t_ent_fts", "type": "service",
+        {"id": "t_elem_fts", "type": "service",
          "position": {"x": 60, "y": 1550},
-         "data": {"label": "entities_fts", "entityType": "service",
+         "data": {"label": "elements_fts", "entityType": "service",
                   "description": "FTS5 virtual table — entity_id, name, "
-                  "entity_type, description, porter unicode61 tokenizer"}},
-        {"id": "t_mod_fts", "type": "service",
+                  "element_type, description, porter unicode61 tokenizer"}},
+        {"id": "t_diag_fts", "type": "service",
          "position": {"x": 350, "y": 1550},
-         "data": {"label": "models_fts", "entityType": "service",
-                  "description": "FTS5 virtual table — model_id, name, "
-                  "model_type, description, porter unicode61 tokenizer"}},
+         "data": {"label": "diagrams_fts", "entityType": "service",
+                  "description": "FTS5 virtual table — diagram_id, name, "
+                  "diagram_type, description, porter unicode61 tokenizer"}},
         {"id": "t_settings", "type": "database",
          "position": {"x": 640, "y": 1550},
          "data": {"label": "settings", "entityType": "database",
@@ -649,40 +649,40 @@ def _build_data_model(
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
                   "label": "created_by \u2192 users.id"}},
-        {"id": "fk6", "source": "t_entity_ver", "target": "t_entities",
+        {"id": "fk6", "source": "t_element_ver", "target": "t_elements",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "entity_id \u2192 entities.id"}},
-        {"id": "fk7", "source": "t_entity_tags", "target": "t_entities",
+                  "label": "element_id \u2192 entities.id"}},
+        {"id": "fk7", "source": "t_element_tags", "target": "t_elements",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "entity_id \u2192 entities.id"}},
+                  "label": "element_id \u2192 entities.id"}},
         # Relationships
-        {"id": "fk8", "source": "t_rels", "target": "t_entities",
+        {"id": "fk8", "source": "t_rels", "target": "t_elements",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "source_entity_id \u2192 entities.id"}},
-        {"id": "fk9", "source": "t_rels", "target": "t_entities",
+                  "label": "source_element_id \u2192 entities.id"}},
+        {"id": "fk9", "source": "t_rels", "target": "t_elements",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "target_entity_id \u2192 entities.id"}},
+                  "label": "target_element_id \u2192 entities.id"}},
         {"id": "fk10", "source": "t_rel_ver", "target": "t_rels",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
                   "label": "relationship_id \u2192 relationships.id"}},
         # Models
-        {"id": "fk11", "source": "t_models", "target": "t_users",
+        {"id": "fk11", "source": "t_diagrams", "target": "t_users",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
                   "label": "created_by \u2192 users.id"}},
-        {"id": "fk12", "source": "t_model_ver", "target": "t_models",
+        {"id": "fk12", "source": "t_diagram_ver", "target": "t_diagrams",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "model_id \u2192 models.id"}},
-        {"id": "fk13", "source": "t_model_tags", "target": "t_models",
+                  "label": "diagram_id \u2192 models.id"}},
+        {"id": "fk13", "source": "t_diagram_tags", "target": "t_diagrams",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "model_id \u2192 models.id"}},
+                  "label": "diagram_id \u2192 models.id"}},
         # Features
         {"id": "fk14", "source": "t_comments", "target": "t_users",
          "type": "depends_on",
@@ -692,76 +692,76 @@ def _build_data_model(
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
                   "label": "user_id \u2192 users.id"}},
-        {"id": "fk16", "source": "t_bookmarks", "target": "t_models",
+        {"id": "fk16", "source": "t_bookmarks", "target": "t_diagrams",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "model_id \u2192 models.id"}},
-        {"id": "fk17", "source": "t_thumbs", "target": "t_models",
+                  "label": "diagram_id \u2192 models.id"}},
+        {"id": "fk17", "source": "t_diagram_thumbs", "target": "t_diagrams",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "model_id \u2192 models.id"}},
+                  "label": "diagram_id \u2192 models.id"}},
         # Search indexes
-        {"id": "fk18", "source": "t_ent_fts", "target": "t_entities",
+        {"id": "fk18", "source": "t_elem_fts", "target": "t_elements",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "indexes entities"}},
-        {"id": "fk19", "source": "t_mod_fts", "target": "t_models",
+                  "label": "indexes elements"}},
+        {"id": "fk19", "source": "t_diag_fts", "target": "t_diagrams",
          "type": "depends_on",
          "data": {"relationshipType": "depends_on",
-                  "label": "indexes models"}},
+                  "label": "indexes diagrams"}},
         # Model ref links
-        {"id": "ref1", "source": "mr_data_layer", "target": "t_entities",
+        {"id": "ref1", "source": "mr_data_layer", "target": "t_elements",
          "type": "composes",
          "data": {"relationshipType": "composes", "label": "Manages"}},
-        {"id": "ref2", "source": "mr_data_layer", "target": "t_models",
+        {"id": "ref2", "source": "mr_data_layer", "target": "t_diagrams",
          "type": "composes",
          "data": {"relationshipType": "composes", "label": "Manages"}},
     ]
     return {"nodes": nodes, "edges": edges}
 
 
-# ── Model definitions ───────────────────────────────────────────────────────
+# ── Diagram definitions ───────────────────────────────────────────────────────
 
-_MODELS = [
+_DIAGRAMS = [
     {
         "index": 0,
-        "model_type": "component",
+        "diagram_type": "component",
         "name": "Iris Architecture",
         "description": (
-            "Component model showing the internal architecture of Iris: "
+            "Component diagram showing the internal architecture of Iris: "
             "Frontend, Backend, Database, Auth, Canvas Engine, and Export "
             "with their interactions."
         ),
         "builder": _build_architecture_model,
-        "tags": _MODEL_TAGS,
+        "tags": _DIAGRAM_TAGS,
     },
     {
         "index": 1,
-        "model_type": "sequence",
+        "diagram_type": "sequence",
         "name": "API Request Flow",
         "description": (
             "Sequence diagram showing a typical user login followed by "
-            "fetching the model gallery, illustrating the interaction "
+            "fetching the diagram gallery, illustrating the interaction "
             "between Browser, Frontend, Backend, Auth, and Database."
         ),
         "builder": _build_sequence_model,
-        "tags": _MODEL_TAGS,
+        "tags": _DIAGRAM_TAGS,
     },
     {
         "index": 2,
-        "model_type": "component",
+        "diagram_type": "component",
         "name": "Data Layer",
         "description": (
-            "Component model detailing the data layer: version control, "
-            "search service, audit service, model renderer, event bus, "
+            "Component diagram detailing the data layer: version control, "
+            "search service, audit service, diagram renderer, event bus, "
             "and their database interactions."
         ),
         "builder": _build_data_layer_model,
-        "tags": _MODEL_TAGS,
+        "tags": _DIAGRAM_TAGS,
     },
     {
         "index": 3,
-        "model_type": "archimate",
+        "diagram_type": "archimate",
         "name": "Iris Enterprise View",
         "description": (
             "Enterprise architecture view showing actors (User, Admin), "
@@ -769,35 +769,35 @@ _MODELS = [
             "services across technology layers."
         ),
         "builder": _build_enterprise_model,
-        "tags": _MODEL_TAGS,
+        "tags": _DIAGRAM_TAGS,
     },
     {
         "index": 4,
-        "model_type": "component",
+        "diagram_type": "component",
         "name": "Iris System Overview",
         "description": (
-            "Top-level overview model using model-in-model references to "
-            "all Iris sub-models (Architecture, API Flow, Data Layer, "
+            "Top-level overview diagram using diagram-in-diagram references to "
+            "all Iris sub-diagrams (Architecture, API Flow, Data Layer, "
             "Enterprise View, Data Model), showing how they relate to "
             "each other and to key actors."
         ),
         "builder": _build_system_overview_model,
-        "tags": _MODEL_TAGS,
+        "tags": _DIAGRAM_TAGS,
     },
     {
         "index": 5,
-        "model_type": "component",
+        "diagram_type": "component",
         "name": "Data Model",
         "description": (
             "Complete database schema for Iris showing all 20 tables "
             "across both databases (iris.db and iris_audit.db), their "
             "columns, primary keys, and 19 foreign key relationships. "
-            "Covers auth, entities, relationships, models, versioning, "
+            "Covers auth, elements, relationships, diagrams, versioning, "
             "comments, bookmarks, thumbnails, tags, FTS5 search indexes, "
             "settings, and audit log."
         ),
         "builder": _build_data_model,
-        "tags": _MODEL_TAGS,
+        "tags": _DIAGRAM_TAGS,
     },
 ]
 
@@ -818,9 +818,9 @@ async def _ensure_system_user(db: aiosqlite.Connection) -> None:
 
 
 async def seed_example_models(db: aiosqlite.Connection) -> None:
-    """Seed example entities and models demonstrating Iris architecture.
+    """Seed example elements and diagrams demonstrating Iris architecture.
 
-    Idempotent: skips if any entity_tags with tag='example' already exist.
+    Idempotent: skips if any element_tags with tag='example' already exist.
     Also skips if no active users exist yet (initial setup not completed).
     """
     # --- Skip if initial setup not yet completed ------------------------------
@@ -833,7 +833,7 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
 
     # --- Idempotency check ---------------------------------------------------
     cursor = await db.execute(
-        "SELECT COUNT(*) FROM entity_tags WHERE tag = 'example'"
+        "SELECT COUNT(*) FROM element_tags WHERE tag = 'example'"
     )
     row = await cursor.fetchone()
     if row and row[0] > 0:
@@ -844,30 +844,30 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
 
     now = datetime.now(tz=UTC).isoformat()
 
-    # --- Create entities ------------------------------------------------------
-    entity_ids: dict[str, str] = {}
+    # --- Create elements ------------------------------------------------------
+    element_ids: dict[str, str] = {}
 
-    for idx, (node_id, entity_type, name, description) in enumerate(_ENTITIES):
-        entity_id = _gen_id("entity", idx)
-        entity_ids[node_id] = entity_id
+    for idx, (node_id, element_type, name, description) in enumerate(_ENTITIES):
+        element_id = _gen_id("element", idx)
+        element_ids[node_id] = element_id
 
         await db.execute(
-            "INSERT INTO entities (id, entity_type, current_version, "
+            "INSERT INTO elements (id, element_type, current_version, "
             "created_at, created_by, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
-            (entity_id, entity_type, now, _SYSTEM_USER_ID, now),
+            (element_id, element_type, now, _SYSTEM_USER_ID, now),
         )
         await db.execute(
-            "INSERT INTO entity_versions (entity_id, version, name, description, "
+            "INSERT INTO element_versions (element_id, version, name, description, "
             "data, change_type, created_at, created_by) "
             "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
-            (entity_id, name, description, json.dumps({}), now, _SYSTEM_USER_ID),
+            (element_id, name, description, json.dumps({}), now, _SYSTEM_USER_ID),
         )
 
-        for tag in _ENTITY_TAGS:
+        for tag in _ELEMENT_TAGS:
             await db.execute(
-                "INSERT INTO entity_tags (entity_id, tag, created_at, created_by) "
+                "INSERT INTO element_tags (element_id, tag, created_at, created_by) "
                 "VALUES (?, ?, ?, ?)",
-                (entity_id, tag, now, _SYSTEM_USER_ID),
+                (element_id, tag, now, _SYSTEM_USER_ID),
             )
 
     # --- Create relationships -------------------------------------------------
@@ -878,10 +878,10 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         rel_ids[f"r{ri}"] = rel_id
 
         await db.execute(
-            "INSERT INTO relationships (id, source_entity_id, target_entity_id, "
+            "INSERT INTO relationships (id, source_element_id, target_element_id, "
             "relationship_type, current_version, created_at, created_by, updated_at) "
             "VALUES (?, ?, ?, ?, 1, ?, ?, ?)",
-            (rel_id, entity_ids[src], entity_ids[tgt], rel_type,
+            (rel_id, element_ids[src], element_ids[tgt], rel_type,
              now, _SYSTEM_USER_ID, now),
         )
         await db.execute(
@@ -891,31 +891,31 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
             (rel_id, label, desc, json.dumps({}), now, _SYSTEM_USER_ID),
         )
 
-    # --- Create models --------------------------------------------------------
-    # Pre-compute all model IDs so the overview model can reference them
-    model_id_map: dict[int, str] = {}
-    for model_def in _MODELS:
-        model_id_map[model_def["index"]] = _gen_id("model", model_def["index"])
+    # --- Create diagrams --------------------------------------------------------
+    # Pre-compute all diagram IDs so the overview diagram can reference them
+    diagram_id_map: dict[int, str] = {}
+    for model_def in _DIAGRAMS:
+        diagram_id_map[model_def["index"]] = _gen_id("diagram", model_def["index"])
 
-    for model_def in _MODELS:
-        model_id = model_id_map[model_def["index"]]
-        model_data = model_def["builder"](entity_ids, rel_ids, mids=model_id_map)
-        model_data_json = json.dumps(model_data)
+    for model_def in _DIAGRAMS:
+        diagram_id = diagram_id_map[model_def["index"]]
+        diagram_data = model_def["builder"](element_ids, rel_ids, mids=diagram_id_map)
+        diagram_data_json = json.dumps(diagram_data)
 
         await db.execute(
-            "INSERT INTO models (id, model_type, current_version, "
+            "INSERT INTO diagrams (id, diagram_type, current_version, "
             "created_at, created_by, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
-            (model_id, model_def["model_type"], now, _SYSTEM_USER_ID, now),
+            (diagram_id, model_def["diagram_type"], now, _SYSTEM_USER_ID, now),
         )
         await db.execute(
-            "INSERT INTO model_versions (model_id, version, name, description, "
+            "INSERT INTO diagram_versions (diagram_id, version, name, description, "
             "data, change_type, created_at, created_by) "
             "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
             (
-                model_id,
+                diagram_id,
                 model_def["name"],
                 model_def["description"],
-                model_data_json,
+                diagram_data_json,
                 now,
                 _SYSTEM_USER_ID,
             ),
@@ -923,9 +923,9 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
 
         for tag in model_def["tags"]:
             await db.execute(
-                "INSERT INTO model_tags (model_id, tag, created_at, created_by) "
+                "INSERT INTO diagram_tags (diagram_id, tag, created_at, created_by) "
                 "VALUES (?, ?, ?, ?)",
-                (model_id, tag, now, _SYSTEM_USER_ID),
+                (diagram_id, tag, now, _SYSTEM_USER_ID),
             )
 
     await db.commit()

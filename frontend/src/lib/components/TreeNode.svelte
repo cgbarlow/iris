@@ -1,29 +1,29 @@
 <script lang="ts">
-	/** Recursive tree node component for model hierarchy navigation. */
-	import type { ModelHierarchyNode } from '$lib/types/api';
+	/** Recursive tree node component for diagram hierarchy navigation. */
+	import type { DiagramHierarchyNode } from '$lib/types/api';
 
 	interface Props {
-		node: ModelHierarchyNode;
+		node: DiagramHierarchyNode;
 		depth?: number;
-		currentModelId?: string;
+		currentDiagramId?: string;
 		searchQuery?: string;
-		showModelsOnly?: boolean;
+		showDiagramsOnly?: boolean;
 		expandedIds?: Set<string>;
 	}
 
 	let {
 		node,
 		depth = 0,
-		currentModelId = '',
+		currentDiagramId = '',
 		searchQuery = '',
-		showModelsOnly = false,
+		showDiagramsOnly = false,
 		expandedIds = new Set<string>(),
 	}: Props = $props();
 
 	let expanded = $state(expandedIds.has(node.id) || depth < 2);
 
 	const hasChildren = $derived(node.children && node.children.length > 0);
-	const isCurrent = $derived(currentModelId === node.id);
+	const isCurrent = $derived(currentDiagramId === node.id);
 	const matchesSearch = $derived(
 		!searchQuery || node.name.toLowerCase().includes(searchQuery.toLowerCase())
 	);
@@ -37,7 +37,7 @@
 	);
 
 	/** Recursively check if this node or any descendant has canvas content. */
-	function descendantHasContent(n: ModelHierarchyNode): boolean {
+	function descendantHasContent(n: DiagramHierarchyNode): boolean {
 		return (n.children ?? []).some(
 			(c) => c.has_content || descendantHasContent(c)
 		);
@@ -45,7 +45,7 @@
 
 	/**
 	 * Indicator type:
-	 * - 'solid': node has canvas content (entities/participants on its canvas)
+	 * - 'solid': node has canvas content (elements/participants on its canvas)
 	 * - 'hollow': node has no content itself but a descendant does (organizational container)
 	 * - 'none': no content anywhere in this subtree
 	 */
@@ -57,10 +57,10 @@
 				: 'none'
 	);
 
-	const passesModelFilter = $derived(
-		!showModelsOnly || node.has_content || descendantHasContent(node)
+	const passesDiagramFilter = $derived(
+		!showDiagramsOnly || node.has_content || descendantHasContent(node)
 	);
-	const visible = $derived((matchesSearch || childMatchesSearch) && passesModelFilter);
+	const visible = $derived((matchesSearch || childMatchesSearch) && passesDiagramFilter);
 
 	function toggleExpand() {
 		expanded = !expanded;
@@ -109,17 +109,17 @@
 				<span class="tree-node__spacer" aria-hidden="true"></span>
 			{/if}
 			<a
-				href="/models/{node.id}"
+				href="/diagrams/{node.id}"
 				class="tree-node__link"
 				onkeydown={handleKeydown}
 			>
 				{#if indicatorType === 'solid'}
-					<span class="tree-node__model-indicator tree-node__model-indicator--solid" aria-hidden="true"></span>
+					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--solid" aria-hidden="true"></span>
 				{:else if indicatorType === 'hollow'}
-					<span class="tree-node__model-indicator tree-node__model-indicator--hollow" aria-hidden="true"></span>
+					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--hollow" aria-hidden="true"></span>
 				{/if}
 				<span class="tree-node__name">{node.name}</span>
-				<span class="tree-node__type">{node.model_type}</span>
+				<span class="tree-node__type">{node.diagram_type}</span>
 			</a>
 		</div>
 		{#if hasChildren && expanded}
@@ -128,9 +128,9 @@
 					<svelte:self
 						node={child}
 						depth={depth + 1}
-						{currentModelId}
+						{currentDiagramId}
 						{searchQuery}
-						{showModelsOnly}
+						{showDiagramsOnly}
 						{expandedIds}
 					/>
 				{/each}
@@ -182,17 +182,17 @@
 		min-width: 0;
 		padding: 2px 0;
 	}
-	.tree-node__model-indicator {
+	.tree-node__diagram-indicator {
 		display: inline-block;
 		width: 8px;
 		height: 8px;
 		border-radius: 2px;
 		flex-shrink: 0;
 	}
-	.tree-node__model-indicator--solid {
+	.tree-node__diagram-indicator--solid {
 		background-color: var(--color-primary);
 	}
-	.tree-node__model-indicator--hollow {
+	.tree-node__diagram-indicator--hollow {
 		background-color: transparent;
 		border: 1.5px solid var(--color-primary);
 	}

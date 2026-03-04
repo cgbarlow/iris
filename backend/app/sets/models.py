@@ -18,7 +18,7 @@ class SetUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     thumbnail_source: str | None = None
-    thumbnail_model_id: str | None = None
+    thumbnail_diagram_id: str | None = None
 
 
 class SetResponse(BaseModel):
@@ -31,10 +31,10 @@ class SetResponse(BaseModel):
     created_by: str
     updated_at: str
     is_deleted: bool = False
-    model_count: int = 0
-    entity_count: int = 0
+    diagram_count: int = 0
+    element_count: int = 0
     thumbnail_source: str | None = None
-    thumbnail_model_id: str | None = None
+    thumbnail_diagram_id: str | None = None
     has_thumbnail_image: bool = False
 
 
@@ -47,5 +47,5 @@ class SetListResponse(BaseModel):
 class SetForceDeleteResponse(BaseModel):
     """Response for force-deleting a set and all its contents."""
 
-    models_deleted: int
-    entities_deleted: int
+    diagrams_deleted: int
+    elements_deleted: int

@@ -9,35 +9,35 @@ if TYPE_CHECKING:
 
 
 async def rebuild_search_index(db: aiosqlite.Connection) -> None:
-    """Rebuild FTS indices from current entity and model data."""
+    """Rebuild FTS indices from current element and diagram data."""
     # Clear existing FTS data
-    await db.execute("DELETE FROM entities_fts")
-    await db.execute("DELETE FROM models_fts")
+    await db.execute("DELETE FROM elements_fts")
+    await db.execute("DELETE FROM diagrams_fts")
 
-    # Re-index all non-deleted entities
+    # Re-index all non-deleted elements
     cursor = await db.execute(
-        "SELECT e.id, e.entity_type, ev.name, ev.description "
-        "FROM entities e "
-        "JOIN entity_versions ev ON e.id = ev.entity_id AND e.current_version = ev.version "
+        "SELECT e.id, e.element_type, ev.name, ev.description "
+        "FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
         "WHERE e.is_deleted = 0"
     )
     for row in await cursor.fetchall():
         await db.execute(
-            "INSERT INTO entities_fts (entity_id, name, entity_type, description) "
+            "INSERT INTO elements_fts (element_id, name, element_type, description) "
             "VALUES (?, ?, ?, ?)",
             (row[0], row[2], row[1], row[3] or ""),
         )
 
-    # Re-index all non-deleted models
+    # Re-index all non-deleted diagrams
     cursor = await db.execute(
-        "SELECT m.id, m.model_type, mv.name, mv.description "
-        "FROM models m "
-        "JOIN model_versions mv ON m.id = mv.model_id AND m.current_version = mv.version "
+        "SELECT m.id, m.diagram_type, mv.name, mv.description "
+        "FROM diagrams m "
+        "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
         "WHERE m.is_deleted = 0"
     )
     for row in await cursor.fetchall():
         await db.execute(
-            "INSERT INTO models_fts (model_id, name, model_type, description) "
+            "INSERT INTO diagrams_fts (diagram_id, name, diagram_type, description) "
             "VALUES (?, ?, ?, ?)",
             (row[0], row[2], row[1], row[3] or ""),
         )
@@ -45,60 +45,60 @@ async def rebuild_search_index(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
-async def index_entity(
+async def index_element(
     db: aiosqlite.Connection,
     *,
-    entity_id: str,
+    element_id: str,
     name: str,
-    entity_type: str,
+    element_type: str,
     description: str | None,
 ) -> None:
-    """Index or re-index an entity in the FTS table."""
+    """Index or re-index an element in the FTS table."""
     # Delete existing entry then insert fresh
     await db.execute(
-        "DELETE FROM entities_fts WHERE entity_id = ?", (entity_id,),
+        "DELETE FROM elements_fts WHERE element_id = ?", (element_id,),
     )
     await db.execute(
-        "INSERT INTO entities_fts (entity_id, name, entity_type, description) "
+        "INSERT INTO elements_fts (element_id, name, element_type, description) "
         "VALUES (?, ?, ?, ?)",
-        (entity_id, name, entity_type, description or ""),
+        (element_id, name, element_type, description or ""),
     )
 
 
-async def index_model(
+async def index_diagram(
     db: aiosqlite.Connection,
     *,
-    model_id: str,
+    diagram_id: str,
     name: str,
-    model_type: str,
+    diagram_type: str,
     description: str | None,
 ) -> None:
-    """Index or re-index a model in the FTS table."""
+    """Index or re-index a diagram in the FTS table."""
     await db.execute(
-        "DELETE FROM models_fts WHERE model_id = ?", (model_id,),
+        "DELETE FROM diagrams_fts WHERE diagram_id = ?", (diagram_id,),
     )
     await db.execute(
-        "INSERT INTO models_fts (model_id, name, model_type, description) "
+        "INSERT INTO diagrams_fts (diagram_id, name, diagram_type, description) "
         "VALUES (?, ?, ?, ?)",
-        (model_id, name, model_type, description or ""),
+        (diagram_id, name, diagram_type, description or ""),
     )
 
 
-async def remove_entity_index(
-    db: aiosqlite.Connection, entity_id: str,
+async def remove_element_index(
+    db: aiosqlite.Connection, element_id: str,
 ) -> None:
-    """Remove an entity from the FTS index."""
+    """Remove an element from the FTS index."""
     await db.execute(
-        "DELETE FROM entities_fts WHERE entity_id = ?", (entity_id,),
+        "DELETE FROM elements_fts WHERE element_id = ?", (element_id,),
     )
 
 
-async def remove_model_index(
-    db: aiosqlite.Connection, model_id: str,
+async def remove_diagram_index(
+    db: aiosqlite.Connection, diagram_id: str,
 ) -> None:
-    """Remove a model from the FTS index."""
+    """Remove a diagram from the FTS index."""
     await db.execute(
-        "DELETE FROM models_fts WHERE model_id = ?", (model_id,),
+        "DELETE FROM diagrams_fts WHERE diagram_id = ?", (diagram_id,),
     )
 
 
@@ -109,7 +109,7 @@ async def search(
     limit: int = 50,
     set_id: str | None = None,
 ) -> list[dict[str, object]]:
-    """Search entities and models using FTS5.
+    """Search elements and diagrams using FTS5.
 
     Returns combined results sorted by relevance rank.
     When set_id is provided, only results belonging to that set are returned.
@@ -121,66 +121,66 @@ async def search(
     if not safe_query:
         return results
 
-    # Search entities
+    # Search elements
     if set_id:
         cursor = await db.execute(
-            "SELECT f.entity_id, f.name, f.entity_type, f.description, f.rank "
-            "FROM entities_fts f "
-            "JOIN entities e ON e.id = f.entity_id "
-            "WHERE entities_fts MATCH ? AND e.set_id = ? "
+            "SELECT f.element_id, f.name, f.element_type, f.description, f.rank "
+            "FROM elements_fts f "
+            "JOIN elements e ON e.id = f.element_id "
+            "WHERE elements_fts MATCH ? AND e.set_id = ? "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, set_id, limit),
         )
     else:
         cursor = await db.execute(
-            "SELECT entity_id, name, entity_type, description, rank "
-            "FROM entities_fts WHERE entities_fts MATCH ? "
+            "SELECT element_id, name, element_type, description, rank "
+            "FROM elements_fts WHERE elements_fts MATCH ? "
             "ORDER BY rank LIMIT ?",
             (safe_query, limit),
         )
-    entity_rows = await cursor.fetchall()
+    element_rows = await cursor.fetchall()
     results.extend(
         {
             "id": row[0],
-            "result_type": "entity",
+            "result_type": "element",
             "name": row[1],
             "type_detail": row[2],
             "description": row[3] or None,
             "rank": float(row[4]),
-            "deep_link": f"/entities/{row[0]}",
+            "deep_link": f"/elements/{row[0]}",
         }
-        for row in entity_rows
+        for row in element_rows
     )
 
-    # Search models
+    # Search diagrams
     if set_id:
         cursor = await db.execute(
-            "SELECT f.model_id, f.name, f.model_type, f.description, f.rank "
-            "FROM models_fts f "
-            "JOIN models m ON m.id = f.model_id "
-            "WHERE models_fts MATCH ? AND m.set_id = ? "
+            "SELECT f.diagram_id, f.name, f.diagram_type, f.description, f.rank "
+            "FROM diagrams_fts f "
+            "JOIN diagrams m ON m.id = f.diagram_id "
+            "WHERE diagrams_fts MATCH ? AND m.set_id = ? "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, set_id, limit),
         )
     else:
         cursor = await db.execute(
-            "SELECT model_id, name, model_type, description, rank "
-            "FROM models_fts WHERE models_fts MATCH ? "
+            "SELECT diagram_id, name, diagram_type, description, rank "
+            "FROM diagrams_fts WHERE diagrams_fts MATCH ? "
             "ORDER BY rank LIMIT ?",
             (safe_query, limit),
         )
-    model_rows = await cursor.fetchall()
+    diagram_rows = await cursor.fetchall()
     results.extend(
         {
             "id": row[0],
-            "result_type": "model",
+            "result_type": "diagram",
             "name": row[1],
             "type_detail": row[2],
             "description": row[3] or None,
             "rank": float(row[4]),
-            "deep_link": f"/models/{row[0]}",
+            "deep_link": f"/diagrams/{row[0]}",
         }
-        for row in model_rows
+        for row in diagram_rows
     )
 
     # Sort combined results by rank (FTS5 rank is negative, closer to 0 = better)

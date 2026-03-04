@@ -10,6 +10,13 @@ if TYPE_CHECKING:
 
 async def up(db: aiosqlite.Connection) -> None:
     """Create model_relationships table."""
+    # Guard: skip if m016 naming rename has already been applied
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await cursor.fetchone():
+        return
+
     cursor = await db.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='model_relationships'"
     )

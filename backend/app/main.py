@@ -15,13 +15,14 @@ from app.bookmarks.router import router as bookmarks_router
 from app.comments.router import router as comments_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
-from app.entities.router import router as entities_router
+from app.diagrams.router import admin_router as admin_thumbnails_router
+from app.diagrams.router import router as diagrams_router
+from app.elements.router import router as elements_router
 from app.import_sparx.router import router as import_router
-from app.model_relationships.router import router as model_relationships_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.models_crud.router import admin_router as admin_thumbnails_router
-from app.models_crud.router import router as models_router
+from app.package_relationships.router import router as package_relationships_router
+from app.packages.router import router as packages_router
 from app.relationships.router import router as relationships_router
 from app.search.router import router as search_router
 from app.sets.router import router as sets_router
@@ -101,9 +102,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     # Register routers
     app.include_router(auth_router)
-    app.include_router(entities_router)
+    app.include_router(elements_router)
     app.include_router(relationships_router)
-    app.include_router(models_router)
+    app.include_router(diagrams_router)
+    app.include_router(packages_router)
     app.include_router(users_router)
     app.include_router(comments_router)
     app.include_router(bookmarks_router)
@@ -112,7 +114,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(settings_router)
     app.include_router(admin_thumbnails_router)
     app.include_router(import_router)
-    app.include_router(model_relationships_router)
+    app.include_router(package_relationships_router)
     app.include_router(sets_router)
     app.include_router(batch_router)
 

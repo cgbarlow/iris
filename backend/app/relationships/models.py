@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 class RelationshipCreate(BaseModel):
     """Request body for creating a relationship."""
 
-    source_entity_id: str
-    target_entity_id: str
+    source_element_id: str
+    target_element_id: str
     relationship_type: str = Field(min_length=1)
     label: str | None = None
     description: str | None = None
@@ -29,8 +29,8 @@ class RelationshipResponse(BaseModel):
     """Response for a single relationship."""
 
     id: str
-    source_entity_id: str
-    target_entity_id: str
+    source_element_id: str
+    target_element_id: str
     relationship_type: str
     current_version: int
     label: str | None = None
@@ -40,8 +40,8 @@ class RelationshipResponse(BaseModel):
     created_by: str
     updated_at: str
     is_deleted: bool = False
-    source_entity_name: str = ""
-    target_entity_name: str = ""
+    source_element_name: str = ""
+    target_element_name: str = ""
 
 
 class RelationshipVersionResponse(BaseModel):

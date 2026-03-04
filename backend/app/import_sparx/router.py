@@ -44,13 +44,13 @@ async def import_sparx(
             db, tmp_path, imported_by=current_user["id"], set_id=set_id,
         )
         return {
-            "models_created": summary.models_created,
-            "entities_created": summary.entities_created,
+            "packages_created": summary.packages_created,
+            "elements_created": summary.elements_created,
             "relationships_created": summary.relationships_created,
             "diagrams_created": summary.diagrams_created,
             "elements_skipped": summary.elements_skipped,
             "connectors_skipped": summary.connectors_skipped,
-            "model_relationships_created": summary.model_relationships_created,
+            "package_relationships_created": summary.package_relationships_created,
             "warnings": [
                 {"category": w.category, "message": w.message} for w in summary.warnings
             ],

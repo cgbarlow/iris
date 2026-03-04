@@ -137,13 +137,13 @@ class TestAuditUsernameResolution:
 
         # Make an authenticated mutating request
         await client.post(
-            "/api/entities",
-            json={"entity_type": "service", "name": "Audit Test", "data": {}},
+            "/api/elements",
+            json={"element_type": "service", "name": "Audit Test", "data": {}},
             headers={"Authorization": f"Bearer {tokens['access_token']}"},
         )
 
         cursor = await db_manager.audit_db.execute(
-            "SELECT username FROM audit_log WHERE action = 'POST /api/entities'"
+            "SELECT username FROM audit_log WHERE action = 'POST /api/elements'"
         )
         row = await cursor.fetchone()
         assert row is not None

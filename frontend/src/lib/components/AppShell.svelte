@@ -14,8 +14,8 @@
 	const navItems = [
 		{ href: '/', label: 'Dashboard', shortcut: 'H' },
 		{ href: '/sets', label: 'Sets', shortcut: 'T' },
-		{ href: '/models', label: 'Models', shortcut: 'M' },
-		{ href: '/entities', label: 'Entities', shortcut: 'E' },
+		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M' },
+		{ href: '/elements', label: 'Elements', shortcut: 'E' },
 		{ href: '/import', label: 'Import', shortcut: 'I' },
 		{ href: '/bookmarks', label: 'Bookmarks', shortcut: 'B' },
 		{ href: '/settings', label: 'Settings', shortcut: 'S' },

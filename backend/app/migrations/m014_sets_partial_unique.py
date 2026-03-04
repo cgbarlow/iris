@@ -16,6 +16,13 @@ if TYPE_CHECKING:
 
 async def up(db: aiosqlite.Connection) -> None:
     """Recreate sets table without UNIQUE on name, add partial unique index."""
+    # Guard: skip if m016 naming rename has already been applied
+    elem_cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='elements'"
+    )
+    if await elem_cursor.fetchone():
+        return
+
     # Idempotent guard: if the partial unique index already exists, skip
     cursor = await db.execute(
         "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_sets_name_active'"
