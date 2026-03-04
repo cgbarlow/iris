@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C4 relationship type with label and technology annotation
 - C4Renderer and C4EdgeRenderer for notation-aware canvas rendering
 - Type equivalences extended with C4 mappings (component→c4_component, actor→person)
+- Admin-configurable Views: named profiles controlling UI feature visibility — toolbar element/relationship types, metadata sections, canvas options (ADR-075)
+- Two default views: Standard (simplified, hides advanced features) and Advanced (full functionality)
+- Views REST API: GET/POST/PUT/DELETE on `/api/views` with default view protection
+- View selector dropdown in top navigation for switching active view
+- Admin views page (`/admin/views`) for creating, editing, and deleting views
+- Global view store with localStorage persistence of active view selection
 
 ### Removed
 - `backend/app/entities/` module (replaced by `elements/`)

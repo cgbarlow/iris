@@ -29,6 +29,7 @@ from app.sets.router import router as sets_router
 from app.settings.router import router as settings_router
 from app.startup import initialize_databases
 from app.users.router import router as users_router
+from app.views.router import router as views_router
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -117,6 +118,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(package_relationships_router)
     app.include_router(sets_router)
     app.include_router(batch_router)
+    app.include_router(views_router)
 
     return app
 
