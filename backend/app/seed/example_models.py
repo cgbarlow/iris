@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     import aiosqlite
 
 _SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000"
+_DEFAULT_SET_ID = "00000000-0000-0000-0000-000000000001"
 
 # ── Element definitions ─────────────────────────────────────────────────────
 # (node_id, element_type, name, description)
@@ -852,9 +853,9 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         element_ids[node_id] = element_id
 
         await db.execute(
-            "INSERT INTO elements (id, element_type, current_version, "
-            "created_at, created_by, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
-            (element_id, element_type, now, _SYSTEM_USER_ID, now),
+            "INSERT INTO elements (id, element_type, set_id, current_version, "
+            "created_at, created_by, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)",
+            (element_id, element_type, _DEFAULT_SET_ID, now, _SYSTEM_USER_ID, now),
         )
         await db.execute(
             "INSERT INTO element_versions (element_id, version, name, description, "
@@ -903,9 +904,9 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         diagram_data_json = json.dumps(diagram_data)
 
         await db.execute(
-            "INSERT INTO diagrams (id, diagram_type, current_version, "
-            "created_at, created_by, updated_at) VALUES (?, ?, 1, ?, ?, ?)",
-            (diagram_id, model_def["diagram_type"], now, _SYSTEM_USER_ID, now),
+            "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
+            "created_at, created_by, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)",
+            (diagram_id, model_def["diagram_type"], _DEFAULT_SET_ID, now, _SYSTEM_USER_ID, now),
         )
         await db.execute(
             "INSERT INTO diagram_versions (diagram_id, version, name, description, "
