@@ -146,17 +146,25 @@ async def import_sparx_file(
 
     for pkg in _topo_sort_packages(packages):
         parent_iris_id = package_map.get(pkg.Parent_ID)
-        # Build metadata from package-type element (Status/Stereotype)
+        # Build metadata from package-type element and tagged values
         pkg_metadata: dict[str, object] | None = None
         pkg_elem = pkg_type_elements.get(pkg.Package_ID)
+        md: dict[str, object] = {}
+        if pkg.ea_guid:
+            md["ea_guid"] = pkg.ea_guid
         if pkg_elem:
-            md: dict[str, object] = {}
-            if pkg_elem.Status:
-                md["status"] = pkg_elem.Status
-            if pkg_elem.Stereotype:
-                md["stereotype"] = pkg_elem.Stereotype
-            if md:
-                pkg_metadata = md
+            for field in ("Status", "Stereotype", "Version", "Scope",
+                          "Author", "Complexity", "Phase", "CreatedDate",
+                          "ModifiedDate", "GenType"):
+                val = getattr(pkg_elem, field, None)
+                if val:
+                    md[field.lower()] = val
+            # Include tagged values from the package-type element
+            elem_tvs = tags_by_object.get(pkg_elem.Object_ID, [])
+            if elem_tvs:
+                md["tagged_values"] = elem_tvs
+        if md:
+            pkg_metadata = md
 
         package = await create_package(
             db,

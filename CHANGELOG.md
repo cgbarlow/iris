@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `backend/app/package_relationships/` module (renamed from `model_relationships/`)
 - Backward-compatible type aliases in `api.ts`: `Entity = Element`, `Model = Diagram`, etc.
 - `DiagramDialog`, `DiagramPicker`, `DiagramThumbnail`, `ElementPicker` frontend components
+- Package metadata enrichment: import captures ea_guid, Status, Stereotype, Version, Scope, Author, Complexity, Phase, dates, and tagged values from SparxEA (ADR-072)
+- Package detail page (`/packages/[id]`) with Overview, Details, and Extended accordion sections displaying all enriched metadata and tagged values
 
 ### Removed
 - `backend/app/entities/` module (replaced by `elements/`)
