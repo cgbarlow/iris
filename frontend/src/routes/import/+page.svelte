@@ -15,9 +15,11 @@
 
 	interface ImportSummary {
 		packages_created: number;
+		packages_skipped: number;
 		elements_created: number;
 		relationships_created: number;
 		diagrams_created: number;
+		diagrams_skipped: number;
 		elements_skipped: number;
 		connectors_skipped: number;
 		warnings: ImportWarning[];
@@ -168,6 +170,14 @@
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
 				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.packages_created}</p>
 				<p class="text-sm" style="color: var(--color-muted)">Packages</p>
+			</div>
+			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.packages_skipped}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Packages Skipped</p>
+			</div>
+			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.diagrams_skipped}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Diagrams Skipped</p>
 			</div>
 			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
 				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.elements_skipped}</p>

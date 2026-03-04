@@ -253,6 +253,25 @@ async def force_delete_set(
 
     now = datetime.now(tz=UTC).isoformat()
 
+    # Count and soft-delete packages in this set
+    pc = await db.execute(
+        "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
+        (set_id,),
+    )
+    packages_deleted = (await pc.fetchone())[0]
+    await db.execute(
+        "UPDATE packages SET is_deleted = 1, updated_at = ? WHERE set_id = ? AND is_deleted = 0",
+        (now, set_id),
+    )
+
+    # Delete package_relationships for packages in this set
+    await db.execute(
+        "DELETE FROM package_relationships "
+        "WHERE source_package_id IN (SELECT id FROM packages WHERE set_id = ?) "
+        "OR target_package_id IN (SELECT id FROM packages WHERE set_id = ?)",
+        (set_id, set_id),
+    )
+
     # Count and soft-delete elements in this set
     ec = await db.execute(
         "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
@@ -306,7 +325,11 @@ async def force_delete_set(
     )
     await db.commit()
 
-    return {"diagrams_deleted": diagrams_deleted, "elements_deleted": elements_deleted}
+    return {
+        "packages_deleted": packages_deleted,
+        "diagrams_deleted": diagrams_deleted,
+        "elements_deleted": elements_deleted,
+    }
 
 
 async def store_set_thumbnail_image(

@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DiagramDialog`, `DiagramPicker`, `DiagramThumbnail`, `ElementPicker` frontend components
 - Package metadata enrichment: import captures ea_guid, Status, Stereotype, Version, Scope, Author, Complexity, Phase, dates, and tagged values from SparxEA (ADR-072)
 - Package detail page (`/packages/[id]`) with Overview, Details, and Extended accordion sections displaying all enriched metadata and tagged values
+- Import idempotency: re-importing the same .qea file skips existing packages, elements, and diagrams matched by ea_guid (ADR-073)
+- Import summary shows skip counts for packages and diagrams on the import results page
+- Force-delete set now cascades packages and package_relationships
 
 ### Removed
 - `backend/app/entities/` module (replaced by `elements/`)

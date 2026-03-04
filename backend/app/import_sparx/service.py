@@ -39,9 +39,11 @@ class ImportWarning:
 @dataclass
 class ImportSummary:
     packages_created: int = 0
+    packages_skipped: int = 0
     elements_created: int = 0
     relationships_created: int = 0
     diagrams_created: int = 0
+    diagrams_skipped: int = 0
     elements_skipped: int = 0
     connectors_skipped: int = 0
     package_relationships_created: int = 0
@@ -100,6 +102,73 @@ def _build_element_index(elements: list[QeaElement]) -> dict[int, QeaElement]:
     return {e.Object_ID: e for e in elements}
 
 
+async def _build_guid_index(
+    db: "aiosqlite.Connection",
+    set_id: str | None,
+) -> dict[str, str]:
+    """Build a GUID -> Iris ID lookup for existing items in a set.
+
+    Scans packages, elements, and diagrams metadata for ea_guid values.
+    Returns a dict mapping ea_guid to the existing Iris item ID.
+    """
+    guid_index: dict[str, str] = {}
+    if not set_id:
+        return guid_index
+
+    # Packages: ea_guid in metadata JSON via package_versions
+    cursor = await db.execute(
+        "SELECT p.id, pv.metadata FROM packages p "
+        "JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+        "WHERE p.set_id = ? AND p.is_deleted = 0",
+        (set_id,),
+    )
+    async for row in cursor:
+        if row[1]:
+            import json
+            try:
+                meta = json.loads(row[1])
+                if meta.get("ea_guid"):
+                    guid_index[meta["ea_guid"]] = row[0]
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    # Elements: ea_guid in metadata JSON via element_versions
+    cursor = await db.execute(
+        "SELECT e.id, ev.metadata FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+        "WHERE e.set_id = ? AND e.is_deleted = 0",
+        (set_id,),
+    )
+    async for row in cursor:
+        if row[1]:
+            import json
+            try:
+                meta = json.loads(row[1])
+                if meta.get("ea_guid"):
+                    guid_index[meta["ea_guid"]] = row[0]
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    # Diagrams: ea_guid in metadata JSON via diagram_versions
+    cursor = await db.execute(
+        "SELECT d.id, dv.metadata FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
+        "WHERE d.set_id = ? AND d.is_deleted = 0",
+        (set_id,),
+    )
+    async for row in cursor:
+        if row[1]:
+            import json
+            try:
+                meta = json.loads(row[1])
+                if meta.get("ea_guid"):
+                    guid_index[meta["ea_guid"]] = row[0]
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    return guid_index
+
+
 async def import_sparx_file(
     db: aiosqlite.Connection,
     qea_path: str,
@@ -140,11 +209,20 @@ async def import_sparx_file(
         if elem.Object_Type == "Package":
             element_to_package[elem.Object_ID] = elem.Package_ID
 
+    # Build GUID index for idempotent re-import
+    guid_index = await _build_guid_index(db, set_id)
+
     # 2. Build package hierarchy -> create Iris packages
     # Map ea_package_id -> iris_package_id
     package_map: dict[int, str] = {}
 
     for pkg in _topo_sort_packages(packages):
+        # Skip if package already exists (idempotent re-import)
+        if pkg.ea_guid and pkg.ea_guid in guid_index:
+            package_map[pkg.Package_ID] = guid_index[pkg.ea_guid]
+            summary.packages_skipped += 1
+            continue
+
         parent_iris_id = package_map.get(pkg.Parent_ID)
         # Build metadata from package-type element and tagged values
         pkg_metadata: dict[str, object] | None = None
@@ -218,9 +296,17 @@ async def import_sparx_file(
                 for a in obj_attrs
             ]
 
+        # Skip if element already exists (idempotent re-import)
+        if elem.ea_guid and elem.ea_guid in guid_index:
+            element_map[elem.Object_ID] = guid_index[elem.ea_guid]
+            summary.elements_skipped += 1
+            continue
+
         # Build element metadata
         element_metadata: dict[str, object] | None = None
         em: dict[str, object] = {}
+        if elem.ea_guid:
+            em["ea_guid"] = elem.ea_guid
         if elem.Status:
             em["status"] = elem.Status
         if elem.Stereotype:
@@ -346,6 +432,11 @@ async def import_sparx_file(
         diag_objects_by_diagram.setdefault(dobj.Diagram_ID, []).append(dobj)
 
     for diag in diagrams:
+        # Skip if diagram already exists (idempotent re-import)
+        if diag.ea_guid and diag.ea_guid in guid_index:
+            summary.diagrams_skipped += 1
+            continue
+
         diagram_type = map_diagram_type(diag.Diagram_Type or "")
         parent_iris_id = package_map.get(diag.Package_ID)
 
@@ -465,6 +556,11 @@ async def import_sparx_file(
 
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
+        # Build diagram metadata with ea_guid
+        diag_metadata: dict[str, object] | None = None
+        if diag.ea_guid:
+            diag_metadata = {"ea_guid": diag.ea_guid}
+
         await create_diagram(
             db,
             diagram_type=diagram_type,
@@ -474,6 +570,7 @@ async def import_sparx_file(
             created_by=imported_by,
             parent_package_id=parent_iris_id,
             set_id=set_id,
+            metadata=diag_metadata,
             change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
         )
         summary.diagrams_created += 1
