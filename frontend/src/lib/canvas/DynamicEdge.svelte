@@ -15,6 +15,7 @@
 	import SimpleEdgeRenderer from './renderers/SimpleEdgeRenderer.svelte';
 	import UmlEdgeRenderer from './renderers/UmlEdgeRenderer.svelte';
 	import ArchimateEdgeRenderer from './renderers/ArchimateEdgeRenderer.svelte';
+	import C4EdgeRenderer from './renderers/C4EdgeRenderer.svelte';
 	import IrisBaseEdge from './BaseEdge.svelte';
 
 	let props: EdgeProps = $props();
@@ -31,6 +32,9 @@
 	/** UML edge relationship types. */
 	const UML_TYPES = new Set(['association', 'aggregation', 'composition', 'dependency', 'realization', 'generalization', 'usage']);
 
+	/** C4 edge relationship types. */
+	const C4_TYPES = new Set(['c4_relationship']);
+
 	/** ArchiMate edge relationship types. */
 	const ARCHIMATE_TYPES = new Set([
 		'serving', 'flow', 'triggering', 'access', 'influence',
@@ -45,6 +49,8 @@
 	<NoteLinkEdge {...props} />
 {:else if notation === 'uml' || UML_TYPES.has(edgeType)}
 	<UmlEdgeRenderer {...props} />
+{:else if notation === 'c4' || C4_TYPES.has(edgeType)}
+	<C4EdgeRenderer {...props} />
 {:else if notation === 'archimate' || ARCHIMATE_TYPES.has(edgeType)}
 	<ArchimateEdgeRenderer {...props} />
 {:else if notation === 'simple' || SIMPLE_TYPES.has(edgeType)}

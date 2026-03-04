@@ -307,6 +307,51 @@ export const ARCHIMATE_ENTITY_TYPES: ArchimateEntityTypeInfo[] = [
 	{ key: 'gap', label: 'Gap', icon: '△', layer: 'implementation_migration', description: 'Difference between two plateaus' },
 ];
 
+/** C4 entity types. */
+export type C4EntityType =
+	| 'person'
+	| 'software_system'
+	| 'software_system_external'
+	| 'container'
+	| 'c4_component'
+	| 'code_element'
+	| 'deployment_node'
+	| 'infrastructure_node'
+	| 'container_instance';
+
+/** C4 level classification. */
+export type C4Level = 'system_context' | 'container' | 'component' | 'code' | 'deployment';
+
+/** C4 entity type display metadata. */
+export interface C4EntityTypeInfo {
+	key: C4EntityType;
+	label: string;
+	icon: string;
+	level: C4Level;
+	description: string;
+}
+
+/** All C4 entity types with display metadata. */
+export const C4_ENTITY_TYPES: C4EntityTypeInfo[] = [
+	{ key: 'person', label: 'Person', icon: '👤', level: 'system_context', description: 'A user or actor interacting with the system' },
+	{ key: 'software_system', label: 'Software System', icon: '▣', level: 'system_context', description: 'An overall software system (internal)' },
+	{ key: 'software_system_external', label: 'External System', icon: '▢', level: 'system_context', description: 'An external system outside your control' },
+	{ key: 'container', label: 'Container', icon: '▤', level: 'container', description: 'An application, data store, or service' },
+	{ key: 'c4_component', label: 'Component', icon: '⬡', level: 'component', description: 'A module or service within a container' },
+	{ key: 'code_element', label: 'Code Element', icon: '▭', level: 'code', description: 'A class, interface, or function' },
+	{ key: 'deployment_node', label: 'Deployment Node', icon: '⬢', level: 'deployment', description: 'Server, VM, container platform, or cloud region' },
+	{ key: 'infrastructure_node', label: 'Infrastructure Node', icon: '◆', level: 'deployment', description: 'Load balancer, firewall, or DNS' },
+	{ key: 'container_instance', label: 'Container Instance', icon: '▥', level: 'deployment', description: 'Running instance of a container' },
+];
+
+/** C4 relationship type. */
+export type C4RelationshipType = 'c4_relationship';
+
+/** All C4 relationship types with display metadata. */
+export const C4_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
+	{ key: 'c4_relationship' as C4RelationshipType, label: 'Relationship', description: 'Labeled relationship with optional technology annotation' },
+];
+
 /** All ArchiMate relationship types with display metadata. */
 export const ARCHIMATE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
 	{ key: 'serving', label: 'Serving', description: 'Source serves target' },

@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Import idempotency: re-importing the same .qea file skips existing packages, elements, and diagrams matched by ea_guid (ADR-073)
 - Import summary shows skip counts for packages and diagrams on the import results page
 - Force-delete set now cascades packages and package_relationships
+- C4 model support: Person, Software System, Container, Component, Code Element, Deployment Node, Infrastructure Node, Container Instance element types with level badges and C4 colour scheme (ADR-074)
+- C4 relationship type with label and technology annotation
+- C4Renderer and C4EdgeRenderer for notation-aware canvas rendering
+- Type equivalences extended with C4 mappings (component→c4_component, actor→person)
 
 ### Removed
 - `backend/app/entities/` module (replaced by `elements/`)

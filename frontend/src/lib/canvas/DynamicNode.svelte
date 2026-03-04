@@ -15,6 +15,7 @@
 	import SimpleRenderer from './renderers/SimpleRenderer.svelte';
 	import UmlRenderer from './renderers/UmlRenderer.svelte';
 	import ArchimateRenderer from './renderers/ArchimateRenderer.svelte';
+	import C4Renderer from './renderers/C4Renderer.svelte';
 	import BaseNode from './BaseNode.svelte';
 
 	interface Props {
@@ -35,6 +36,13 @@
 	const UML_TYPES = new Set([
 		'class', 'object', 'use_case', 'state', 'activity', 'node',
 		'interface_uml', 'enumeration', 'abstract_class', 'component_uml', 'package_uml',
+	]);
+
+	/** C4 type keys that should use C4Renderer. */
+	const C4_TYPES = new Set([
+		'person', 'software_system', 'software_system_external', 'container',
+		'c4_component', 'code_element', 'deployment_node', 'infrastructure_node',
+		'container_instance',
 	]);
 
 	/** ArchiMate type keys that should use ArchimateRenderer. */
@@ -64,6 +72,8 @@
 	<ModelRefNode {data} {selected} />
 {:else if notation === 'uml' || (!isUniversal && UML_TYPES.has(data.entityType))}
 	<UmlRenderer {data} {selected} />
+{:else if notation === 'c4' || C4_TYPES.has(data.entityType)}
+	<C4Renderer {data} {selected} />
 {:else if notation === 'archimate' || ARCHIMATE_TYPES.has(data.entityType)}
 	<ArchimateRenderer {data} {selected} />
 {:else if notation === 'simple'}

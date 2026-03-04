@@ -95,18 +95,20 @@ describe('Unified registry (ADR-068)', () => {
 });
 
 describe('Type equivalence map (ADR-068)', () => {
-	it('component maps across simple, uml, and archimate', () => {
+	it('component maps across simple, uml, archimate, and c4', () => {
 		expect(TYPE_EQUIVALENCES.component).toEqual({
 			simple: 'component',
 			uml: 'component_uml',
 			archimate: 'application_component',
+			c4: 'c4_component',
 		});
 	});
 
-	it('actor maps across simple and archimate', () => {
+	it('actor maps across simple, archimate, and c4', () => {
 		expect(TYPE_EQUIVALENCES.actor).toEqual({
 			simple: 'actor',
 			archimate: 'business_actor',
+			c4: 'person',
 		});
 	});
 

@@ -37,6 +37,10 @@ const ALL_NODE_TYPE_KEYS = [
 	'resource', 'capability', 'course_of_action', 'value_stream',
 	// ArchiMate — Implementation & Migration
 	'work_package', 'deliverable', 'implementation_event', 'plateau', 'gap',
+	// C4
+	'person', 'software_system', 'software_system_external', 'container',
+	'c4_component', 'code_element', 'deployment_node', 'infrastructure_node',
+	'container_instance',
 ] as const;
 
 /** All edge type keys across all notations. */
@@ -51,6 +55,8 @@ const ALL_EDGE_TYPE_KEYS = [
 	'serving', 'flow', 'triggering', 'access', 'influence',
 	'archimate_realization', 'archimate_composition', 'archimate_aggregation',
 	'specialization', 'assignment', 'association_archimate',
+	// C4
+	'c4_relationship',
 ] as const;
 
 /** Unified node type registry — ALL types map to DynamicNode. */
@@ -65,8 +71,8 @@ export const unifiedEdgeTypes: Record<string, Component> = Object.fromEntries(
 
 /** Type equivalence map for cross-notation element compatibility. */
 export const TYPE_EQUIVALENCES: Record<string, Partial<Record<string, string>>> = {
-	component: { simple: 'component', uml: 'component_uml', archimate: 'application_component' },
-	actor: { simple: 'actor', archimate: 'business_actor' },
+	component: { simple: 'component', uml: 'component_uml', archimate: 'application_component', c4: 'c4_component' },
+	actor: { simple: 'actor', archimate: 'business_actor', c4: 'person' },
 	interface: { simple: 'interface', uml: 'interface_uml', archimate: 'application_interface' },
 	package: { simple: 'package', uml: 'package_uml' },
 	service: { simple: 'service', archimate: 'application_service' },
