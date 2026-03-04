@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING:** Entity → Element rename throughout: database tables (`elements`, `element_versions`, `element_tags`), API routes (`/api/elements/`), frontend routes (`/elements/`), types, and UI labels (ADR-071)
 - **BREAKING:** Model → Diagram + Package split: `models` table split into `diagrams` and `packages` tables with dedicated API routes (`/api/diagrams/`, `/api/packages/`), frontend routes (`/diagrams/`), and UI labels (ADR-071)
 - **BREAKING:** Model relationships → Package relationships: `model_relationships` table renamed to `package_relationships` with API route `/api/packages/{id}/relationships` (ADR-071)
+- Canvas architecture: single DynamicNode/DynamicEdge with notation-aware rendering replaces 30+ separate node/edge components (ADR-068)
+- Elements render according to diagram notation — same element appears differently on UML vs ArchiMate vs C4 diagrams
 - Migration m016: renames tables, splits models into diagrams + packages, rebuilds FTS5 indexes, migrates all foreign keys (ADR-071)
 - Migrations m002-m015 now skip safely on re-init after m016 has run
 - UnifiedCanvas split into separate browse/edit SvelteFlow instances to fix Svelte 5 duplicate attribute error
@@ -19,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sets thumbnail source accepts both "model" and "diagram" values for backward compatibility
 
 ### Added
+- BaseNode/BaseEdge shared components eliminating code duplication across all canvas components (ADR-068)
+- Type equivalence map for cross-notation element compatibility (ADR-068)
+- SparxEA connector direction, cardinality, roles, stereotypes, and routing now imported (ADR-070)
+- UML-correct arrow markers on edges (open arrow, closed triangle, filled/open diamond)
+- Cardinality and role name labels at edge endpoints
+- Stereotype display as `<<name>>` on edges
+- Edge properties panel for editing metadata on user-created edges
 - Package as first-class concept with dedicated `packages` and `package_versions` tables
 - `backend/app/elements/` module (renamed from `entities/`)
 - `backend/app/diagrams/` module (renamed from `models_crud/`)
@@ -42,7 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin views page (`/admin/views`) for creating, editing, and deleting views
 - Global view store with localStorage persistence of active view selection
 
+### Fixed
+- Class nodes render correctly in browse mode (ADR-068)
+- Note and Boundary nodes render in UML edit mode (ADR-068)
+- SparxEA Note elements import with content-derived labels instead of "Unknown" (ADR-069)
+- Canvas nodes from import always include `description` field (ADR-069)
+
 ### Removed
+- ModelCanvas, FullViewCanvas, BrowseCanvas and 30+ individual node/edge components (replaced by DynamicNode/DynamicEdge + renderers) (ADR-068)
 - `backend/app/entities/` module (replaced by `elements/`)
 - `backend/app/models_crud/` module (replaced by `diagrams/` and `packages/`)
 - `backend/app/model_relationships/` module (replaced by `package_relationships/`)
