@@ -8,7 +8,7 @@
 	import type { Comment } from '$lib/types/api';
 
 	interface Props {
-		targetType: 'model' | 'entity';
+		targetType: 'diagram' | 'element';
 		targetId: string;
 	}
 
@@ -28,7 +28,7 @@
 
 	/** Build the target-specific base URL for comments. */
 	function commentsBaseUrl(): string {
-		const resource = targetType === 'model' ? 'models' : 'entities';
+		const resource = targetType === 'diagram' ? 'diagrams' : 'elements';
 		return `/api/${resource}/${targetId}/comments`;
 	}
 
