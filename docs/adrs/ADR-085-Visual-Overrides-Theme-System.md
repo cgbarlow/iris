@@ -1,4 +1,4 @@
-# ADR-084: Per-Element Visual Overrides and Theme System
+# ADR-085: Per-Element Visual Overrides and Theme System
 
 ## Status
 Accepted

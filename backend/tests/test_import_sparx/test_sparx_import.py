@@ -196,19 +196,28 @@ class TestMapper:
         assert map_connector_type("SomeUnknownConnector") is None
 
     def test_map_logical_diagram(self) -> None:
-        assert map_diagram_type("Logical") == "uml"
+        assert map_diagram_type("Logical") == ("class", "uml")
 
     def test_map_sequence_diagram(self) -> None:
-        assert map_diagram_type("Sequence") == "sequence"
+        assert map_diagram_type("Sequence") == ("sequence", "uml")
 
     def test_map_custom_diagram(self) -> None:
-        assert map_diagram_type("Custom") == "archimate"
+        assert map_diagram_type("Custom") == ("component", "archimate")
 
-    def test_unknown_diagram_defaults_to_simple(self) -> None:
-        assert map_diagram_type("SomeUnknownDiagram") == "simple"
+    def test_unknown_diagram_defaults_to_free_form_simple(self) -> None:
+        assert map_diagram_type("SomeUnknownDiagram") == ("free_form", "simple")
 
     def test_map_package_diagram(self) -> None:
-        assert map_diagram_type("Package") == "uml"
+        assert map_diagram_type("Package") == ("component", "uml")
+
+    def test_map_use_case_diagram(self) -> None:
+        assert map_diagram_type("Use Case") == ("use_case", "uml")
+
+    def test_map_statechart_diagram(self) -> None:
+        assert map_diagram_type("Statechart") == ("state_machine", "uml")
+
+    def test_map_activity_diagram(self) -> None:
+        assert map_diagram_type("Activity") == ("process", "uml")
 
 
 # ---------- Converter Tests ----------
@@ -391,7 +400,9 @@ class TestImportRouter:
             headers=headers,
         )
         assert resp.status_code == 400
-        assert "qea" in resp.json()["detail"].lower()
+        detail = resp.json()["detail"].lower()
+        assert "qea" in detail
+        assert "eap" in detail
 
     async def test_import_requires_auth(self, client: httpx.AsyncClient) -> None:
         resp = await client.post(
@@ -399,6 +410,20 @@ class TestImportRouter:
             files={"file": ("test.qea", b"fake", "application/octet-stream")},
         )
         assert resp.status_code == 401
+
+    async def test_import_accepts_eap_extension(self, client: httpx.AsyncClient) -> None:
+        """Upload a .eap file — extension is accepted, but invalid content returns 400."""
+        headers = await _auth_headers(client)
+        # Send a non-JET4 file with .eap extension — should fail at conversion (not JET4)
+        resp = await client.post(
+            "/api/import/sparx",
+            files={"file": ("test.eap", b"not a real eap", "application/octet-stream")},
+            headers=headers,
+        )
+        # .eap extension is accepted (not rejected as wrong extension),
+        # but conversion fails because file is not JET4 format → 400
+        assert resp.status_code == 400
+        assert "JET4" in resp.json()["detail"]
 
     async def test_import_via_endpoint(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)

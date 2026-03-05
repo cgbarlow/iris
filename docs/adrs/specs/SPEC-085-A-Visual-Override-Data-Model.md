@@ -1,7 +1,7 @@
-# SPEC-084-A: Visual Override Data Model
+# SPEC-085-A: Visual Override Data Model
 
 ## Parent ADR
-ADR-084: Per-Element Visual Overrides and Theme System
+ADR-085: Per-Element Visual Overrides and Theme System
 
 ## Summary
 Defines the `NodeVisualOverrides` and `EdgeVisualOverrides` interfaces stored in `CanvasNodeData.visual` and `CanvasEdgeData.visual`. These drive inline CSS styles on rendered nodes and edges.

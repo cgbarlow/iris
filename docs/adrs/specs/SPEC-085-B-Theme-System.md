@@ -1,7 +1,7 @@
-# SPEC-084-B: Theme System
+# SPEC-085-B: Theme System
 
 ## Parent ADR
-ADR-084: Per-Element Visual Overrides and Theme System
+ADR-085: Per-Element Visual Overrides and Theme System
 
 ## Summary
 Defines the themes backend (table, CRUD API, seed data) and frontend (store, selector, cascade resolution).

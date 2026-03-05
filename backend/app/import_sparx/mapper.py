@@ -24,6 +24,7 @@ OBJECT_TYPE_MAP: dict[str, str] = {
     "ArchiMate_TechnologyNode": "technology_node",
     "Note": "note",
     "Boundary": "boundary",
+    "Artifact": "component",
 }
 
 CONNECTOR_TYPE_MAP: dict[str, str] = {
@@ -43,19 +44,19 @@ SKIP_OBJECT_TYPES: set[str] = {"Text", "UMLDiagram", "Constraint"}
 
 SKIP_CONNECTOR_TYPES: set[str] = set()
 
-DIAGRAM_TYPE_MAP: dict[str, str] = {
-    "Logical": "uml",
-    "Use Case": "uml",
-    "Component": "uml",
-    "Deployment": "uml",
-    "Object": "uml",
-    "Package": "uml",
-    "Sequence": "sequence",
-    "Activity": "uml",
-    "Statechart": "uml",
-    "Custom": "archimate",
-    "Analysis": "uml",
-    "Class": "uml",
+DIAGRAM_TYPE_MAP: dict[str, tuple[str, str]] = {
+    "Logical": ("class", "uml"),
+    "Use Case": ("use_case", "uml"),
+    "Component": ("component", "uml"),
+    "Deployment": ("deployment", "uml"),
+    "Object": ("class", "uml"),
+    "Package": ("component", "uml"),
+    "Sequence": ("sequence", "uml"),
+    "Activity": ("process", "uml"),
+    "Statechart": ("state_machine", "uml"),
+    "Custom": ("component", "archimate"),
+    "Analysis": ("class", "uml"),
+    "Class": ("class", "uml"),
 }
 
 
@@ -79,9 +80,9 @@ def map_connector_type(ea_type: str) -> str | None:
     return CONNECTOR_TYPE_MAP.get(ea_type)
 
 
-def map_diagram_type(ea_type: str) -> str:
-    """Map a SparxEA Diagram_Type to an Iris model type.
+def map_diagram_type(ea_type: str) -> tuple[str, str]:
+    """Map a SparxEA Diagram_Type to an Iris (diagram_type, notation) pair.
 
-    Returns the mapped type, defaulting to 'simple' for unknown types.
+    Returns the mapped tuple, defaulting to ('free_form', 'simple') for unknown types.
     """
-    return DIAGRAM_TYPE_MAP.get(ea_type, "simple")
+    return DIAGRAM_TYPE_MAP.get(ea_type, ("free_form", "simple"))
