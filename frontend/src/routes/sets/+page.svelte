@@ -4,6 +4,7 @@
 	import { getActiveSetId, clearActiveSet, setActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import type { IrisSet } from '$lib/types/api';
 	import SetDialog from '$lib/components/SetDialog.svelte';
+	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
 
 	let sets = $state<IrisSet[]>([]);
 	let loading = $state(true);
@@ -14,8 +15,6 @@
 	);
 	let editMode = $state(false);
 	let showCreateDialog = $state(false);
-	let thumbnailMode = $state<'svg' | 'png'>('svg');
-	let currentTheme = $state('dark');
 
 	const activeSetIdValue = $derived(getActiveSetId());
 
@@ -31,36 +30,7 @@
 
 	$effect(() => {
 		loadSets();
-		loadThumbnailMode();
 	});
-
-	$effect(() => {
-		if (typeof document === 'undefined') return;
-		const detectTheme = () => {
-			const el = document.documentElement;
-			if (el.classList.contains('high-contrast')) {
-				currentTheme = 'high-contrast';
-			} else if (el.classList.contains('dark')) {
-				currentTheme = 'dark';
-			} else {
-				currentTheme = 'light';
-			}
-		};
-		detectTheme();
-		const observer = new MutationObserver(detectTheme);
-		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-		return () => observer.disconnect();
-	});
-
-	async function loadThumbnailMode() {
-		try {
-			const settings = await apiFetch<{key: string; value: string}[]>('/api/settings');
-			const mode = settings.find(s => s.key === 'gallery_thumbnail_mode');
-			if (mode) thumbnailMode = mode.value as 'svg' | 'png';
-		} catch {
-			// default to svg
-		}
-	}
 
 	$effect(() => {
 		if (typeof localStorage !== 'undefined') {
@@ -107,10 +77,7 @@
 		}
 	}
 
-	function getThumbnailUrl(set: IrisSet): string | null {
-		if (set.thumbnail_source === 'model' && set.thumbnail_diagram_id) {
-			return `/api/sets/${set.id}/thumbnail?theme=${currentTheme}`;
-		}
+	function getImageThumbnailUrl(set: IrisSet): string | null {
 		if (set.thumbnail_source === 'image' && set.has_thumbnail_image) {
 			return `/api/sets/${set.id}/thumbnail`;
 		}
@@ -196,7 +163,7 @@
 	</p>
 {:else if viewMode === 'list'}
 	<!-- List view -->
-	<div class="mt-4 flex flex-col gap-2" style="max-width: 700px">
+	<div class="mt-4 flex flex-col gap-2">
 		{#each filteredSets as set}
 			<button
 				onclick={() => handleSetClick(set)}
@@ -228,9 +195,9 @@
 	</div>
 {:else}
 	<!-- Gallery view -->
-	<div class="mt-4 grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); max-width: 900px">
+	<div class="mt-4 grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
 		{#each filteredSets as set}
-			{@const thumbUrl = getThumbnailUrl(set)}
+			{@const imageUrl = getImageThumbnailUrl(set)}
 			<button
 				onclick={() => handleSetClick(set)}
 				class="flex flex-col items-center rounded border p-4 text-center transition-colors"
@@ -242,9 +209,11 @@
 					class="flex items-center justify-center rounded"
 					style="width: 160px; height: 100px; background-color: var(--color-bg); border: 1px solid var(--color-border); overflow: hidden"
 				>
-					{#if thumbUrl}
+					{#if set.thumbnail_diagram_data && set.thumbnail_diagram_type}
+						<DiagramThumbnail data={set.thumbnail_diagram_data} diagramType={set.thumbnail_diagram_type} />
+					{:else if imageUrl}
 						<img
-							src={thumbUrl}
+							src={imageUrl}
 							alt="{set.name} thumbnail"
 							style="max-width: 100%; max-height: 100%; object-fit: contain"
 						/>

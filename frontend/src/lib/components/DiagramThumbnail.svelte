@@ -6,7 +6,7 @@
 
 	let { data, diagramType }: Props = $props();
 
-	const CANVAS_TYPES = ['simple', 'component', 'uml', 'archimate'];
+	const CANVAS_TYPES = ['simple', 'component', 'uml', 'archimate', 'c4'];
 
 	interface NodeInfo {
 		id: string;

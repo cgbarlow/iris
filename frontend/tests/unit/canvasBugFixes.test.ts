@@ -27,14 +27,13 @@ describe('Canvas bug fixes', () => {
 	});
 
 	describe('Bug fix: RelationshipDialog wiring', () => {
-		it('relationship types include all 6 simple view types', () => {
-			expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(6);
+		it('relationship types include all 4 simple view types', () => {
+			expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(4);
 			const keys = SIMPLE_RELATIONSHIP_TYPES.map(t => t.key);
 			expect(keys).toContain('uses');
 			expect(keys).toContain('depends_on');
-			expect(keys).toContain('composes');
-			expect(keys).toContain('implements');
 			expect(keys).toContain('contains');
+			expect(keys).toContain('note_link');
 		});
 
 		it('edge can be created with any relationship type', () => {

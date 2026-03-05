@@ -15,14 +15,18 @@ from app.bookmarks.router import router as bookmarks_router
 from app.comments.router import router as comments_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
+from app.diagrams.registry_router import router as registry_router
 from app.diagrams.router import admin_router as admin_thumbnails_router
 from app.diagrams.router import router as diagrams_router
+from app.locks.router import admin_router as admin_locks_router
+from app.locks.router import router as locks_router
 from app.elements.router import router as elements_router
 from app.import_sparx.router import router as import_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.package_relationships.router import router as package_relationships_router
 from app.packages.router import router as packages_router
+from app.recycle_bin.router import router as recycle_bin_router
 from app.relationships.router import router as relationships_router
 from app.search.router import router as search_router
 from app.sets.router import router as sets_router
@@ -119,6 +123,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(sets_router)
     app.include_router(batch_router)
     app.include_router(views_router)
+    app.include_router(recycle_bin_router)
+    app.include_router(registry_router)
+    app.include_router(locks_router)
+    app.include_router(admin_locks_router)
 
     return app
 

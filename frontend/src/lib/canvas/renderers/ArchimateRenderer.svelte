@@ -79,7 +79,8 @@
 	}
 	.archimate-node__description {
 		font-size: 0.7rem;
-		color: var(--color-muted, #666);
+		color: inherit;
+		opacity: 0.85;
 		margin-top: 4px;
 	}
 	/* Layer colours */

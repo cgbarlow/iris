@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { apiFetch } from '$lib/utils/api';
 	import { setActiveSet, clearActiveSet, getActiveSetId } from '$lib/stores/activeSet.svelte.js';
+	import TreeNode from '$lib/components/TreeNode.svelte';
 	import type {
 		PaginatedResponse,
 		Element,
@@ -10,6 +11,7 @@
 		SearchResult,
 		SearchResponse,
 		IrisSet,
+		DiagramHierarchyNode,
 	} from '$lib/types/api';
 
 	let elementCount = $state(0);
@@ -22,8 +24,12 @@
 	let searching = $state(false);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let hierarchyTree = $state<DiagramHierarchyNode[]>([]);
+	let hierarchyLoading = $state(false);
+	let treeSearchQuery = $state('');
+	let treeExpandedIds = $state(new Set<string>());
 
-	let setId = $derived(page.url.searchParams.get('set_id') || '');
+	let setId = $derived(page.url.searchParams.get('set_id') || getActiveSetId() || '');
 
 	$effect(() => {
 		loadDashboard();
@@ -48,21 +54,43 @@
 			// Resolve active set if filtering
 			if (setId) {
 				activeSet = setsData.items.find((s) => s.id === setId) ?? null;
-				if (activeSet) setActiveSet(activeSet.id, activeSet.name);
+				if (activeSet && page.url.searchParams.get('set_id')) {
+					setActiveSet(activeSet.id, activeSet.name);
+				}
 			} else {
 				activeSet = null;
 			}
 
-			// Resolve bookmarked diagrams
-			const diagramPromises = bookmarks.map((b) =>
-				apiFetch<Diagram>(`/api/diagrams/${b.diagram_id}`).catch(() => null)
-			);
+			// Resolve bookmarked diagrams (filter out package bookmarks)
+			const diagramPromises = bookmarks
+				.filter((b) => b.diagram_id)
+				.map((b) =>
+					apiFetch<Diagram>(`/api/diagrams/${b.diagram_id}`).catch(() => null)
+				);
 			const resolved = await Promise.all(diagramPromises);
 			bookmarkedDiagrams = resolved.filter((d): d is Diagram => d !== null);
 		} catch {
 			error = 'Failed to load dashboard data';
 		}
 		loading = false;
+
+		if (setId) {
+			loadHierarchy();
+		} else {
+			hierarchyTree = [];
+		}
+	}
+
+	async function loadHierarchy() {
+		hierarchyLoading = true;
+		try {
+			hierarchyTree = await apiFetch<DiagramHierarchyNode[]>(
+				`/api/diagrams/hierarchy?set_id=${setId}`
+			);
+		} catch {
+			hierarchyTree = [];
+		}
+		hierarchyLoading = false;
 	}
 
 	async function handleSearch() {
@@ -145,6 +173,32 @@
 			</div>
 		</a>
 	</div>
+
+	<!-- Diagram Hierarchy (when set selected) -->
+	{#if activeSet}
+		<div class="mt-6" style="max-width: 500px">
+			<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Diagram Hierarchy</h2>
+			<input
+				id="tree-search"
+				bind:value={treeSearchQuery}
+				type="search"
+				placeholder="Filter diagrams..."
+				class="mt-2 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			/>
+			{#if hierarchyLoading}
+				<p class="mt-2 text-sm" style="color: var(--color-muted)">Loading hierarchy...</p>
+			{:else if hierarchyTree.length === 0}
+				<p class="mt-2 text-sm" style="color: var(--color-muted)">No diagrams in this set.</p>
+			{:else}
+				<ul role="tree" class="mt-4" style="list-style: none; padding: 0; margin: 0">
+					{#each hierarchyTree as node (node.id)}
+						<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} />
+					{/each}
+				</ul>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Search -->
 	<div class="mt-6">

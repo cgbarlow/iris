@@ -48,6 +48,7 @@ async def create(
         created_by=current_user["id"],
         set_id=body.set_id,
         metadata=body.metadata,
+        notation=body.notation,
     )
     return ElementResponse(**result)
 

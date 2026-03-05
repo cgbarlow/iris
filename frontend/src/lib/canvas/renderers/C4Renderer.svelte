@@ -56,6 +56,10 @@
 	:global(.c4-node--infrastructure_node) { background: #ffffff; border: 2px solid #999999; color: #1a1a2e; }
 	:global(.c4-node--container_instance) { background: #438dd5; color: white; border-style: dashed; }
 
+	/* Override description text color so it inherits from the node color instead
+	   of using --color-muted (grey on dark backgrounds is illegible). */
+	:global(.c4-node .canvas-node__description) { color: inherit; opacity: 0.85; }
+
 	/* Dark mode variants */
 	:global(.dark) :global(.c4-node--person) { background: #0a5299; }
 	:global(.dark) :global(.c4-node--software_system) { background: #1472cc; }

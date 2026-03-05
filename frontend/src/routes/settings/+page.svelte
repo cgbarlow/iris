@@ -2,9 +2,11 @@
 	import { mode, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { getDefaultNotation, setDefaultNotation } from '$lib/stores/defaultNotation.svelte';
 
 	let highContrast = $state(false);
 	let isSystem = $state(false);
+	let defaultNotation = $state('simple');
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -16,10 +18,17 @@
 	onMount(() => {
 		highContrast = localStorage.getItem('iris-high-contrast') === 'true';
 		isSystem = localStorage.getItem('iris-theme') === 'system';
+		defaultNotation = getDefaultNotation();
 		if (highContrast) {
 			document.documentElement.classList.add('high-contrast');
 		}
 	});
+
+	function selectNotation(value: string) {
+		defaultNotation = value;
+		setDefaultNotation(value);
+	}
+
 
 	const currentTheme = $derived(
 		highContrast ? 'high-contrast' : isSystem ? 'system' : (mode.current ?? 'light'),
@@ -95,73 +104,41 @@
 <p class="mt-2" style="color: var(--color-muted)">Configure your preferences.</p>
 
 <section class="mt-6">
-	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Theme</h2>
-	<p class="mt-1 text-sm" style="color: var(--color-muted)">Choose your preferred colour scheme.</p>
-
-	<fieldset class="mt-4 flex flex-col gap-3" role="radiogroup" aria-label="Theme selection">
-		<label
-			class="flex items-center gap-3 rounded border px-4 py-3 cursor-pointer"
-			style="border-color: {currentTheme === 'system' ? 'var(--color-primary)' : 'var(--color-border)'}; background-color: {currentTheme === 'system' ? 'var(--color-bg)' : 'transparent'}"
+	<div>
+		<label for="settings-theme" class="text-lg font-semibold" style="color: var(--color-fg)">Theme</label>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Choose your preferred colour scheme.</p>
+		<select
+			id="settings-theme"
+			value={currentTheme}
+			onchange={(e) => selectTheme((e.target as HTMLSelectElement).value)}
+			class="mt-2 w-full rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		>
-			<input
-				type="radio"
-				name="theme"
-				value="system"
-				checked={currentTheme === 'system'}
-				onchange={() => selectTheme('system')}
-				class="accent-[var(--color-primary)]"
-			/>
-			<div>
-				<span style="color: var(--color-fg)">System</span>
-				<p class="text-xs" style="color: var(--color-muted)">Follows your operating system preference</p>
-			</div>
-		</label>
+			<option value="system">System — follows your operating system preference</option>
+			<option value="light">Light — light background with dark text</option>
+			<option value="dark">Dark — dark background with light text</option>
+			<option value="high-contrast">High Contrast — maximum contrast for accessibility</option>
+		</select>
+	</div>
+</section>
 
-		<label
-			class="flex items-center gap-3 rounded border px-4 py-3 cursor-pointer"
-			style="border-color: {currentTheme === 'light' ? 'var(--color-primary)' : 'var(--color-border)'}; background-color: {currentTheme === 'light' ? 'var(--color-bg)' : 'transparent'}"
+<section class="mt-6">
+	<div>
+		<label for="settings-notation" class="text-lg font-semibold" style="color: var(--color-fg)">Default Notation</label>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Choose your preferred default notation for new diagrams and elements.</p>
+		<select
+			id="settings-notation"
+			value={defaultNotation}
+			onchange={(e) => selectNotation((e.target as HTMLSelectElement).value)}
+			class="mt-2 w-full rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		>
-			<input
-				type="radio"
-				name="theme"
-				value="light"
-				checked={currentTheme === 'light'}
-				onchange={() => selectTheme('light')}
-				class="accent-[var(--color-primary)]"
-			/>
-			<span style="color: var(--color-fg)">Light</span>
-		</label>
-
-		<label
-			class="flex items-center gap-3 rounded border px-4 py-3 cursor-pointer"
-			style="border-color: {currentTheme === 'dark' ? 'var(--color-primary)' : 'var(--color-border)'}; background-color: {currentTheme === 'dark' ? 'var(--color-bg)' : 'transparent'}"
-		>
-			<input
-				type="radio"
-				name="theme"
-				value="dark"
-				checked={currentTheme === 'dark'}
-				onchange={() => selectTheme('dark')}
-				class="accent-[var(--color-primary)]"
-			/>
-			<span style="color: var(--color-fg)">Dark</span>
-		</label>
-
-		<label
-			class="flex items-center gap-3 rounded border px-4 py-3 cursor-pointer"
-			style="border-color: {currentTheme === 'high-contrast' ? 'var(--color-primary)' : 'var(--color-border)'}; background-color: {currentTheme === 'high-contrast' ? 'var(--color-bg)' : 'transparent'}"
-		>
-			<input
-				type="radio"
-				name="theme"
-				value="high-contrast"
-				checked={currentTheme === 'high-contrast'}
-				onchange={() => selectTheme('high-contrast')}
-				class="accent-[var(--color-primary)]"
-			/>
-			<span style="color: var(--color-fg)">High Contrast</span>
-		</label>
-	</fieldset>
+			<option value="simple">Simple — basic shapes (component, service, interface, actor, database)</option>
+			<option value="uml">UML — class, object, use case, state, activity</option>
+			<option value="archimate">ArchiMate — business, application, technology layers</option>
+			<option value="c4">C4 — person, software system, container, component</option>
+		</select>
+	</div>
 </section>
 
 <section class="mt-6">
@@ -220,8 +197,8 @@
 		<button
 			type="submit"
 			disabled={passwordLoading}
-			class="self-start rounded px-4 py-2 text-sm font-medium"
-			style="background-color: var(--color-primary); color: var(--color-primary-fg); opacity: {passwordLoading ? '0.6' : '1'}; cursor: {passwordLoading ? 'not-allowed' : 'pointer'}"
+			class="self-start rounded px-4 py-2 text-sm text-white"
+			style="background-color: var(--color-primary); opacity: {passwordLoading ? '0.6' : '1'}; cursor: {passwordLoading ? 'not-allowed' : 'pointer'}"
 		>
 			{passwordLoading ? 'Changing...' : 'Change Password'}
 		</button>

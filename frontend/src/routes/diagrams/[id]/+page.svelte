@@ -21,13 +21,15 @@
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import ElementPicker from '$lib/components/ElementPicker.svelte';
 	import DiagramPicker from '$lib/components/DiagramPicker.svelte';
+	import PackagePicker from '$lib/components/PackagePicker.svelte';
 	import NodeDeleteDialog from '$lib/components/NodeDeleteDialog.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import DOMPurify from 'dompurify';
-	import type { Element, DiagramHierarchyNode } from '$lib/types/api';
+	import type { Element, DiagramHierarchyNode, Package } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
 	import type { SimpleEntityType, SimpleRelationshipType, EdgeRoutingType, NotationType } from '$lib/types/canvas';
 	import {
@@ -139,11 +141,17 @@
 	let focusMode = $state(false);
 
 	// Hierarchy tree sidebar state
-	let sidebarOpen = $state(false);
+	let sidebarOpen = $state(
+		typeof localStorage !== 'undefined' && localStorage.getItem('iris-hierarchy-sidebar-open') === 'true'
+	);
 	let hierarchyTree = $state<DiagramHierarchyNode[]>([]);
 	let hierarchyLoading = $state(false);
 	let treeSearchQuery = $state('');
 	let showCreateChildDialog = $state(false);
+	let showCreateChildPackageDialog = $state(false);
+	let showChildMenu = $state(false);
+	let childPackageName = $state('');
+	let childPackageDescription = $state('');
 	let showParentPicker = $state(false);
 	let treeDiagramsOnly = $state(false);
 	let treeExpandedIds = $state(new Set<string>());
@@ -224,16 +232,16 @@
 		return () => document.removeEventListener('edgelabelmove', onEdgeLabelMove);
 	});
 
-	/** Determine which canvas component to render based on diagram type. */
+	/** Determine which canvas component to render based on diagram notation/type. */
 	const canvasType = $derived.by(() => {
 		if (!diagram) return 'simple';
-		const mt = diagram.diagram_type;
-		if (mt === 'sequence') return 'sequence';
-		if (mt === 'uml') return 'uml';
-		if (mt === 'archimate') return 'archimate';
-		if (mt === 'c4' || mt === 'c4_landscape' || mt === 'c4_dynamic' || mt === 'c4_deployment') return 'c4';
-		if (mt === 'roadmap') return 'simple';
-		return 'simple'; // 'simple' and 'component' both use simple view
+		if (diagram.diagram_type === 'sequence') return 'sequence';
+		// Use notation from registry (ADR-079)
+		const n = diagram.notation ?? 'simple';
+		if (n === 'uml') return 'uml';
+		if (n === 'archimate') return 'archimate';
+		if (n === 'c4') return 'c4';
+		return 'simple';
 	});
 
 	/** Notation for UnifiedCanvas context. */
@@ -357,24 +365,27 @@
 
 	function toggleSidebar() {
 		sidebarOpen = !sidebarOpen;
+		localStorage.setItem('iris-hierarchy-sidebar-open', String(sidebarOpen));
 		if (sidebarOpen && hierarchyTree.length === 0) {
 			loadHierarchyTree();
 		}
 	}
 
-	async function handleCreateChild(name: string, diagramType: string, description: string) {
+	async function handleCreateChild(name: string, diagramType: string, description: string, _tags?: string[], _isTemplate?: boolean, childNotation?: string) {
 		if (!diagram) return;
 		try {
+			const body: Record<string, unknown> = {
+				diagram_type: diagramType,
+				name,
+				description,
+				data: {},
+				parent_package_id: diagram.id,
+				set_id: diagram.set_id,
+			};
+			if (childNotation) body.notation = childNotation;
 			const created = await apiFetch<Diagram>('/api/diagrams', {
 				method: 'POST',
-				body: JSON.stringify({
-					diagram_type: diagramType,
-					name,
-					description,
-					data: {},
-					parent_package_id: diagram.id,
-					set_id: diagram.set_id,
-				}),
+				body: JSON.stringify(body),
 			});
 			showCreateChildDialog = false;
 			await loadHierarchyTree();
@@ -384,13 +395,35 @@
 		}
 	}
 
-	async function handleSetParent(parentDiagram: Diagram) {
+	async function handleCreateChildPackage() {
+		if (!diagram || !childPackageName.trim()) return;
+		try {
+			const created = await apiFetch<{ id: string }>('/api/packages', {
+				method: 'POST',
+				body: JSON.stringify({
+					name: childPackageName.trim(),
+					description: childPackageDescription.trim() || null,
+					parent_package_id: diagram.parent_package_id,
+					set_id: diagram.set_id,
+				}),
+			});
+			showCreateChildPackageDialog = false;
+			childPackageName = '';
+			childPackageDescription = '';
+			await loadHierarchyTree();
+			await goto(`/packages/${created.id}`);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create child package';
+		}
+	}
+
+	async function handleSetParent(parentPkg: Package) {
 		if (!diagram) return;
 		showParentPicker = false;
 		try {
 			await apiFetch(`/api/diagrams/${diagram.id}/parent`, {
 				method: 'PUT',
-				body: JSON.stringify({ parent_package_id: parentDiagram.id }),
+				body: JSON.stringify({ parent_package_id: parentPkg.id }),
 			});
 			await loadDiagram(diagram.id);
 			if (sidebarOpen) await loadHierarchyTree();
@@ -596,17 +629,19 @@
 		}
 	}
 
-	async function handleClone(name: string, diagramType: string, description: string) {
+	async function handleClone(name: string, diagramType: string, description: string, _tags?: string[], _isTemplate?: boolean, cloneNotation?: string) {
 		if (!diagram) return;
 		try {
+			const body: Record<string, unknown> = {
+				diagram_type: diagramType,
+				name,
+				description,
+				data: diagram.data ?? {},
+			};
+			if (cloneNotation) body.notation = cloneNotation;
 			const created = await apiFetch<Diagram>('/api/diagrams', {
 				method: 'POST',
-				body: JSON.stringify({
-					diagram_type: diagramType,
-					name,
-					description,
-					data: diagram.data ?? {},
-				}),
+				body: JSON.stringify(body),
 			});
 			showCloneDialog = false;
 			await goto(`/diagrams/${created.id}`);
@@ -645,8 +680,9 @@
 		return { x: 60, y: 60 };
 	}
 
-	async function handleAddElement(name: string, elementType: SimpleEntityType, description: string) {
+	async function handleAddElement(name: string, elementType: SimpleEntityType, description: string, _tags?: string[], elementNotation?: string) {
 		try {
+			const effectiveNotation = elementNotation ?? notation ?? 'simple';
 			const created = await apiFetch<Element>('/api/elements', {
 				method: 'POST',
 				body: JSON.stringify({
@@ -654,6 +690,7 @@
 					name,
 					description,
 					data: {},
+					notation: effectiveNotation,
 				}),
 			});
 			const id = crypto.randomUUID();
@@ -666,6 +703,7 @@
 					entityType: elementType,
 					description,
 					entityId: created.id,
+					notation: effectiveNotation,
 				},
 			};
 			history.pushState(canvasNodes, canvasEdges);
@@ -780,7 +818,7 @@
 	}
 
 	/** Save the edited element via PUT, then update the canvas node. */
-	async function handleEditElementSave(name: string, elementType: SimpleEntityType, description: string) {
+	async function handleEditElementSave(name: string, elementType: SimpleEntityType, description: string, _tags?: string[], _notation?: string) {
 		if (!editElementData || !selectedEditNodeId) return;
 		try {
 			await apiFetch(`/api/elements/${editElementData.id}`, {
@@ -963,6 +1001,7 @@
 				entityType: elementType,
 				description: element.description ?? '',
 				entityId: element.id,
+				notation: element.notation ?? 'simple',
 			},
 		};
 		history.pushState(canvasNodes, canvasEdges);
@@ -1295,7 +1334,7 @@
 
 {#if loading}
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-		<ol class="flex gap-1">
+		<ol class="flex flex-wrap items-baseline gap-1">
 			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
 			<li aria-hidden="true">/</li>
 			<li aria-current="page">{page.params.id}</li>
@@ -1304,7 +1343,7 @@
 	<p style="color: var(--color-muted)">Loading diagram...</p>
 {:else if error}
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-		<ol class="flex gap-1">
+		<ol class="flex flex-wrap items-baseline gap-1">
 			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
 			<li aria-hidden="true">/</li>
 			<li aria-current="page">{page.params.id}</li>
@@ -1315,15 +1354,15 @@
 	</div>
 {:else if diagram}
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-		<ol class="flex items-center gap-1">
+		<ol class="flex flex-wrap items-baseline gap-1">
 			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
 			{#each ancestors as ancestor}
-				<li class="flex items-center gap-1">
+				<li class="flex items-baseline gap-1">
 					<span aria-hidden="true">/</span>
 					<a href="/diagrams/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
 				</li>
 			{/each}
-			<li class="flex items-center gap-1">
+			<li class="flex items-baseline gap-1">
 				<span aria-hidden="true">/</span>
 				<span aria-current="page">{diagram.name}</span>
 			</li>
@@ -1331,8 +1370,22 @@
 	</nav>
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{diagram.name}</h1>
-			<p class="mt-1 text-sm" style="color: var(--color-muted)">{diagram.diagram_type}</p>
+			<div class="flex flex-wrap items-center gap-3">
+				<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{diagram.name}</h1>
+				{#if diagram.set_name}
+					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-muted); border: 1px solid var(--color-border)">{diagram.set_name}</span>
+				{/if}
+			</div>
+			<p class="mt-1 text-sm flex items-center gap-2 flex-wrap" style="color: var(--color-muted)">
+				<span>{diagram.diagram_type}</span>
+				{#if diagram.detected_notations && diagram.detected_notations.length > 0}
+					{#each diagram.detected_notations as dn}
+						<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{dn}</span>
+					{/each}
+				{:else if diagram.notation}
+					<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{diagram.notation}</span>
+				{/if}
+			</p>
 		</div>
 		<div class="flex gap-2">
 			<button
@@ -1382,16 +1435,47 @@
 					>
 						Diagrams
 					</button>
+					<div style="position: relative">
+						<button
+							onclick={() => (showChildMenu = !showChildMenu)}
+							class="rounded px-2 py-1 text-xs"
+							style="background: var(--color-primary); color: white; border: 1px solid var(--color-primary)"
+							title="Create child item"
+						>
+							+ Child
+						</button>
+						{#if showChildMenu}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div
+								style="position: fixed; inset: 0; z-index: 9"
+								onclick={() => (showChildMenu = false)}
+								onkeydown={(e) => { if (e.key === 'Escape') showChildMenu = false; }}
+							></div>
+							<div
+								style="position: absolute; top: 100%; right: 0; z-index: 10; min-width: 120px"
+								class="mt-1 rounded border shadow-md"
+								style:border-color="var(--color-border)"
+								style:background-color="var(--color-surface)"
+							>
+								<button
+									onclick={() => { showCreateChildDialog = true; showChildMenu = false; }}
+									class="block w-full px-3 py-2 text-left text-xs hover:opacity-80"
+									style="color: var(--color-fg)"
+								>
+									Diagram
+								</button>
+								<button
+									onclick={() => { showCreateChildPackageDialog = true; showChildMenu = false; }}
+									class="block w-full px-3 py-2 text-left text-xs hover:opacity-80"
+									style="color: var(--color-fg); border-top: 1px solid var(--color-border)"
+								>
+									Package
+								</button>
+							</div>
+						{/if}
+					</div>
 					<button
-						onclick={() => (showCreateChildDialog = true)}
-						class="rounded px-2 py-1 text-xs"
-						style="background: var(--color-primary); color: white"
-						title="Create child diagram"
-					>
-						+ Child
-					</button>
-					<button
-						onclick={() => (sidebarOpen = false)}
+						onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
 						class="rounded p-1 text-xs"
 						style="color: var(--color-muted)"
 						aria-label="Close sidebar"
@@ -1553,6 +1637,20 @@
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
 							<dd style="color: var(--color-fg)">{diagram.diagram_type}</dd>
 
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Notation</dt>
+							<dd style="color: var(--color-fg)">{diagram.notation ?? 'simple'}</dd>
+
+							{#if diagram.detected_notations && diagram.detected_notations.length > 0}
+								<dt class="text-sm font-medium" style="color: var(--color-muted)">Detected Notations</dt>
+								<dd>
+									<div class="flex flex-wrap gap-1">
+										{#each diagram.detected_notations as dn}
+											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{dn}</span>
+										{/each}
+									</div>
+								</dd>
+							{/if}
+
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
 							<dd>
 								<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
@@ -1611,7 +1709,7 @@
 								{#if diagram.parent_package_id}
 									{@const parentAncestor = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null}
 									{#if parentAncestor}
-										<a href="/diagrams/{parentAncestor.id}" style="color: var(--color-primary)" class="text-sm">{parentAncestor.name}</a>
+										<a href="/packages/{parentAncestor.id}" style="color: var(--color-primary)" class="text-sm">{parentAncestor.name}</a>
 									{:else}
 										<span class="text-sm" style="color: var(--color-fg)">{diagram.parent_package_id.slice(0, 8)}...</span>
 									{/if}
@@ -2266,34 +2364,7 @@
 				{/if}
 			{/if}
 		{:else if activeTab === 'versions'}
-			{#if versionsLoading}
-				<p style="color: var(--color-muted)">Loading versions...</p>
-			{:else if versions.length === 0}
-				<p style="color: var(--color-muted)">No version history available.</p>
-			{:else}
-				<table class="w-full text-sm">
-					<thead>
-						<tr style="border-bottom: 1px solid var(--color-border)">
-							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">User</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each versions as v}
-							<tr style="border-bottom: 1px solid var(--color-border)">
-								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.created_by_username ?? v.created_by}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			{/if}
+			<VersionHistory {versions} loading={versionsLoading} />
 		{/if}
 	</div>
 
@@ -2314,11 +2385,62 @@
 		oncancel={() => (showCreateChildDialog = false)}
 	/>
 
-	<DiagramPicker
+	{#if showCreateChildPackageDialog}
+		<div style="position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4)">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div
+				class="rounded-lg p-6 shadow-lg"
+				style="background: var(--color-bg); border: 1px solid var(--color-border); width: 400px; max-width: 90vw"
+				onkeydown={(e) => { if (e.key === 'Escape') { showCreateChildPackageDialog = false; childPackageName = ''; childPackageDescription = ''; } }}
+			>
+				<h3 class="mb-4 text-lg font-semibold" style="color: var(--color-fg)">Create Package</h3>
+				<label class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
+					Name
+					<input
+						type="text"
+						bind:value={childPackageName}
+						class="mt-1 block w-full rounded border px-3 py-2 text-sm"
+						style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)"
+						placeholder="Package name"
+					/>
+				</label>
+				<label class="mb-4 mt-3 block text-sm font-medium" style="color: var(--color-fg)">
+					Description
+					<textarea
+						bind:value={childPackageDescription}
+						rows="3"
+						class="mt-1 block w-full rounded border px-3 py-2 text-sm"
+						style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)"
+						placeholder="Optional description"
+					></textarea>
+				</label>
+				<div class="flex justify-end gap-2">
+					<button
+						onclick={() => { showCreateChildPackageDialog = false; childPackageName = ''; childPackageDescription = ''; }}
+						class="rounded px-4 py-2 text-sm"
+						style="border: 1px solid var(--color-border); color: var(--color-fg)"
+					>
+						Cancel
+					</button>
+					<button
+						onclick={handleCreateChildPackage}
+						disabled={!childPackageName.trim()}
+						class="rounded px-4 py-2 text-sm text-white disabled:opacity-50"
+						style="background: var(--color-primary)"
+					>
+						Create
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<PackagePicker
 		open={showParentPicker}
 		onselect={handleSetParent}
 		oncancel={() => (showParentPicker = false)}
-		excludeDiagramId={diagram?.id}
+		title="Select Parent Package"
+		subtitle="Choose a package to contain this diagram."
 	/>
 
 	<DiagramDialog
@@ -2343,6 +2465,8 @@
 	<EntityDialog
 		open={showAddElement}
 		mode="create"
+		notation={notation}
+		diagramType={diagram?.diagram_type}
 		onsave={handleAddElement}
 		oncancel={() => (showAddElement = false)}
 	/>
@@ -2350,6 +2474,8 @@
 	<EntityDialog
 		open={showEditElement}
 		mode="edit"
+		notation={notation}
+		diagramType={diagram?.diagram_type}
 		initialName={editElementData?.name ?? ''}
 		initialType={(editElementData?.element_type ?? 'component') as SimpleEntityType}
 		initialDescription={editElementData?.description ?? ''}

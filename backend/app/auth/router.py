@@ -60,7 +60,7 @@ async def login(body: LoginRequest, request: Request) -> TokenResponse:
     if row is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, _, password_hash, role, is_active = (
+    user_id, username_val, password_hash, role, is_active = (
         row[0], row[1], row[2], row[3], row[4]
     )
     failed_count, locked_until = row[5], row[6]
@@ -109,7 +109,8 @@ async def login(body: LoginRequest, request: Request) -> TokenResponse:
     timeout = await _get_session_timeout(db)
 
     access_token, _jti = create_access_token(
-        user_id, role, config.auth, timeout_minutes=timeout
+        user_id, role, config.auth, timeout_minutes=timeout,
+        username=username_val,
     )
     refresh_token = await create_refresh_token(db, user_id, config.auth)
 
@@ -133,9 +134,9 @@ async def refresh(body: RefreshRequest, request: Request) -> TokenResponse:
 
     new_refresh_token, user_id = result
 
-    # Get user role
+    # Get user role and username
     cursor = await db.execute(
-        "SELECT role FROM users WHERE id = ?", (user_id,)
+        "SELECT role, username FROM users WHERE id = ?", (user_id,)
     )
     row = await cursor.fetchone()
     if row is None:
@@ -145,7 +146,8 @@ async def refresh(body: RefreshRequest, request: Request) -> TokenResponse:
     timeout = await _get_session_timeout(db)
 
     access_token, _ = create_access_token(
-        user_id, row[0], config.auth, timeout_minutes=timeout
+        user_id, row[0], config.auth, timeout_minutes=timeout,
+        username=row[1],
     )
 
     expires_in = (timeout or config.auth.access_token_expire_minutes) * 60

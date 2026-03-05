@@ -433,6 +433,188 @@ async def get_package_hierarchy(
     return roots
 
 
+async def count_package_descendants(
+    db: aiosqlite.Connection,
+    package_id: str,
+) -> dict[str, int]:
+    """Count all descendant packages and diagrams under a package (non-deleted only)."""
+    # Recursive CTE to find all descendant package IDs
+    cursor = await db.execute(
+        "WITH RECURSIVE descendants(id) AS ("
+        "  SELECT id FROM packages "
+        "  WHERE parent_package_id = ? AND is_deleted = 0 "
+        "  UNION ALL "
+        "  SELECT p.id FROM packages p "
+        "  JOIN descendants d ON p.parent_package_id = d.id "
+        "  WHERE p.is_deleted = 0"
+        ") SELECT id FROM descendants",
+        (package_id,),
+    )
+    child_package_ids = [row[0] for row in await cursor.fetchall()]
+
+    # Count diagrams under the root and all descendant packages
+    all_package_ids = [package_id, *child_package_ids]
+    placeholders = ",".join("?" for _ in all_package_ids)
+    cursor = await db.execute(
+        f"SELECT COUNT(*) FROM diagrams "  # noqa: S608
+        f"WHERE parent_package_id IN ({placeholders}) AND is_deleted = 0",
+        all_package_ids,
+    )
+    diagram_count = (await cursor.fetchone())[0]
+
+    return {"child_packages": len(child_package_ids), "child_diagrams": diagram_count}
+
+
+async def cascade_delete_package(
+    db: aiosqlite.Connection,
+    package_id: str,
+    *,
+    deleted_by: str,
+    expected_version: int,
+) -> bool:
+    """Cascade soft-delete a package and all descendants."""
+    # OCC check on root package
+    cursor = await db.execute(
+        "SELECT current_version FROM packages WHERE id = ? AND is_deleted = 0",
+        (package_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] != expected_version:
+        return False
+
+    deleted_group_id = str(uuid.uuid4())
+    now = datetime.now(tz=UTC).isoformat()
+
+    # Collect all descendant package IDs via recursive CTE
+    cursor = await db.execute(
+        "WITH RECURSIVE descendants(id) AS ("
+        "  SELECT id FROM packages "
+        "  WHERE parent_package_id = ? AND is_deleted = 0 "
+        "  UNION ALL "
+        "  SELECT p.id FROM packages p "
+        "  JOIN descendants d ON p.parent_package_id = d.id "
+        "  WHERE p.is_deleted = 0"
+        ") SELECT id FROM descendants",
+        (package_id,),
+    )
+    child_package_ids = [row[0] for row in await cursor.fetchall()]
+
+    # All packages to delete: root + descendants
+    all_package_ids = [package_id, *child_package_ids]
+
+    # Soft-delete each package
+    for pid in all_package_ids:
+        cursor = await db.execute(
+            "SELECT current_version FROM packages WHERE id = ? AND is_deleted = 0",
+            (pid,),
+        )
+        pkg_row = await cursor.fetchone()
+        if pkg_row is None:
+            continue
+        new_version = pkg_row[0] + 1
+
+        cursor = await db.execute(
+            "SELECT name, description FROM package_versions "
+            "WHERE package_id = ? AND version = ?",
+            (pid, pkg_row[0]),
+        )
+        ver_row = await cursor.fetchone()
+
+        await db.execute(
+            "UPDATE packages SET current_version = ?, updated_at = ?, "
+            "is_deleted = 1, deleted_group_id = ? WHERE id = ?",
+            (new_version, now, deleted_group_id, pid),
+        )
+        await db.execute(
+            "INSERT INTO package_versions (package_id, version, name, description, "
+            "data, change_type, created_at, created_by) "
+            "VALUES (?, ?, ?, ?, '{}', 'delete', ?, ?)",
+            (pid, new_version, ver_row[0], ver_row[1], now, deleted_by),
+        )
+
+    # Soft-delete all diagrams under any of those packages
+    placeholders = ",".join("?" for _ in all_package_ids)
+    cursor = await db.execute(
+        f"SELECT id, current_version FROM diagrams "  # noqa: S608
+        f"WHERE parent_package_id IN ({placeholders}) AND is_deleted = 0",
+        all_package_ids,
+    )
+    diagram_rows = await cursor.fetchall()
+
+    for did, d_version in diagram_rows:
+        new_d_version = d_version + 1
+        cursor = await db.execute(
+            "SELECT name, description, data FROM diagram_versions "
+            "WHERE diagram_id = ? AND version = ?",
+            (did, d_version),
+        )
+        d_ver_row = await cursor.fetchone()
+
+        await db.execute(
+            "UPDATE diagrams SET current_version = ?, updated_at = ?, "
+            "is_deleted = 1, deleted_group_id = ? WHERE id = ?",
+            (new_d_version, now, deleted_group_id, did),
+        )
+        await db.execute(
+            "INSERT INTO diagram_versions (diagram_id, version, name, description, "
+            "data, change_type, created_at, created_by) "
+            "VALUES (?, ?, ?, ?, ?, 'delete', ?, ?)",
+            (did, new_d_version, d_ver_row[0], d_ver_row[1],
+             d_ver_row[2], now, deleted_by),
+        )
+
+    await db.commit()
+
+    # Remove deleted diagrams from search index
+    from app.search.service import remove_diagram_index as _remove_diagram_index
+
+    for did, _ in diagram_rows:
+        await _remove_diagram_index(db, did)
+    await db.commit()
+
+    return True
+
+
+async def restore_package(
+    db: aiosqlite.Connection,
+    package_id: str,
+    *,
+    restored_by: str,
+) -> bool:
+    """Restore a soft-deleted package."""
+    cursor = await db.execute(
+        "SELECT current_version FROM packages WHERE id = ? AND is_deleted = 1",
+        (package_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return False
+
+    new_version = row[0] + 1
+    now = datetime.now(tz=UTC).isoformat()
+
+    cursor = await db.execute(
+        "SELECT name, description FROM package_versions "
+        "WHERE package_id = ? AND version = ?",
+        (package_id, row[0]),
+    )
+    ver_row = await cursor.fetchone()
+
+    await db.execute(
+        "UPDATE packages SET current_version = ?, updated_at = ?, "
+        "is_deleted = 0, deleted_group_id = NULL WHERE id = ?",
+        (new_version, now, package_id),
+    )
+    await db.execute(
+        "INSERT INTO package_versions (package_id, version, name, description, "
+        "data, change_type, created_at, created_by) "
+        "VALUES (?, ?, ?, ?, '{}', 'restore', ?, ?)",
+        (package_id, new_version, ver_row[0], ver_row[1], now, restored_by),
+    )
+    await db.commit()
+    return True
+
+
 async def get_package_versions(
     db: aiosqlite.Connection,
     package_id: str,

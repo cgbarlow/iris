@@ -52,6 +52,9 @@
 			<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
 			<dd class="mb-3" style="color: var(--color-fg)">{entity.entityType}</dd>
 
+			<dt class="text-sm font-medium" style="color: var(--color-muted)">Notation</dt>
+			<dd class="mb-3" style="color: var(--color-fg)">{entity.notation ?? 'simple'}</dd>
+
 			{#if entity.description}
 				<dt class="text-sm font-medium" style="color: var(--color-muted)">Description</dt>
 				<dd class="mb-3" style="color: var(--color-fg)">{entity.description}</dd>

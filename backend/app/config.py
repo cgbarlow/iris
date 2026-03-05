@@ -65,7 +65,7 @@ class AppConfig:
         default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_REFRESH", "30"))
     )
     rate_limit_general: int = field(
-        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_GENERAL", "300"))
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_GENERAL", "1000"))
     )
 
 

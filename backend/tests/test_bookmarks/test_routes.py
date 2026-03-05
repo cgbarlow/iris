@@ -74,6 +74,21 @@ async def _create_diagram(
     return resp.json()["id"]
 
 
+async def _create_package(
+    client: httpx.AsyncClient,
+    headers: dict[str, str],
+    name: str = "Test Package",
+) -> str:
+    """Create a package via the API and return its ID."""
+    resp = await client.post(
+        "/api/packages",
+        json={"name": name},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
 class TestBookmarkDiagram:
     """Verify bookmarking a diagram."""
 
@@ -200,3 +215,89 @@ class TestBookmarkIsolation:
         viewer_bookmarks = resp.json()
         assert len(viewer_bookmarks) == 1
         assert viewer_bookmarks[0]["diagram_id"] == diagram_2
+
+
+class TestBookmarkPackage:
+    """Verify bookmarking a package."""
+
+    async def test_bookmark_package_and_list(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        package_id = await _create_package(client, headers)
+
+        resp = await client.post(
+            f"/api/packages/{package_id}/bookmark", headers=headers,
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["package_id"] == package_id
+        assert data["diagram_id"] is None
+        assert "created_at" in data
+
+        resp = await client.get("/api/bookmarks", headers=headers)
+        bookmarks = resp.json()
+        assert len(bookmarks) == 1
+        assert bookmarks[0]["package_id"] == package_id
+
+    async def test_duplicate_package_bookmark_returns_409(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        package_id = await _create_package(client, headers)
+
+        await client.post(
+            f"/api/packages/{package_id}/bookmark", headers=headers,
+        )
+        resp = await client.post(
+            f"/api/packages/{package_id}/bookmark", headers=headers,
+        )
+        assert resp.status_code == 409
+
+    async def test_unbookmark_package(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        package_id = await _create_package(client, headers)
+
+        await client.post(
+            f"/api/packages/{package_id}/bookmark", headers=headers,
+        )
+        resp = await client.delete(
+            f"/api/packages/{package_id}/bookmark", headers=headers,
+        )
+        assert resp.status_code == 204
+
+        resp = await client.get("/api/bookmarks", headers=headers)
+        assert len(resp.json()) == 0
+
+    async def test_unbookmark_package_not_found(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        resp = await client.delete(
+            "/api/packages/nonexistent/bookmark", headers=headers,
+        )
+        assert resp.status_code == 404
+
+    async def test_mixed_diagram_and_package_bookmarks(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _admin_headers(client)
+        diagram_id = await _create_diagram(client, headers)
+        package_id = await _create_package(client, headers)
+
+        await client.post(
+            f"/api/diagrams/{diagram_id}/bookmark", headers=headers,
+        )
+        await client.post(
+            f"/api/packages/{package_id}/bookmark", headers=headers,
+        )
+
+        resp = await client.get("/api/bookmarks", headers=headers)
+        bookmarks = resp.json()
+        assert len(bookmarks) == 2
+        diagram_bms = [b for b in bookmarks if b["diagram_id"]]
+        package_bms = [b for b in bookmarks if b["package_id"]]
+        assert len(diagram_bms) == 1
+        assert len(package_bms) == 1

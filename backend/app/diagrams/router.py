@@ -70,6 +70,7 @@ async def create(
         created_by=current_user["id"],
         parent_package_id=body.parent_package_id,
         set_id=body.set_id,
+        notation=body.notation,
         metadata=body.metadata,
     )
     return DiagramResponse(**result)
@@ -92,15 +93,17 @@ async def hierarchy(
 async def list_all(
     request: Request,
     diagram_type: str | None = None,
+    notation: str | None = None,
     set_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> DiagramListResponse:
-    """List diagrams with optional type/set filter and pagination."""
+    """List diagrams with optional type/notation/set filter and pagination."""
     db = request.app.state.db_manager.main_db
     items, total = await list_diagrams(
-        db, diagram_type=diagram_type, set_id=set_id, page=page, page_size=page_size,
+        db, diagram_type=diagram_type, notation=notation,
+        set_id=set_id, page=page, page_size=page_size,
     )
     return DiagramListResponse(
         items=[DiagramResponse(**item) for item in items],

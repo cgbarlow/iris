@@ -129,6 +129,25 @@ async def list_sets(
         )
         item["element_count"] = (await ec.fetchone())[0]
 
+        # Include thumbnail diagram data for client-side rendering (DRY)
+        thumb_id = row[8]  # thumbnail_diagram_id
+        if row[7] in ("model", "diagram") and thumb_id:
+            tc = await db.execute(
+                "SELECT dv.data, d.diagram_type "
+                "FROM diagram_versions dv "
+                "JOIN diagrams d ON d.id = dv.diagram_id "
+                "WHERE dv.diagram_id = ? ORDER BY dv.version DESC LIMIT 1",
+                (thumb_id,),
+            )
+            trow = await tc.fetchone()
+            if trow:
+                import json
+
+                item["thumbnail_diagram_data"] = (
+                    json.loads(trow[0]) if isinstance(trow[0], str) else trow[0]
+                )
+                item["thumbnail_diagram_type"] = trow[1]
+
         items.append(item)
 
     return items

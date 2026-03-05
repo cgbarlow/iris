@@ -26,6 +26,7 @@ async def create_element(
     set_id: str | None = None,
     metadata: dict[str, object] | None = None,
     change_summary: str | None = None,
+    notation: str = "simple",
 ) -> dict[str, object]:
     """Create a new element with initial version."""
     element_id = str(uuid.uuid4())
@@ -36,8 +37,8 @@ async def create_element(
 
     await db.execute(
         "INSERT INTO elements (id, element_type, current_version, "
-        "created_at, created_by, updated_at, set_id) VALUES (?, ?, 1, ?, ?, ?, ?)",
-        (element_id, element_type, now, created_by, now, effective_set_id),
+        "created_at, created_by, updated_at, set_id, notation) VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
+        (element_id, element_type, now, created_by, now, effective_set_id, notation),
     )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, "
@@ -65,6 +66,7 @@ async def create_element(
         "is_deleted": False,
         "set_id": effective_set_id,
         "metadata": metadata,
+        "notation": notation,
     }
 
 
@@ -77,7 +79,7 @@ async def get_element(
         "SELECT e.id, e.element_type, e.current_version, "
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "u.username, e.set_id, s.name, ev.metadata "
+        "u.username, e.set_id, s.name, ev.metadata, e.notation "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -105,6 +107,7 @@ async def get_element(
         "set_id": row[11],
         "set_name": row[12],
         "metadata": json.loads(row[13]) if row[13] else None,
+        "notation": row[14] or "simple",
     }
 
     # Enrich with tags
@@ -154,7 +157,7 @@ async def list_elements(
         f"SELECT e.id, e.element_type, e.current_version, "  # noqa: S608
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "e.set_id, s.name, ev.metadata "
+        "e.set_id, s.name, ev.metadata, e.notation "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -180,6 +183,7 @@ async def list_elements(
             "set_id": r[10],
             "set_name": r[11],
             "metadata": json.loads(r[12]) if r[12] else None,
+            "notation": r[13] or "simple",
         }
         for r in rows
     ]
@@ -400,6 +404,57 @@ async def soft_delete_element(
     await db.commit()
     await _remove_element_index(db, element_id)
     await db.commit()
+    return True
+
+
+async def restore_element(
+    db: aiosqlite.Connection,
+    element_id: str,
+    *,
+    restored_by: str,
+) -> bool:
+    """Restore a soft-deleted element."""
+    cursor = await db.execute(
+        "SELECT current_version, element_type FROM elements "
+        "WHERE id = ? AND is_deleted = 1",
+        (element_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return False
+
+    new_version = row[0] + 1
+    element_type = row[1]
+    now = datetime.now(tz=UTC).isoformat()
+
+    cursor = await db.execute(
+        "SELECT name, description, data FROM element_versions "
+        "WHERE element_id = ? AND version = ?",
+        (element_id, row[0]),
+    )
+    ver_row = await cursor.fetchone()
+
+    await db.execute(
+        "UPDATE elements SET current_version = ?, updated_at = ?, "
+        "is_deleted = 0, deleted_group_id = NULL WHERE id = ?",
+        (new_version, now, element_id),
+    )
+    await db.execute(
+        "INSERT INTO element_versions (element_id, version, name, description, "
+        "data, change_type, created_at, created_by) "
+        "VALUES (?, ?, ?, ?, ?, 'restore', ?, ?)",
+        (element_id, new_version, ver_row[0], ver_row[1],
+         ver_row[2], now, restored_by),
+    )
+    await db.commit()
+
+    # Re-index for search
+    await _index_element(
+        db, element_id=element_id, name=ver_row[0],
+        element_type=element_type, description=ver_row[1],
+    )
+    await db.commit()
+
     return True
 
 

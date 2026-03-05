@@ -5,6 +5,63 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-05
+
+### Added
+- Notation filter dropdown on diagrams and elements list pages
+- ADR-083: Comprehensive seed diagrams covering all 31 diagram-type/notation permutations
+- Seed hierarchy reorganised by notation (Simple, UML, ArchiMate, C4 packages) with 32 diagrams, 55 elements, and 50 relationships
+- ~40 new seed elements across UML, ArchiMate, and C4 notations describing the Iris system
+- Use Case and State Machine diagram types for UML notation (ADR-082)
+- System Context and Container diagram types for C4 notation (ADR-082)
+- Motivation and Strategy diagram types for ArchiMate notation (ADR-082)
+- ArchiMate notation mapping added to Roadmap diagram type, C4 mapping added to Sequence (ADR-082)
+- Element type filtering by diagram type in canvas EntityDialog — shows only relevant types per diagram (ADR-082)
+- "Show all types" override toggle in EntityDialog to bypass diagram-type filtering (ADR-082)
+- Default notation user setting in Settings page — stored in localStorage, choose Simple/UML/ArchiMate/C4 (ADR-081)
+- Elements carry notation field (`notation` column) — displayed in browse mode popup and element detail page (ADR-081)
+- Diagram Type and Notation Registry — separates structural diagram type (component, sequence, class, deployment, process, roadmap, free_form) from visual notation (simple, uml, archimate, c4) via database registry tables with many-to-many mapping (ADR-079)
+- Registry API endpoints: `GET /api/registry/diagram-types`, `GET /api/registry/notations`, `PUT /api/registry/diagrams/{id}/notation` (ADR-079)
+- Auto-detection of notations present on canvas — scans node entity types and stores detected notations per diagram (ADR-079)
+- Notation dropdown in DiagramDialog — two-step selection: pick diagram type, then pick notation (filtered by valid pairs, default pre-selected) (ADR-079)
+- Notation and detected_notations display on diagram detail page, list view, and gallery view (ADR-079)
+- Edit Locking System — pessimistic advisory locks with 15-minute timeout, heartbeat extension, and lazy expiry cleanup for diagrams, elements, and packages (ADR-080)
+- Lock API endpoints: `POST /api/locks`, `GET /api/locks/check`, `PUT /api/locks/{id}/heartbeat`, `DELETE /api/locks/{id}`, `GET /api/locks`, `DELETE /api/admin/locks/{id}` (ADR-080)
+- Lock manager composable (`locks.svelte.ts`) with auto-heartbeat and beforeunload release (ADR-080)
+- Admin Locks page for viewing and force-releasing active edit locks (ADR-080)
+- Cascade delete for packages — deleting a package soft-deletes all descendant packages and diagrams with a shared group ID (ADR-078)
+- Descendant count warning — delete confirmation dialog shows exact count of child packages and diagrams before deletion (ADR-078)
+- Recycle bin page — browse, restore, and permanently delete soft-deleted items with grouped restore for cascade deletions (ADR-078)
+- Recycle bin navigation item in sidebar
+- Set filtering on bookmarks page — uses the same SetSelector pattern as other list pages (ADR-078)
+- Restore capability for packages, diagrams, and elements — creates version record with `change_type='restore'` (ADR-078)
+- Diagram hierarchy tree on dashboard when a set is selected — reuses existing TreeNode component (ADR-076)
+- C4 System Context diagram in example seed showing Iris with external actors and systems (ADR-077)
+- Seed auto-migration from v1 flat format to v2 package hierarchy (ADR-077)
+- Hierarchy sidebar on package detail page — reuses TreeNode component from diagram view
+- Shared VersionHistory component for consistent card-style version display across all detail pages
+
+### Changed
+- Locks admin nav icon changed from sliders to padlock (ADR-083)
+- Bookmarks moved above Import in sidebar navigation order
+- DiagramDialog now shows Notation first, filtering available diagram types by selected notation (ADR-081)
+- EntityDialog shows visible Notation dropdown for entity type filtering, onsave includes notation (ADR-081)
+- Simple notation streamlined to 5 domain types + 2 universal types (removed package, queue entity types and composes, implements relationship types) — Phase C of ADR-079
+- EntityDialog now filters available entity types by current diagram notation (simple, uml, archimate, c4) (ADR-079)
+- Diagram type filter dropdown on diagrams list page updated to reflect registry types (component, sequence, class, deployment, process, roadmap, free_form) (ADR-079)
+- Example seed uses explicit notation values per diagram (ADR-079)
+- Example seed reorganized into 4-package hierarchy with 7 diagrams demonstrating
+  package nesting, parent_package_id, modelrefs, and C4 notation (ADR-077)
+- Set gallery thumbnail now uses client-side DiagramThumbnail component (DRY with diagram gallery)
+- Package detail page layout matches diagram detail page (tab bar, spacing, button styles)
+- Parent package field displays name instead of GUID
+
+### Fixed
+- Dashboard now reads active set from global store when no URL parameter is present, ensuring hierarchy tree loads after set selection on Sets page
+- Sets page list and gallery views no longer constrain width with max-width, matching other pages
+- C4 diagrams now render SVG thumbnails in diagram gallery view
+- ArchiMate and C4 node description text legibility on coloured backgrounds
+
 ## [2.0.0] - 2026-03-04
 
 ### Changed

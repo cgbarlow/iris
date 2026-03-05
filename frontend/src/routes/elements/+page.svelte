@@ -17,6 +17,7 @@
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let typeFilter = $state('');
+	let notationFilter = $state('');
 	let tagFilter = $state('');
 	let availableTags = $state<string[]>([]);
 	let sortField = $state<'name' | 'element_type' | 'updated_at'>('name');
@@ -218,6 +219,7 @@
 		elements
 			.filter((e) => {
 				if (typeFilter && e.element_type !== typeFilter) return false;
+				if (notationFilter && e.notation !== notationFilter) return false;
 				if (tagFilter && !(e.tags ?? []).includes(tagFilter)) return false;
 				if (searchQuery) {
 					const q = searchQuery.toLowerCase();
@@ -312,6 +314,21 @@
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		/>
+	</div>
+	<div>
+		<label for="element-notation-filter" class="sr-only">Filter by notation</label>
+		<select
+			id="element-notation-filter"
+			bind:value={notationFilter}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		>
+			<option value="">All notations</option>
+			<option value="simple">Simple</option>
+			<option value="uml">UML</option>
+			<option value="archimate">ArchiMate</option>
+			<option value="c4">C4</option>
+		</select>
 	</div>
 	<div>
 		<label for="element-type-filter" class="sr-only">Filter by type</label>

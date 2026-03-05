@@ -20,6 +20,7 @@
 	let searchQuery = $state('');
 	let sortField = $state<'name' | 'diagram_type' | 'updated_at'>('name');
 	let typeFilter = $state<string>('');
+	let notationFilter = $state<string>('');
 	let tagFilter = $state('');
 	let availableTags = $state<string[]>([]);
 	let templateFilter = $state(false);
@@ -150,7 +151,7 @@
 		}
 	}
 
-	async function handleCreate(name: string, diagramType: string, description: string) {
+	async function handleCreate(name: string, diagramType: string, description: string, _tags?: string[], _isTemplate?: boolean, createNotation?: string) {
 		try {
 			const body: Record<string, unknown> = {
 				diagram_type: diagramType,
@@ -159,6 +160,7 @@
 				data: {},
 			};
 			if (currentSetId) body.set_id = currentSetId;
+			if (createNotation) body.notation = createNotation;
 			const created = await apiFetch<Diagram>('/api/diagrams', {
 				method: 'POST',
 				body: JSON.stringify(body),
@@ -298,6 +300,7 @@
 				if (typeFilter && m.diagram_type.toLowerCase() !== typeFilter.toLowerCase()) {
 					return false;
 				}
+				if (notationFilter && m.notation !== notationFilter) return false;
 				if (tagFilter && !(m.tags ?? []).includes(tagFilter)) return false;
 			if (templateFilter && !(m.tags ?? []).includes('template')) return false;
 				if (searchQuery) {
@@ -363,6 +366,21 @@
 		/>
 	</div>
 	<div>
+		<label for="diagram-notation-filter" class="sr-only">Filter by notation</label>
+		<select
+			id="diagram-notation-filter"
+			bind:value={notationFilter}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+		>
+			<option value="">All notations</option>
+			<option value="simple">Simple</option>
+			<option value="uml">UML</option>
+			<option value="archimate">ArchiMate</option>
+			<option value="c4">C4</option>
+		</select>
+	</div>
+	<div>
 		<label for="diagram-type-filter" class="sr-only">Filter by type</label>
 		<select
 			id="diagram-type-filter"
@@ -370,13 +388,20 @@
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		>
-			<option value="">All</option>
-			<option value="simple">Simple</option>
+			<option value="">All types</option>
 			<option value="component">Component</option>
 			<option value="sequence">Sequence</option>
-			<option value="uml">UML</option>
-			<option value="archimate">ArchiMate</option>
+			<option value="class">Class</option>
+			<option value="deployment">Deployment</option>
+			<option value="process">Process</option>
 			<option value="roadmap">Roadmap</option>
+			<option value="free_form">Free Form</option>
+			<option value="use_case">Use Case</option>
+			<option value="state_machine">State Machine</option>
+			<option value="system_context">System Context</option>
+			<option value="container">Container</option>
+			<option value="motivation">Motivation</option>
+			<option value="strategy">Strategy</option>
 		</select>
 	</div>
 	<div>
@@ -533,6 +558,13 @@
 								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
 									{model.diagram_type}
 								</span>
+								{#if model.detected_notations && model.detected_notations.length > 0}
+									{#each model.detected_notations as dn}
+										<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{dn}</span>
+									{/each}
+								{:else if model.notation}
+									<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{model.notation}</span>
+								{/if}
 								{#if model.set_name}
 									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
 										{model.set_name}
@@ -588,6 +620,15 @@
 							<div class="flex flex-col gap-2 p-4">
 								<span class="font-medium" data-testid="card-name" style="color: var(--color-primary)">{model.name}</span>
 								<span class="rounded px-2 py-0.5 text-xs w-fit" data-testid="card-type" style="background: var(--color-surface); color: var(--color-muted)">{model.diagram_type}</span>
+								{#if model.detected_notations && model.detected_notations.length > 0}
+									<div class="flex flex-wrap gap-1">
+										{#each model.detected_notations as dn}
+											<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{dn}</span>
+										{/each}
+									</div>
+								{:else if model.notation}
+									<span class="rounded-full px-2 py-0.5 text-xs w-fit" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{model.notation}</span>
+								{/if}
 								{#if (model.tags ?? []).includes('template')}
 									<span class="rounded px-2 py-0.5 text-xs font-medium w-fit" style="background: var(--color-success, #16a34a); color: white">Template</span>
 								{/if}

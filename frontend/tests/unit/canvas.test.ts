@@ -7,27 +7,23 @@ import {
 } from '$lib/types/canvas';
 
 describe('Canvas types', () => {
-	it('defines all 9 Simple View entity types', () => {
-		expect(SIMPLE_ENTITY_TYPES).toHaveLength(9);
+	it('defines all 7 Simple View entity types (5 domain + 2 universal)', () => {
+		expect(SIMPLE_ENTITY_TYPES).toHaveLength(7);
 		const keys = SIMPLE_ENTITY_TYPES.map((t) => t.key);
 		expect(keys).toContain('component');
 		expect(keys).toContain('service');
 		expect(keys).toContain('interface');
-		expect(keys).toContain('package');
 		expect(keys).toContain('actor');
 		expect(keys).toContain('database');
-		expect(keys).toContain('queue');
 		expect(keys).toContain('note');
 		expect(keys).toContain('boundary');
 	});
 
-	it('defines all 6 Simple View relationship types', () => {
-		expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(6);
+	it('defines all 4 Simple View relationship types (non-technical mode)', () => {
+		expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(4);
 		const keys = SIMPLE_RELATIONSHIP_TYPES.map((t) => t.key);
 		expect(keys).toContain('uses');
 		expect(keys).toContain('depends_on');
-		expect(keys).toContain('composes');
-		expect(keys).toContain('implements');
 		expect(keys).toContain('contains');
 		expect(keys).toContain('note_link');
 	});

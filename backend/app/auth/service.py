@@ -84,6 +84,7 @@ def create_access_token(
     role: str,
     config: AuthConfig,
     timeout_minutes: int | None = None,
+    username: str | None = None,
 ) -> tuple[str, str]:
     """Create a JWT access token. Returns (token, jti).
 
@@ -99,6 +100,8 @@ def create_access_token(
         "iat": now,
         "exp": now + timedelta(minutes=expire_minutes),
     }
+    if username is not None:
+        payload["username"] = username
     token: str = jwt.encode(
         payload, config.jwt_secret, algorithm=config.jwt_algorithm
     )

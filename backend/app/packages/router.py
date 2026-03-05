@@ -16,6 +16,8 @@ from app.packages.models import (
     PackageVersionResponse,
 )
 from app.packages.service import (
+    cascade_delete_package,
+    count_package_descendants,
     create_package,
     get_package,
     get_package_ancestors,
@@ -24,7 +26,6 @@ from app.packages.service import (
     get_package_versions,
     list_packages,
     set_package_parent,
-    soft_delete_package,
     update_package,
 )
 
@@ -83,6 +84,20 @@ async def list_all(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/{package_id}/descendants/count")
+async def get_descendant_count(
+    package_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, int]:
+    """Get counts of descendant packages and diagrams."""
+    db = request.app.state.db_manager.main_db
+    result = await get_package(db, package_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Package not found")
+    return await count_package_descendants(db, package_id)
 
 
 @router.get("/{package_id}", response_model=PackageResponse)
@@ -156,7 +171,7 @@ async def delete(
         )
 
     db = request.app.state.db_manager.main_db
-    deleted = await soft_delete_package(
+    deleted = await cascade_delete_package(
         db, package_id,
         deleted_by=current_user["id"],
         expected_version=expected_version,

@@ -49,6 +49,7 @@
 	 * - 'hollow': node has no content itself but a descendant does (organizational container)
 	 * - 'none': no content anywhere in this subtree
 	 */
+	const isPackage = $derived(node.node_type === 'package');
 	const indicatorType = $derived<'solid' | 'hollow' | 'none'>(
 		node.has_content
 			? 'solid'
@@ -56,6 +57,7 @@
 				? 'hollow'
 				: 'none'
 	);
+	const nodeHref = $derived(isPackage ? `/packages/${node.id}` : `/diagrams/${node.id}`);
 
 	const passesDiagramFilter = $derived(
 		!showDiagramsOnly || node.has_content || descendantHasContent(node)
@@ -109,8 +111,9 @@
 				<span class="tree-node__spacer" aria-hidden="true"></span>
 			{/if}
 			<a
-				href="/diagrams/{node.id}"
+				href={nodeHref}
 				class="tree-node__link"
+				onclick={() => { if (hasChildren && !expanded) { expanded = true; expandedIds.add(node.id); } }}
 				onkeydown={handleKeydown}
 			>
 				{#if indicatorType === 'solid'}
@@ -119,7 +122,11 @@
 					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--hollow" aria-hidden="true"></span>
 				{/if}
 				<span class="tree-node__name">{node.name}</span>
-				<span class="tree-node__type">{node.diagram_type}</span>
+				{#if node.diagram_type}
+					<span class="tree-node__type">{node.diagram_type}</span>
+				{:else if isPackage}
+					<span class="tree-node__type tree-node__type--package">pkg</span>
+				{/if}
 			</a>
 		</div>
 		{#if hasChildren && expanded}
@@ -208,6 +215,10 @@
 		background: var(--color-surface);
 		padding: 1px 6px;
 		border-radius: 4px;
+	}
+	.tree-node__type--package {
+		opacity: 0.6;
+		font-style: italic;
 	}
 	.tree-node__children {
 		list-style: none;

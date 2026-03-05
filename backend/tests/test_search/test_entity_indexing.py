@@ -33,6 +33,7 @@ from app.migrations.m013_set_thumbnails import up as m013_up
 from app.migrations.m014_sets_partial_unique import up as m014_up
 from app.migrations.m015_model_relationships import up as m015_up
 from app.migrations.m016_naming_rename import up as m016_up
+from app.migrations.m022_element_notation import up as m022_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import search
 
@@ -56,6 +57,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await m014_up(db)
     await m015_up(db)
     await m016_up(db)
+    await m022_up(db)
     await seed_roles_and_permissions(db)
 
 

@@ -14,6 +14,7 @@ class ElementCreate(BaseModel):
     data: dict[str, object] = Field(default_factory=dict)
     set_id: str | None = None
     metadata: dict[str, object] | None = None
+    notation: str = "simple"
 
 
 class ElementUpdate(BaseModel):
@@ -52,6 +53,7 @@ class ElementResponse(BaseModel):
     set_id: str | None = None
     set_name: str | None = None
     metadata: dict[str, object] | None = None
+    notation: str = "simple"
 
 
 class ElementVersionResponse(BaseModel):

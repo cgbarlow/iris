@@ -1,19 +1,23 @@
 <script lang="ts">
-	/** Dialog for creating/editing diagrams. */
+	/** Dialog for creating/editing diagrams — notation-first flow (ADR-081). */
 	import DOMPurify from 'dompurify';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import { apiFetch } from '$lib/utils/api';
+	import type { DiagramTypeRegistry, NotationMapping } from '$lib/types/api';
+	import { getDefaultNotation } from '$lib/stores/defaultNotation.svelte';
 
 	interface Props {
 		open: boolean;
 		mode: 'create' | 'edit';
 		initialName?: string;
 		initialType?: string;
+		initialNotation?: string;
 		initialDescription?: string;
 		initialTags?: string[];
 		initialIsTemplate?: boolean;
 		suggestions?: string[];
 		inheritedTags?: string[];
-		onsave: (name: string, diagramType: string, description: string, tags?: string[], isTemplate?: boolean) => void;
+		onsave: (name: string, diagramType: string, description: string, tags?: string[], isTemplate?: boolean, notation?: string) => void;
 		oncancel: () => void;
 	}
 
@@ -22,6 +26,7 @@
 		mode,
 		initialName = '',
 		initialType = 'component',
+		initialNotation = '',
 		initialDescription = '',
 		initialTags = [],
 		initialIsTemplate = false,
@@ -33,32 +38,102 @@
 
 	let name = $state('');
 	let diagramType = $state('');
+	let notation = $state('');
 	let description = $state('');
 	let tags = $state<string[]>([]);
 	let isTemplate = $state(false);
 	let dialogEl: HTMLDialogElement | undefined = $state();
 
-	const DIAGRAM_TYPES = [
-		{ value: 'simple', label: 'Simple' },
-		{ value: 'component', label: 'Component' },
-		{ value: 'sequence', label: 'Sequence' },
-		{ value: 'uml', label: 'UML' },
-		{ value: 'archimate', label: 'ArchiMate' },
-		{ value: 'roadmap', label: 'Roadmap' },
-	];
+	// Registry data
+	let registryTypes = $state<DiagramTypeRegistry[]>([]);
+	let registryLoaded = $state(false);
+
+	/** Hardcoded notation→type fallback mapping (from ADR-079 matrix). */
+	const NOTATION_TYPE_FALLBACK: Record<string, { value: string; label: string }[]> = {
+		simple: [
+			{ value: 'component', label: 'Component' },
+			{ value: 'sequence', label: 'Sequence' },
+			{ value: 'deployment', label: 'Deployment' },
+			{ value: 'process', label: 'Process' },
+			{ value: 'roadmap', label: 'Roadmap' },
+			{ value: 'free_form', label: 'Free Form' },
+			{ value: 'use_case', label: 'Use Case' },
+			{ value: 'state_machine', label: 'State Machine' },
+			{ value: 'system_context', label: 'System Context' },
+			{ value: 'container', label: 'Container' },
+		],
+		uml: [
+			{ value: 'component', label: 'Component' },
+			{ value: 'sequence', label: 'Sequence' },
+			{ value: 'class', label: 'Class' },
+			{ value: 'deployment', label: 'Deployment' },
+			{ value: 'process', label: 'Process' },
+			{ value: 'free_form', label: 'Free Form' },
+			{ value: 'use_case', label: 'Use Case' },
+			{ value: 'state_machine', label: 'State Machine' },
+		],
+		archimate: [
+			{ value: 'component', label: 'Component' },
+			{ value: 'deployment', label: 'Deployment' },
+			{ value: 'process', label: 'Process' },
+			{ value: 'free_form', label: 'Free Form' },
+			{ value: 'roadmap', label: 'Roadmap' },
+			{ value: 'motivation', label: 'Motivation' },
+			{ value: 'strategy', label: 'Strategy' },
+		],
+		c4: [
+			{ value: 'component', label: 'Component' },
+			{ value: 'deployment', label: 'Deployment' },
+			{ value: 'free_form', label: 'Free Form' },
+			{ value: 'sequence', label: 'Sequence' },
+			{ value: 'system_context', label: 'System Context' },
+			{ value: 'container', label: 'Container' },
+		],
+	};
+
+	/** Diagram types filtered by the selected notation. */
+	let filteredTypes = $derived.by(() => {
+		if (registryTypes.length > 0) {
+			return registryTypes
+				.filter((t) => t.notations.some((n) => n.notation_id === notation))
+				.map((t) => ({ value: t.id, label: t.name }));
+		}
+		return NOTATION_TYPE_FALLBACK[notation] ?? NOTATION_TYPE_FALLBACK['simple'];
+	});
+
+	async function loadRegistry() {
+		if (registryLoaded) return;
+		try {
+			registryTypes = await apiFetch<DiagramTypeRegistry[]>('/api/registry/diagram-types');
+			registryLoaded = true;
+		} catch {
+			registryTypes = [];
+		}
+	}
 
 	$effect(() => {
 		if (open && dialogEl && !dialogEl.open) {
+			loadRegistry();
 			name = initialName;
-			diagramType = initialType;
 			description = initialDescription;
 			tags = [...initialTags];
 			isTemplate = initialIsTemplate;
+			// Set notation: use initial if provided, otherwise user default
+			notation = initialNotation || getDefaultNotation();
+			diagramType = initialType;
 			dialogEl.showModal();
 		} else if (!open && dialogEl?.open) {
 			dialogEl.close();
 		}
 	});
+
+	function handleNotationChange() {
+		// When notation changes, reset diagram type to first available type
+		const types = filteredTypes;
+		if (types.length > 0 && !types.some((t) => t.value === diagramType)) {
+			diagramType = types[0].value;
+		}
+	}
 
 	function handleAddTag(tag: string) {
 		if (!tags.includes(tag)) {
@@ -77,9 +152,9 @@
 		const sanitizedDesc = DOMPurify.sanitize(description.trim());
 		if (sanitizedName && sanitizedType) {
 			if (mode === 'edit') {
-				onsave(sanitizedName, sanitizedType, sanitizedDesc, tags, isTemplate);
+				onsave(sanitizedName, sanitizedType, sanitizedDesc, tags, isTemplate, notation || undefined);
 			} else {
-				onsave(sanitizedName, sanitizedType, sanitizedDesc);
+				onsave(sanitizedName, sanitizedType, sanitizedDesc, undefined, undefined, notation || undefined);
 			}
 		}
 	}
@@ -117,6 +192,22 @@
 			</div>
 
 			<div>
+				<label for="diagram-notation" class="block text-sm font-medium">Notation</label>
+				<select
+					id="diagram-notation"
+					bind:value={notation}
+					onchange={handleNotationChange}
+					class="mt-1 w-full rounded border px-3 py-2 text-sm"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+				>
+					<option value="simple">Simple</option>
+					<option value="uml">UML</option>
+					<option value="archimate">ArchiMate</option>
+					<option value="c4">C4</option>
+				</select>
+			</div>
+
+			<div>
 				<label for="diagram-type" class="block text-sm font-medium">Diagram Type</label>
 				{#if mode === 'create'}
 					<select
@@ -127,7 +218,7 @@
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 					>
 						<option value="" disabled>Select a type…</option>
-						{#each DIAGRAM_TYPES as t}
+						{#each filteredTypes as t}
 							<option value={t.value}>{t.label}</option>
 						{/each}
 					</select>

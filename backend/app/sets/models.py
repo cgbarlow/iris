@@ -36,6 +36,8 @@ class SetResponse(BaseModel):
     thumbnail_source: str | None = None
     thumbnail_diagram_id: str | None = None
     has_thumbnail_image: bool = False
+    thumbnail_diagram_data: dict | None = None
+    thumbnail_diagram_type: str | None = None
 
 
 class SetListResponse(BaseModel):

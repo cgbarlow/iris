@@ -12,6 +12,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
+	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import { Accordion } from 'bits-ui';
 	import DOMPurify from 'dompurify';
 
@@ -232,10 +233,12 @@
 </svelte:head>
 
 <nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-	<ol class="flex gap-1">
+	<ol class="flex flex-wrap items-baseline gap-1">
 		<li><a href="/elements" style="color: var(--color-primary)">Elements</a></li>
-		<li aria-hidden="true">/</li>
-		<li aria-current="page">{entity?.name ?? page.params.id}</li>
+		<li class="flex items-baseline gap-1">
+			<span aria-hidden="true">/</span>
+			<span aria-current="page">{entity?.name ?? page.params.id}</span>
+		</li>
 	</ol>
 </nav>
 
@@ -248,8 +251,18 @@
 {:else if entity}
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{entity.name}</h1>
-			<p class="mt-1 text-sm" style="color: var(--color-muted)">{entity.element_type}</p>
+			<div class="flex flex-wrap items-center gap-3">
+				<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{entity.name}</h1>
+				{#if entity.set_name}
+					<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-muted); border: 1px solid var(--color-border)">{entity.set_name}</span>
+				{/if}
+			</div>
+			<p class="mt-1 text-sm flex items-center gap-2 flex-wrap" style="color: var(--color-muted)">
+				<span>{entity.element_type}</span>
+				{#if entity.notation && entity.notation !== 'simple'}
+					<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{entity.notation}</span>
+				{/if}
+			</p>
 		</div>
 		<div class="flex gap-2">
 			<button
@@ -386,6 +399,9 @@
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Type</dt>
 							<dd style="color: var(--color-fg)">{entity.element_type}</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Notation</dt>
+							<dd style="color: var(--color-fg)">{entity.notation ?? 'simple'}</dd>
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Set</dt>
 							<dd>
@@ -603,34 +619,7 @@
 				</table>
 			{/if}
 		{:else if activeTab === 'versions'}
-			{#if versionsLoading}
-				<p style="color: var(--color-muted)">Loading versions...</p>
-			{:else if versions.length === 0}
-				<p style="color: var(--color-muted)">No version history available.</p>
-			{:else}
-				<table class="w-full text-sm">
-					<thead>
-						<tr style="border-bottom: 1px solid var(--color-border)">
-							<th class="py-2 text-left" style="color: var(--color-muted)">Version</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">User</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Date</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Change Summary</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each versions as v}
-							<tr style="border-bottom: 1px solid var(--color-border)">
-								<td class="py-2" style="color: var(--color-fg)">v{v.version}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_type}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.created_by_username ?? v.created_by}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.created_at}</td>
-								<td class="py-2" style="color: var(--color-fg)">{v.change_summary ?? '—'}</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			{/if}
+			<VersionHistory {versions} loading={versionsLoading} />
 		{/if}
 	</div>
 

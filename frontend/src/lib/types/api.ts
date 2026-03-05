@@ -31,6 +31,7 @@ export interface Element {
 	set_id?: string;
 	set_name?: string;
 	metadata?: Record<string, unknown> | null;
+	notation?: string;
 }
 
 export interface Diagram {
@@ -49,16 +50,80 @@ export interface Diagram {
 	tags?: string[];
 	set_id?: string;
 	set_name?: string;
+	notation?: string;
+	detected_notations?: string[];
+	metadata?: Record<string, unknown> | null;
+}
+
+export interface Package {
+	id: string;
+	current_version: number;
+	name: string;
+	description: string | null;
+	created_at: string;
+	created_by: string;
+	created_by_username?: string;
+	updated_at: string;
+	is_deleted: boolean;
+	parent_package_id: string | null;
+	set_id?: string;
+	set_name?: string;
 	metadata?: Record<string, unknown> | null;
 }
 
 export interface DiagramHierarchyNode {
 	id: string;
 	name: string;
-	diagram_type: string;
+	node_type: 'package' | 'diagram';
+	diagram_type: string | null;
+	notation: string | null;
 	parent_package_id: string | null;
 	has_content: boolean;
 	children: DiagramHierarchyNode[];
+}
+
+/** Registry types (ADR-079) */
+
+export interface NotationMapping {
+	notation_id: string;
+	notation_name: string;
+	is_default: boolean;
+}
+
+export interface DiagramTypeRegistry {
+	id: string;
+	name: string;
+	description: string | null;
+	display_order: number;
+	is_active: boolean;
+	notations: NotationMapping[];
+}
+
+export interface NotationRegistry {
+	id: string;
+	name: string;
+	description: string | null;
+	display_order: number;
+	is_active: boolean;
+}
+
+/** Lock types (ADR-080) */
+
+export interface EditLock {
+	id: string;
+	target_type: string;
+	target_id: string;
+	user_id: string;
+	username: string;
+	acquired_at: string;
+	expires_at: string;
+	last_heartbeat: string;
+}
+
+export interface LockCheckResponse {
+	locked: boolean;
+	lock: EditLock | null;
+	is_owner: boolean;
 }
 
 export interface SearchResult {
@@ -88,7 +153,8 @@ export interface Comment {
 }
 
 export interface Bookmark {
-	diagram_id: string;
+	diagram_id: string | null;
+	package_id: string | null;
 	created_at: string;
 }
 
@@ -204,9 +270,11 @@ export interface IrisSet {
 	is_deleted: boolean;
 	diagram_count: number;
 	element_count: number;
-	thumbnail_source: 'diagram' | 'image' | null;
+	thumbnail_source: 'model' | 'diagram' | 'image' | null;
 	thumbnail_diagram_id: string | null;
 	has_thumbnail_image: boolean;
+	thumbnail_diagram_data?: Record<string, unknown>;
+	thumbnail_diagram_type?: string;
 }
 
 export interface BatchResult {

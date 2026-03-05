@@ -14,6 +14,7 @@ class DiagramCreate(BaseModel):
     data: dict[str, object] = Field(default_factory=dict)
     parent_package_id: str | None = None
     set_id: str | None = None
+    notation: str | None = None
     metadata: dict[str, object] | None = None
 
 
@@ -45,15 +46,19 @@ class DiagramResponse(BaseModel):
     tags: list[str] = Field(default_factory=list)
     set_id: str | None = None
     set_name: str | None = None
+    notation: str = "simple"
+    detected_notations: list[str] = Field(default_factory=list)
     metadata: dict[str, object] | None = None
 
 
 class DiagramHierarchyNode(BaseModel):
-    """A node in the diagram hierarchy tree."""
+    """A node in the diagram hierarchy tree (packages and diagrams)."""
 
     id: str
     name: str
-    diagram_type: str
+    node_type: str = "diagram"
+    diagram_type: str | None = None
+    notation: str | None = None
     parent_package_id: str | None = None
     has_content: bool = False
     children: list[DiagramHierarchyNode] = Field(default_factory=list)

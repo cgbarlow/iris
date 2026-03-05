@@ -23,6 +23,12 @@ from app.migrations.m014_sets_partial_unique import up as m014_up
 from app.migrations.m015_model_relationships import up as m015_up
 from app.migrations.m016_naming_rename import up as m016_up
 from app.migrations.m017_views import up as m017_up
+from app.migrations.m018_package_bookmarks import up as m018_up
+from app.migrations.m019_recycle_bin import up as m019_up
+from app.migrations.m020_diagram_type_notation_registry import up as m020_up
+from app.migrations.m021_edit_locks import up as m021_up
+from app.migrations.m022_element_notation import up as m022_up
+from app.migrations.m023_new_diagram_types import up as m023_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
@@ -62,6 +68,12 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
     await m015_up(db_manager.main_db)
     await m016_up(db_manager.main_db)
     await m017_up(db_manager.main_db)
+    await m018_up(db_manager.main_db)
+    await m019_up(db_manager.main_db)
+    await m020_up(db_manager.main_db)
+    await m021_up(db_manager.main_db)
+    await m022_up(db_manager.main_db)
+    await m023_up(db_manager.main_db)
 
     # Seed default views
     from app.views.service import seed_default_views

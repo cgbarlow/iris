@@ -16,7 +16,7 @@
 
 	let name = $state('');
 	let description = $state('');
-	let thumbnailSource = $state<'model' | 'image' | null>(null);
+	let thumbnailSource = $state<'model' | 'diagram' | 'image' | null>(null);
 	let thumbnailDiagramId = $state<string | null>(null);
 	let thumbnailFile = $state<File | null>(null);
 

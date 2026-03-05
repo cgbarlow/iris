@@ -11,6 +11,8 @@ from app.migrations.m012_sets import DEFAULT_SET_ID
 from app.diagrams.thumbnail import VALID_THEMES, generate_and_store_thumbnail
 from app.package_relationships.service import create_package_relationship
 from app.relationships.service import create_relationship
+from app.diagrams.notation_detection import detect_notations as _detect_notations
+from app.diagrams.registry_service import get_default_notation, validate_type_notation
 from app.search.service import index_diagram as _index_diagram
 from app.search.service import remove_diagram_index as _remove_diagram_index
 
@@ -28,6 +30,7 @@ async def create_diagram(
     created_by: str,
     parent_package_id: str | None = None,
     set_id: str | None = None,
+    notation: str | None = None,
     metadata: dict[str, object] | None = None,
     change_summary: str | None = None,
 ) -> dict[str, object]:
@@ -38,11 +41,38 @@ async def create_diagram(
     metadata_json = json.dumps(metadata) if metadata else None
     effective_set_id = set_id or DEFAULT_SET_ID
 
+    # Validate set_id exists — fall back to default if not
+    cursor = await db.execute(
+        "SELECT 1 FROM sets WHERE id = ?", (effective_set_id,)
+    )
+    if await cursor.fetchone() is None:
+        effective_set_id = DEFAULT_SET_ID
+
+    # Resolve notation: use provided, else default from registry, else 'simple'
+    effective_notation = notation
+    if not effective_notation:
+        default = await get_default_notation(db, diagram_type)
+        effective_notation = default or "simple"
+
+    # Validate (type, notation) pair if both are known
+    if effective_notation:
+        is_valid = await validate_type_notation(db, diagram_type, effective_notation)
+        if not is_valid:
+            # Fallback to default rather than rejecting
+            default = await get_default_notation(db, diagram_type)
+            effective_notation = default or "simple"
+
+    # Auto-detect notations from canvas data
+    detected = _detect_notations(data) if isinstance(data, dict) else []
+    detected_json = json.dumps(detected)
+
     await db.execute(
         "INSERT INTO diagrams (id, diagram_type, current_version, "
-        "created_at, created_by, updated_at, parent_package_id, set_id) "
-        "VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
-        (diagram_id, diagram_type, now, created_by, now, parent_package_id, effective_set_id),
+        "created_at, created_by, updated_at, parent_package_id, set_id, "
+        "notation, detected_notations) "
+        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)",
+        (diagram_id, diagram_type, now, created_by, now,
+         parent_package_id, effective_set_id, effective_notation, detected_json),
     )
     await db.execute(
         "INSERT INTO diagram_versions (diagram_id, version, name, description, "
@@ -73,6 +103,8 @@ async def create_diagram(
         "is_deleted": False,
         "parent_package_id": parent_package_id,
         "set_id": effective_set_id,
+        "notation": effective_notation,
+        "detected_notations": detected,
         "metadata": metadata,
     }
 
@@ -86,7 +118,8 @@ async def get_diagram(
         "SELECT d.id, d.diagram_type, d.current_version, "
         "dv.name, dv.description, dv.data, "
         "d.created_at, d.created_by, d.updated_at, d.is_deleted, "
-        "u.username, d.parent_package_id, d.set_id, s.name, dv.metadata "
+        "u.username, d.parent_package_id, d.set_id, s.name, dv.metadata, "
+        "d.notation, d.detected_notations "
         "FROM diagrams d "
         "JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "AND d.current_version = dv.version "
@@ -107,6 +140,13 @@ async def get_diagram(
     tag_rows = await tag_cursor.fetchall()
     tags = [t[0] for t in tag_rows]
 
+    # Parse detected_notations JSON
+    detected_raw = row[16]
+    try:
+        detected = json.loads(detected_raw) if detected_raw else []
+    except (json.JSONDecodeError, TypeError):
+        detected = []
+
     return {
         "id": row[0],
         "diagram_type": row[1],
@@ -123,6 +163,8 @@ async def get_diagram(
         "tags": tags,
         "set_id": row[12],
         "set_name": row[13],
+        "notation": row[15] or "simple",
+        "detected_notations": detected,
         "metadata": json.loads(row[14]) if row[14] else None,
     }
 
@@ -131,6 +173,7 @@ async def list_diagrams(
     db: aiosqlite.Connection,
     *,
     diagram_type: str | None = None,
+    notation: str | None = None,
     set_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
@@ -142,6 +185,10 @@ async def list_diagrams(
     if diagram_type:
         where_clauses.append("d.diagram_type = ?")
         params.append(diagram_type)
+
+    if notation:
+        where_clauses.append("d.notation = ?")
+        params.append(notation)
 
     if set_id:
         where_clauses.append("d.set_id = ?")
@@ -161,7 +208,8 @@ async def list_diagrams(
         f"SELECT d.id, d.diagram_type, d.current_version, "  # noqa: S608
         "dv.name, dv.description, dv.data, "
         "d.created_at, d.created_by, d.updated_at, d.is_deleted, "
-        "d.parent_package_id, d.set_id, s.name, dv.metadata "
+        "d.parent_package_id, d.set_id, s.name, dv.metadata, "
+        "d.notation, d.detected_notations "
         "FROM diagrams d "
         "JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "AND d.current_version = dv.version "
@@ -185,8 +233,15 @@ async def list_diagrams(
         for tr in tag_rows:
             tags_by_diagram[tr[0]].append(tr[1])
 
-    items = [
-        {
+    items = []
+    for r in rows:
+        detected_raw = r[15 + 0]  # notation is index 14, detected_notations is 15
+        # Actually: indices are 0-15. notation=14, detected_notations=15
+        try:
+            detected = json.loads(r[15]) if r[15] else []
+        except (json.JSONDecodeError, TypeError):
+            detected = []
+        items.append({
             "id": r[0],
             "diagram_type": r[1],
             "current_version": r[2],
@@ -201,10 +256,10 @@ async def list_diagrams(
             "tags": tags_by_diagram.get(r[0], []),
             "set_id": r[11],
             "set_name": r[12],
+            "notation": r[14] or "simple",
+            "detected_notations": detected,
             "metadata": json.loads(r[13]) if r[13] else None,
-        }
-        for r in rows
-    ]
+        })
     return items, total
 
 
@@ -234,9 +289,14 @@ async def update_diagram(
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
 
+    # Auto-detect notations from canvas data
+    detected = _detect_notations(data) if isinstance(data, dict) else []
+    detected_json = json.dumps(detected)
+
     await db.execute(
-        "UPDATE diagrams SET current_version = ?, updated_at = ? WHERE id = ?",
-        (new_version, now, diagram_id),
+        "UPDATE diagrams SET current_version = ?, updated_at = ?, "
+        "detected_notations = ? WHERE id = ?",
+        (new_version, now, detected_json, diagram_id),
     )
     await db.execute(
         "INSERT INTO diagram_versions (diagram_id, version, name, description, "
@@ -418,6 +478,57 @@ async def soft_delete_diagram(
     return True
 
 
+async def restore_diagram(
+    db: aiosqlite.Connection,
+    diagram_id: str,
+    *,
+    restored_by: str,
+) -> bool:
+    """Restore a soft-deleted diagram."""
+    cursor = await db.execute(
+        "SELECT current_version, diagram_type FROM diagrams "
+        "WHERE id = ? AND is_deleted = 1",
+        (diagram_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return False
+
+    new_version = row[0] + 1
+    diagram_type = row[1]
+    now = datetime.now(tz=UTC).isoformat()
+
+    cursor = await db.execute(
+        "SELECT name, description, data FROM diagram_versions "
+        "WHERE diagram_id = ? AND version = ?",
+        (diagram_id, row[0]),
+    )
+    ver_row = await cursor.fetchone()
+
+    await db.execute(
+        "UPDATE diagrams SET current_version = ?, updated_at = ?, "
+        "is_deleted = 0, deleted_group_id = NULL WHERE id = ?",
+        (new_version, now, diagram_id),
+    )
+    await db.execute(
+        "INSERT INTO diagram_versions (diagram_id, version, name, description, "
+        "data, change_type, created_at, created_by) "
+        "VALUES (?, ?, ?, ?, ?, 'restore', ?, ?)",
+        (diagram_id, new_version, ver_row[0], ver_row[1],
+         ver_row[2], now, restored_by),
+    )
+    await db.commit()
+
+    # Re-index for search
+    await _index_diagram(
+        db, diagram_id=diagram_id, name=ver_row[0],
+        diagram_type=diagram_type, description=ver_row[1],
+    )
+    await db.commit()
+
+    return True
+
+
 async def validate_no_cycle(
     db: aiosqlite.Connection,
     diagram_id: str,
@@ -579,54 +690,81 @@ async def get_diagram_hierarchy(
 ) -> list[dict[str, object]]:
     """Get the diagram hierarchy as a tree.
 
-    If root_id is given, returns subtree rooted at that diagram.
-    If set_id is given, only includes diagrams from that set.
-    Otherwise returns all root diagrams with their children.
+    Builds a combined tree of packages and diagrams.  Packages act as
+    folder nodes (node_type="package") and diagrams as leaf/content nodes
+    (node_type="diagram").  Each diagram's parent_package_id points to a
+    package, and packages can nest via their own parent_package_id.
+
+    If root_id is given, returns subtree rooted at that node.
+    If set_id is given, only includes items from that set.
+    Otherwise returns all root nodes with their children.
     """
-    # Fetch all non-deleted diagrams (optionally filtered by set)
-    query = (
-        "SELECT d.id, dv.name, d.diagram_type, d.parent_package_id, dv.data "
-        "FROM diagrams d "
-        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
-        "AND d.current_version = dv.version "
-        "WHERE d.is_deleted = 0 "
-    )
     params: list[str] = []
+    pkg_set_filter = ""
+    diag_set_filter = ""
     if set_id is not None:
-        query += "AND d.set_id = ? "
-        params.append(set_id)
-    query += "ORDER BY dv.name"
+        pkg_set_filter = "AND p.set_id = ? "
+        diag_set_filter = "AND d.set_id = ? "
+        params = [set_id, set_id]
+
+    # Fetch packages and diagrams in a single UNION query so we can
+    # build the full hierarchy in one pass.
+    query = (
+        "SELECT t.id, t.name, t.node_type, t.parent_package_id, t.diagram_type, t.data, t.notation "
+        "FROM ("
+        "  SELECT p.id, pv.name, 'package' AS node_type, p.parent_package_id, "
+        "         NULL AS diagram_type, NULL AS data, NULL AS notation "
+        "  FROM packages p "
+        "  JOIN package_versions pv ON p.id = pv.package_id "
+        "       AND p.current_version = pv.version "
+        f"  WHERE p.is_deleted = 0 {pkg_set_filter}"
+        "  UNION ALL "
+        "  SELECT d.id, dv.name, 'diagram' AS node_type, d.parent_package_id, "
+        "         d.diagram_type, dv.data, d.notation "
+        "  FROM diagrams d "
+        "  JOIN diagram_versions dv ON d.id = dv.diagram_id "
+        "       AND d.current_version = dv.version "
+        f"  WHERE d.is_deleted = 0 {diag_set_filter}"
+        ") t "
+        "ORDER BY t.node_type, t.name"
+    )
     cursor = await db.execute(query, params)
     rows = await cursor.fetchall()
 
     # Build lookup structures
     nodes: dict[str, dict[str, object]] = {}
     for r in rows:
-        # Determine if diagram has canvas content (non-empty nodes or participants)
+        node_type = r[2]
         has_content = False
-        try:
-            data = json.loads(r[4]) if r[4] else {}
-            if isinstance(data, dict):
-                has_content = bool(data.get("nodes")) or bool(data.get("participants"))
-        except (json.JSONDecodeError, TypeError):
-            pass
+        if node_type == "diagram":
+            try:
+                data = json.loads(r[5]) if r[5] else {}
+                if isinstance(data, dict):
+                    has_content = bool(data.get("nodes")) or bool(
+                        data.get("participants")
+                    )
+            except (json.JSONDecodeError, TypeError):
+                pass
         nodes[r[0]] = {
             "id": r[0],
             "name": r[1],
-            "diagram_type": r[2],
+            "node_type": node_type,
+            "diagram_type": r[4],
+            "notation": r[6],
             "parent_package_id": r[3],
             "has_content": has_content,
             "children": [],
         }
 
-    # Build tree
+    # Build tree — parent_package_id references are now resolvable
+    # because both packages and diagrams are in the nodes dict.
     roots: list[dict[str, object]] = []
     for node in nodes.values():
         parent_id = node["parent_package_id"]
         if parent_id is not None and parent_id in nodes:
             parent_children: list[dict[str, object]] = nodes[parent_id]["children"]  # type: ignore[assignment]
             parent_children.append(node)
-        elif parent_id is None or parent_id not in nodes:
+        else:
             roots.append(node)
 
     if root_id is not None:

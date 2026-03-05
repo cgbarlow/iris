@@ -5,20 +5,18 @@ import type { Node, Edge } from '@xyflow/svelte';
 /** Diagram notation type — determines how elements render on canvas. */
 export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4';
 
-/** Simple View entity types. */
+/** Simple View entity types (5 domain + 2 universal = 7 total). */
 export type SimpleEntityType =
 	| 'component'
 	| 'service'
 	| 'interface'
-	| 'package'
 	| 'actor'
 	| 'database'
-	| 'queue'
 	| 'note'
 	| 'boundary';
 
-/** Simple View relationship types. */
-export type SimpleRelationshipType = 'uses' | 'depends_on' | 'composes' | 'implements' | 'contains' | 'note_link';
+/** Simple View relationship types (4 types — non-technical mode). */
+export type SimpleRelationshipType = 'uses' | 'depends_on' | 'contains' | 'note_link';
 
 /** Full View UML relationship types (declared early for RelationshipTypeInfo). */
 export type UmlRelationshipType =
@@ -52,6 +50,7 @@ export interface CanvasNodeData {
 	description?: string;
 	linkedModelId?: string;
 	browseMode?: boolean;
+	notation?: string;
 	[key: string]: unknown;
 }
 
@@ -114,20 +113,13 @@ export interface EntityTypeInfo {
 	description: string;
 }
 
-/** All Simple View entity types with display metadata. */
+/** All Simple View entity types with display metadata (5 domain + 2 universal). */
 export const SIMPLE_ENTITY_TYPES: EntityTypeInfo[] = [
-	{ key: 'component', label: 'Component', icon: '⬡', description: 'A modular unit of software' },
+	{ key: 'component', label: 'Component', icon: '⬡', description: 'A modular unit or generic box' },
 	{ key: 'service', label: 'Service', icon: '◎', description: 'A deployed or logical service' },
-	{
-		key: 'interface',
-		label: 'Interface',
-		icon: '◯',
-		description: 'A contract or API surface',
-	},
-	{ key: 'package', label: 'Package', icon: '▤', description: 'A grouping container' },
+	{ key: 'interface', label: 'Interface', icon: '◯', description: 'An API or contract' },
 	{ key: 'actor', label: 'Actor', icon: '👤', description: 'A person or external system' },
-	{ key: 'database', label: 'Database', icon: '▦', description: 'A persistent data store' },
-	{ key: 'queue', label: 'Queue', icon: '≋', description: 'An asynchronous message channel' },
+	{ key: 'database', label: 'Database', icon: '▦', description: 'A data store' },
 	{ key: 'note', label: 'Note', icon: '📝', description: 'An annotation or documentation note' },
 	{ key: 'boundary', label: 'Boundary', icon: '▧', description: 'A visual grouping boundary' },
 ];
@@ -139,13 +131,11 @@ export interface RelationshipTypeInfo {
 	description: string;
 }
 
-/** All Simple View relationship types with display metadata. */
+/** All Simple View relationship types with display metadata (4 types). */
 export const SIMPLE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
-	{ key: 'uses', label: 'Uses', description: 'Source uses/depends on target' },
-	{ key: 'depends_on', label: 'Depends On', description: 'Source depends on target' },
-	{ key: 'composes', label: 'Composes', description: 'Source is composed of target' },
-	{ key: 'implements', label: 'Implements', description: 'Source implements target interface' },
-	{ key: 'contains', label: 'Contains', description: 'Source contains target (nesting)' },
+	{ key: 'uses', label: 'Uses', description: 'A uses B' },
+	{ key: 'depends_on', label: 'Depends On', description: 'A depends on B' },
+	{ key: 'contains', label: 'Contains', description: 'A contains B (for boundary grouping)' },
 	{ key: 'note_link', label: 'Note Link', description: 'Attaches a note to an element' },
 ];
 
@@ -343,6 +333,54 @@ export const C4_ENTITY_TYPES: C4EntityTypeInfo[] = [
 	{ key: 'infrastructure_node', label: 'Infrastructure Node', icon: '◆', level: 'deployment', description: 'Load balancer, firewall, or DNS' },
 	{ key: 'container_instance', label: 'Container Instance', icon: '▥', level: 'deployment', description: 'Running instance of a container' },
 ];
+
+/** Simple diagram-type → allowed element type keys (ADR-082). null = no filtering.
+ *  Note and boundary are universal annotation types, always available on any diagram. */
+export const SIMPLE_DIAGRAM_TYPE_FILTER: Record<string, string[] | null> = {
+	component: ['component', 'service', 'interface', 'actor', 'database'],
+	sequence: ['component', 'service', 'actor'],
+	deployment: ['component', 'service', 'database'],
+	process: ['component', 'service', 'actor'],
+	roadmap: ['component', 'service'],
+	use_case: ['component', 'service', 'actor'],
+	state_machine: ['component', 'service'],
+	system_context: ['component', 'service', 'actor', 'database'],
+	container: ['component', 'service', 'database'],
+	free_form: null,
+};
+
+/** UML diagram-type → allowed element type keys (ADR-082). null = no filtering. */
+export const UML_DIAGRAM_TYPE_FILTER: Record<string, string[] | null> = {
+	component: ['component_uml', 'interface_uml', 'package_uml', 'node'],
+	sequence: ['class', 'object', 'component_uml', 'interface_uml'],
+	class: ['class', 'object', 'interface_uml', 'enumeration', 'abstract_class', 'package_uml'],
+	deployment: ['node', 'component_uml'],
+	process: ['activity', 'state'],
+	use_case: ['use_case', 'component_uml', 'package_uml'],
+	state_machine: ['state'],
+	free_form: null,
+};
+
+/** ArchiMate diagram-type → allowed layers (ADR-082). null = no filtering. */
+export const ARCHIMATE_DIAGRAM_TYPE_LAYERS: Record<string, string[] | null> = {
+	component: ['application', 'technology', 'business'],
+	deployment: ['technology'],
+	process: ['business', 'application', 'technology'],
+	roadmap: ['implementation_migration', 'strategy'],
+	motivation: ['motivation'],
+	strategy: ['strategy'],
+	free_form: null,
+};
+
+/** C4 diagram-type → allowed levels (ADR-082). null = no filtering. */
+export const C4_DIAGRAM_TYPE_LEVELS: Record<string, string[] | null> = {
+	system_context: ['system_context'],
+	container: ['system_context', 'container'],
+	component: ['container', 'component'],
+	deployment: ['deployment'],
+	sequence: ['system_context', 'container', 'component', 'code'],
+	free_form: null,
+};
 
 /** C4 relationship type. */
 export type C4RelationshipType = 'c4_relationship';

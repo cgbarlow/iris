@@ -126,9 +126,9 @@ describe('Client-side filtering performance', () => {
 });
 
 describe('Type registry completeness', () => {
-	it('Simple View has 9 entity types and 6 relationship types', () => {
-		expect(SIMPLE_ENTITY_TYPES).toHaveLength(9);
-		expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(6);
+	it('Simple View has 7 entity types and 4 relationship types', () => {
+		expect(SIMPLE_ENTITY_TYPES).toHaveLength(7);
+		expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(4);
 	});
 
 	it('UML has 11 entity types and 7 relationship types', () => {
@@ -141,7 +141,7 @@ describe('Type registry completeness', () => {
 		expect(ARCHIMATE_RELATIONSHIP_TYPES).toHaveLength(11);
 	});
 
-	it('total type count: 65 entity types + 24 relationship types', () => {
+	it('total type count: 63 entity types + 22 relationship types', () => {
 		const totalEntityTypes =
 			SIMPLE_ENTITY_TYPES.length + UML_ENTITY_TYPES.length + ARCHIMATE_ENTITY_TYPES.length;
 		const totalRelTypes =
@@ -149,7 +149,7 @@ describe('Type registry completeness', () => {
 			UML_RELATIONSHIP_TYPES.length +
 			ARCHIMATE_RELATIONSHIP_TYPES.length;
 
-		expect(totalEntityTypes).toBe(65);
-		expect(totalRelTypes).toBe(24);
+		expect(totalEntityTypes).toBe(63);
+		expect(totalRelTypes).toBe(22);
 	});
 });
