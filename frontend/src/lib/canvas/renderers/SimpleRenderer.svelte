@@ -5,6 +5,7 @@
 	 */
 	import BaseNode from '../BaseNode.svelte';
 	import type { CanvasNodeData } from '$lib/types/canvas';
+	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -24,6 +25,9 @@
 	};
 
 	const icon = $derived(SIMPLE_ICONS[data.entityType] ?? '⬡');
+	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 </script>
 
-<BaseNode {data} {selected} {icon} typeLabel={data.entityType} cssClass="canvas-node--{data.entityType}" />
+<div style={visualStyle}>
+	<BaseNode {data} {selected} {icon} typeLabel={data.entityType} cssClass="canvas-node--{data.entityType}" />
+</div>

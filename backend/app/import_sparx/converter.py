@@ -17,6 +17,95 @@ def bgr_to_rgb(bgr_int: int) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
+def parse_object_style(style_str: str | None) -> dict[str, int]:
+    """Parse EA diagram object style string like 'BCol=X;BFol=Y;LCol=Z;...' into a dict.
+
+    Values are integers. Keys commonly include BCol (background), LCol (line),
+    LWth (line width), FCol (font colour).
+    """
+    result: dict[str, int] = {}
+    if not style_str:
+        return result
+    for part in style_str.split(";"):
+        if "=" in part:
+            key, _, val = part.partition("=")
+            key = key.strip()
+            val = val.strip()
+            try:
+                result[key] = int(val)
+            except ValueError:
+                pass
+    return result
+
+
+def build_node_visual(
+    object_style: str | None,
+    backcolor: int | None,
+    fontcolor: int | None,
+    bordercolor: int | None,
+    border_width: int | None,
+) -> dict[str, object] | None:
+    """Build a NodeVisualOverrides dict from EA element/object style data.
+
+    Returns None when all values are defaults (-1 or None).
+    Priority: object_style (per-diagram-placement) > element-level colors.
+    """
+    style = parse_object_style(object_style)
+    visual: dict[str, object] = {}
+
+    # Object style overrides (per-placement on diagram)
+    bg = style.get("BCol", -1)
+    lc = style.get("LCol", -1)
+    fc = style.get("FCol", -1)
+    lw = style.get("LWth", -1)
+
+    # Fall back to element-level colors
+    if bg == -1 and backcolor is not None and backcolor >= 0:
+        bg = backcolor
+    if lc == -1 and bordercolor is not None and bordercolor >= 0:
+        lc = bordercolor
+    if fc == -1 and fontcolor is not None and fontcolor >= 0:
+        fc = fontcolor
+    if lw == -1 and border_width is not None and border_width > 0:
+        lw = border_width
+
+    if bg >= 0:
+        visual["bgColor"] = bgr_to_rgb(bg)
+    if lc >= 0:
+        visual["borderColor"] = bgr_to_rgb(lc)
+    if fc >= 0:
+        visual["fontColor"] = bgr_to_rgb(fc)
+    if lw > 0:
+        visual["borderWidth"] = lw
+
+    return visual if visual else None
+
+
+def build_edge_visual(
+    line_color: int | None,
+    is_bold: int | None,
+    line_style: int | None,
+) -> dict[str, object] | None:
+    """Build an EdgeVisualOverrides dict from EA connector data.
+
+    Returns None when all values are defaults.
+    """
+    visual: dict[str, object] = {}
+
+    if line_color is not None and line_color >= 0:
+        visual["lineColor"] = bgr_to_rgb(line_color)
+    if is_bold and is_bold > 0:
+        visual["lineWidth"] = 2
+    # EA line styles: 0=solid, 1=dashed, 2=dotted, 3=dash-dot, 4=dash-dot-dot
+    if line_style is not None and line_style > 0:
+        dash_map = {1: "8 4", 2: "2 4", 3: "8 4 2 4", 4: "8 4 2 4 2 4"}
+        da = dash_map.get(line_style)
+        if da:
+            visual["dashArray"] = da
+
+    return visual if visual else None
+
+
 def ea_rect_to_position(
     rect_left: int, rect_right: int, rect_top: int, rect_bottom: int
 ) -> dict[str, int]:

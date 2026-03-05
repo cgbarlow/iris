@@ -6,6 +6,7 @@
 	 */
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { CanvasNodeData } from '$lib/types/canvas';
+	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -45,12 +46,14 @@
 	const isAbstract = $derived(data.entityType === 'abstract_class');
 	const isPackage = $derived(data.entityType === 'package_uml');
 	const isComponent = $derived(data.entityType === 'component_uml');
+	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 </script>
 
 <div
 	class="uml-node uml-node--{data.entityType}"
 	class:uml-node--selected={selected}
 	class:uml-node--abstract={isAbstract}
+	style={visualStyle}
 	aria-label="{data.label}, {data.entityType}"
 >
 	{#if isPackage}

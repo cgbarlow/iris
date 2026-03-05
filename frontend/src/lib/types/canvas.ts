@@ -42,6 +42,26 @@ export type ArchimateRelationshipType =
 	| 'assignment'
 	| 'association_archimate';
 
+/** Per-element visual overrides (from EA import or manual styling). */
+export interface NodeVisualOverrides {
+	bgColor?: string;
+	borderColor?: string;
+	fontColor?: string;
+	borderWidth?: number;
+	fontSize?: number;
+	bold?: boolean;
+	italic?: boolean;
+	width?: number;
+	height?: number;
+}
+
+/** Per-edge visual overrides (from EA import or manual styling). */
+export interface EdgeVisualOverrides {
+	lineColor?: string;
+	lineWidth?: number;
+	dashArray?: string;
+}
+
 /** Data stored in each canvas node. */
 export interface CanvasNodeData {
 	label: string;
@@ -51,6 +71,7 @@ export interface CanvasNodeData {
 	linkedModelId?: string;
 	browseMode?: boolean;
 	notation?: string;
+	visual?: NodeVisualOverrides;
 	[key: string]: unknown;
 }
 
@@ -75,6 +96,7 @@ export interface CanvasEdgeData {
 	stereotype?: string;
 	direction?: string;
 	technology?: string;
+	visual?: EdgeVisualOverrides;
 	[key: string]: unknown;
 }
 

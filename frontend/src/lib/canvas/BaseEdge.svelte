@@ -13,6 +13,8 @@
 		type EdgeProps,
 	} from '@xyflow/svelte';
 	import EdgeLabel from './edges/EdgeLabel.svelte';
+	import { edgeOverrideStyle } from '$lib/canvas/utils/visualStyles';
+	import type { EdgeVisualOverrides } from '$lib/types/canvas';
 
 	interface Props extends EdgeProps {
 		dashArray?: string;
@@ -43,13 +45,16 @@
 	});
 
 	const edgeDash = $derived(dashArray !== 'none' ? `stroke-dasharray: ${dashArray}; ` : '');
+	const edgeVisual = $derived(data?.visual as EdgeVisualOverrides | undefined);
+	const visualOverride = $derived(edgeOverrideStyle(edgeVisual));
+	const dashFromVisual = $derived(edgeVisual?.dashArray ? `stroke-dasharray: ${edgeVisual.dashArray}; ` : '');
 </script>
 
 <FlowBaseEdge
 	{id}
 	path={path[0]}
 	{markerEnd}
-	style="{edgeDash}{style ?? ''}"
+	style="{edgeDash}{dashFromVisual}{visualOverride ? visualOverride + '; ' : ''}{style ?? ''}"
 	aria-label="{data?.label ?? data?.relationshipType ?? 'relationship'}"
 />
 {#if data?.label}

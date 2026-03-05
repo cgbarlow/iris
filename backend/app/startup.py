@@ -29,6 +29,7 @@ from app.migrations.m020_diagram_type_notation_registry import up as m020_up
 from app.migrations.m021_edit_locks import up as m021_up
 from app.migrations.m022_element_notation import up as m022_up
 from app.migrations.m023_new_diagram_types import up as m023_up
+from app.migrations.m024_themes import up as m024_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
@@ -74,10 +75,15 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
     await m021_up(db_manager.main_db)
     await m022_up(db_manager.main_db)
     await m023_up(db_manager.main_db)
+    await m024_up(db_manager.main_db)
 
     # Seed default views
     from app.views.service import seed_default_views
     await seed_default_views(db_manager.main_db)
+
+    # Seed default themes
+    from app.themes.service import seed_default_themes
+    await seed_default_themes(db_manager.main_db)
 
     # 3b. Rebuild FTS search index from existing data
     await rebuild_search_index(db_manager.main_db)

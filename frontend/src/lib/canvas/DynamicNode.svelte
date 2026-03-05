@@ -8,7 +8,8 @@
 	 * dedicated components regardless of notation.
 	 */
 	import { getContext } from 'svelte';
-	import type { CanvasNodeData, NotationType } from '$lib/types/canvas';
+	import type { CanvasNodeData, NotationType, NodeVisualOverrides } from '$lib/types/canvas';
+	import { resolveNodeVisual } from '$lib/stores/themeStore.svelte';
 	import NoteNode from './nodes/NoteNode.svelte';
 	import BoundaryNode from './nodes/BoundaryNode.svelte';
 	import ModelRefNode from './nodes/ModelRefNode.svelte';
@@ -27,10 +28,22 @@
 
 	const notation = getContext<NotationType>('notation') ?? 'simple';
 
+	/** Compute effective visual: theme defaults merged with per-element overrides (per-element wins). */
+	const effectiveData = $derived.by(() => {
+		const themeVisual = resolveNodeVisual(
+			notation,
+			data.entityType,
+			(data as Record<string, unknown>).stereotype as string | undefined,
+		);
+		if (!themeVisual && !data.visual) return data;
+		const merged: NodeVisualOverrides = { ...themeVisual, ...data.visual };
+		return { ...data, visual: merged };
+	});
+
 	/** Universal types that render the same regardless of notation. */
 	const UNIVERSAL_TYPES = ['note', 'boundary', 'modelref'] as const;
 
-	const isUniversal = $derived(UNIVERSAL_TYPES.includes(data.entityType as typeof UNIVERSAL_TYPES[number]));
+	const isUniversal = $derived(UNIVERSAL_TYPES.includes(effectiveData.entityType as typeof UNIVERSAL_TYPES[number]));
 
 	/** UML type keys that should use UmlRenderer. */
 	const UML_TYPES = new Set([
@@ -64,21 +77,21 @@
 	]);
 </script>
 
-{#if data.entityType === 'note'}
-	<NoteNode {data} {selected} />
-{:else if data.entityType === 'boundary'}
-	<BoundaryNode {data} {selected} />
-{:else if data.entityType === 'modelref'}
-	<ModelRefNode {data} {selected} />
-{:else if notation === 'uml' || (!isUniversal && UML_TYPES.has(data.entityType))}
-	<UmlRenderer {data} {selected} />
-{:else if notation === 'c4' || C4_TYPES.has(data.entityType)}
-	<C4Renderer {data} {selected} />
-{:else if notation === 'archimate' || ARCHIMATE_TYPES.has(data.entityType)}
-	<ArchimateRenderer {data} {selected} />
+{#if effectiveData.entityType === 'note'}
+	<NoteNode data={effectiveData} {selected} />
+{:else if effectiveData.entityType === 'boundary'}
+	<BoundaryNode data={effectiveData} {selected} />
+{:else if effectiveData.entityType === 'modelref'}
+	<ModelRefNode data={effectiveData} {selected} />
+{:else if notation === 'uml' || (!isUniversal && UML_TYPES.has(effectiveData.entityType))}
+	<UmlRenderer data={effectiveData} {selected} />
+{:else if notation === 'c4' || C4_TYPES.has(effectiveData.entityType)}
+	<C4Renderer data={effectiveData} {selected} />
+{:else if notation === 'archimate' || ARCHIMATE_TYPES.has(effectiveData.entityType)}
+	<ArchimateRenderer data={effectiveData} {selected} />
 {:else if notation === 'simple'}
-	<SimpleRenderer {data} {selected} />
+	<SimpleRenderer data={effectiveData} {selected} />
 {:else}
 	<!-- Fallback for unknown type/notation combinations -->
-	<BaseNode {data} {selected} />
+	<BaseNode data={effectiveData} {selected} />
 {/if}

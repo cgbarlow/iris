@@ -36,6 +36,10 @@ class QeaElement:
     CreatedDate: str | None = None
     ModifiedDate: str | None = None
     GenType: str | None = None
+    Backcolor: int | None = None
+    Fontcolor: int | None = None
+    Bordercolor: int | None = None
+    BorderWidth: int | None = None
 
 
 @dataclass
@@ -56,6 +60,9 @@ class QeaConnector:
     RouteStyle: int | None = None
     SourceIsNavigable: str | None = None
     DestIsNavigable: str | None = None
+    LineColor: int | None = None
+    IsBold: int | None = None
+    LineStyle: int | None = None
 
 
 @dataclass
@@ -76,6 +83,7 @@ class QeaDiagramObject:
     RectBottom: int
     RectLeft: int
     RectRight: int
+    ObjectStyle: str | None = None
 
 
 @dataclass
@@ -123,7 +131,8 @@ async def read_elements(db_path: str) -> list[QeaElement]:
         cursor = await db.execute(
             "SELECT Object_ID, Object_Type, Name, Package_ID, Note, ea_guid, "
             "Status, Stereotype, Version, Scope, Abstract, Persistence, "
-            "Author, Complexity, Phase, CreatedDate, ModifiedDate, GenType "
+            "Author, Complexity, Phase, CreatedDate, ModifiedDate, GenType, "
+            "Backcolor, Fontcolor, Bordercolor, BorderWidth "
             "FROM t_object"
         )
         rows = await cursor.fetchall()
@@ -147,6 +156,10 @@ async def read_elements(db_path: str) -> list[QeaElement]:
                 CreatedDate=row[15],
                 ModifiedDate=row[16],
                 GenType=row[17],
+                Backcolor=row[18],
+                Fontcolor=row[19],
+                Bordercolor=row[20],
+                BorderWidth=row[21],
             )
             for row in rows
         ]
@@ -159,7 +172,8 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
             "SELECT Connector_ID, Connector_Type, Name, "
             "Start_Object_ID, End_Object_ID, ea_guid, Notes, "
             "Direction, SourceCard, DestCard, SourceRole, DestRole, "
-            "Stereotype, RouteStyle, SourceIsNavigable, DestIsNavigable "
+            "Stereotype, RouteStyle, SourceIsNavigable, DestIsNavigable, "
+            "LineColor, IsBold, LineStyle "
             "FROM t_connector"
         )
         rows = await cursor.fetchall()
@@ -181,6 +195,9 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
                 RouteStyle=row[13],
                 SourceIsNavigable=str(row[14]) if row[14] is not None else None,
                 DestIsNavigable=str(row[15]) if row[15] is not None else None,
+                LineColor=row[16],
+                IsBold=row[17],
+                LineStyle=row[18],
             )
             for row in rows
         ]
@@ -212,7 +229,7 @@ async def read_diagram_objects(db_path: str) -> list[QeaDiagramObject]:
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
             "SELECT Diagram_ID, Object_ID, RectTop, RectBottom, "
-            "RectLeft, RectRight FROM t_diagramobjects"
+            "RectLeft, RectRight, ObjectStyle FROM t_diagramobjects"
         )
         rows = await cursor.fetchall()
         return [
@@ -223,6 +240,7 @@ async def read_diagram_objects(db_path: str) -> list[QeaDiagramObject]:
                 RectBottom=row[3] or 0,
                 RectLeft=row[4] or 0,
                 RectRight=row[5] or 0,
+                ObjectStyle=row[6],
             )
             for row in rows
         ]

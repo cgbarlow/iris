@@ -5,6 +5,26 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-05
+
+### Added
+- Per-element visual overrides — nodes and edges carry optional `visual` properties (bgColor, borderColor, fontColor, width, height, lineColor, lineWidth, dashArray) applied as inline styles (ADR-084)
+- Theme system — `themes` table with CRUD API (`GET/POST /api/themes`, `GET/PUT/DELETE /api/themes/{id}`), notation-linked visual profiles with element defaults, stereotype overrides, and edge defaults (ADR-084)
+- Seed themes: "Iris Default UML" (white/black), "Sparx EA Default UML" (yellow class boxes with stereotype colours for feature/DataType/CodeList/XSDsimpleType/choice), "Iris Default Simple" (ADR-084)
+- Style cascade: per-element visual > stereotype override > element type default > global theme default > renderer hardcoded defaults (ADR-084)
+- EA import colour preservation — reads ObjectStyle, Backcolor, Fontcolor, Bordercolor from t_object and t_diagramobjects; builds visual override dicts via `build_node_visual()` and `build_edge_visual()` (ADR-084)
+- EA import explicit dimensions — imported element width/height from EA coordinates now stored in `data.visual.width/height` and applied as inline styles, overriding CSS min-width defaults (ADR-084)
+- EA import stereotype threading — element Stereotype stored in `node_data["stereotype"]` for theme resolution (ADR-084)
+- Theme selector dropdown in diagram toolbar — shows available themes for the current notation (ADR-084)
+- NodeStylePanel — per-element style editor with colour pickers, border width, font size, bold/italic toggles, and "Reset to theme defaults" button (ADR-084)
+- Admin Themes page — CRUD for themes grouped by notation, with JSON config editor (ADR-084)
+- Themes link on admin dashboard page (ADR-084)
+
+### Changed
+- All renderers (UML, Simple, ArchiMate, C4, BaseNode, BaseEdge) apply `data.visual` overrides as inline styles (ADR-084)
+- DynamicNode computes effective visual by merging active theme defaults with per-element overrides before passing to renderers (ADR-084)
+- EA import reader reads additional columns: ObjectStyle (t_diagramobjects), Backcolor/Fontcolor/Bordercolor/BorderWidth (t_object), LineColor/IsBold/LineStyle (t_connector) (ADR-084)
+
 ## [2.1.0] - 2026-03-05
 
 ### Added

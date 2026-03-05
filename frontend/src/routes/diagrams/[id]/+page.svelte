@@ -26,6 +26,7 @@
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import DOMPurify from 'dompurify';
@@ -1872,6 +1873,9 @@
 					{/if}
 					<!-- View group (always visible) -->
 					<div class="ml-auto flex items-center gap-2">
+						{#if notation}
+							<ThemeSelector {notation} />
+						{/if}
 						<div class="relative">
 							<button
 								onclick={() => (showExportMenu = !showExportMenu)}
@@ -2106,6 +2110,9 @@
 					{/if}
 					<!-- View group (always visible) -->
 					<div class="ml-auto flex items-center gap-2">
+						{#if notation}
+							<ThemeSelector {notation} />
+						{/if}
 						<div class="relative">
 							<button
 								onclick={() => (showExportMenu = !showExportMenu)}

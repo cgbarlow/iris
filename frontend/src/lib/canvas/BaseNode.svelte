@@ -9,6 +9,7 @@
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { Snippet } from 'svelte';
 	import type { CanvasNodeData } from '$lib/types/canvas';
+	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -27,11 +28,14 @@
 		cssClass = '',
 		children,
 	}: Props = $props();
+
+	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 </script>
 
 <div
 	class="canvas-node {cssClass}"
 	class:canvas-node--selected={selected}
+	style={visualStyle}
 	aria-label="{data.label}, {typeLabel}"
 >
 	<div class="canvas-node__header">

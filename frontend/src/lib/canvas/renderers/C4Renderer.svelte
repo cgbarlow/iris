@@ -6,6 +6,7 @@
 	 */
 	import BaseNode from '../BaseNode.svelte';
 	import type { CanvasNodeData } from '$lib/types/canvas';
+	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -40,9 +41,12 @@
 
 	const icon = $derived(C4_ICONS[data.entityType] ?? '▣');
 	const levelLabel = $derived(C4_LEVELS[data.entityType] ?? 'Element');
+	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 </script>
 
-<BaseNode {data} {selected} {icon} typeLabel={levelLabel} cssClass="c4-node c4-node--{data.entityType}" />
+<div style={visualStyle}>
+	<BaseNode {data} {selected} {icon} typeLabel={levelLabel} cssClass="c4-node c4-node--{data.entityType}" />
+</div>
 
 <style>
 	:global(.c4-node) { border-radius: 8px; }

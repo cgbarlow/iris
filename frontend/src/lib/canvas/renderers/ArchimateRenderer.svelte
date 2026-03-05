@@ -6,6 +6,7 @@
 	 */
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { CanvasNodeData, ArchimateLayer } from '$lib/types/canvas';
+	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -16,11 +17,13 @@
 
 	const layer = $derived(((data as Record<string, unknown>).layer as ArchimateLayer) ?? 'business');
 	const archimateIcon = $derived(((data as Record<string, unknown>).icon as string) ?? '⬡');
+	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 </script>
 
 <div
 	class="archimate-node archimate-node--{layer}"
 	class:archimate-node--selected={selected}
+	style={visualStyle}
 	aria-label="{data.label}, {data.entityType}"
 >
 	<div class="archimate-node__layer-badge">{layer}</div>

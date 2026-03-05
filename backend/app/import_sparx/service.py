@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from app.diagrams.service import create_diagram
 from app.elements.service import create_element
-from app.import_sparx.converter import ea_rect_to_position
+from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position
 from app.import_sparx.mapper import map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
     QeaElement,
@@ -478,6 +478,23 @@ async def import_sparx_file(
             # Always populate description from element's Note content
             if elem and elem.Note:
                 node_data["description"] = elem.Note
+            # Store stereotype for theme resolution
+            if elem and elem.Stereotype:
+                node_data["stereotype"] = elem.Stereotype
+
+            # Build visual overrides from EA style data
+            node_visual = build_node_visual(
+                dobj.ObjectStyle,  # type: ignore[union-attr]
+                elem.Backcolor if elem else None,
+                elem.Fontcolor if elem else None,
+                elem.Bordercolor if elem else None,
+                elem.BorderWidth if elem else None,
+            )
+            # Include explicit dimensions from EA in visual overrides
+            visual_with_size: dict[str, object] = node_visual or {}
+            visual_with_size["width"] = pos["width"]
+            visual_with_size["height"] = pos["height"]
+            node_data["visual"] = visual_with_size
 
             nodes.append({
                 "id": node_id,
@@ -533,6 +550,13 @@ async def import_sparx_file(
                 edge_data["direction"] = conn.Direction
             if conn.RouteStyle is not None:
                 edge_data["routingType"] = route_map.get(conn.RouteStyle, "bezier")
+
+            # Build edge visual overrides
+            edge_visual = build_edge_visual(
+                conn.LineColor, conn.IsBold, conn.LineStyle,
+            )
+            if edge_visual:
+                edge_data["visual"] = edge_visual
 
             # Self-loop edge
             if source_node == target_node:
