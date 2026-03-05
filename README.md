@@ -131,7 +131,7 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Unified relationship management: create entity and model relationships from Relationships tab with "Add to canvas?" prompt
 - Canvas modelref-to-modelref connections auto-create backend model relationships
 - Node removal dialog: "Remove from this model" or "Delete entity and all relationships" (cascade deletion)
-- SparxEA import: full coverage — Note/Boundary elements, NoteLink connectors, self-references, Package-to-Package dependencies as model relationships
+- SparxEA import (.qea and .eap): full coverage — Note/Boundary elements, NoteLink connectors, self-references, Package-to-Package dependencies as model relationships
 - Import change summary in version history ("Imported from SparxEA")
 - Entity CRUD with optimistic concurrency via If-Match headers
 - Model CRUD with type filter on list page (Simple, Component, Sequence, UML, ArchiMate)
@@ -193,7 +193,7 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 ### Running Tests
 
 ```sh
-# Backend (415 tests)
+# Backend (556 tests)
 cd backend
 uv run python -m pytest
 
@@ -244,8 +244,8 @@ npm run test:all-e2e
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 67 Architecture Decision Records |
-| `docs/adrs/specs/` | 82 implementation specifications |
+| `docs/adrs/` | 85 Architecture Decision Records |
+| `docs/adrs/specs/` | 97 implementation specifications |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 

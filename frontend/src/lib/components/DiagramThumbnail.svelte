@@ -6,8 +6,6 @@
 
 	let { data, diagramType }: Props = $props();
 
-	const CANVAS_TYPES = ['simple', 'component', 'uml', 'archimate', 'c4'];
-
 	interface NodeInfo {
 		id: string;
 		x: number;
@@ -20,7 +18,7 @@
 	}
 
 	const canvasData = $derived.by(() => {
-		if (!CANVAS_TYPES.includes(diagramType)) return null;
+		if (diagramType === 'sequence') return null;
 		const rawNodes = data?.nodes;
 		if (!Array.isArray(rawNodes) || rawNodes.length === 0) return null;
 

@@ -437,7 +437,7 @@ async def import_sparx_file(
             summary.diagrams_skipped += 1
             continue
 
-        diagram_type = map_diagram_type(diag.Diagram_Type or "")
+        diagram_type, diagram_notation = map_diagram_type(diag.Diagram_Type or "")
         parent_iris_id = package_map.get(diag.Package_ID)
 
         # Build canvas nodes from diagram objects
@@ -570,6 +570,7 @@ async def import_sparx_file(
             created_by=imported_by,
             parent_package_id=parent_iris_id,
             set_id=set_id,
+            notation=diagram_notation,
             metadata=diag_metadata,
             change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
         )

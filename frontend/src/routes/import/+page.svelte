@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** SparxEA import page — upload .qea files to import diagrams, elements, and relationships. */
+	/** SparxEA import page — upload .qea or .eap files to import diagrams, elements, and relationships. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { setActiveSet } from '$lib/stores/activeSet.svelte.js';
@@ -63,8 +63,8 @@
 	}
 
 	function selectFile(file: File) {
-		if (!file.name.endsWith('.qea')) {
-			error = 'Only .qea files (SparxEA) are supported.';
+		if (!file.name.endsWith('.qea') && !file.name.endsWith('.eap')) {
+			error = 'Only .qea and .eap files (SparxEA) are supported.';
 			return;
 		}
 		error = null;
@@ -146,7 +146,7 @@
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
 	<p class="mt-2" style="color: var(--color-muted)">
-		Import diagrams from SparxEA (.qea) files.
+		Import diagrams from SparxEA (.qea, .eap) files.
 	</p>
 </div>
 
@@ -226,7 +226,7 @@
 		style="border-color: {dragOver ? 'var(--color-primary)' : 'var(--color-border)'}; background: {dragOver ? 'var(--color-surface)' : 'transparent'}"
 		role="button"
 		tabindex="0"
-		aria-label="Drop .qea file here or click to browse"
+		aria-label="Drop .qea or .eap file here or click to browse"
 		ondragover={handleDragOver}
 		ondragleave={handleDragLeave}
 		ondrop={handleDrop}
@@ -245,11 +245,11 @@
 			{#if selectedFile}
 				Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
 			{:else}
-				Drop a .qea file here or click to browse
+				Drop a .qea or .eap file here or click to browse
 			{/if}
 		</p>
 		<p class="mt-1 text-xs" style="color: var(--color-muted)">
-			SparxEA files (.qea) — SQLite format, EA 16+
+			SparxEA files (.qea, .eap) — SQLite or JET4/MDB format
 		</p>
 	</div>
 
@@ -301,7 +301,7 @@
 				{#if progress < 20}
 					Preparing upload...
 				{:else if progress < 80}
-					Reading .qea file and importing data...
+					Reading file and importing data...
 				{:else if progress < 100}
 					Finalizing import...
 				{:else}
