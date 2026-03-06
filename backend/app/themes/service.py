@@ -141,11 +141,13 @@ async def delete_theme(
 
 
 async def seed_default_themes(db: aiosqlite.Connection) -> None:
-    """Seed default themes if none exist."""
+    """Seed default themes if none exist, or update existing seed themes with latest config."""
     cursor = await db.execute("SELECT COUNT(*) FROM themes")
     count = (await cursor.fetchone())[0]
+
     if count > 0:
-        return
+        # Update existing seed themes with latest config (e.g. new rendering fields)
+        pass  # Fall through to upsert logic below
 
     now = datetime.now(tz=UTC).isoformat()
 
@@ -163,7 +165,7 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
         },
     }
     await db.execute(
-        "INSERT INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
+        "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("iris-default-uml", "Iris Default UML", "Clean white look — Iris defaults", "uml",
          json.dumps(iris_uml_config), 1, "system", now, now),
@@ -217,7 +219,7 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
         },
     }
     await db.execute(
-        "INSERT INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
+        "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("ea-default-uml", "Sparx EA Default UML", "EA default UML class diagram palette with stereotype colours", "uml",
          json.dumps(ea_uml_config), 1, "system", now, now),
@@ -235,7 +237,7 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
         },
     }
     await db.execute(
-        "INSERT INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
+        "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("iris-default-simple", "Iris Default Simple", "Clean simple look", "simple",
          json.dumps(iris_simple_config), 1, "system", now, now),
