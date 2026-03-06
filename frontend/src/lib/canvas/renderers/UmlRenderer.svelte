@@ -99,9 +99,6 @@
 			</div>
 		{/if}
 	{/if}
-	{#if data.description}
-		<div class="uml-node__description">{data.description}</div>
-	{/if}
 	{#if data.browseMode && data.entityId}
 		<a href="/elements/{data.entityId}" class="canvas-node__browse-link" aria-label="View {data.label} details">
 			View details
@@ -122,6 +119,7 @@
 		border-radius: 3px;
 		min-width: 140px;
 		font-size: 0.8rem;
+		overflow: hidden;
 	}
 	.uml-node--selected {
 		box-shadow: 0 0 0 2px var(--color-primary, #3b82f6);
@@ -174,11 +172,6 @@
 	.uml-node__attr {
 		font-size: 0.7rem;
 		font-family: monospace;
-	}
-	.uml-node__description {
-		padding: 2px 8px;
-		font-size: 0.7rem;
-		color: var(--color-muted, #666);
 	}
 	:global(.dark) .uml-node {
 		background: var(--color-bg, #1a1a1a);

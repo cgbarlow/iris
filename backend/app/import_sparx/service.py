@@ -543,7 +543,7 @@ async def import_sparx_file(
             ) or "association"
 
             # Build edge metadata
-            route_map = {0: "bezier", 3: "step"}
+            route_map = {0: "bezier", 1: "step", 2: "step", 3: "step", 4: "step", 5: "step"}
             edge_data: dict[str, object] = {
                 "relationshipType": iris_conn_type,
                 "label": conn.Name or "",

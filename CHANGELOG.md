@@ -5,7 +5,7 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.0] - 2026-03-06
 
 ### Added
 - UML class attributes rendered in compartments on canvas nodes (imported and user-created) (ADR-086)
@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UML edges rendered without arrowheads/diamonds
 - Edit mode not acquiring lock per ADR-080 specification
 - sendBeacon lock release using non-existent endpoint
+- UML class nodes showing description text causing massive overflow — now hidden on compartment types (ADR-086)
+- Node height forced to EA pixel value clipping content — now uses min-height for natural sizing (ADR-086)
+- EA orthogonal route style (Auto Route) incorrectly mapped to bezier — now maps to step routing (ADR-086)
 
 ## [2.3.0] - 2026-03-05
 
