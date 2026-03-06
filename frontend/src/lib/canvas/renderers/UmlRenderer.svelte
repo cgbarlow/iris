@@ -40,7 +40,7 @@
 	const hasCompartments = $derived(
 		['class', 'abstract_class', 'interface_uml', 'enumeration'].includes(data.entityType)
 	);
-	const attributes = $derived((data as Record<string, unknown>).attributes as (string | { name: string; type: string })[] | undefined);
+	const attributes = $derived((data as Record<string, unknown>).attributes as (string | { name: string; type: string; scope?: string })[] | undefined);
 	const operations = $derived((data as Record<string, unknown>).operations as string[] | undefined);
 	const literals = $derived((data as Record<string, unknown>).literals as string[] | undefined);
 	const isAbstract = $derived(data.entityType === 'abstract_class');
@@ -78,7 +78,7 @@
 						{#if typeof attr === 'string'}
 							{attr}
 						{:else}
-							{attr.name}: {attr.type}
+							{attr.scope === 'Private' ? '- ' : attr.scope === 'Protected' ? '# ' : attr.scope === 'Package' ? '~ ' : '+ '}{attr.name}: {attr.type}
 						{/if}
 					</div>
 				{/each}

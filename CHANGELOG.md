@@ -5,6 +5,25 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- UML class attributes rendered in compartments on canvas nodes (imported and user-created) (ADR-086)
+- UML visibility prefixes (+/-/#/~) from EA Scope field on attributes (ADR-086)
+- SVG marker definitions for UML arrowheads: filled diamond, open diamond, closed triangle, open arrow (ADR-086)
+- Cardinality labels at edge endpoints, controlled by view config (ADR-086)
+- Role name labels at edge endpoints, controlled by view config (ADR-086)
+- Edge style panel for editing cardinality, roles, stereotype after creation (ADR-086)
+- Relationship dialog extended with cardinality, role, stereotype fields for UML notation (ADR-086)
+- Edit lock integration: lock acquired on edit, conflict banner, heartbeat, auto-release (ADR-080, ADR-086)
+- POST lock release endpoint for sendBeacon compatibility (ADR-086)
+
+### Fixed
+- Attributes from EA import not appearing on canvas class nodes
+- UML edges rendered without arrowheads/diamonds
+- Edit mode not acquiring lock per ADR-080 specification
+- sendBeacon lock release using non-existent endpoint
+
 ## [2.3.0] - 2026-03-05
 
 ### Added

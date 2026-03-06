@@ -496,6 +496,18 @@ async def import_sparx_file(
             visual_with_size["height"] = pos["height"]
             node_data["visual"] = visual_with_size
 
+            # Thread element attributes to canvas node for compartment rendering
+            obj_attrs = attrs_by_object.get(dobj.Object_ID)  # type: ignore[union-attr]
+            if obj_attrs:
+                node_data["attributes"] = [
+                    {
+                        "name": a.Name or "",  # type: ignore[union-attr]
+                        "type": a.Type or "",  # type: ignore[union-attr]
+                        "scope": a.Scope,  # type: ignore[union-attr]
+                    }
+                    for a in obj_attrs
+                ]
+
             nodes.append({
                 "id": node_id,
                 "type": iris_type_str or "component",

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, beforeNavigate } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { exportToSvg, exportToPng, exportToPdf } from '$lib/utils/export';
 	import type { Diagram, DiagramVersion, Bookmark } from '$lib/types/api';
@@ -17,6 +18,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
 	import RelationshipDialog from '$lib/canvas/controls/RelationshipDialog.svelte';
+	import EdgeStylePanel from '$lib/canvas/controls/EdgeStylePanel.svelte';
 	import EntityDetailPanel from '$lib/canvas/controls/EntityDetailPanel.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import ElementPicker from '$lib/components/ElementPicker.svelte';
@@ -29,6 +31,7 @@
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
+	import { createLockManager } from '$lib/utils/locks.svelte';
 	import DOMPurify from 'dompurify';
 	import type { Element, DiagramHierarchyNode, Package } from '$lib/types/api';
 	import type { CanvasNode, CanvasEdge } from '$lib/types/canvas';
@@ -117,6 +120,10 @@
 
 	// Canvas undo/redo history
 	const history = createCanvasHistory();
+
+	// Edit lock manager (ADR-080/086)
+	let lockManager = $state<ReturnType<typeof createLockManager> | null>(null);
+	let lockConflictUser = $state<string | null>(null);
 
 	// RelationshipDialog state
 	let showRelationshipDialog = $state(false);
@@ -233,6 +240,37 @@
 		return () => document.removeEventListener('edgelabelmove', onEdgeLabelMove);
 	});
 
+	// Listen for edge style change events from EdgeStylePanel (ADR-086)
+	$effect(() => {
+		function onEdgeStyleChange(e: Event) {
+			const { edgeId, data: updatedData } = (e as CustomEvent).detail;
+			if (!editing) return;
+			history.pushState(canvasNodes, canvasEdges);
+			canvasEdges = canvasEdges.map((edge) =>
+				edge.id === edgeId
+					? { ...edge, data: { ...edge.data!, ...updatedData } }
+					: edge,
+			);
+			canvasDirty = true;
+		}
+		document.addEventListener('edgestylechange', onEdgeStyleChange);
+		return () => document.removeEventListener('edgestylechange', onEdgeStyleChange);
+	});
+
+	// Release lock on navigation and component destroy (ADR-080/086)
+	beforeNavigate(() => {
+		if (lockManager && lockManager.isOwner) {
+			lockManager.releaseLock();
+			editing = false;
+		}
+	});
+
+	onDestroy(() => {
+		if (lockManager) {
+			lockManager.destroy();
+		}
+	});
+
 	/** Determine which canvas component to render based on diagram notation/type. */
 	const canvasType = $derived.by(() => {
 		if (!diagram) return 'simple';
@@ -281,6 +319,12 @@
 			loadInheritedTags();
 			loadAllTags();
 			loadAncestors(id);
+			// Initialize lock manager for this diagram (ADR-080/086)
+			if (lockManager) {
+				lockManager.destroy();
+			}
+			lockManager = createLockManager('diagram', id);
+			lockConflictUser = null;
 		} catch (e) {
 			error = e instanceof ApiError && e.status === 404
 				? 'Diagram not found'
@@ -847,31 +891,18 @@
 	}
 
 	/** Derived routing type for the currently selected edge. */
-	const selectedEdgeRoutingType = $derived.by(() => {
-		if (!selectedEdgeId) return 'default';
+	const selectedEdgeData = $derived.by(() => {
+		if (!selectedEdgeId) return null;
 		const edge = canvasEdges.find((e) => e.id === selectedEdgeId);
-		return edge?.data?.routingType ?? 'default';
+		return edge?.data ?? null;
 	});
-
-	function handleRoutingTypeChange(event: Event) {
-		const target = event.target as HTMLSelectElement;
-		const newType = target.value as EdgeRoutingType;
-		if (!selectedEdgeId) return;
-		history.pushState(canvasNodes, canvasEdges);
-		canvasEdges = canvasEdges.map((e) =>
-			e.id === selectedEdgeId
-				? { ...e, data: { ...e.data!, routingType: newType === 'default' ? undefined : newType } }
-				: e,
-		);
-		canvasDirty = true;
-	}
 
 	function handleConnectNodes(sourceId: string, targetId: string) {
 		pendingConnection = { sourceId, targetId };
 		showRelationshipDialog = true;
 	}
 
-	async function handleRelationshipSave(type: SimpleRelationshipType, label: string) {
+	async function handleRelationshipSave(type: SimpleRelationshipType, label: string, extras?: { sourceCardinality?: string; targetCardinality?: string; sourceRole?: string; targetRole?: string; stereotype?: string }) {
 		if (!pendingConnection) return;
 		const { sourceId, targetId } = pendingConnection;
 
@@ -928,6 +959,7 @@
 				label: label || undefined,
 				relationshipId,
 				diagramRelationshipId,
+				...extras,
 			},
 		};
 		history.pushState(canvasNodes, canvasEdges);
@@ -983,6 +1015,11 @@
 			});
 			canvasDirty = false;
 			history.clear();
+			editing = false;
+			if (lockManager) {
+				await lockManager.releaseLock();
+			}
+			lockConflictUser = null;
 			await loadDiagram(diagram.id);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to save canvas';
@@ -1215,6 +1252,24 @@
 		parseCanvasData();
 		history.clear();
 		editing = false;
+		lockConflictUser = null;
+		if (lockManager) {
+			lockManager.releaseLock();
+		}
+	}
+
+	async function handleStartEditing() {
+		if (lockManager) {
+			const acquired = await lockManager.acquireLock();
+			if (acquired) {
+				editing = true;
+				lockConflictUser = null;
+			} else {
+				lockConflictUser = lockManager.lockHolder;
+			}
+		} else {
+			editing = true;
+		}
 	}
 
 	// Export handlers
@@ -1321,6 +1376,11 @@
 				}),
 			});
 			canvasDirty = false;
+			editing = false;
+			if (lockManager) {
+				await lockManager.releaseLock();
+			}
+			lockConflictUser = null;
 			await loadDiagram(diagram.id);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to save sequence';
@@ -1808,6 +1868,13 @@
 				</Accordion.Item>
 			</Accordion.Root>
 		{:else if activeTab === 'canvas'}
+			{#if lockConflictUser}
+				<div class="mb-3 flex items-center gap-2 rounded border px-4 py-2 text-sm" style="border-color: var(--color-warning, #f59e0b); background: rgba(245, 158, 11, 0.1); color: var(--color-fg)">
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; color: var(--color-warning, #f59e0b)"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+					This diagram is being edited by <strong>{lockConflictUser}</strong>. Try again later.
+					<button onclick={() => (lockConflictUser = null)} class="ml-auto text-xs" style="color: var(--color-muted)">Dismiss</button>
+				</div>
+			{/if}
 			{#if canvasType === 'sequence'}
 				<!-- Sequence diagram toolbar -->
 				<div class="mb-3 flex flex-wrap items-center gap-2 gap-y-2">
@@ -1864,7 +1931,7 @@
 						</div>
 					{:else}
 						<button
-							onclick={() => (editing = true)}
+							onclick={handleStartEditing}
 							class="rounded px-3 py-1.5 text-sm"
 							style="background-color: var(--color-primary); color: white"
 						>
@@ -1922,7 +1989,7 @@
 					<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
 						<p style="color: var(--color-muted)">This sequence diagram has no participants yet.</p>
 						<button
-							onclick={() => (editing = true)}
+							onclick={handleStartEditing}
 							class="rounded px-4 py-2 text-sm text-white"
 							style="background-color: var(--color-primary)"
 						>
@@ -2039,25 +2106,7 @@
 							>
 								Delete Edge
 							</button>
-							{#if selectedEdgeId}
-								<label class="flex items-center gap-1 text-sm" style="color: var(--color-fg)">
-									Routing:
-									<select
-										value={selectedEdgeRoutingType}
-										onchange={handleRoutingTypeChange}
-										class="rounded px-2 py-1 text-sm"
-										style="border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-										aria-label="Edge routing type"
-									>
-										<option value="default">Default</option>
-										<option value="straight">Straight</option>
-										<option value="step">Step</option>
-										<option value="smoothstep">Smooth Step</option>
-										<option value="bezier">Bezier</option>
-									</select>
-								</label>
-							{/if}
-							<button
+								<button
 								onclick={handleUndo}
 								disabled={!history.canUndo}
 								class="rounded px-3 py-1.5 text-sm disabled:opacity-50"
@@ -2101,7 +2150,7 @@
 						</div>
 					{:else}
 						<button
-							onclick={() => (editing = true)}
+							onclick={handleStartEditing}
 							class="rounded px-3 py-1.5 text-sm"
 							style="background-color: var(--color-primary); color: white"
 						>
@@ -2215,12 +2264,17 @@
 							onnodedragstart={handleNodeDragStart}
 						/>
 					</div>
+					{#if selectedEdgeId && selectedEdgeData}
+						<div class="mt-2">
+							<EdgeStylePanel edgeId={selectedEdgeId} data={selectedEdgeData} />
+						</div>
+					{/if}
 					{/if}
 				{:else if canvasNodes.length === 0}
 					<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
 						<p style="color: var(--color-muted)">This diagram has no canvas content yet.</p>
 						<button
-							onclick={() => (editing = true)}
+							onclick={handleStartEditing}
 							class="rounded px-4 py-2 text-sm text-white"
 							style="background-color: var(--color-primary)"
 						>
@@ -2494,6 +2548,7 @@
 		open={showRelationshipDialog}
 		sourceName={pendingSourceName}
 		targetName={pendingTargetName}
+		{notation}
 		onsave={handleRelationshipSave}
 		oncancel={handleRelationshipCancel}
 	/>
