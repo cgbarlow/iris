@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 
 def bgr_to_rgb(bgr_int: int) -> str:
     """Convert EA BGR decimal integer to CSS hex colour string.
@@ -118,6 +120,61 @@ def format_uml_visibility(scope: str | None) -> str:
         "Package": "~",
     }
     return _SCOPE_MAP.get(scope or "", "+")
+
+
+def parse_diagram_link_geometry(geometry: str | None) -> dict:
+    """Parse EA t_diagramlinks.Geometry string.
+
+    Format: key=value pairs separated by semicolons.
+    Common keys: SX, SY, EX, EY (attachment offsets), EDGE (routing hint).
+
+    Returns dict with sx, sy, ex, ey (ints) and optional edge (int).
+    """
+    if not geometry:
+        return {}
+    result: dict = {}
+    for part in geometry.split(";"):
+        part = part.strip()
+        if "=" not in part:
+            continue
+        key, _, val = part.partition("=")
+        key = key.strip()
+        val = val.strip()
+        try:
+            int_val = int(val)
+        except ValueError:
+            continue
+        key_lower = key.lower()
+        if key_lower in ("sx", "sy", "ex", "ey"):
+            result[key_lower] = int_val
+        elif key_lower == "edge":
+            result["edge"] = int_val
+    return result
+
+
+def parse_diagram_link_path(path: str | None) -> list[dict]:
+    """Parse EA Path column: 'X1:Y1;X2:Y2;...' into list of {x, y} dicts.
+
+    Coordinates are in EA's system (Y negative = up).
+    Converts to screen coordinates (negates Y).
+    """
+    if not path or not path.strip():
+        return []
+    result: list[dict] = []
+    for segment in path.split(";"):
+        segment = segment.strip()
+        if ":" not in segment:
+            continue
+        parts = segment.split(":")
+        if len(parts) != 2:
+            continue
+        try:
+            x = int(parts[0].strip())
+            y = int(parts[1].strip())
+            result.append({"x": x, "y": -y})
+        except ValueError:
+            continue
+    return result
 
 
 def ea_rect_to_position(

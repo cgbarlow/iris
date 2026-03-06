@@ -169,20 +169,23 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
          json.dumps(iris_uml_config), 1, "system", now, now),
     )
 
-    # Sparx EA Default UML — EA's pale yellow class boxes + stereotype colours
+    # Sparx EA Default UML — faithful EA rendering: cream boxes, 1px black border, no radius,
+    # no UML icons, red attribute text, italic abstract names
+    ea_node = {"bgColor": "#ffffcc", "borderColor": "#000000", "fontColor": "#000000", "borderWidth": 1}
     ea_uml_config = {
         "element_defaults": {
-            "class": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "abstract_class": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "interface_uml": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "enumeration": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "package_uml": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "component_uml": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "object": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "use_case": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "node": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "state": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
-            "activity": {"bgColor": "#ffffcc", "borderColor": "#000080", "fontColor": "#000000"},
+            "class": ea_node,
+            "abstract_class": {**ea_node, "italic": True},
+            "interface_uml": ea_node,
+            "enumeration": ea_node,
+            "package_uml": ea_node,
+            "component_uml": ea_node,
+            "object": ea_node,
+            "use_case": ea_node,
+            "node": ea_node,
+            "state": ea_node,
+            "activity": ea_node,
+            "note": {"bgColor": "#ffffff", "borderColor": "#000000", "fontColor": "#000000", "borderWidth": 1},
         },
         "stereotype_overrides": {
             "feature": {"bgColor": "#ccffcc"},
@@ -193,17 +196,24 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
             "choice": {"bgColor": "#ccffff"},
         },
         "edge_defaults": {
-            "association": {"lineColor": "#000080"},
-            "generalization": {"lineColor": "#000080"},
-            "dependency": {"lineColor": "#000080"},
-            "realization": {"lineColor": "#000080"},
-            "aggregation": {"lineColor": "#000080"},
-            "composition": {"lineColor": "#000080"},
+            "association": {"lineColor": "#000000"},
+            "generalization": {"lineColor": "#000000"},
+            "dependency": {"lineColor": "#000000"},
+            "realization": {"lineColor": "#000000"},
+            "aggregation": {"lineColor": "#000000"},
+            "composition": {"lineColor": "#000000"},
         },
         "global": {
             "defaultBgColor": "#ffffcc",
-            "defaultBorderColor": "#000080",
+            "defaultBorderColor": "#000000",
             "defaultFontColor": "#000000",
+        },
+        "rendering": {
+            "hideIcons": True,
+            "borderRadius": 0,
+            "attrFontColor": "#993333",
+            "hideTypeStereotypes": True,
+            "abstractBoldOverride": False,
         },
     }
     await db.execute(

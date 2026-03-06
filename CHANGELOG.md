@@ -5,6 +5,27 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-03-06
+
+### Added
+- Diagram frame/title block for imported EA diagrams — shows `[type] [name]` tab with border (ADR-087)
+- Attribute sort option (`pos` or `alpha`) in view config for canvas (ADR-087)
+- EA connector `Start_Edge`/`End_Edge` mapped to SvelteFlow handles for explicit connection points (ADR-087)
+- EA orthogonal routing via `t_diagramlinks.Path` waypoints rendered as polyline edges (ADR-087)
+- EA absolute connection points (`PtStartX/Y`, `PtEndX/Y`) override auto-computed handle positions (ADR-087)
+
+### Fixed
+- Abstract class `«abstract»` stereotype text no longer shown when EA theme active — italic-only conveys abstract (ADR-087)
+- UML class name labels properly centered in node header (ADR-087)
+- Abstract class names render as italic-only (not bold+italic) when EA theme active (ADR-087)
+- Note elements use original EA dimensions — fixes overlap with adjacent elements (ADR-087)
+- Theme selector dropdown now overrides diagram's preferred theme when explicitly changed (ADR-087)
+- Note background and border colors respect theme configuration via CSS variables (ADR-087)
+- SVG markers (diamonds/arrows) visible at all zoom levels with `overflow: visible` (ADR-087)
+
+### Changed
+- `ThemeRenderingConfig` extended with `hideTypeStereotypes` and `abstractBoldOverride` fields (ADR-087)
+
 ## [2.4.0] - 2026-03-06
 
 ### Added

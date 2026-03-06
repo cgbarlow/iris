@@ -38,8 +38,31 @@
 		dashArray = 'none',
 	}: Props = $props();
 
+	/** Build polyline path through waypoints. */
+	function buildWaypointPath(sx: number, sy: number, tx: number, ty: number, wps: { x: number; y: number }[]): [string, number, number] {
+		const points = [{ x: sx, y: sy }, ...wps, { x: tx, y: ty }];
+		const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
+		// Label position at midpoint of path
+		const mid = points[Math.floor(points.length / 2)];
+		return [d, mid.x, mid.y];
+	}
+
 	const path = $derived.by(() => {
-		const pathParams = { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition };
+		// Apply absolute connection point overrides
+		let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY;
+		if (data?.sourcePoint) { sx = (data.sourcePoint as { x: number; y: number }).x; sy = (data.sourcePoint as { x: number; y: number }).y; }
+		if (data?.targetPoint) { tx = (data.targetPoint as { x: number; y: number }).x; ty = (data.targetPoint as { x: number; y: number }).y; }
+		// Apply relative offset overrides
+		if (data?.sourceOffset) { sx += (data.sourceOffset as { x: number; y: number }).x; sy += (data.sourceOffset as { x: number; y: number }).y; }
+		if (data?.targetOffset) { tx += (data.targetOffset as { x: number; y: number }).x; ty += (data.targetOffset as { x: number; y: number }).y; }
+
+		// Waypoint-based polyline routing
+		const waypoints = data?.waypoints as { x: number; y: number }[] | undefined;
+		if (waypoints && waypoints.length > 0) {
+			return buildWaypointPath(sx, sy, tx, ty, waypoints);
+		}
+
+		const pathParams = { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty, sourcePosition, targetPosition };
 		const rt = data?.routingType;
 		if (rt === 'straight') return getStraightPath(pathParams);
 		if (rt === 'step') return getSmoothStepPath({ ...pathParams, borderRadius: 0 });

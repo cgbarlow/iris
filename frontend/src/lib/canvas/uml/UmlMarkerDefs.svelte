@@ -7,53 +7,57 @@
 		<!-- Filled diamond: composition (source marker) -->
 		<marker
 			id="uml-diamond-filled"
-			markerWidth="16"
-			markerHeight="10"
-			refX="16"
-			refY="5"
+			markerWidth="18"
+			markerHeight="12"
+			refX="18"
+			refY="6"
 			orient="auto"
 			markerUnits="userSpaceOnUse"
+			overflow="visible"
 		>
-			<polygon points="0,5 8,0 16,5 8,10" fill="#333" stroke="#333" stroke-width="1" />
+			<polygon points="0,6 9,0 18,6 9,12" fill="#333" stroke="#333" stroke-width="1" />
 		</marker>
 
 		<!-- Open diamond: aggregation (source marker) -->
 		<marker
 			id="uml-diamond-open"
-			markerWidth="16"
-			markerHeight="10"
-			refX="16"
-			refY="5"
+			markerWidth="18"
+			markerHeight="12"
+			refX="18"
+			refY="6"
 			orient="auto"
 			markerUnits="userSpaceOnUse"
+			overflow="visible"
 		>
-			<polygon points="0,5 8,0 16,5 8,10" fill="#fff" stroke="#333" stroke-width="1.5" />
+			<polygon points="0,6 9,0 18,6 9,12" fill="#fff" stroke="#333" stroke-width="1.5" />
 		</marker>
 
 		<!-- Closed triangle: generalization/realization (target marker) -->
 		<marker
 			id="uml-triangle-closed"
 			markerWidth="14"
-			markerHeight="10"
+			markerHeight="12"
 			refX="14"
-			refY="5"
+			refY="6"
 			orient="auto"
 			markerUnits="userSpaceOnUse"
+			overflow="visible"
 		>
-			<polygon points="0,0 14,5 0,10" fill="#fff" stroke="#333" stroke-width="1.5" />
+			<polygon points="0,0 14,6 0,12" fill="#fff" stroke="#333" stroke-width="1.5" />
 		</marker>
 
 		<!-- Open arrow: dependency/usage/association (target marker) -->
 		<marker
 			id="uml-arrow-open"
-			markerWidth="12"
-			markerHeight="10"
-			refX="12"
-			refY="5"
+			markerWidth="14"
+			markerHeight="12"
+			refX="14"
+			refY="6"
 			orient="auto"
 			markerUnits="userSpaceOnUse"
+			overflow="visible"
 		>
-			<polyline points="0,0 12,5 0,10" fill="none" stroke="#333" stroke-width="1.5" />
+			<polyline points="0,0 14,6 0,12" fill="none" stroke="#333" stroke-width="1.5" />
 		</marker>
 	</defs>
 </svg>

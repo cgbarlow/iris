@@ -56,13 +56,33 @@ class QeaConnector:
     DestCard: str | None = None
     SourceRole: str | None = None
     DestRole: str | None = None
+    SourceAccess: str | None = None
+    DestAccess: str | None = None
     Stereotype: str | None = None
     RouteStyle: int | None = None
     SourceIsNavigable: str | None = None
     DestIsNavigable: str | None = None
+    SourceIsAggregate: int | None = None
+    DestIsAggregate: int | None = None
     LineColor: int | None = None
     IsBold: int | None = None
     LineStyle: int | None = None
+    Start_Edge: int | None = None
+    End_Edge: int | None = None
+    PtStartX: int | None = None
+    PtStartY: int | None = None
+    PtEndX: int | None = None
+    PtEndY: int | None = None
+
+
+@dataclass
+class QeaDiagramLink:
+    DiagramID: int
+    ConnectorID: int
+    Geometry: str | None = None
+    Style: str | None = None
+    Hidden: int = 0
+    Path: str | None = None
 
 
 @dataclass
@@ -73,6 +93,8 @@ class QeaDiagram:
     Package_ID: int
     ea_guid: str | None
     Notes: str | None = None
+    cx: int | None = None
+    cy: int | None = None
 
 
 @dataclass
@@ -172,8 +194,11 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
             "SELECT Connector_ID, Connector_Type, Name, "
             "Start_Object_ID, End_Object_ID, ea_guid, Notes, "
             "Direction, SourceCard, DestCard, SourceRole, DestRole, "
+            "SourceAccess, DestAccess, "
             "Stereotype, RouteStyle, SourceIsNavigable, DestIsNavigable, "
-            "LineColor, IsBold, LineStyle "
+            "SourceIsAggregate, DestIsAggregate, "
+            "LineColor, IsBold, LineStyle, "
+            "Start_Edge, End_Edge, PtStartX, PtStartY, PtEndX, PtEndY "
             "FROM t_connector"
         )
         rows = await cursor.fetchall()
@@ -191,13 +216,23 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
                 DestCard=row[9],
                 SourceRole=row[10],
                 DestRole=row[11],
-                Stereotype=row[12],
-                RouteStyle=row[13],
-                SourceIsNavigable=str(row[14]) if row[14] is not None else None,
-                DestIsNavigable=str(row[15]) if row[15] is not None else None,
-                LineColor=row[16],
-                IsBold=row[17],
-                LineStyle=row[18],
+                SourceAccess=row[12],
+                DestAccess=row[13],
+                Stereotype=row[14],
+                RouteStyle=row[15],
+                SourceIsNavigable=str(row[16]) if row[16] is not None else None,
+                DestIsNavigable=str(row[17]) if row[17] is not None else None,
+                SourceIsAggregate=row[18],
+                DestIsAggregate=row[19],
+                LineColor=row[20],
+                IsBold=row[21],
+                LineStyle=row[22],
+                Start_Edge=row[23],
+                End_Edge=row[24],
+                PtStartX=row[25],
+                PtStartY=row[26],
+                PtEndX=row[27],
+                PtEndY=row[28],
             )
             for row in rows
         ]
@@ -207,7 +242,7 @@ async def read_diagrams(db_path: str) -> list[QeaDiagram]:
     """Read all diagrams from a .qea file."""
     async with aiosqlite.connect(db_path) as db:
         cursor = await db.execute(
-            "SELECT Diagram_ID, Name, Diagram_Type, Package_ID, ea_guid, Notes "
+            "SELECT Diagram_ID, Name, Diagram_Type, Package_ID, ea_guid, Notes, cx, cy "
             "FROM t_diagram"
         )
         rows = await cursor.fetchall()
@@ -219,6 +254,29 @@ async def read_diagrams(db_path: str) -> list[QeaDiagram]:
                 Package_ID=row[3] or 0,
                 ea_guid=row[4],
                 Notes=row[5],
+                cx=row[6],
+                cy=row[7],
+            )
+            for row in rows
+        ]
+
+
+async def read_diagram_links(db_path: str) -> list[QeaDiagramLink]:
+    """Read all diagram link placements from a .qea file."""
+    async with aiosqlite.connect(db_path) as db:
+        cursor = await db.execute(
+            "SELECT DiagramID, ConnectorID, Geometry, Style, Hidden, Path "
+            "FROM t_diagramlinks"
+        )
+        rows = await cursor.fetchall()
+        return [
+            QeaDiagramLink(
+                DiagramID=row[0] or 0,
+                ConnectorID=row[1] or 0,
+                Geometry=row[2],
+                Style=row[3],
+                Hidden=row[4] or 0,
+                Path=row[5],
             )
             for row in rows
         ]

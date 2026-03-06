@@ -9,13 +9,14 @@ from typing import TYPE_CHECKING
 
 from app.diagrams.service import create_diagram
 from app.elements.service import create_element
-from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position
+from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position, format_uml_visibility, parse_diagram_link_geometry, parse_diagram_link_path
 from app.import_sparx.mapper import map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
     QeaElement,
     QeaPackage,
     read_attributes,
     read_connectors,
+    read_diagram_links,
     read_diagram_objects,
     read_diagrams,
     read_elements,
@@ -184,6 +185,7 @@ async def import_sparx_file(
     connectors = await read_connectors(qea_path)
     diagrams = await read_diagrams(qea_path)
     diagram_objects = await read_diagram_objects(qea_path)
+    diagram_links = await read_diagram_links(qea_path)
     attributes = await read_attributes(qea_path)
     tagged_values = await read_tagged_values(qea_path)
 
@@ -277,6 +279,9 @@ async def import_sparx_file(
             continue
         if iris_type == "_package":
             continue  # Already handled as hierarchy
+        # Abstract classes get a distinct type so UML renderer applies italic styling
+        if iris_type == "class" and elem.Abstract == "1":
+            iris_type = "abstract_class"
 
         element_data: dict[str, object] = {}
         # Add class attributes if present (rich object format)
@@ -371,6 +376,14 @@ async def import_sparx_file(
             summary.connectors_skipped += 1
             continue
 
+        # EA stores composition/aggregation as Association with SourceIsAggregate/DestIsAggregate flags
+        # 0=none, 1=shared (aggregation), 2=composite (composition)
+        if iris_type == "association":
+            if conn.SourceIsAggregate == 2 or conn.DestIsAggregate == 2:
+                iris_type = "composition"
+            elif conn.SourceIsAggregate == 1 or conn.DestIsAggregate == 1:
+                iris_type = "aggregation"
+
         source_id = element_map.get(conn.Start_Object_ID)
         target_id = element_map.get(conn.End_Object_ID)
         if not source_id or not target_id:
@@ -407,9 +420,11 @@ async def import_sparx_file(
         if conn.DestCard:
             rel_data["targetCardinality"] = conn.DestCard
         if conn.SourceRole:
-            rel_data["sourceRole"] = conn.SourceRole
+            prefix = format_uml_visibility(conn.SourceAccess)
+            rel_data["sourceRole"] = f"{prefix}{conn.SourceRole}"
         if conn.DestRole:
-            rel_data["targetRole"] = conn.DestRole
+            prefix = format_uml_visibility(conn.DestAccess)
+            rel_data["targetRole"] = f"{prefix}{conn.DestRole}"
         if conn.Stereotype:
             rel_data["stereotype"] = conn.Stereotype
 
@@ -426,10 +441,18 @@ async def import_sparx_file(
         summary.relationships_created += 1
 
     # 5. Create diagram models with canvas data
+    # Build package name lookup for cross-package qualifiers
+    package_names: dict[int, str] = {p.Package_ID: (p.Name or "") for p in packages}
+
     # Build diagram_objects lookup
     diag_objects_by_diagram: dict[int, list[object]] = {}
     for dobj in diagram_objects:
         diag_objects_by_diagram.setdefault(dobj.Diagram_ID, []).append(dobj)
+
+    # Build diagram_links lookup: (DiagramID, ConnectorID) -> QeaDiagramLink
+    diag_links_index: dict[tuple[int, int], object] = {}
+    for dlink in diagram_links:
+        diag_links_index[(dlink.DiagramID, dlink.ConnectorID)] = dlink
 
     for diag in diagrams:
         # Skip if diagram already exists (idempotent re-import)
@@ -462,6 +485,9 @@ async def import_sparx_file(
             iris_type_str = (
                 map_object_type(elem.Object_Type) if elem and elem.Object_Type else "component"
             )
+            # Abstract classes get a distinct type for italic rendering in UML
+            if iris_type_str == "class" and elem and elem.Abstract == "1":
+                iris_type_str = "abstract_class"
 
             node_id = str(uuid.uuid4())
             # Derive label for notes/boundaries with NULL Name
@@ -481,6 +507,12 @@ async def import_sparx_file(
             # Store stereotype for theme resolution
             if elem and elem.Stereotype:
                 node_data["stereotype"] = elem.Stereotype
+            # Cross-package qualifier: show source package name when element
+            # belongs to a different package than the diagram
+            if elem and elem.Package_ID != diag.Package_ID:
+                pkg_name = package_names.get(elem.Package_ID)
+                if pkg_name:
+                    node_data["qualifier"] = pkg_name
 
             # Build visual overrides from EA style data
             node_visual = build_node_visual(
@@ -542,8 +574,16 @@ async def import_sparx_file(
                 map_connector_type(conn.Connector_Type) if conn.Connector_Type else "association"
             ) or "association"
 
+            # Detect composition/aggregation from EA aggregate flags
+            if iris_conn_type == "association":
+                if conn.SourceIsAggregate == 2 or conn.DestIsAggregate == 2:
+                    iris_conn_type = "composition"
+                elif conn.SourceIsAggregate == 1 or conn.DestIsAggregate == 1:
+                    iris_conn_type = "aggregation"
+
             # Build edge metadata
-            route_map = {0: "bezier", 1: "step", 2: "step", 3: "step", 4: "step", 5: "step"}
+            # EA RouteStyle: 0=Direct, 1=Auto Route, 2=Custom, 3=Tree, 4=Orthogonal, 5=Orthogonal Rounded
+            route_map = {0: "straight", 1: "step", 2: "straight", 3: "straight", 4: "step", 5: "smoothstep"}
             edge_data: dict[str, object] = {
                 "relationshipType": iris_conn_type,
                 "label": conn.Name or "",
@@ -553,9 +593,11 @@ async def import_sparx_file(
             if conn.DestCard:
                 edge_data["targetCardinality"] = conn.DestCard
             if conn.SourceRole:
-                edge_data["sourceRole"] = conn.SourceRole
+                prefix = format_uml_visibility(conn.SourceAccess)
+                edge_data["sourceRole"] = f"{prefix}{conn.SourceRole}"
             if conn.DestRole:
-                edge_data["targetRole"] = conn.DestRole
+                prefix = format_uml_visibility(conn.DestAccess)
+                edge_data["targetRole"] = f"{prefix}{conn.DestRole}"
             if conn.Stereotype:
                 edge_data["stereotype"] = conn.Stereotype
             if conn.Direction:
@@ -570,6 +612,33 @@ async def import_sparx_file(
             if edge_visual:
                 edge_data["visual"] = edge_visual
 
+            # EA edge geometry: waypoints and connection point offsets
+            dlink = diag_links_index.get((diag.Diagram_ID, conn.Connector_ID))
+            if dlink:
+                geom = parse_diagram_link_geometry(dlink.Geometry)  # type: ignore[union-attr]
+                if geom.get("sx") or geom.get("sy"):
+                    edge_data["sourceOffset"] = {"x": geom.get("sx", 0), "y": geom.get("sy", 0)}
+                if geom.get("ex") or geom.get("ey"):
+                    edge_data["targetOffset"] = {"x": geom.get("ex", 0), "y": geom.get("ey", 0)}
+                waypoints = parse_diagram_link_path(dlink.Path)  # type: ignore[union-attr]
+                if waypoints:
+                    edge_data["waypoints"] = waypoints
+
+            # EA connector absolute connection points
+            if conn.PtStartX and conn.PtStartY:
+                edge_data["sourcePoint"] = {"x": conn.PtStartX, "y": -conn.PtStartY}
+            if conn.PtEndX and conn.PtEndY:
+                edge_data["targetPoint"] = {"x": conn.PtEndX, "y": -conn.PtEndY}
+
+            # EA Start_Edge/End_Edge: map to handle side hints
+            edge_handle_map = {1: "top", 2: "right", 3: "bottom", 4: "left"}
+            source_handle = None
+            target_handle = None
+            if conn.Start_Edge and conn.Start_Edge in edge_handle_map:
+                source_handle = edge_handle_map[conn.Start_Edge]
+            if conn.End_Edge and conn.End_Edge in edge_handle_map:
+                target_handle = edge_handle_map[conn.End_Edge]
+
             # Self-loop edge
             if source_node == target_node:
                 edges.append({
@@ -582,20 +651,34 @@ async def import_sparx_file(
                     "data": edge_data,
                 })
             else:
-                edges.append({
+                edge_entry: dict[str, object] = {
                     "id": str(uuid.uuid4()),
                     "source": source_node,
                     "target": target_node,
                     "type": iris_conn_type,
                     "data": edge_data,
-                })
+                }
+                if source_handle:
+                    edge_entry["sourceHandle"] = source_handle
+                if target_handle:
+                    edge_entry["targetHandle"] = target_handle
+                edges.append(edge_entry)
 
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
-        # Build diagram metadata with ea_guid
-        diag_metadata: dict[str, object] | None = None
+        # Add diagram frame data for EA imported diagrams
+        if diag.cx and diag.cy:
+            model_data["diagramFrame"] = {
+                "type": diag.Diagram_Type or "class",
+                "name": diag.Name or "",
+                "width": diag.cx,
+                "height": diag.cy,
+            }
+
+        # Build diagram metadata with ea_guid and theme
+        diag_metadata: dict[str, object] = {"theme_id": "ea-default-uml"}
         if diag.ea_guid:
-            diag_metadata = {"ea_guid": diag.ea_guid}
+            diag_metadata["ea_guid"] = diag.ea_guid
 
         await create_diagram(
             db,

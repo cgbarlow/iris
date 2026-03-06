@@ -29,6 +29,7 @@
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
+	import { getActiveThemeId } from '$lib/stores/themeStore.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import { createLockManager } from '$lib/utils/locks.svelte';
@@ -105,8 +106,8 @@
 	let bookmarkLoading = $state(false);
 
 	// Canvas state
-	let canvasNodes = $state<CanvasNode[]>([]);
-	let canvasEdges = $state<CanvasEdge[]>([]);
+	let canvasNodes = $state.raw<CanvasNode[]>([]);
+	let canvasEdges = $state.raw<CanvasEdge[]>([]);
 	let editing = $state(false);
 	let showAddElement = $state(false);
 	let canvasDirty = $state(false);
@@ -285,6 +286,15 @@
 
 	/** Notation for UnifiedCanvas context. */
 	const notation = $derived<NotationType>(canvasType === 'sequence' ? 'simple' : canvasType as NotationType);
+
+	/** Preferred theme from diagram metadata (e.g. Sparx EA imports set theme_id). */
+	const preferredThemeId = $derived(diagram?.metadata?.theme_id as string | undefined);
+
+	/** Diagram frame data from EA import (border + title tab). */
+	const diagramFrame = $derived(
+		(diagram?.data as Record<string, unknown>)?.diagramFrame as
+			{ type: string; name: string; width: number; height: number } | undefined
+	);
 
 	/** Source node name for RelationshipDialog display. */
 	const pendingSourceName = $derived.by(() => {
@@ -1003,6 +1013,11 @@
 		saving = true;
 		error = null;
 		try {
+			// Persist active theme to diagram metadata if user has one set
+			const activeTheme = getActiveThemeId(notation);
+			const metadata = activeTheme && !diagram.metadata?.theme_id
+				? { ...(diagram.metadata ?? {}), theme_id: activeTheme }
+				: diagram.metadata;
 			await apiFetch(`/api/diagrams/${diagram.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(diagram.current_version) },
@@ -1010,6 +1025,7 @@
 					name: diagram.name,
 					description: diagram.description ?? '',
 					data: { nodes: canvasNodes, edges: canvasEdges },
+					metadata,
 					change_summary: 'Updated diagram',
 				}),
 			});
@@ -2230,6 +2246,8 @@
 								<div style="flex: 1; border: 1px solid var(--color-border); overflow: hidden">
 									<UnifiedCanvas
 										{notation}
+										{preferredThemeId}
+										{diagramFrame}
 										bind:nodes={canvasNodes}
 										bind:edges={canvasEdges}
 										oncreatenode={() => (showAddElement = true)}
@@ -2250,6 +2268,8 @@
 					<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 						<UnifiedCanvas
 							{notation}
+							{preferredThemeId}
+							{diagramFrame}
 							bind:nodes={canvasNodes}
 							bind:edges={canvasEdges}
 							oncreatenode={() => (showAddElement = true)}
@@ -2287,6 +2307,8 @@
 							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden">
 								<UnifiedCanvas
 									{notation}
+									{preferredThemeId}
+									{diagramFrame}
 									nodes={canvasNodes}
 									edges={canvasEdges}
 									browseMode={true}
@@ -2299,6 +2321,8 @@
 						<div class="flex-1" style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 							<UnifiedCanvas
 								{notation}
+								{preferredThemeId}
+								{diagramFrame}
 								nodes={canvasNodes}
 								edges={canvasEdges}
 								browseMode={true}

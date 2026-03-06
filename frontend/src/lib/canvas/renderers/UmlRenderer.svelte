@@ -4,9 +4,12 @@
 	 * Supports class compartments (attributes/operations), stereotypes,
 	 * abstract classes, enumerations with literals, and standard UML icons.
 	 */
+	import { getContext } from 'svelte';
 	import { Handle, Position } from '@xyflow/svelte';
-	import type { CanvasNodeData } from '$lib/types/canvas';
+	import type { CanvasNodeData, NotationType } from '$lib/types/canvas';
 	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
+	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
+	import { getActiveConfig } from '$lib/stores/viewStore.svelte';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -14,6 +17,15 @@
 	}
 
 	let { data, selected = false }: Props = $props();
+
+	const notation = getContext<NotationType>('notation') ?? 'uml';
+	const preferredThemeId = getContext<string | undefined>('preferredThemeId');
+	const rendering = $derived(getThemeRendering(notation, preferredThemeId));
+	const hideIcons = $derived(rendering?.hideIcons ?? false);
+	const themeBorderRadius = $derived(rendering?.borderRadius);
+	const attrFontColor = $derived(rendering?.attrFontColor);
+	const hideTypeStereotypes = $derived(rendering?.hideTypeStereotypes ?? false);
+	const abstractBoldOverride = $derived(rendering?.abstractBoldOverride);
 
 	const UML_ICONS: Record<string, string> = {
 		class: '▭',
@@ -36,17 +48,36 @@
 	};
 
 	const icon = $derived(UML_ICONS[data.entityType] ?? '▭');
-	const stereotype = $derived(STEREOTYPES[data.entityType]);
+	const stereotype = $derived(
+		hideTypeStereotypes
+			? ((data as Record<string, unknown>).stereotype as string | undefined)
+			: (STEREOTYPES[data.entityType] ?? (data as Record<string, unknown>).stereotype as string | undefined)
+	);
+	const qualifier = $derived((data as Record<string, unknown>).qualifier as string | undefined);
 	const hasCompartments = $derived(
 		['class', 'abstract_class', 'interface_uml', 'enumeration'].includes(data.entityType)
 	);
-	const attributes = $derived((data as Record<string, unknown>).attributes as (string | { name: string; type: string; scope?: string })[] | undefined);
+	const viewConfig = $derived(getActiveConfig());
+	const sortAttributes = $derived(viewConfig.canvas?.sort_attributes);
+	const rawAttributes = $derived((data as Record<string, unknown>).attributes as (string | { name: string; type: string; scope?: string })[] | undefined);
+	const attributes = $derived.by(() => {
+		if (!rawAttributes || sortAttributes !== 'alpha') return rawAttributes;
+		return [...rawAttributes].sort((a, b) => {
+			const nameA = typeof a === 'string' ? a : a.name;
+			const nameB = typeof b === 'string' ? b : b.name;
+			return nameA.localeCompare(nameB);
+		});
+	});
 	const operations = $derived((data as Record<string, unknown>).operations as string[] | undefined);
 	const literals = $derived((data as Record<string, unknown>).literals as string[] | undefined);
 	const isAbstract = $derived(data.entityType === 'abstract_class');
 	const isPackage = $derived(data.entityType === 'package_uml');
 	const isComponent = $derived(data.entityType === 'component_uml');
-	const visualStyle = $derived(nodeOverrideStyle(data.visual));
+	const visualStyle = $derived.by(() => {
+		let style = nodeOverrideStyle(data.visual);
+		if (themeBorderRadius != null) style += (style ? '; ' : '') + `border-radius: ${themeBorderRadius}px`;
+		return style;
+	});
 </script>
 
 <div
@@ -56,25 +87,28 @@
 	style={visualStyle}
 	aria-label="{data.label}, {data.entityType}"
 >
-	{#if isPackage}
+	{#if isPackage && !hideIcons}
 		<div class="uml-node__tab">
 			<span class="uml-node__icon" aria-hidden="true">{icon}</span>
 		</div>
 	{/if}
 	<div class="uml-node__header">
-		{#if !isPackage}
+		{#if !isPackage && !hideIcons}
 			<span class="uml-node__icon{isComponent ? ' uml-node__icon--corner' : ''}" aria-hidden="true">{icon}</span>
+		{/if}
+		{#if qualifier}
+			<div class="uml-node__qualifier">{qualifier}::</div>
 		{/if}
 		{#if stereotype}
 			<div class="uml-node__stereotype">&laquo;{stereotype}&raquo;</div>
 		{/if}
-		<span class="uml-node__label" class:uml-node__label--underline={data.entityType === 'object'} class:uml-node__label--italic={isAbstract}>{data.label}</span>
+		<span class="uml-node__label" class:uml-node__label--underline={data.entityType === 'object'} class:uml-node__label--italic={isAbstract} class:uml-node__label--no-bold={isAbstract && abstractBoldOverride === false}>{data.label}</span>
 	</div>
 	{#if hasCompartments}
 		{#if attributes && attributes.length > 0}
 			<div class="uml-node__compartment">
 				{#each attributes as attr}
-					<div class="uml-node__attr">
+					<div class="uml-node__attr" style={attrFontColor ? `color: ${attrFontColor}` : ''}>
 						{#if typeof attr === 'string'}
 							{attr}
 						{:else}
@@ -119,7 +153,6 @@
 		border-radius: 3px;
 		min-width: 140px;
 		font-size: 0.8rem;
-		overflow: hidden;
 	}
 	.uml-node--selected {
 		box-shadow: 0 0 0 2px var(--color-primary, #3b82f6);
@@ -140,7 +173,9 @@
 	}
 	.uml-node__header {
 		padding: 4px 8px;
-		text-align: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
 	}
 	.uml-node__icon {
 		font-size: 0.7rem;
@@ -152,18 +187,25 @@
 		right: 4px;
 		margin-right: 0;
 	}
+	.uml-node__qualifier {
+		font-size: 0.6rem;
+		color: var(--color-muted, #666);
+	}
 	.uml-node__stereotype {
 		font-size: 0.65rem;
 		color: var(--color-muted, #666);
 	}
 	.uml-node__label {
-		font-weight: 600;
+		font-weight: 700;
 	}
 	.uml-node__label--underline {
 		text-decoration: underline;
 	}
 	.uml-node__label--italic {
 		font-style: italic;
+	}
+	.uml-node__label--no-bold {
+		font-weight: 400;
 	}
 	.uml-node__compartment {
 		border-top: 1px solid var(--color-border, #333);
