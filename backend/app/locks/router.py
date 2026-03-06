@@ -108,6 +108,19 @@ async def release(
         raise HTTPException(status_code=404, detail="Lock not found or not owned")
 
 
+@router.post("/{lock_id}/release", status_code=204)
+async def release_via_post(
+    lock_id: str,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> None:
+    """Release an edit lock via POST (for sendBeacon compatibility)."""
+    db = request.app.state.db_manager.main_db
+    released = await release_lock(db, lock_id, current_user["id"])
+    if not released:
+        raise HTTPException(status_code=404, detail="Lock not found or not owned")
+
+
 @router.get("", response_model=LockListResponse)
 async def list_locks(
     request: Request,

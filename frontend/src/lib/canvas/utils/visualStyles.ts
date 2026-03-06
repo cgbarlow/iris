@@ -13,7 +13,7 @@ export function nodeOverrideStyle(visual?: NodeVisualOverrides): string {
 	if (visual.bold) parts.push('font-weight: bold');
 	if (visual.italic) parts.push('font-style: italic');
 	if (visual.width != null) parts.push(`width: ${visual.width}px`, 'min-width: unset');
-	if (visual.height != null) parts.push(`height: ${visual.height}px`, 'min-height: unset');
+	if (visual.height != null) parts.push(`min-height: ${visual.height}px`);
 	return parts.join('; ');
 }
 

@@ -10,6 +10,7 @@
 	import '@xyflow/svelte/dist/style.css';
 
 	import { unifiedNodeTypes, unifiedEdgeTypes } from './registry';
+	import UmlMarkerDefs from './uml/UmlMarkerDefs.svelte';
 	import CanvasAnnouncer from './controls/CanvasAnnouncer.svelte';
 	import KeyboardHandler from './controls/KeyboardHandler.svelte';
 	import type { CanvasNode, CanvasEdge, NotationType } from '$lib/types/canvas';
@@ -226,6 +227,9 @@
 		>
 			<Controls showLock={false} />
 			<Background />
+			{#if notation === 'uml'}
+				<UmlMarkerDefs />
+			{/if}
 		</SvelteFlow>
 	{:else}
 		<SvelteFlow
@@ -247,6 +251,9 @@
 		>
 			<Controls showLock={false} />
 			<Background />
+			{#if notation === 'uml'}
+				<UmlMarkerDefs />
+			{/if}
 			<KeyboardHandler
 				bind:this={keyboardHandler}
 				{nodes}

@@ -106,6 +106,20 @@ def build_edge_visual(
     return visual if visual else None
 
 
+def format_uml_visibility(scope: str | None) -> str:
+    """Convert EA Scope value to UML visibility prefix.
+
+    Public -> +, Private -> -, Protected -> #, Package -> ~, default -> +
+    """
+    _SCOPE_MAP = {
+        "Public": "+",
+        "Private": "-",
+        "Protected": "#",
+        "Package": "~",
+    }
+    return _SCOPE_MAP.get(scope or "", "+")
+
+
 def ea_rect_to_position(
     rect_left: int, rect_right: int, rect_top: int, rect_bottom: int
 ) -> dict[str, int]:

@@ -13,11 +13,14 @@
 		type EdgeProps,
 	} from '@xyflow/svelte';
 	import EdgeLabel from './edges/EdgeLabel.svelte';
+	import EdgeEndpointLabels from './edges/EdgeEndpointLabels.svelte';
 	import { edgeOverrideStyle } from '$lib/canvas/utils/visualStyles';
-	import type { EdgeVisualOverrides } from '$lib/types/canvas';
+	import { getActiveConfig } from '$lib/stores/viewStore.svelte';
+	import type { EdgeVisualOverrides, CanvasEdgeData } from '$lib/types/canvas';
 
 	interface Props extends EdgeProps {
 		dashArray?: string;
+		markerStart?: string;
 	}
 
 	let {
@@ -30,6 +33,7 @@
 		targetPosition,
 		style,
 		markerEnd,
+		markerStart,
 		data,
 		dashArray = 'none',
 	}: Props = $props();
@@ -48,12 +52,23 @@
 	const edgeVisual = $derived(data?.visual as EdgeVisualOverrides | undefined);
 	const visualOverride = $derived(edgeOverrideStyle(edgeVisual));
 	const dashFromVisual = $derived(edgeVisual?.dashArray ? `stroke-dasharray: ${edgeVisual.dashArray}; ` : '');
+
+	// ViewConfig toggles for endpoint labels (ADR-086)
+	const viewConfig = $derived(getActiveConfig());
+	const showCardinality = $derived(viewConfig.canvas?.show_cardinality !== false);
+	const showRoleNames = $derived(viewConfig.canvas?.show_role_names !== false);
+	const edgeData = $derived(data as CanvasEdgeData | undefined);
+	const hasEndpointLabels = $derived(
+		(showCardinality && (edgeData?.sourceCardinality || edgeData?.targetCardinality)) ||
+		(showRoleNames && (edgeData?.sourceRole || edgeData?.targetRole))
+	);
 </script>
 
 <FlowBaseEdge
 	{id}
 	path={path[0]}
 	{markerEnd}
+	{markerStart}
 	style="{edgeDash}{dashFromVisual}{visualOverride ? visualOverride + '; ' : ''}{style ?? ''}"
 	aria-label="{data?.label ?? data?.relationshipType ?? 'relationship'}"
 />
@@ -66,6 +81,15 @@
 		offsetX={data.labelOffsetX ?? 0}
 		offsetY={data.labelOffsetY ?? 0}
 		rotation={data.labelRotation ?? 0}
+	/>
+{/if}
+{#if hasEndpointLabels}
+	<EdgeEndpointLabels
+		{sourceX} {sourceY} {targetX} {targetY}
+		sourceCardinality={showCardinality ? edgeData?.sourceCardinality : undefined}
+		targetCardinality={showCardinality ? edgeData?.targetCardinality : undefined}
+		sourceRole={showRoleNames ? edgeData?.sourceRole : undefined}
+		targetRole={showRoleNames ? edgeData?.targetRole : undefined}
 	/>
 {/if}
 <EdgeReconnectAnchor type="source" position={{ x: sourceX, y: sourceY }} />

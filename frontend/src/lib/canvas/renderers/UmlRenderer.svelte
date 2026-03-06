@@ -40,7 +40,7 @@
 	const hasCompartments = $derived(
 		['class', 'abstract_class', 'interface_uml', 'enumeration'].includes(data.entityType)
 	);
-	const attributes = $derived((data as Record<string, unknown>).attributes as (string | { name: string; type: string })[] | undefined);
+	const attributes = $derived((data as Record<string, unknown>).attributes as (string | { name: string; type: string; scope?: string })[] | undefined);
 	const operations = $derived((data as Record<string, unknown>).operations as string[] | undefined);
 	const literals = $derived((data as Record<string, unknown>).literals as string[] | undefined);
 	const isAbstract = $derived(data.entityType === 'abstract_class');
@@ -78,7 +78,7 @@
 						{#if typeof attr === 'string'}
 							{attr}
 						{:else}
-							{attr.name}: {attr.type}
+							{attr.scope === 'Private' ? '- ' : attr.scope === 'Protected' ? '# ' : attr.scope === 'Package' ? '~ ' : '+ '}{attr.name}: {attr.type}
 						{/if}
 					</div>
 				{/each}
@@ -98,9 +98,6 @@
 				{/each}
 			</div>
 		{/if}
-	{/if}
-	{#if data.description}
-		<div class="uml-node__description">{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
 		<a href="/elements/{data.entityId}" class="canvas-node__browse-link" aria-label="View {data.label} details">
@@ -122,6 +119,7 @@
 		border-radius: 3px;
 		min-width: 140px;
 		font-size: 0.8rem;
+		overflow: hidden;
 	}
 	.uml-node--selected {
 		box-shadow: 0 0 0 2px var(--color-primary, #3b82f6);
@@ -174,11 +172,6 @@
 	.uml-node__attr {
 		font-size: 0.7rem;
 		font-family: monospace;
-	}
-	.uml-node__description {
-		padding: 2px 8px;
-		font-size: 0.7rem;
-		color: var(--color-muted, #666);
 	}
 	:global(.dark) .uml-node {
 		background: var(--color-bg, #1a1a1a);

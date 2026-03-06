@@ -496,6 +496,18 @@ async def import_sparx_file(
             visual_with_size["height"] = pos["height"]
             node_data["visual"] = visual_with_size
 
+            # Thread element attributes to canvas node for compartment rendering
+            obj_attrs = attrs_by_object.get(dobj.Object_ID)  # type: ignore[union-attr]
+            if obj_attrs:
+                node_data["attributes"] = [
+                    {
+                        "name": a.Name or "",  # type: ignore[union-attr]
+                        "type": a.Type or "",  # type: ignore[union-attr]
+                        "scope": a.Scope,  # type: ignore[union-attr]
+                    }
+                    for a in obj_attrs
+                ]
+
             nodes.append({
                 "id": node_id,
                 "type": iris_type_str or "component",
@@ -531,7 +543,7 @@ async def import_sparx_file(
             ) or "association"
 
             # Build edge metadata
-            route_map = {0: "bezier", 3: "step"}
+            route_map = {0: "bezier", 1: "step", 2: "step", 3: "step", 4: "step", 5: "step"}
             edge_data: dict[str, object] = {
                 "relationshipType": iris_conn_type,
                 "label": conn.Name or "",
