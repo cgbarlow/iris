@@ -14,6 +14,7 @@
 	import BoundaryNode from './nodes/BoundaryNode.svelte';
 	import ModelRefNode from './nodes/ModelRefNode.svelte';
 	import DiagramFrameNode from './nodes/DiagramFrameNode.svelte';
+	import NavigationCellNode from './nodes/NavigationCellNode.svelte';
 	import SimpleRenderer from './renderers/SimpleRenderer.svelte';
 	import UmlRenderer from './renderers/UmlRenderer.svelte';
 	import ArchimateRenderer from './renderers/ArchimateRenderer.svelte';
@@ -40,6 +41,13 @@
 		);
 		if (!themeVisual && !data.visual) return data;
 		const merged: NodeVisualOverrides = { ...themeVisual, ...data.visual };
+		// ArchiMate types use CSS layer colours; navigation cells use their own card styling.
+		// Don't let theme global defaults (e.g. UML cream #ffffcc) override them —
+		// only per-element explicit colours should take precedence over CSS layers.
+		if (ARCHIMATE_TYPES.has(data.entityType) || data.entityType === 'navigation_cell') {
+			if (!data.visual?.bgColor && merged.bgColor) delete merged.bgColor;
+			if (!data.visual?.borderColor && merged.borderColor) delete merged.borderColor;
+		}
 		return { ...data, visual: merged };
 	});
 
@@ -82,6 +90,8 @@
 
 {#if effectiveData.entityType === 'diagram_frame'}
 	<DiagramFrameNode data={effectiveData} />
+{:else if effectiveData.entityType === 'navigation_cell'}
+	<NavigationCellNode data={effectiveData} {selected} />
 {:else if effectiveData.entityType === 'note'}
 	<NoteNode data={effectiveData} {selected} />
 {:else if effectiveData.entityType === 'boundary'}

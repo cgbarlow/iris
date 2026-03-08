@@ -132,13 +132,7 @@
 	const iconSvg = $derived(ARCHIMATE_ICONS[data.entityType] ?? '');
 	const hasFixedSize = $derived(data.visual?.width != null && data.visual?.height != null);
 	const visualStyle = $derived.by(() => {
-		// Skip bgColor=#ffffff (EA default) so CSS layer colors apply as intended.
-		// Non-white bgColors (e.g. #dcdcdc for capability) are respected as explicit overrides.
-		const visual = data.visual ? { ...data.visual } : undefined;
-		if (visual?.bgColor?.toLowerCase() === '#ffffff') {
-			delete visual.bgColor;
-		}
-		let style = nodeOverrideStyle(visual, hasFixedSize);
+		let style = nodeOverrideStyle(data.visual, hasFixedSize);
 		if (hasFixedSize) style += (style ? '; ' : '') + 'box-sizing: border-box';
 		return style;
 	});
@@ -233,13 +227,13 @@
 		white-space: nowrap;
 		display: block;
 	}
-	/* Layer colours */
-	.archimate-node--business { background: #fffde7; border-color: #f9a825; color: #5d4037; }
-	.archimate-node--application { background: #e3f2fd; border-color: #1565c0; color: #0d47a1; }
-	.archimate-node--technology { background: #e8f5e9; border-color: #2e7d32; color: #1b5e20; }
-	.archimate-node--motivation { background: #f3e5f5; border-color: #7b1fa2; color: #4a148c; }
-	.archimate-node--strategy { background: #ffebee; border-color: #c62828; color: #b71c1c; }
-	.archimate-node--implementation_migration { background: #ffe0e0; border-color: #c62828; color: #4a1010; }
+	/* Layer colours — match EA/ArchiMate standard palette */
+	.archimate-node--business { background: #ffffb5; border-color: #b09a40; color: #333; }
+	.archimate-node--application { background: #b5ffff; border-color: #4098ad; color: #1a4a5a; }
+	.archimate-node--technology { background: #c9e7b7; border-color: #5a8a42; color: #2a4a1a; }
+	.archimate-node--motivation { background: #ccccff; border-color: #7a7ab0; color: #2a2a5a; }
+	.archimate-node--strategy { background: #f5deaa; border-color: #b09a40; color: #4a3a10; }
+	.archimate-node--implementation_migration { background: #ffe0e0; border-color: #c07070; color: #4a1010; }
 	:global(.dark) .archimate-node--business { background: #3e2723; border-color: #f9a825; }
 	:global(.dark) .archimate-node--application { background: #0d47a1; border-color: #42a5f5; color: #e3f2fd; }
 	:global(.dark) .archimate-node--technology { background: #1b5e20; border-color: #66bb6a; color: #e8f5e9; }

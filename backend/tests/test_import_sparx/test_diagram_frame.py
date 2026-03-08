@@ -67,7 +67,8 @@ async def _create_mock_qea_with_frame(path: str) -> None:
             "  Backcolor INTEGER DEFAULT -1,"
             "  Fontcolor INTEGER DEFAULT -1,"
             "  Bordercolor INTEGER DEFAULT -1,"
-            "  BorderWidth INTEGER DEFAULT -1"
+            "  BorderWidth INTEGER DEFAULT -1,"
+            "  PDATA1 TEXT"
             ")"
         )
         await db.execute(

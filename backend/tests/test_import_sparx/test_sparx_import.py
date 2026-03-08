@@ -171,8 +171,8 @@ class TestMapper:
     def test_map_boundary(self) -> None:
         assert map_object_type("Boundary") == "boundary"
 
-    def test_skip_text(self) -> None:
-        assert map_object_type("Text") is None
+    def test_text_maps_to_note(self) -> None:
+        assert map_object_type("Text") == "note"
 
     def test_unknown_object_type_returns_none(self) -> None:
         assert map_object_type("SomeUnknownType") is None
@@ -258,8 +258,8 @@ class TestConverter:
     def test_ea_rect_minimum_dimensions(self) -> None:
         # Small rect should be clamped to minimums
         pos = ea_rect_to_position(0, 50, -10, -30)
-        assert pos["width"] == 100  # clamped from 50 to 100
-        assert pos["height"] == 60  # clamped from 20 to 60
+        assert pos["width"] == 50  # clamped from 50 to max(50, 40)
+        assert pos["height"] == 30  # clamped from 20 to max(20, 30)
 
     def test_ea_rect_to_position_typical(self) -> None:
         # From sample: RectTop=-23, RectBottom=-102, RectLeft=324, RectRight=579
