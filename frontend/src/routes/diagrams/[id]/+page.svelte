@@ -290,12 +290,6 @@
 	/** Preferred theme from diagram metadata (e.g. Sparx EA imports set theme_id). */
 	const preferredThemeId = $derived(diagram?.metadata?.theme_id as string | undefined);
 
-	/** Diagram frame data from EA import (border + title tab). */
-	const diagramFrame = $derived(
-		(diagram?.data as Record<string, unknown>)?.diagramFrame as
-			{ type: string; name: string; width: number; height: number } | undefined
-	);
-
 	/** Source node name for RelationshipDialog display. */
 	const pendingSourceName = $derived.by(() => {
 		const pc = pendingConnection;
@@ -352,14 +346,16 @@
 				if (!entityId) return node;
 				try {
 					const element = await apiFetch<Element>(`/api/elements/${entityId}`);
-					if (element.description !== node.data.description || element.name !== node.data.label) {
+					const rawDesc = element.description ?? '';
+					const desc = rawDesc.startsWith(node.data.label) ? rawDesc.slice(rawDesc.indexOf('\n') + 1).replace(/^\r?\n/, '') : rawDesc;
+					if (desc !== node.data.description || element.name !== node.data.label) {
 						updated = true;
 						return {
 							...node,
 							data: {
 								...node.data,
 								label: element.name,
-								description: element.description ?? '',
+								description: desc,
 							},
 						};
 					}
@@ -2247,8 +2243,7 @@
 									<UnifiedCanvas
 										{notation}
 										{preferredThemeId}
-										{diagramFrame}
-										bind:nodes={canvasNodes}
+											bind:nodes={canvasNodes}
 										bind:edges={canvasEdges}
 										oncreatenode={() => (showAddElement = true)}
 										ondeletenode={handleDeleteNode}
@@ -2269,8 +2264,7 @@
 						<UnifiedCanvas
 							{notation}
 							{preferredThemeId}
-							{diagramFrame}
-							bind:nodes={canvasNodes}
+								bind:nodes={canvasNodes}
 							bind:edges={canvasEdges}
 							oncreatenode={() => (showAddElement = true)}
 							ondeletenode={handleDeleteNode}
@@ -2308,7 +2302,6 @@
 								<UnifiedCanvas
 									{notation}
 									{preferredThemeId}
-									{diagramFrame}
 									nodes={canvasNodes}
 									edges={canvasEdges}
 									browseMode={true}
@@ -2322,8 +2315,7 @@
 							<UnifiedCanvas
 								{notation}
 								{preferredThemeId}
-								{diagramFrame}
-								nodes={canvasNodes}
+										nodes={canvasNodes}
 								edges={canvasEdges}
 								browseMode={true}
 								onnodeselect={handleBrowseNodeSelect}

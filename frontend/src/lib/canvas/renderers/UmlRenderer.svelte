@@ -48,11 +48,23 @@
 	};
 
 	const icon = $derived(UML_ICONS[data.entityType] ?? '▭');
-	const stereotype = $derived(
-		hideTypeStereotypes
-			? ((data as Record<string, unknown>).stereotype as string | undefined)
-			: (STEREOTYPES[data.entityType] ?? (data as Record<string, unknown>).stereotype as string | undefined)
-	);
+	/** Well-known UML stereotypes that should be displayed in guillemets. */
+	const DISPLAYABLE_STEREOTYPES = new Set([
+		'interface', 'enumeration', 'abstract', 'utility', 'dataType', 'primitive',
+		'signal', 'exception', 'metaclass', 'stereotype', 'auxiliary', 'focus',
+	]);
+
+	const stereotype = $derived.by(() => {
+		// Type-derived stereotypes (e.g., interface_uml → «interface»)
+		const typeStereo = STEREOTYPES[data.entityType];
+		if (typeStereo) return hideTypeStereotypes ? undefined : typeStereo;
+		// Raw stereotype from data — only show if it's a well-known UML stereotype.
+		// Custom stereotypes (TEA_Application, NavigationCell, etc.) are hidden to
+		// avoid cluttering the display with internal EA metadata.
+		const raw = (data as Record<string, unknown>).stereotype as string | undefined;
+		if (raw && DISPLAYABLE_STEREOTYPES.has(raw)) return raw;
+		return undefined;
+	});
 	const qualifier = $derived((data as Record<string, unknown>).qualifier as string | undefined);
 	const hasCompartments = $derived(
 		['class', 'abstract_class', 'interface_uml', 'enumeration'].includes(data.entityType)
@@ -73,9 +85,11 @@
 	const isAbstract = $derived(data.entityType === 'abstract_class');
 	const isPackage = $derived(data.entityType === 'package_uml');
 	const isComponent = $derived(data.entityType === 'component_uml');
+	const hasFixedSize = $derived(data.visual?.width != null && data.visual?.height != null);
 	const visualStyle = $derived.by(() => {
-		let style = nodeOverrideStyle(data.visual);
+		let style = nodeOverrideStyle(data.visual, hasFixedSize);
 		if (themeBorderRadius != null) style += (style ? '; ' : '') + `border-radius: ${themeBorderRadius}px`;
+		if (hasFixedSize) style += (style ? '; ' : '') + 'box-sizing: border-box';
 		return style;
 	});
 </script>
@@ -84,6 +98,7 @@
 	class="uml-node uml-node--{data.entityType}"
 	class:uml-node--selected={selected}
 	class:uml-node--abstract={isAbstract}
+	class:uml-node--fixed={hasFixedSize}
 	style={visualStyle}
 	aria-label="{data.label}, {data.entityType}"
 >
@@ -93,7 +108,7 @@
 		</div>
 	{/if}
 	<div class="uml-node__header">
-		{#if !isPackage && !hideIcons}
+		{#if !isPackage && !hideIcons && !hasFixedSize}
 			<span class="uml-node__icon{isComponent ? ' uml-node__icon--corner' : ''}" aria-hidden="true">{icon}</span>
 		{/if}
 		{#if qualifier}
@@ -139,19 +154,24 @@
 		</a>
 	{/if}
 	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Top} id="top" style="top:0" />
 	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Bottom} id="bottom" style="bottom:0;top:auto" />
 	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Left} id="left" style="left:0" />
 	<Handle type="source" position={Position.Right} id="right" />
+	<Handle type="target" position={Position.Right} id="right" style="right:0;left:auto" />
 	<Handle type="source" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 	<Handle type="target" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 </div>
 
 <style>
 	.uml-node {
-		background: var(--color-bg, #fff);
+		background: var(--color-bg, #ffffcc);
 		border: 2px solid var(--color-border, #333);
 		border-radius: 3px;
 		min-width: 140px;
+		min-height: 0;
 		font-size: 0.8rem;
 	}
 	.uml-node--selected {
@@ -161,7 +181,7 @@
 		position: absolute;
 		top: -18px;
 		left: 0;
-		background: var(--color-bg, #fff);
+		background: var(--color-bg, #ffffcc);
 		border: 2px solid var(--color-border, #333);
 		border-bottom: none;
 		padding: 1px 8px;
@@ -172,7 +192,7 @@
 		padding-top: 6px;
 	}
 	.uml-node__header {
-		padding: 4px 8px;
+		padding: 2px 6px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -192,7 +212,7 @@
 		color: var(--color-muted, #666);
 	}
 	.uml-node__stereotype {
-		font-size: 0.65rem;
+		font-size: 0.6rem;
 		color: var(--color-muted, #666);
 	}
 	.uml-node__label {
@@ -209,11 +229,37 @@
 	}
 	.uml-node__compartment {
 		border-top: 1px solid var(--color-border, #333);
-		padding: 4px 8px;
+		padding: 2px 6px;
+		font-style: normal;
 	}
 	.uml-node__attr {
-		font-size: 0.7rem;
+		font-size: 0.65rem;
 		font-family: monospace;
+		font-style: normal;
+	}
+	.uml-node--fixed {
+		min-width: 0;
+	}
+	.uml-node--fixed .uml-node__header {
+		padding: 1px 4px;
+		line-height: 1.1;
+	}
+	.uml-node--fixed .uml-node__compartment {
+		padding: 1px 4px;
+	}
+	.uml-node--fixed .uml-node__attr {
+		line-height: 1.2;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.uml-node--fixed .uml-node__label,
+	.uml-node--fixed .uml-node__stereotype,
+	.uml-node--fixed .uml-node__qualifier {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 100%;
 	}
 	:global(.dark) .uml-node {
 		background: var(--color-bg, #1a1a1a);

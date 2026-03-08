@@ -2,7 +2,7 @@
 
 import type { NodeVisualOverrides, EdgeVisualOverrides } from '$lib/types/canvas';
 
-export function nodeOverrideStyle(visual?: NodeVisualOverrides): string {
+export function nodeOverrideStyle(visual?: NodeVisualOverrides, fixedSize?: boolean): string {
 	if (!visual) return '';
 	const parts: string[] = [];
 	if (visual.bgColor) parts.push(`background-color: ${visual.bgColor}`);
@@ -12,8 +12,18 @@ export function nodeOverrideStyle(visual?: NodeVisualOverrides): string {
 	if (visual.fontSize != null) parts.push(`font-size: ${visual.fontSize}px`);
 	if (visual.bold) parts.push('font-weight: bold');
 	if (visual.italic) parts.push('font-style: italic');
-	if (visual.width != null) parts.push(`width: ${visual.width}px`, 'min-width: unset');
-	if (visual.height != null) parts.push(`min-height: ${visual.height}px`);
+	if (visual.width != null) {
+		if (fixedSize) {
+			parts.push(`width: ${visual.width}px`);
+		} else {
+			parts.push(`min-width: ${visual.width}px`);
+		}
+	}
+	if (visual.height != null) {
+		// Always use min-height to prevent content clipping — EA heights are
+		// exact for the EA renderer but Iris padding/borders differ slightly.
+		parts.push(`min-height: ${visual.height}px`);
+	}
 	return parts.join('; ');
 }
 

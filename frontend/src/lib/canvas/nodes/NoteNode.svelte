@@ -28,6 +28,27 @@
 	const sanitizedDescription = $derived(
 		data.description ? DOMPurify.sanitize(data.description) : ''
 	);
+
+	/** Strip HTML tags to get plain text for comparison */
+	function stripHtml(html: string): string {
+		return html.replace(/<[^>]*>/g, '').replace(/\r\n/g, '\n').trim();
+	}
+
+	const descriptionPlain = $derived(stripHtml(sanitizedDescription));
+	const labelTrimmed = $derived((data.label ?? '').trim());
+
+	/**
+	 * Deduplication logic:
+	 * - If plain description equals label → show header only (skip description)
+	 * - If plain description starts with label → show description only (skip header, it's redundant)
+	 * - Otherwise → show both
+	 */
+	const showHeader = $derived(
+		!(sanitizedDescription && descriptionPlain.startsWith(labelTrimmed) && descriptionPlain !== labelTrimmed)
+	);
+	const showDescription = $derived(
+		!!(sanitizedDescription && descriptionPlain !== labelTrimmed)
+	);
 </script>
 
 <div
@@ -36,13 +57,15 @@
 	style={visualStyle}
 	aria-label="{data.label}, Note"
 >
-	<div class="canvas-node__header">
-		{#if !hideIcons}
-			<span class="canvas-node__icon" aria-hidden="true">📝</span>
-		{/if}
-		<span class="canvas-node__label">{data.label}</span>
-	</div>
-	{#if sanitizedDescription}
+	{#if showHeader}
+		<div class="canvas-node__header">
+			{#if !hideIcons}
+				<span class="canvas-node__icon" aria-hidden="true">📝</span>
+			{/if}
+			<span class="canvas-node__label">{data.label}</span>
+		</div>
+	{/if}
+	{#if showDescription}
 		<div class="canvas-node__description">{@html sanitizedDescription}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
@@ -55,9 +78,13 @@
 		</a>
 	{/if}
 	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Top} id="top" style="top:0" />
 	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Bottom} id="bottom" style="bottom:0;top:auto" />
 	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Left} id="left" style="left:0" />
 	<Handle type="source" position={Position.Right} id="right" />
+	<Handle type="target" position={Position.Right} id="right" style="right:0;left:auto" />
 	<Handle type="source" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 	<Handle type="target" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 </div>
@@ -75,9 +102,10 @@
 		overflow: hidden;
 		word-break: break-word;
 		overflow-wrap: break-word;
+		box-sizing: border-box;
 	}
 	.canvas-node--note :global(.canvas-node__header) {
-		font-weight: 700;
+		font-weight: normal;
 		font-size: 9px;
 		flex-wrap: wrap;
 	}
@@ -85,6 +113,20 @@
 		white-space: normal;
 		text-overflow: unset;
 		overflow: visible;
+	}
+	.canvas-node--note :global(.canvas-node__description ol),
+	.canvas-node--note :global(.canvas-node__description ul) {
+		margin: 2px 0;
+		padding-left: 16px;
+	}
+	.canvas-node--note :global(.canvas-node__description ol) {
+		list-style: decimal;
+	}
+	.canvas-node--note :global(.canvas-node__description ul) {
+		list-style: disc;
+	}
+	.canvas-node--note :global(.canvas-node__description li) {
+		margin: 1px 0;
 	}
 	.canvas-node--note::before {
 		content: '';

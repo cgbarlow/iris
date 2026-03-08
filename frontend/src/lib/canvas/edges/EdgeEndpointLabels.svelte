@@ -2,8 +2,21 @@
 	/**
 	 * EdgeEndpointLabels: Renders cardinality and role name labels near edge endpoints (ADR-086).
 	 * Positioned with offsets along and perpendicular to the edge direction.
+	 * Accepts optional labelPositions from EA for data-driven positioning (ADR-088).
 	 */
 	import { EdgeLabel } from '@xyflow/svelte';
+
+	interface LabelPos {
+		cx: number;
+		cy: number;
+	}
+
+	interface LabelPositions {
+		llb?: LabelPos;
+		llt?: LabelPos;
+		lrt?: LabelPos;
+		lrb?: LabelPos;
+	}
 
 	interface Props {
 		sourceX: number;
@@ -14,9 +27,10 @@
 		targetCardinality?: string;
 		sourceRole?: string;
 		targetRole?: string;
+		labelPositions?: LabelPositions;
 	}
 
-	let { sourceX, sourceY, targetX, targetY, sourceCardinality, targetCardinality, sourceRole, targetRole }: Props = $props();
+	let { sourceX, sourceY, targetX, targetY, sourceCardinality, targetCardinality, sourceRole, targetRole, labelPositions }: Props = $props();
 
 	/** Compute offset positions along and perpendicular to the edge. */
 	const ALONG = 25;
@@ -32,17 +46,21 @@
 	const px = $derived(-uy); // perpendicular
 	const py = $derived(ux);
 
-	// Source label positions (near source endpoint, offset along edge)
-	const srcLabelX = $derived(sourceX + ux * ALONG + px * PERP);
-	const srcLabelY = $derived(sourceY + uy * ALONG + py * PERP);
-	const srcRoleX = $derived(sourceX + ux * ALONG - px * PERP);
-	const srcRoleY = $derived(sourceY + uy * ALONG - py * PERP);
+	// Source cardinality position (LLB = source cardinality)
+	const srcLabelX = $derived(labelPositions?.llb ? sourceX + labelPositions.llb.cx : sourceX + ux * ALONG + px * PERP);
+	const srcLabelY = $derived(labelPositions?.llb ? sourceY - labelPositions.llb.cy : sourceY + uy * ALONG + py * PERP);
 
-	// Target label positions (near target endpoint, offset back along edge)
-	const tgtLabelX = $derived(targetX - ux * ALONG + px * PERP);
-	const tgtLabelY = $derived(targetY - uy * ALONG + py * PERP);
-	const tgtRoleX = $derived(targetX - ux * ALONG - px * PERP);
-	const tgtRoleY = $derived(targetY - uy * ALONG - py * PERP);
+	// Source role position (LLT = source role)
+	const srcRoleX = $derived(labelPositions?.llt ? sourceX + labelPositions.llt.cx : sourceX + ux * ALONG - px * PERP);
+	const srcRoleY = $derived(labelPositions?.llt ? sourceY - labelPositions.llt.cy : sourceY + uy * ALONG - py * PERP);
+
+	// Target cardinality position (LRT = target cardinality)
+	const tgtLabelX = $derived(labelPositions?.lrt ? targetX + labelPositions.lrt.cx : targetX - ux * ALONG + px * PERP);
+	const tgtLabelY = $derived(labelPositions?.lrt ? targetY - labelPositions.lrt.cy : targetY - uy * ALONG + py * PERP);
+
+	// Target role position (LRB = target role)
+	const tgtRoleX = $derived(labelPositions?.lrb ? targetX + labelPositions.lrb.cx : targetX - ux * ALONG - px * PERP);
+	const tgtRoleY = $derived(labelPositions?.lrb ? targetY - labelPositions.lrb.cy : targetY - uy * ALONG - py * PERP);
 </script>
 
 {#if sourceCardinality}

@@ -182,6 +182,7 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
             "enumeration": ea_node,
             "package_uml": ea_node,
             "component_uml": ea_node,
+            "component": ea_node,
             "object": ea_node,
             "use_case": ea_node,
             "node": ea_node,

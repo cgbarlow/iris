@@ -1,8 +1,8 @@
-"""Tests for diagram frame metadata after import (ADR-086).
+"""Tests for diagram frame as canvas node after import (ADR-088).
 
-Verifies that imported diagrams include a diagramFrame key in their
-canvas data containing the diagram's type, name, width, and height
-derived from EA's cx/cy columns.
+Verifies that imported diagrams include a diagram_frame node in the
+nodes array (not a separate diagramFrame field), with type, name,
+width, and height derived from EA's cx/cy columns.
 """
 
 from __future__ import annotations
@@ -235,12 +235,12 @@ async def _auth_headers(client: httpx.AsyncClient) -> dict[str, str]:
 
 
 class TestDiagramFrame:
-    """Verify imported diagrams include diagramFrame in canvas data."""
+    """Verify imported diagrams include diagram_frame as a node in the nodes array."""
 
-    async def test_diagram_data_has_diagram_frame_key(
+    async def test_frame_is_a_node_in_nodes_array(
         self, client: httpx.AsyncClient, tmp_path: Path,
     ) -> None:
-        """After import, diagram canvas data must contain a 'diagramFrame' key."""
+        """After import, diagram canvas data must contain a diagram_frame node."""
         headers = await _auth_headers(client)
         db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
         db = db_manager.main_db
@@ -260,14 +260,14 @@ class TestDiagramFrame:
         assert len(rows) >= 1, "No diagram data found after import"
 
         data = json.loads(rows[0][0])
-        assert "diagramFrame" in data, (
-            f"Diagram canvas data missing 'diagramFrame' key. Keys present: {list(data.keys())}"
-        )
+        nodes = data.get("nodes", [])
+        frame_nodes = [n for n in nodes if n.get("type") == "diagram_frame"]
+        assert len(frame_nodes) == 1, f"Expected 1 diagram_frame node, found {len(frame_nodes)}"
 
-    async def test_diagram_frame_has_type(
+    async def test_frame_node_has_dimensions(
         self, client: httpx.AsyncClient, tmp_path: Path,
     ) -> None:
-        """diagramFrame.type should reflect the EA Diagram_Type."""
+        """diagram_frame node should include frameWidth and frameHeight in data."""
         headers = await _auth_headers(client)
         db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
         db = db_manager.main_db
@@ -285,14 +285,15 @@ class TestDiagramFrame:
         )
         rows = await cursor.fetchall()
         data = json.loads(rows[0][0])
-        frame = data["diagramFrame"]
-        assert "type" in frame, "diagramFrame missing 'type' field"
-        assert frame["type"] == "Logical", f"Expected type='Logical', got '{frame['type']}'"
+        nodes = data.get("nodes", [])
+        frame_node = next(n for n in nodes if n.get("type") == "diagram_frame")
+        assert frame_node["data"]["frameWidth"] == 799
+        assert frame_node["data"]["frameHeight"] == 1067
 
-    async def test_diagram_frame_has_name(
+    async def test_frame_node_has_name_and_type(
         self, client: httpx.AsyncClient, tmp_path: Path,
     ) -> None:
-        """diagramFrame.name should be the EA diagram name."""
+        """diagram_frame node data should have frameType and label."""
         headers = await _auth_headers(client)
         db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
         db = db_manager.main_db
@@ -310,13 +311,15 @@ class TestDiagramFrame:
         )
         rows = await cursor.fetchall()
         data = json.loads(rows[0][0])
-        frame = data["diagramFrame"]
-        assert frame.get("name") == "Main", f"Expected name='Main', got '{frame.get('name')}'"
+        nodes = data.get("nodes", [])
+        frame_node = next(n for n in nodes if n.get("type") == "diagram_frame")
+        assert frame_node["data"]["frameType"] == "class"
+        assert frame_node["data"]["label"] == "Main"
 
-    async def test_diagram_frame_has_dimensions(
+    async def test_no_separate_diagram_frame_field(
         self, client: httpx.AsyncClient, tmp_path: Path,
     ) -> None:
-        """diagramFrame should include width (cx=799) and height (cy=1067)."""
+        """diagramFrame should NOT exist as a separate field in canvas data."""
         headers = await _auth_headers(client)
         db_manager = client._transport.app.state.db_manager  # type: ignore[union-attr]
         db = db_manager.main_db
@@ -334,6 +337,4 @@ class TestDiagramFrame:
         )
         rows = await cursor.fetchall()
         data = json.loads(rows[0][0])
-        frame = data["diagramFrame"]
-        assert frame.get("width") == 799, f"Expected width=799, got {frame.get('width')}"
-        assert frame.get("height") == 1067, f"Expected height=1067, got {frame.get('height')}"
+        assert "diagramFrame" not in data, "diagramFrame should be a node, not a separate field"

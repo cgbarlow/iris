@@ -13,6 +13,7 @@
 	import NoteNode from './nodes/NoteNode.svelte';
 	import BoundaryNode from './nodes/BoundaryNode.svelte';
 	import ModelRefNode from './nodes/ModelRefNode.svelte';
+	import DiagramFrameNode from './nodes/DiagramFrameNode.svelte';
 	import SimpleRenderer from './renderers/SimpleRenderer.svelte';
 	import UmlRenderer from './renderers/UmlRenderer.svelte';
 	import ArchimateRenderer from './renderers/ArchimateRenderer.svelte';
@@ -27,6 +28,7 @@
 	let { data, selected = false }: Props = $props();
 
 	const notation = getContext<NotationType>('notation') ?? 'simple';
+	const preferredThemeId = getContext<string | undefined>('preferredThemeId');
 
 	/** Compute effective visual: theme defaults merged with per-element overrides (per-element wins). */
 	const effectiveData = $derived.by(() => {
@@ -34,6 +36,7 @@
 			notation,
 			data.entityType,
 			(data as Record<string, unknown>).stereotype as string | undefined,
+			preferredThemeId,
 		);
 		if (!themeVisual && !data.visual) return data;
 		const merged: NodeVisualOverrides = { ...themeVisual, ...data.visual };
@@ -77,17 +80,21 @@
 	]);
 </script>
 
-{#if effectiveData.entityType === 'note'}
+{#if effectiveData.entityType === 'diagram_frame'}
+	<DiagramFrameNode data={effectiveData} />
+{:else if effectiveData.entityType === 'note'}
 	<NoteNode data={effectiveData} {selected} />
 {:else if effectiveData.entityType === 'boundary'}
 	<BoundaryNode data={effectiveData} {selected} />
 {:else if effectiveData.entityType === 'modelref'}
 	<ModelRefNode data={effectiveData} {selected} />
+{:else if !isUniversal && ARCHIMATE_TYPES.has(effectiveData.entityType)}
+	<ArchimateRenderer data={effectiveData} {selected} />
 {:else if notation === 'uml' || (!isUniversal && UML_TYPES.has(effectiveData.entityType))}
 	<UmlRenderer data={effectiveData} {selected} />
 {:else if notation === 'c4' || C4_TYPES.has(effectiveData.entityType)}
 	<C4Renderer data={effectiveData} {selected} />
-{:else if notation === 'archimate' || ARCHIMATE_TYPES.has(effectiveData.entityType)}
+{:else if notation === 'archimate'}
 	<ArchimateRenderer data={effectiveData} {selected} />
 {:else if notation === 'simple'}
 	<SimpleRenderer data={effectiveData} {selected} />

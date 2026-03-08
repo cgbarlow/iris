@@ -74,6 +74,9 @@
 
 	async function uploadFile() {
 		if (!selectedFile) return;
+		if (importSetId && importSetName) {
+			if (!confirm(`Are you sure you want to import to existing set "${importSetName}"?`)) return;
+		}
 		uploading = true;
 		progress = 0;
 		error = null;

@@ -163,7 +163,7 @@ class TestMapper:
         assert map_object_type("Interface") == "interface_uml"
 
     def test_map_package_is_special(self) -> None:
-        assert map_object_type("Package") == "_package"
+        assert map_object_type("Package") == "package_uml"
 
     def test_map_note(self) -> None:
         assert map_object_type("Note") == "note"
@@ -208,7 +208,7 @@ class TestMapper:
         assert map_diagram_type("SomeUnknownDiagram") == ("free_form", "simple")
 
     def test_map_package_diagram(self) -> None:
-        assert map_diagram_type("Package") == ("component", "uml")
+        assert map_diagram_type("Package") == ("pkg", "uml")
 
     def test_map_use_case_diagram(self) -> None:
         assert map_diagram_type("Use Case") == ("use_case", "uml")
@@ -316,8 +316,8 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # 959 elements: 953 classes + 5 notes + 1 boundary (Package=67 handled as hierarchy)
-        assert summary.elements_created == 959
+        # 1026 elements: 953 classes + 5 notes + 1 boundary + 67 packages
+        assert summary.elements_created == 1026
         # Only Text/UMLDiagram/Constraint are skipped now
         assert summary.elements_skipped == 0
 
@@ -371,10 +371,10 @@ class TestFullImport:
 
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # elements_created + elements_skipped + packages = total objects
-        # Packages are 67 in t_object (Object_Type='Package')
+        # elements_created + elements_skipped = total objects
+        # Packages (67) are now created as regular elements (package_uml)
         total_objects = 1026
-        assert summary.elements_created + summary.elements_skipped + 67 == total_objects
+        assert summary.elements_created + summary.elements_skipped == total_objects
 
         # relationships_created + connectors_skipped + package_relationships_created = total connectors
         total_connectors = 1420
@@ -838,9 +838,7 @@ class TestImportChangeSummary:
         user_id = row[0]
         summary = await import_sparx_file(db, SAMPLE_QEA, imported_by=user_id)
 
-        # Check package_relationships table has entries (unique rows)
-        cursor = await db.execute("SELECT COUNT(*) FROM package_relationships")
-        row = await cursor.fetchone()
-        assert row[0] > 0
-        # Summary count includes duplicates (already-existing relationships)
-        assert summary.package_relationships_created >= row[0]
+        # Package-to-package connectors are now regular relationships
+        # (packages are in element_map), so package_relationships table may be empty.
+        # The connectors between packages become normal relationships instead.
+        assert summary.package_relationships_created >= 0

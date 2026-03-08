@@ -13,7 +13,7 @@ const ALL_NODE_TYPE_KEYS = [
 	// Simple view
 	'component', 'service', 'interface', 'package', 'actor', 'database', 'queue',
 	// Universal
-	'note', 'boundary', 'modelref',
+	'note', 'boundary', 'modelref', 'diagram_frame', 'navigation_cell',
 	// UML
 	'class', 'object', 'use_case', 'state', 'activity', 'node',
 	'interface_uml', 'enumeration', 'abstract_class', 'component_uml', 'package_uml',

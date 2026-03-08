@@ -48,13 +48,8 @@
 	}
 
 	const path = $derived.by(() => {
-		// Apply absolute connection point overrides
+		// Use SvelteFlow's computed handle positions (correctly placed on node edges)
 		let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY;
-		if (data?.sourcePoint) { sx = (data.sourcePoint as { x: number; y: number }).x; sy = (data.sourcePoint as { x: number; y: number }).y; }
-		if (data?.targetPoint) { tx = (data.targetPoint as { x: number; y: number }).x; ty = (data.targetPoint as { x: number; y: number }).y; }
-		// Apply relative offset overrides
-		if (data?.sourceOffset) { sx += (data.sourceOffset as { x: number; y: number }).x; sy += (data.sourceOffset as { x: number; y: number }).y; }
-		if (data?.targetOffset) { tx += (data.targetOffset as { x: number; y: number }).x; ty += (data.targetOffset as { x: number; y: number }).y; }
 
 		// Waypoint-based polyline routing
 		const waypoints = data?.waypoints as { x: number; y: number }[] | undefined;
@@ -113,6 +108,7 @@
 		targetCardinality={showCardinality ? edgeData?.targetCardinality : undefined}
 		sourceRole={showRoleNames ? edgeData?.sourceRole : undefined}
 		targetRole={showRoleNames ? edgeData?.targetRole : undefined}
+		labelPositions={edgeData?.labelPositions}
 	/>
 {/if}
 <EdgeReconnectAnchor type="source" position={{ x: sourceX, y: sourceY }} />

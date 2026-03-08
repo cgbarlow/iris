@@ -40,6 +40,7 @@ class QeaElement:
     Fontcolor: int | None = None
     Bordercolor: int | None = None
     BorderWidth: int | None = None
+    PDATA1: str | None = None
 
 
 @dataclass
@@ -154,7 +155,7 @@ async def read_elements(db_path: str) -> list[QeaElement]:
             "SELECT Object_ID, Object_Type, Name, Package_ID, Note, ea_guid, "
             "Status, Stereotype, Version, Scope, Abstract, Persistence, "
             "Author, Complexity, Phase, CreatedDate, ModifiedDate, GenType, "
-            "Backcolor, Fontcolor, Bordercolor, BorderWidth "
+            "Backcolor, Fontcolor, Bordercolor, BorderWidth, PDATA1 "
             "FROM t_object"
         )
         rows = await cursor.fetchall()
@@ -182,6 +183,7 @@ async def read_elements(db_path: str) -> list[QeaElement]:
                 Fontcolor=row[19],
                 Bordercolor=row[20],
                 BorderWidth=row[21],
+                PDATA1=row[22],
             )
             for row in rows
         ]
@@ -262,12 +264,16 @@ async def read_diagrams(db_path: str) -> list[QeaDiagram]:
 
 
 async def read_diagram_links(db_path: str) -> list[QeaDiagramLink]:
-    """Read all diagram link placements from a .qea file."""
+    """Read all diagram link placements from a .qea/.eap file."""
     async with aiosqlite.connect(db_path) as db:
-        cursor = await db.execute(
-            "SELECT DiagramID, ConnectorID, Geometry, Style, Hidden, Path "
-            "FROM t_diagramlinks"
-        )
+        try:
+            cursor = await db.execute(
+                "SELECT DiagramID, ConnectorID, Geometry, Style, Hidden, Path "
+                "FROM t_diagramlinks"
+            )
+        except Exception:
+            # Table may not exist in older .eap files
+            return []
         rows = await cursor.fetchall()
         return [
             QeaDiagramLink(

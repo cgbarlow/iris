@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING
 from app.diagrams.service import create_diagram
 from app.elements.service import create_element
 from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position, format_uml_visibility, parse_diagram_link_geometry, parse_diagram_link_path
-from app.import_sparx.mapper import map_connector_type, map_diagram_type, map_object_type
+from app.import_sparx.mapper import map_archimate_stereotype, map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
     QeaElement,
     QeaPackage,
@@ -77,6 +78,47 @@ def derive_note_label(html_content: str | None, fallback: str) -> str:
             return stripped
 
     return fallback
+
+
+def strip_label_from_note(label: str, note_text: str) -> str:
+    """Strip the label prefix from note text to avoid duplicate title display.
+
+    If note_text starts with label followed by a line break, returns the
+    remainder only. Otherwise returns note_text unchanged.
+    """
+    for sep in ("\r\n", "\n"):
+        prefix = label + sep
+        if note_text.startswith(prefix):
+            return note_text[len(prefix):].lstrip("\r\n")
+    return note_text
+
+
+def compute_auto_handles(
+    src_x: int, src_y: int, src_w: int, src_h: int,
+    tgt_x: int, tgt_y: int, tgt_w: int, tgt_h: int,
+) -> tuple[str, str]:
+    """Compute optimal source/target handle sides from node geometry.
+
+    Compares node center positions and returns the handle side pair
+    (sourceHandle, targetHandle) that produces the shortest connection.
+    """
+    src_cx = src_x + src_w / 2
+    src_cy = src_y + src_h / 2
+    tgt_cx = tgt_x + tgt_w / 2
+    tgt_cy = tgt_y + tgt_h / 2
+
+    dx = tgt_cx - src_cx
+    dy = tgt_cy - src_cy
+
+    if abs(dx) >= abs(dy):
+        # Predominantly horizontal
+        if dx >= 0:
+            return ("right", "left")
+        return ("left", "right")
+    # Predominantly vertical
+    if dy >= 0:
+        return ("bottom", "top")
+    return ("top", "bottom")
 
 
 def _topo_sort_packages(packages: list[QeaPackage]) -> list[QeaPackage]:
@@ -273,12 +315,10 @@ async def import_sparx_file(
             summary.elements_skipped += 1
             continue
 
-        iris_type = map_object_type(elem.Object_Type)
+        iris_type = map_object_type(elem.Object_Type, elem.Stereotype)
         if iris_type is None:
             summary.elements_skipped += 1
             continue
-        if iris_type == "_package":
-            continue  # Already handled as hierarchy
         # Abstract classes get a distinct type so UML renderer applies italic styling
         if iris_type == "class" and elem.Abstract == "1":
             iris_type = "abstract_class"
@@ -348,6 +388,16 @@ async def import_sparx_file(
                 elem.Note,
                 f"{'Note' if iris_type == 'note' else 'Boundary'} {elem.Object_ID}",
             )
+        elif iris_type == "navigation_cell" and not elem.Name:
+            # NavigationCell: use target diagram name as element name
+            nav_target_id = None
+            if elem.PDATA1:
+                try:
+                    nav_target_id = int(elem.PDATA1)
+                except (ValueError, TypeError):
+                    pass
+            ea_diag_name_lookup = {d.Diagram_ID: (d.Name or "") for d in diagrams}
+            element_name = ea_diag_name_lookup.get(nav_target_id, f"Navigation {elem.Object_ID}") if nav_target_id else f"Navigation {elem.Object_ID}"
         else:
             element_name = elem.Name or f"Element {elem.Object_ID}"
 
@@ -444,6 +494,9 @@ async def import_sparx_file(
     # Build package name lookup for cross-package qualifiers
     package_names: dict[int, str] = {p.Package_ID: (p.Name or "") for p in packages}
 
+    # Build EA diagram name lookup for NavigationCell label resolution
+    ea_diagram_names: dict[int, str] = {d.Diagram_ID: (d.Name or "") for d in diagrams}
+
     # Build diagram_objects lookup
     diag_objects_by_diagram: dict[int, list[object]] = {}
     for dobj in diagram_objects:
@@ -453,6 +506,8 @@ async def import_sparx_file(
     diag_links_index: dict[tuple[int, int], object] = {}
     for dlink in diagram_links:
         diag_links_index[(dlink.DiagramID, dlink.ConnectorID)] = dlink
+
+    ea_diagram_id_to_iris: dict[int, str] = {}
 
     for diag in diagrams:
         # Skip if diagram already exists (idempotent re-import)
@@ -483,16 +538,33 @@ async def import_sparx_file(
             # Find the element to get its type and name
             elem = element_index.get(dobj.Object_ID)  # type: ignore[union-attr]
             iris_type_str = (
-                map_object_type(elem.Object_Type) if elem and elem.Object_Type else "component"
+                map_object_type(elem.Object_Type, elem.Stereotype) if elem and elem.Object_Type else "component"
             )
             # Abstract classes get a distinct type for italic rendering in UML
             if iris_type_str == "class" and elem and elem.Abstract == "1":
                 iris_type_str = "abstract_class"
+            # ArchiMate stereotype override: EA stores ArchiMate elements as
+            # standard UML types (Class, Component, Activity) with ArchiMate
+            # stereotypes — use the stereotype to select the correct Iris type.
+            if elem and elem.Stereotype:
+                archimate_type = map_archimate_stereotype(elem.Stereotype)
+                if archimate_type:
+                    iris_type_str = archimate_type
 
             node_id = str(uuid.uuid4())
             # Derive label for notes/boundaries with NULL Name
             if elem and iris_type_str in ("note", "boundary") and not elem.Name:
                 node_label = derive_note_label(elem.Note, "Unknown")
+            elif elem and iris_type_str == "navigation_cell":
+                # NavigationCell: PDATA1 is the EA Diagram_ID the cell links to.
+                # Use the target diagram's name as the card label.
+                target_diag_id = None
+                if elem.PDATA1:
+                    try:
+                        target_diag_id = int(elem.PDATA1)
+                    except (ValueError, TypeError):
+                        pass
+                node_label = ea_diagram_names.get(target_diag_id, "Unknown") if target_diag_id else "Unknown"
             else:
                 node_label = (elem.Name or "Unknown") if elem else "Unknown"
 
@@ -501,9 +573,16 @@ async def import_sparx_file(
                 "entityType": iris_type_str or "component",
                 "entityId": element_id,
             }
+            # NavigationCell: store target EA diagram ID for post-processing
+            # (will be resolved to Iris UUID after all diagrams are created)
+            if elem and iris_type_str == "navigation_cell" and elem.PDATA1:
+                try:
+                    node_data["_targetEaDiagramId"] = int(elem.PDATA1)
+                except (ValueError, TypeError):
+                    pass
             # Always populate description from element's Note content
             if elem and elem.Note:
-                node_data["description"] = elem.Note
+                node_data["description"] = strip_label_from_note(node_label, elem.Note)
             # Store stereotype for theme resolution
             if elem and elem.Stereotype:
                 node_data["stereotype"] = elem.Stereotype
@@ -526,6 +605,11 @@ async def import_sparx_file(
             visual_with_size: dict[str, object] = node_visual or {}
             visual_with_size["width"] = pos["width"]
             visual_with_size["height"] = pos["height"]
+            # Boundaries are transparent containers — strip bgColor so CSS
+            # default (transparent) applies. EA BackColor on boundaries is
+            # typically not rendered as a fill in the EA UI.
+            if iris_type_str == "boundary":
+                visual_with_size.pop("bgColor", None)
             node_data["visual"] = visual_with_size
 
             # Thread element attributes to canvas node for compartment rendering
@@ -540,7 +624,7 @@ async def import_sparx_file(
                     for a in obj_attrs
                 ]
 
-            nodes.append({
+            node_dict: dict[str, object] = {
                 "id": node_id,
                 "type": iris_type_str or "component",
                 "position": {"x": pos["x"], "y": pos["y"]},
@@ -549,16 +633,27 @@ async def import_sparx_file(
                     "width": pos["width"],
                     "height": pos["height"],
                 },
-            })
+            }
+            # Boundaries and diagram frames render behind content nodes
+            if iris_type_str in ("boundary", "diagram_frame"):
+                node_dict["zIndex"] = -1
+            nodes.append(node_dict)
 
         # Build edges from connectors that connect nodes on this diagram
         node_entity_to_node_id: dict[str, str] = {}
+        node_geometry: dict[str, dict[str, int]] = {}
         for n in nodes:
             data = n.get("data")
             if isinstance(data, dict):
                 eid = data.get("entityId")
                 if eid:
                     node_entity_to_node_id[eid] = n["id"]  # type: ignore[assignment]
+            measured = n.get("measured", {})
+            pos = n.get("position", {})
+            node_geometry[n["id"]] = {  # type: ignore[index]
+                "x": pos.get("x", 0), "y": pos.get("y", 0),  # type: ignore[union-attr]
+                "w": measured.get("width", 100), "h": measured.get("height", 60),  # type: ignore[union-attr]
+            }
 
         for conn in connectors:
             source_eid = element_map.get(conn.Start_Object_ID)
@@ -600,6 +695,9 @@ async def import_sparx_file(
                 edge_data["targetRole"] = f"{prefix}{conn.DestRole}"
             if conn.Stereotype:
                 edge_data["stereotype"] = conn.Stereotype
+                # Show stereotype as label when edge has no name (ADR-090)
+                if not conn.Name:
+                    edge_data["label"] = f"\u00AB{conn.Stereotype}\u00BB"
             if conn.Direction:
                 edge_data["direction"] = conn.Direction
             if conn.RouteStyle is not None:
@@ -623,6 +721,9 @@ async def import_sparx_file(
                 waypoints = parse_diagram_link_path(dlink.Path)  # type: ignore[union-attr]
                 if waypoints:
                     edge_data["waypoints"] = waypoints
+                # EA label positions from geometry
+                if geom.get("labels"):
+                    edge_data["labelPositions"] = geom["labels"]
 
             # EA connector absolute connection points
             if conn.PtStartX and conn.PtStartY:
@@ -638,6 +739,21 @@ async def import_sparx_file(
                 source_handle = edge_handle_map[conn.Start_Edge]
             if conn.End_Edge and conn.End_Edge in edge_handle_map:
                 target_handle = edge_handle_map[conn.End_Edge]
+
+            # Note links use center-to-center handles
+            if iris_conn_type == "note_link":
+                source_handle = "center"
+                target_handle = "center"
+
+            # Auto-compute handles from node geometry when EA says "auto-route"
+            if not source_handle and not target_handle and source_node != target_node:
+                sg = node_geometry.get(source_node, {})
+                tg = node_geometry.get(target_node, {})
+                if sg and tg:
+                    source_handle, target_handle = compute_auto_handles(
+                        sg["x"], sg["y"], sg["w"], sg["h"],
+                        tg["x"], tg["y"], tg["w"], tg["h"],
+                    )
 
             # Self-loop edge
             if source_node == target_node:
@@ -664,23 +780,39 @@ async def import_sparx_file(
                     edge_entry["targetHandle"] = target_handle
                 edges.append(edge_entry)
 
-        model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
-
-        # Add diagram frame data for EA imported diagrams
+        # Add diagram frame as a canvas node so it zooms/pans with the canvas
         if diag.cx and diag.cy:
-            model_data["diagramFrame"] = {
-                "type": diag.Diagram_Type or "class",
-                "name": diag.Name or "",
-                "width": diag.cx,
-                "height": diag.cy,
+            # Compute bounding box origin from all nodes, with padding
+            min_x = min((n["position"]["x"] for n in nodes), default=0) - 10  # type: ignore[index]
+            min_y = min((n["position"]["y"] for n in nodes), default=0) - 40  # type: ignore[index]
+            frame_node: dict[str, object] = {
+                "id": str(uuid.uuid4()),
+                "type": "diagram_frame",
+                "position": {"x": min_x, "y": min_y},
+                "data": {
+                    "label": diag.Name or "",
+                    "entityType": "diagram_frame",
+                    "frameType": diagram_type,
+                    "frameName": diag.Name or "",
+                    "frameWidth": diag.cx,
+                    "frameHeight": diag.cy,
+                },
+                "selectable": False,
+                "draggable": False,
+                "connectable": False,
+                "zIndex": -1,
             }
+            # Insert at beginning so it renders behind other nodes
+            nodes.insert(0, frame_node)
+
+        model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
         # Build diagram metadata with ea_guid and theme
         diag_metadata: dict[str, object] = {"theme_id": "ea-default-uml"}
         if diag.ea_guid:
             diag_metadata["ea_guid"] = diag.ea_guid
 
-        await create_diagram(
+        result = await create_diagram(
             db,
             diagram_type=diagram_type,
             name=diag.Name or f"Diagram {diag.Diagram_ID}",
@@ -693,6 +825,35 @@ async def import_sparx_file(
             metadata=diag_metadata,
             change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
         )
+        ea_diagram_id_to_iris[diag.Diagram_ID] = result["id"]
         summary.diagrams_created += 1
+
+    # 6. Post-process: link NavigationCell nodes to their target diagrams.
+    # NavigationCells use PDATA1 (EA Diagram_ID) to reference the diagram they
+    # navigate to. Now that all diagrams have Iris UUIDs, patch linkedModelId.
+    if ea_diagram_id_to_iris:
+        for ea_diag_id, iris_diag_id in ea_diagram_id_to_iris.items():
+            cursor = await db.execute(
+                "SELECT data FROM diagram_versions WHERE diagram_id = ? ORDER BY version DESC LIMIT 1",
+                (iris_diag_id,),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                continue
+            canvas = json.loads(row[0])
+            patched = False
+            for node in canvas.get("nodes", []):
+                nd = node.get("data", {})
+                if nd.get("entityType") == "navigation_cell" and nd.get("_targetEaDiagramId"):
+                    target_iris_id = ea_diagram_id_to_iris.get(nd["_targetEaDiagramId"])
+                    if target_iris_id:
+                        nd["linkedModelId"] = target_iris_id
+                    del nd["_targetEaDiagramId"]
+                    patched = True
+            if patched:
+                await db.execute(
+                    "UPDATE diagram_versions SET data = ? WHERE diagram_id = ? AND version = 1",
+                    (json.dumps(canvas), iris_diag_id),
+                )
 
     return summary

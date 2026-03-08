@@ -18,6 +18,7 @@ class LockResponse(BaseModel):
     id: str
     target_type: str
     target_id: str
+    target_name: str | None = None
     user_id: str
     username: str
     acquired_at: str

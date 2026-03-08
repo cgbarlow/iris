@@ -71,6 +71,7 @@ def build_node_visual(
     if lw == -1 and border_width is not None and border_width > 0:
         lw = border_width
 
+    # Only emit colors when EA has explicit values — omit to let theme defaults apply
     if bg >= 0:
         visual["bgColor"] = bgr_to_rgb(bg)
     if lc >= 0:
@@ -80,7 +81,7 @@ def build_node_visual(
     if lw > 0:
         visual["borderWidth"] = lw
 
-    return visual if visual else None
+    return visual
 
 
 def build_edge_visual(
@@ -94,6 +95,7 @@ def build_edge_visual(
     """
     visual: dict[str, object] = {}
 
+    # Only emit lineColor when EA has explicit value — CSS defaults handle the rest
     if line_color is not None and line_color >= 0:
         visual["lineColor"] = bgr_to_rgb(line_color)
     if is_bold and is_bold > 0:
@@ -105,7 +107,7 @@ def build_edge_visual(
         if da:
             visual["dashArray"] = da
 
-    return visual if visual else None
+    return visual
 
 
 def format_uml_visibility(scope: str | None) -> str:
@@ -140,6 +142,18 @@ def parse_diagram_link_geometry(geometry: str | None) -> dict:
         key, _, val = part.partition("=")
         key = key.strip()
         val = val.strip()
+        # Label position codes: LLB=CX:CY, LLT=CX:CY, LRT=CX:CY, LRB=CX:CY
+        key_upper = key.upper()
+        if key_upper in ("LLB", "LLT", "LRT", "LRB"):
+            coords = val.split(":")
+            if len(coords) == 2:
+                try:
+                    cx = int(coords[0].strip())
+                    cy = int(coords[1].strip())
+                    result.setdefault("labels", {})[key_upper.lower()] = {"cx": cx, "cy": cy}
+                except ValueError:
+                    pass
+            continue
         try:
             int_val = int(val)
         except ValueError:
@@ -200,6 +214,6 @@ def ea_rect_to_position(
     return {
         "x": x,
         "y": y,
-        "width": max(width, 100),
-        "height": max(height, 60),
+        "width": max(width, 40),
+        "height": max(height, 30),
     }

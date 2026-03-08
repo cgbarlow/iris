@@ -58,9 +58,13 @@
 		</a>
 	{/if}
 	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Top} id="top" style="top:0" />
 	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Bottom} id="bottom" style="bottom:0;top:auto" />
 	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Left} id="left" style="left:0" />
 	<Handle type="source" position={Position.Right} id="right" />
+	<Handle type="target" position={Position.Right} id="right" style="right:0;left:auto" />
 	<Handle type="source" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 	<Handle type="target" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 </div>

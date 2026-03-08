@@ -50,3 +50,7 @@ uv.lock
 # Campaign Mode (agent tooling, not project source)
 .campaign/
 CLAUDE.md
+
+#temp
+temp/
+ea-visual-audit/

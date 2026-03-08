@@ -97,6 +97,12 @@ export interface CanvasEdgeData {
 	direction?: string;
 	technology?: string;
 	visual?: EdgeVisualOverrides;
+	labelPositions?: {
+		llb?: { cx: number; cy: number };
+		llt?: { cx: number; cy: number };
+		lrt?: { cx: number; cy: number };
+		lrb?: { cx: number; cy: number };
+	};
 	[key: string]: unknown;
 }
 

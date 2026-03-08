@@ -34,6 +34,7 @@
 	let editName = $state('');
 	let editDescription = $state('');
 	let editTags = $state<string[]>([]);
+	let editAttributes = $state<{name: string; type: string; scope: string; notes: string; lower_bound: string; upper_bound: string}[]>([]);
 
 	// Loading states per tab
 	let versionsLoading = $state(false);
@@ -59,7 +60,11 @@
 		const descChanged = editDescription !== (entity.description ?? '');
 		const origTags = entity.tags ?? [];
 		const tagsChanged = JSON.stringify(editTags.slice().sort()) !== JSON.stringify(origTags.slice().sort());
-		detailsDirty = nameChanged || descChanged || tagsChanged;
+		const origAttrs = (entity.data as Record<string, unknown>)?.attributes;
+		const attrsChanged = JSON.stringify(editAttributes) !== JSON.stringify(
+			Array.isArray(origAttrs) ? origAttrs.map((a: any) => ({ name: a.name ?? '', type: a.type ?? '', scope: a.scope ?? 'Public', notes: a.notes ?? '', lower_bound: a.lower_bound ?? '', upper_bound: a.upper_bound ?? '' })) : []
+		);
+		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged;
 	});
 
 	async function loadEntity(id: string) {
@@ -138,6 +143,10 @@
 		editName = entity.name;
 		editDescription = entity.description ?? '';
 		editTags = [...(entity.tags ?? [])];
+		const srcAttrs = (entity.data as Record<string, unknown>)?.attributes;
+		editAttributes = Array.isArray(srcAttrs)
+			? srcAttrs.map((a: any) => ({ name: a.name ?? '', type: a.type ?? '', scope: a.scope ?? 'Public', notes: a.notes ?? '', lower_bound: a.lower_bound ?? '', upper_bound: a.upper_bound ?? '' }))
+			: [];
 		editingDetails = true;
 		detailsDirty = false;
 	}
@@ -154,6 +163,12 @@
 				savingDetails = false;
 				return;
 			}
+			const updatedData = { ...(entity.data ?? {}) } as Record<string, unknown>;
+			if (editAttributes.length > 0) {
+				updatedData.attributes = editAttributes.filter(a => a.name.trim());
+			} else {
+				delete updatedData.attributes;
+			}
 			await apiFetch(`/api/elements/${entity.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(entity.current_version) },
@@ -161,6 +176,7 @@
 					name: sanitizedName,
 					element_type: entity.element_type,
 					description: sanitizedDesc,
+					data: updatedData,
 					change_summary: 'Updated element details',
 				}),
 			});
@@ -436,6 +452,87 @@
 						</dl>
 					</Accordion.Content>
 				</Accordion.Item>
+
+				<!-- Attributes group -->
+				{@const elemData = entity.data as Record<string, unknown> | null | undefined}
+				{@const elemAttrs = Array.isArray(elemData?.attributes) ? elemData.attributes as {name: string; type: string; scope?: string; notes?: string; default?: string; lower_bound?: string; upper_bound?: string; stereotype?: string}[] : []}
+				{#if elemAttrs.length > 0 || editingDetails}
+					<Accordion.Item value="attributes" class="border-b" style="border-color: var(--color-border)">
+						<Accordion.Header>
+							<Accordion.Trigger class="group flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+								Attributes ({editingDetails ? editAttributes.length : elemAttrs.length})
+								<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+							</Accordion.Trigger>
+						</Accordion.Header>
+						<Accordion.Content class="pb-4">
+							{#if editingDetails}
+								<table class="w-full text-sm" style="color: var(--color-fg)">
+									<thead>
+										<tr style="border-bottom: 1px solid var(--color-border)">
+											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Scope</th>
+											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Name</th>
+											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Type</th>
+											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Lower</th>
+											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Upper</th>
+											<th class="py-1 text-left font-medium" style="color: var(--color-muted)"></th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each editAttributes as attr, i}
+											<tr style="border-bottom: 1px solid var(--color-border)">
+												<td class="py-1 pr-2">
+													<select bind:value={attr.scope} class="w-full rounded border px-1 py-0.5 text-xs" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+														<option value="Public">+ Public</option>
+														<option value="Private">- Private</option>
+														<option value="Protected"># Protected</option>
+														<option value="Package">~ Package</option>
+													</select>
+												</td>
+												<td class="py-1 pr-2"><input type="text" bind:value={attr.name} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="name" /></td>
+												<td class="py-1 pr-2"><input type="text" bind:value={attr.type} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="type" /></td>
+												<td class="py-1 pr-2" style="width:3rem"><input type="text" bind:value={attr.lower_bound} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="0" /></td>
+												<td class="py-1 pr-2" style="width:3rem"><input type="text" bind:value={attr.upper_bound} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="*" /></td>
+												<td class="py-1">
+													<button onclick={() => { editAttributes = editAttributes.filter((_, idx) => idx !== i); }} class="text-xs px-1 rounded" style="color: var(--color-danger)" title="Remove attribute">✕</button>
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+								<button
+									onclick={() => { editAttributes = [...editAttributes, {name: '', type: '', scope: 'Public', notes: '', lower_bound: '', upper_bound: ''}]; }}
+									class="mt-2 rounded px-2 py-1 text-xs"
+									style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								>
+									+ Add Attribute
+								</button>
+							{:else}
+								<table class="w-full text-sm" style="color: var(--color-fg)">
+									<thead>
+										<tr style="border-bottom: 1px solid var(--color-border)">
+											<th class="py-1 pr-4 text-left font-medium" style="color: var(--color-muted)">Vis</th>
+											<th class="py-1 pr-4 text-left font-medium" style="color: var(--color-muted)">Name</th>
+											<th class="py-1 pr-4 text-left font-medium" style="color: var(--color-muted)">Type</th>
+											<th class="py-1 pr-4 text-left font-medium" style="color: var(--color-muted)">Multiplicity</th>
+											<th class="py-1 text-left font-medium" style="color: var(--color-muted)">Notes</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#each elemAttrs as attr}
+											<tr style="border-bottom: 1px solid var(--color-border)">
+												<td class="py-1 pr-4 font-mono">{attr.scope === 'Private' ? '-' : attr.scope === 'Protected' ? '#' : attr.scope === 'Package' ? '~' : '+'}</td>
+												<td class="py-1 pr-4 font-medium">{attr.name}</td>
+												<td class="py-1 pr-4">{attr.type || '—'}</td>
+												<td class="py-1 pr-4">{attr.lower_bound && attr.upper_bound ? `${attr.lower_bound}..${attr.upper_bound}` : '—'}</td>
+												<td class="py-1 text-xs" style="color: var(--color-muted)">{attr.notes || ''}</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							{/if}
+						</Accordion.Content>
+					</Accordion.Item>
+				{/if}
 
 				<!-- Details group (collapsed) -->
 				<Accordion.Item value="element-details" class="border-b" style="border-color: var(--color-border)">

@@ -113,6 +113,7 @@ export interface EditLock {
 	id: string;
 	target_type: string;
 	target_id: string;
+	target_name?: string;
 	user_id: string;
 	username: string;
 	acquired_at: string;

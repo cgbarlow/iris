@@ -5,6 +5,48 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.5] - 2026-03-07
+
+### Fixed
+- All 144 diagrams now have correct node background colors — EA default white (#FFFFFF) emitted when Backcolor is unset (ADR-090)
+- All 40 diagrams with unstyled edges now have explicit black line color — EA default #000000 emitted when LineColor is unset (ADR-090)
+- 3 edges with stereotype but no name now display stereotype text as label with guillemets (ADR-090)
+
+### Added
+- Iterative visual audit framework (ea-audit.mjs) with comparison tracking across iterations (ADR-090)
+
+## [2.3.4] - 2026-03-07
+
+### Fixed
+- All 149 diagrams now render edges correctly — unified handle IDs between backend and frontend (ADR-089)
+- Node content no longer clipped — switched from fixed `height` to `min-height` for EA-imported nodes (ADR-089)
+- Long text in fixed-width nodes truncated with ellipsis instead of hidden (ADR-089)
+- All node types (UML, ArchiMate, C4, Boundary) now have dual source+target handles at every position (ADR-089)
+
+### Added
+- Comprehensive automated diagram audit script (`frontend/audit-diagrams.mjs`) covering 14 check categories (ADR-089)
+
+## [2.3.3] - 2026-03-07
+
+### Fixed
+- Note "Feature Properties" no longer duplicates title in body — label prefix stripped from description (ADR-088)
+- Attribute text in abstract classes renders upright — `font-style: normal` blocks italic inheritance (ADR-088)
+- Node widths match EA dimensions exactly — `fixedSize` mode with `overflow: hidden` (ADR-088)
+- Composition/aggregation edges show both diamond source marker and open arrow target marker (ADR-088)
+- Diamond markers extend outward from node — `refX=0` instead of `18` (ADR-088)
+- Edges auto-route via geometrically optimal handles when EA specifies auto-routing (ADR-088)
+- Edge cardinality and role labels positioned per EA's stored LLB/LLT/LRT/LRB coordinates (ADR-088)
+- Diagram frame zooms and pans with canvas — converted from absolute-positioned SVG to SvelteFlow node (ADR-088)
+- Fixed-size node content no longer clipped — UML icons hidden and compact padding/line-height applied (ADR-088 R3)
+- Package nodes now appear on diagrams — no longer skipped during import (ADR-088 R3)
+- Diagram frame type label shows mapped type ("class", "pkg") instead of raw EA type ("Logical", "Package") (ADR-088 R3)
+
+### Added
+- Dual-type handles on UML nodes — each side accepts both source and target connections (ADR-088)
+- `compute_auto_handles()` backend function for geometry-based handle selection (ADR-088)
+- `DiagramFrameNode.svelte` component for canvas-integrated diagram frames (ADR-088)
+- EA label position parsing (LLB/LLT/LRT/LRB) from `t_diagramlinks.Geometry` (ADR-088)
+
 ## [2.3.2] - 2026-03-06
 
 ### Added

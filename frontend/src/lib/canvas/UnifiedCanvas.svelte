@@ -11,22 +11,13 @@
 
 	import { unifiedNodeTypes, unifiedEdgeTypes } from './registry';
 	import UmlMarkerDefs from './uml/UmlMarkerDefs.svelte';
-	import DiagramFrame from './DiagramFrame.svelte';
 	import CanvasAnnouncer from './controls/CanvasAnnouncer.svelte';
 	import KeyboardHandler from './controls/KeyboardHandler.svelte';
 	import type { CanvasNode, CanvasEdge, NotationType } from '$lib/types/canvas';
 
-	interface DiagramFrameData {
-		type: string;
-		name: string;
-		width: number;
-		height: number;
-	}
-
 	interface Props {
 		notation: NotationType;
 		preferredThemeId?: string;
-		diagramFrame?: DiagramFrameData;
 		nodes: CanvasNode[];
 		edges: CanvasEdge[];
 		browseMode?: boolean;
@@ -45,7 +36,6 @@
 	let {
 		notation,
 		preferredThemeId,
-		diagramFrame,
 		nodes = $bindable([]),
 		edges = $bindable([]),
 		browseMode = false,
@@ -242,9 +232,6 @@
 			<Background />
 			{#if notation === 'uml'}
 				<UmlMarkerDefs />
-			{/if}
-			{#if diagramFrame}
-				<DiagramFrame type={diagramFrame.type} name={diagramFrame.name} width={diagramFrame.width} height={diagramFrame.height} />
 			{/if}
 		</SvelteFlow>
 	{:else}
