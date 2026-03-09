@@ -81,7 +81,7 @@ def build_node_visual(
     if lw > 0:
         visual["borderWidth"] = lw
 
-    return visual
+    return visual or None
 
 
 def build_edge_visual(
@@ -108,6 +108,18 @@ def build_edge_visual(
             visual["dashArray"] = da
 
     return visual
+
+
+def parse_nid(style_ex: str | None) -> str | None:
+    """Extract NID value from EA StyleEx string.
+
+    StyleEx may contain 'NID=2-13;' — the NID identifies a Prolaborate icon.
+    Returns the NID string (e.g. '2-13') or None if not present.
+    """
+    if not style_ex:
+        return None
+    match = re.search(r"NID=(\d+-\d+)", style_ex)
+    return match.group(1) if match else None
 
 
 def format_uml_visibility(scope: str | None) -> str:

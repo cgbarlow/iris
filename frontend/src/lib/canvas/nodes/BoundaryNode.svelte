@@ -60,8 +60,11 @@
 		border: 2px dashed var(--boundary-border, var(--color-muted, #6b7280));
 		border-radius: 4px;
 		padding: 8px;
+		width: 100%;
+		height: 100%;
 		min-width: 160px;
 		min-height: 80px;
 		pointer-events: none;
+		box-sizing: border-box;
 	}
 </style>

@@ -810,3 +810,54 @@ async def get_diagram_versions(
         }
         for r in rows
     ]
+
+
+async def rollback_diagram(
+    db: aiosqlite.Connection,
+    diagram_id: str,
+    *,
+    target_version: int,
+    rolled_back_by: str,
+    expected_version: int,
+) -> dict[str, object] | None:
+    """Rollback diagram to a previous version (creates new version). Returns None on conflict."""
+    # Check current version (OCC)
+    cursor = await db.execute(
+        "SELECT current_version FROM diagrams WHERE id = ? AND is_deleted = 0",
+        (diagram_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+
+    current_version: int = row[0]
+    if current_version != expected_version:
+        return None
+
+    # Get target version data
+    cursor = await db.execute(
+        "SELECT name, description, data, metadata FROM diagram_versions "
+        "WHERE diagram_id = ? AND version = ?",
+        (diagram_id, target_version),
+    )
+    target_row = await cursor.fetchone()
+    if target_row is None:
+        return None
+
+    new_version = current_version + 1
+    now = datetime.now(tz=UTC).isoformat()
+
+    await db.execute(
+        "UPDATE diagrams SET current_version = ?, updated_at = ? WHERE id = ?",
+        (new_version, now, diagram_id),
+    )
+    await db.execute(
+        "INSERT INTO diagram_versions (diagram_id, version, name, description, "
+        "data, metadata, change_type, rollback_to, created_at, created_by) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'rollback', ?, ?, ?)",
+        (diagram_id, new_version, target_row[0], target_row[1],
+         target_row[2], target_row[3], target_version, now, rolled_back_by),
+    )
+    await db.commit()
+
+    return await get_diagram(db, diagram_id)

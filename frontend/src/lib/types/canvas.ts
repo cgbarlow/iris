@@ -42,6 +42,12 @@ export type ArchimateRelationshipType =
 	| 'assignment'
 	| 'association_archimate';
 
+/** Reference to an icon in a named icon set (ADR-091-B). */
+export interface IconRef {
+	set: 'lucide' | 'archimate' | 'custom';
+	name: string;
+}
+
 /** Per-element visual overrides (from EA import or manual styling). */
 export interface NodeVisualOverrides {
 	bgColor?: string;
@@ -51,8 +57,10 @@ export interface NodeVisualOverrides {
 	fontSize?: number;
 	bold?: boolean;
 	italic?: boolean;
+	borderStyle?: string;
 	width?: number;
 	height?: number;
+	icon?: IconRef;
 }
 
 /** Per-edge visual overrides (from EA import or manual styling). */

@@ -95,6 +95,8 @@
 		border: 1px solid var(--note-border, #ca8a04);
 		border-radius: 2px;
 		padding: 4px;
+		width: 100%;
+		height: 100%;
 		min-width: 100px;
 		position: relative;
 		font-size: 8px;

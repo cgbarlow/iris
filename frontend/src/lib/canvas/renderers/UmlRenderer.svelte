@@ -170,9 +170,12 @@
 		background: var(--color-bg, #ffffcc);
 		border: 2px solid var(--color-border, #333);
 		border-radius: 3px;
+		width: 100%;
+		height: 100%;
 		min-width: 140px;
 		min-height: 0;
 		font-size: 0.8rem;
+		box-sizing: border-box;
 	}
 	.uml-node--selected {
 		box-shadow: 0 0 0 2px var(--color-primary, #3b82f6);

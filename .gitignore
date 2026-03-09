@@ -51,6 +51,9 @@ uv.lock
 .campaign/
 CLAUDE.md
 
+# Claude Code worktrees
+.claude/worktrees/
+
 #temp
 temp/
 ea-visual-audit/

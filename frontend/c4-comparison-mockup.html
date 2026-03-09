@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>C4 Visual Notation — Full Comparison</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; padding: 24px; color: #1a1a2e; font-size: 13px; }
+  h1 { text-align: center; margin-bottom: 4px; font-size: 22px; }
+  .subtitle { text-align: center; color: #666; margin-bottom: 32px; font-size: 12px; }
+
+  .section { max-width: 1200px; margin: 0 auto 40px; }
+  .section-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #ddd; }
+  .section-header h2 { font-size: 16px; }
+  .tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .tag-canonical { background: #dcfce7; color: #166534; }
+  .tag-current { background: #dbeafe; color: #1e40af; }
+  .tag-fa5 { background: #fef3c7; color: #92400e; }
+  .tag-structurizr { background: #fce7f3; color: #9d174d; }
+  .tag-hybrid { background: #f3e8ff; color: #6b21a8; }
+  .tag-score { background: #111; color: #fff; font-size: 12px; padding: 2px 10px; margin-left: auto; }
+  .section-desc { font-size: 12px; color: #666; margin-bottom: 12px; line-height: 1.5; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  /* --- Current dropdown icons reference --- */
+  .dropdown-ref { max-width: 1200px; margin: 0 auto 40px; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .dropdown-ref h2 { font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid #eee; padding-bottom: 6px; }
+  .dropdown-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dropdown-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; background: #f8f9fa; }
+  .dropdown-item .unicode-icon { font-size: 18px; width: 28px; text-align: center; }
+  .dropdown-item .label { font-weight: 600; font-size: 12px; }
+  .dropdown-item .key { font-family: monospace; font-size: 10px; color: #888; }
+
+  /* --- CANONICAL --- */
+  .canonical-card {
+    background: white; border-radius: 10px; padding: 12px; min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    border: 2.5px solid; position: relative;
+  }
+  .canonical-person { border-color: #2d8a4e; padding-top: 42px; }
+  .canonical-person::before {
+    content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 20px; border: 2.5px solid #2d8a4e; border-radius: 50%; background: white;
+  }
+  .canonical-person::after {
+    content: ''; position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 14px; border: 2.5px solid #2d8a4e; border-top: none;
+    border-radius: 0 0 10px 10px; background: white;
+  }
+  .canonical-system { border-color: #1168bd; color: #1168bd; }
+  .canonical-external { border-color: #c0392b; color: #c0392b; }
+  .canonical-dependency { border-color: #e67e22; color: #e67e22; }
+  .canonical-container { border-color: #1168bd; color: #1168bd; }
+  .canonical-component { border-color: #1168bd; color: #1168bd; }
+  .canonical-card .n { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .canonical-card .d { font-size: 10px; opacity: 0.65; }
+  .canonical-card .t { font-size: 9px; opacity: 0.45; margin-top: auto; padding-top: 4px; font-style: italic; }
+  .canonical-webapp { border-color: #1168bd; padding-top: 24px; }
+  .canonical-webapp::before { content: '● ● ●'; position: absolute; top: 5px; left: 8px; font-size: 6px; letter-spacing: 2px; color: #1168bd; opacity: 0.5; }
+
+  /* --- FILLED CARDS (shared by B, C) --- */
+  .fc { border-radius: 8px; padding: 12px; min-height: 75px; display: flex; flex-direction: column; }
+  .fc .h { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .fc .h svg, .fc .h i { width: 14px; height: 14px; font-size: 13px; flex-shrink: 0; }
+  .fc .n { font-size: 12px; font-weight: 600; }
+  .fc .d { font-size: 10px; opacity: 0.8; line-height: 1.3; }
+  .fc .t { font-size: 9px; opacity: 0.45; margin-top: auto; padding-top: 4px; font-family: monospace; }
+
+  .fp { background: #08427b; color: white; }
+  .fs { background: #1168bd; color: white; }
+  .fe { background: #999; color: white; }
+  .fco { background: #438dd5; color: white; }
+  .fcm { background: #85bbf0; color: #1a1a2e; }
+  .fcd { background: #b3d7ff; color: #1a1a2e; }
+  .fdn { background: #fff; color: #1a1a2e; border: 2px solid #438dd5; }
+  .fin { background: #fff; color: #1a1a2e; border: 2px solid #999; }
+  .fci { background: #438dd5; color: white; border: 2px dashed rgba(255,255,255,0.4); }
+
+  /* --- STRUCTURIZR --- */
+  .sc { border-radius: 8px; padding: 12px; min-height: 75px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .sc .n { font-size: 12px; font-weight: 700; margin-bottom: 1px; }
+  .sc .tech { font-size: 10px; opacity: 0.65; margin-bottom: 4px; font-style: italic; }
+  .sc .d { font-size: 10px; opacity: 0.8; line-height: 1.3; }
+  .sp { background: #08427b; color: white; }
+  .sp::before { content: ''; display: block; width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; margin: 0 auto 4px; }
+
+  /* --- HYBRID --- */
+  .hc { border-radius: 10px; padding: 12px; min-height: 75px; display: flex; flex-direction: column; border: 2.5px solid; }
+  .hc .h { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .hc .h svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .hc .n { font-size: 12px; font-weight: 600; }
+  .hc .d { font-size: 10px; opacity: 0.7; line-height: 1.3; }
+  .hc .t { font-size: 9px; opacity: 0.35; margin-top: auto; padding-top: 4px; font-family: monospace; }
+
+  .hp { border-color: #2d8a4e; background: #f0fdf4; color: #166534; }
+  .hs { border-color: #1168bd; background: #eff6ff; color: #1e40af; }
+  .hx { border-color: #c0392b; background: #fef2f2; color: #991b1b; }
+  .hco { border-color: #438dd5; background: #f0f7ff; color: #1e40af; }
+  .hcm { border-color: #85bbf0; background: #f8fbff; color: #1e40af; }
+  .hcd { border-color: #93c5fd; background: #fafcff; color: #1e40af; }
+  .hdn { border-color: #438dd5; background: white; color: #1e40af; border-style: dashed; }
+  .hin { border-color: #999; background: white; color: #555; border-style: dashed; }
+  .hci { border-color: #438dd5; background: #f0f7ff; color: #1e40af; border-style: dashed; }
+
+  /* --- SCORE TABLE --- */
+  .scores { max-width: 1200px; margin: 0 auto 40px; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .scores h2 { font-size: 16px; margin-bottom: 12px; }
+  .scores table { width: 100%; border-collapse: collapse; }
+  .scores th { text-align: left; padding: 6px 8px; border-bottom: 2px solid #eee; font-size: 11px; color: #666; }
+  .scores td { padding: 6px 8px; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
+  .scores td.num { text-align: center; font-weight: 700; font-size: 14px; }
+  .scores .best { background: #f0fdf4; }
+  .scores .worst { background: #fef2f2; }
+  .g { color: #166534; }
+  .r { color: #991b1b; }
+  .y { color: #92400e; }
+  .total-row td { border-top: 3px solid #333; font-weight: 700; font-size: 14px; }
+  .total-row .winner { background: #dcfce7; font-size: 18px; }
+</style>
+</head>
+<body>
+
+<h1>C4 Visual Notation — Full Comparison</h1>
+<p class="subtitle">All options side-by-side with the current dropdown unicode icons and weighted scoring</p>
+
+<!-- ═══════ CURRENT DROPDOWN ICONS ═══════ -->
+<div class="dropdown-ref">
+  <h2>Current: Unicode Icons in Type Dropdown &amp; C4_ENTITY_TYPES</h2>
+  <p style="color:#888;margin-bottom:12px;font-size:11px">These unicode characters are used in the element type dropdown (edit element view) and as fallback icons in C4_ENTITY_TYPES. They are NOT the same as what's rendered on canvas nodes (which use Lucide).</p>
+  <div class="dropdown-grid">
+    <div class="dropdown-item"><span class="unicode-icon">👤</span><div><div class="label">Person</div><div class="key">person</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">▣</span><div><div class="label">Software System</div><div class="key">software_system</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">▢</span><div><div class="label">External System</div><div class="key">software_system_external</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">▤</span><div><div class="label">Container</div><div class="key">container</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">⬡</span><div><div class="label">Component</div><div class="key">c4_component</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">▭</span><div><div class="label">Code Element</div><div class="key">code_element</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">⬢</span><div><div class="label">Deployment Node</div><div class="key">deployment_node</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">◆</span><div><div class="label">Infrastructure Node</div><div class="key">infrastructure_node</div></div></div>
+    <div class="dropdown-item"><span class="unicode-icon">▥</span><div><div class="label">Container Instance</div><div class="key">container_instance</div></div></div>
+  </div>
+</div>
+
+<!-- ═══════ OPTION A: CANONICAL ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <h2>A: Canonical c4model.com</h2>
+    <span class="tag tag-canonical">CANONICAL</span>
+    <span class="tag tag-score">Score: 38/50</span>
+  </div>
+  <p class="section-desc">
+    Official notation. <b>Outline-only, no fill, shape = type.</b>
+    <span style="color:#2d8a4e;font-weight:600">Green</span> = person,
+    <span style="color:#1168bd;font-weight:600">blue</span> = internal,
+    <span style="color:#c0392b;font-weight:600">red</span> = external,
+    <span style="color:#e67e22;font-weight:600">orange</span> = dependency.
+    Person = silhouette. DB = cylinder. Web app = browser chrome. Server = terminal <code>&gt;_</code>.
+  </p>
+  <div class="grid">
+    <div class="canonical-card canonical-person"><div class="n" style="color:#2d8a4e">IrisUser</div><div class="d" style="color:#2d8a4e">End user</div><div class="t">[Person]</div></div>
+    <div class="canonical-card canonical-system"><div class="n">IrisPlatform</div><div class="d">Architecture platform</div><div class="t">[Software System]</div></div>
+    <div class="canonical-card canonical-external"><div class="n">WebBrowserExt</div><div class="d">External browser</div><div class="t">[Software System]</div></div>
+    <div class="canonical-card canonical-webapp"><div class="n" style="color:#1168bd">Frontend</div><div class="d" style="color:#1168bd">SvelteKit SPA</div><div class="t" style="color:#1168bd">[Container: SvelteKit]</div></div>
+    <div class="canonical-card canonical-container"><div style="font-family:monospace;font-size:12px;opacity:0.5;color:#1168bd">&gt;_</div><div class="n" style="color:#1168bd">BackendAPI</div><div class="d" style="color:#1168bd">FastAPI backend</div><div class="t" style="color:#1168bd">[Container: Python]</div></div>
+    <div class="canonical-card" style="border:none;padding:0;background:transparent">
+      <svg viewBox="0 0 140 90" style="width:100%;height:auto">
+        <ellipse cx="70" cy="16" rx="55" ry="14" fill="white" stroke="#1168bd" stroke-width="2.5"/>
+        <rect x="15" y="16" width="110" height="45" fill="white" stroke="white"/>
+        <line x1="15" y1="16" x2="15" y2="61" stroke="#1168bd" stroke-width="2.5"/>
+        <line x1="125" y1="16" x2="125" y2="61" stroke="#1168bd" stroke-width="2.5"/>
+        <ellipse cx="70" cy="61" rx="55" ry="14" fill="white" stroke="#1168bd" stroke-width="2.5"/>
+        <text x="70" y="38" text-anchor="middle" fill="#1168bd" font-weight="600" font-size="11" font-family="sans-serif">Database</text>
+        <text x="70" y="50" text-anchor="middle" fill="#1168bd" font-size="9" font-family="sans-serif" opacity="0.6">[SQLite]</text>
+      </svg>
+    </div>
+    <div class="canonical-card canonical-component"><div class="n">AuthModule</div><div class="d" style="color:#1168bd">Auth component</div><div class="t" style="color:#1168bd">[Component]</div></div>
+    <div class="canonical-card" style="border-color:#1168bd;border-style:dashed"><div class="n" style="color:#1168bd">LinuxServer</div><div class="d" style="color:#1168bd">Ubuntu 22.04</div><div class="t" style="color:#1168bd">[Deployment Node]</div></div>
+    <div class="canonical-card" style="border-color:#999;border-style:dashed"><div class="n" style="color:#666">LoadBalancer</div><div class="d" style="color:#666">NGINX</div><div class="t" style="color:#666">[Infrastructure]</div></div>
+  </div>
+</div>
+
+<!-- ═══════ OPTION B: CURRENT IRIS (LUCIDE) ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <h2>B: Current Iris (Lucide Icons + Filled Boxes)</h2>
+    <span class="tag tag-current">CURRENT</span>
+    <span class="tag tag-score">Score: 30/50</span>
+  </div>
+  <p class="section-desc">What Iris uses today on canvas nodes. Filled Structurizr-palette boxes with <code>lucide-svelte</code> icons. Dropdown uses unrelated unicode chars (👤 ▣ ▢ etc.).</p>
+  <div class="grid">
+    <div class="fc fp"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="n">IrisUser</span></div><div class="d">End user</div><div class="t">lucide:user</div></div>
+    <div class="fc fs"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/></svg><span class="n">IrisPlatform</span></div><div class="d">Architecture platform</div><div class="t">lucide:boxes</div></div>
+    <div class="fc fe"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><span class="n">WebBrowserExt</span></div><div class="d">External browser</div><div class="t">lucide:globe</div></div>
+    <div class="fc fco"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg><span class="n">BackendAPI</span></div><div class="d">FastAPI backend</div><div class="t">lucide:container</div></div>
+    <div class="fc fcm"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5.5 8.5 9 12l-3.5 3.5L2 12l3.5-3.5Z"/><path d="m12 2 3.5 3.5L12 9 8.5 5.5 12 2Z"/><path d="M18.5 8.5 22 12l-3.5 3.5L15 12l3.5-3.5Z"/><path d="m12 15 3.5 3.5L12 22l-3.5-3.5L12 15Z"/></svg><span class="n">AuthModule</span></div><div class="d">Authentication</div><div class="t">lucide:component</div></div>
+    <div class="fc fcd"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg><span class="n">DiagramService</span></div><div class="d">CRUD</div><div class="t">lucide:file-code</div></div>
+    <div class="fc fdn"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><circle cx="6" cy="6" r="0.5" fill="currentColor"/><circle cx="6" cy="18" r="0.5" fill="currentColor"/></svg><span class="n">LinuxServer</span></div><div class="d">Ubuntu 22.04</div><div class="t">lucide:server</div></div>
+    <div class="fc fin"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg><span class="n">LoadBalancer</span></div><div class="d">NGINX</div><div class="t">lucide:shield</div></div>
+    <div class="fc fci"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span class="n">BackendAPI-1</span></div><div class="d">Instance</div><div class="t">lucide:package</div></div>
+  </div>
+</div>
+
+<!-- ═══════ OPTION C: FA5 ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <h2>C: Font Awesome 5 (tupadr3/plantuml-icon-font-sprites)</h2>
+    <span class="tag tag-fa5">FA5</span>
+    <span class="tag tag-score">Score: 31/50</span>
+  </div>
+  <p class="section-desc">Same filled boxes, FA5 icons from the PlantUML C4 ecosystem. Adds ~400KB dependency (<code>@fortawesome</code>).</p>
+  <div class="grid">
+    <div class="fc fp"><div class="h"><i class="fas fa-user"></i><span class="n">IrisUser</span></div><div class="d">End user</div><div class="t">fa5:user</div></div>
+    <div class="fc fs"><div class="h"><i class="fas fa-cube"></i><span class="n">IrisPlatform</span></div><div class="d">Architecture platform</div><div class="t">fa5:cube</div></div>
+    <div class="fc fe"><div class="h"><i class="fas fa-globe"></i><span class="n">WebBrowserExt</span></div><div class="d">External browser</div><div class="t">fa5:globe</div></div>
+    <div class="fc fco"><div class="h"><i class="fas fa-box"></i><span class="n">BackendAPI</span></div><div class="d">FastAPI backend</div><div class="t">fa5:box</div></div>
+    <div class="fc fcm"><div class="h"><i class="fas fa-puzzle-piece"></i><span class="n">AuthModule</span></div><div class="d">Authentication</div><div class="t">fa5:puzzle-piece</div></div>
+    <div class="fc fcd"><div class="h"><i class="fas fa-file-code"></i><span class="n">DiagramService</span></div><div class="d">CRUD</div><div class="t">fa5:file-code</div></div>
+    <div class="fc fdn"><div class="h"><i class="fas fa-server"></i><span class="n">LinuxServer</span></div><div class="d">Ubuntu 22.04</div><div class="t">fa5:server</div></div>
+    <div class="fc fin"><div class="h"><i class="fas fa-shield-alt"></i><span class="n">LoadBalancer</span></div><div class="d">NGINX</div><div class="t">fa5:shield-alt</div></div>
+    <div class="fc fci"><div class="h"><i class="far fa-clone"></i><span class="n">BackendAPI-1</span></div><div class="d">Instance</div><div class="t">fa5:clone</div></div>
+  </div>
+</div>
+
+<!-- ═══════ OPTION D: STRUCTURIZR ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <h2>D: Structurizr (Type Labels, No Icons)</h2>
+    <span class="tag tag-structurizr">STRUCTURIZR</span>
+    <span class="tag tag-score">Score: 35/50</span>
+  </div>
+  <p class="section-desc">Simon Brown's own tool. Filled boxes, <b>no icons</b>. Type shown as <code>[Container: Technology]</code> bracket label. Person has circle silhouette above name. Zero dependency.</p>
+  <div class="grid">
+    <div class="sc sp"><div class="n">IrisUser</div><div class="tech">[Person]</div><div class="d">End user</div></div>
+    <div class="sc fs" style="text-align:center"><div class="n">IrisPlatform</div><div class="tech">[Software System]</div><div class="d">Architecture platform</div></div>
+    <div class="sc fe" style="text-align:center"><div class="n">WebBrowserExt</div><div class="tech">[Software System]</div><div class="d">External browser</div></div>
+    <div class="sc fco" style="text-align:center"><div class="n">BackendAPI</div><div class="tech">[Container: FastAPI]</div><div class="d">REST endpoints</div></div>
+    <div class="sc fcm" style="text-align:center"><div class="n">AuthModule</div><div class="tech">[Component]</div><div class="d">Authentication</div></div>
+    <div class="sc fcd" style="text-align:center"><div class="n">DiagramService</div><div class="tech">[Code Element]</div><div class="d">CRUD</div></div>
+    <div class="sc fdn" style="text-align:center"><div class="n">LinuxServer</div><div class="tech">[Deployment Node]</div><div class="d">Ubuntu 22.04</div></div>
+    <div class="sc fin" style="text-align:center"><div class="n">LoadBalancer</div><div class="tech">[Infrastructure Node]</div><div class="d">NGINX</div></div>
+    <div class="sc fci" style="text-align:center"><div class="n">BackendAPI-1</div><div class="tech">[Container Instance]</div><div class="d">Running instance</div></div>
+  </div>
+</div>
+
+<!-- ═══════ OPTION E: HYBRID ═══════ -->
+<div class="section">
+  <div class="section-header">
+    <h2>E: Hybrid (Canonical Colours + Shape Glyphs + Subtle Fill)</h2>
+    <span class="tag tag-hybrid">HYBRID</span>
+    <span class="tag tag-score">Score: 43/50</span>
+  </div>
+  <p class="section-desc">
+    <b>Canonical colour coding</b> (green/blue/red/orange) + <b>subtle tinted fills</b> for readability + <b>inline SVG shape glyphs</b> from canonical notation.
+    No external icon dependency. Internal vs external clearly distinguished by colour.
+  </p>
+  <div class="grid">
+    <div class="hc hp"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#2d8a4e" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg><span class="n">IrisUser</span></div><div class="d">End user</div><div class="t">person</div></div>
+    <div class="hc hs"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#1168bd" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg><span class="n">IrisPlatform</span></div><div class="d">Architecture platform</div><div class="t">software_system</div></div>
+    <div class="hc hx"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18"/><path d="M3 12h18"/></svg><span class="n">WebBrowserExt</span></div><div class="d">External browser</div><div class="t">software_system_external</div></div>
+    <div class="hc hco"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#438dd5" stroke-width="2.5" stroke-linecap="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/></svg><span class="n">BackendAPI</span></div><div class="d">FastAPI backend</div><div class="t">container</div></div>
+    <div class="hc hcm"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#1168bd" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v4"/><path d="M15 4v4"/><path d="M4 9h4"/><path d="M4 15h4"/></svg><span class="n">AuthModule</span></div><div class="d">Authentication</div><div class="t">c4_component</div></div>
+    <div class="hc hcd"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#1168bd" stroke-width="2.5" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span class="n">DiagramService</span></div><div class="d">CRUD</div><div class="t">code_element</div></div>
+    <div class="hc hdn"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#438dd5" stroke-width="2.5" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="#438dd5"/><circle cx="6" cy="18" r="1" fill="#438dd5"/></svg><span class="n">LinuxServer</span></div><div class="d">Ubuntu 22.04</div><div class="t">deployment_node</div></div>
+    <div class="hc hin"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2.5" stroke-linecap="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg><span class="n">LoadBalancer</span></div><div class="d">NGINX</div><div class="t">infrastructure_node</div></div>
+    <div class="hc hci"><div class="h"><svg viewBox="0 0 24 24" fill="none" stroke="#438dd5" stroke-width="2" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="2" y="2" width="14" height="14" rx="2"/></svg><span class="n">BackendAPI-1</span></div><div class="d">Running instance</div><div class="t">container_instance</div></div>
+  </div>
+</div>
+
+<!-- ═══════ SCORING TABLE ═══════ -->
+<div class="scores">
+  <h2>Weighted Scoring (10 = best per criterion)</h2>
+  <table>
+    <tr>
+      <th style="width:25%">Criterion (weight)</th>
+      <th style="width:15%">A: Canonical</th>
+      <th style="width:15%">B: Lucide (current)</th>
+      <th style="width:15%">C: FA5</th>
+      <th style="width:15%">D: Structurizr</th>
+      <th style="width:15%">E: Hybrid</th>
+    </tr>
+    <tr>
+      <td><b>C4 fidelity</b> (&times;2)</td>
+      <td class="num best">10</td>
+      <td class="num worst">4</td>
+      <td class="num">5</td>
+      <td class="num">8</td>
+      <td class="num best">9</td>
+    </tr>
+    <tr>
+      <td><b>Readability</b> at small sizes (&times;2)</td>
+      <td class="num worst">5</td>
+      <td class="num">8</td>
+      <td class="num">8</td>
+      <td class="num">7</td>
+      <td class="num best">9</td>
+    </tr>
+    <tr>
+      <td><b>Type distinguishability</b> (&times;2)</td>
+      <td class="num best">9</td>
+      <td class="num worst">5</td>
+      <td class="num">6</td>
+      <td class="num">5</td>
+      <td class="num">8</td>
+    </tr>
+    <tr>
+      <td><b>Internal vs External clarity</b> (&times;1.5)</td>
+      <td class="num best">10</td>
+      <td class="num worst">4</td>
+      <td class="num worst">4</td>
+      <td class="num worst">4</td>
+      <td class="num best">10</td>
+    </tr>
+    <tr>
+      <td><b>No new dependency</b> (&times;1)</td>
+      <td class="num best">10</td>
+      <td class="num">8</td>
+      <td class="num worst">3</td>
+      <td class="num best">10</td>
+      <td class="num best">10</td>
+    </tr>
+    <tr>
+      <td><b>Implementation effort</b> (&times;1)</td>
+      <td class="num worst">4</td>
+      <td class="num best">10</td>
+      <td class="num">6</td>
+      <td class="num">7</td>
+      <td class="num">6</td>
+    </tr>
+    <tr>
+      <td><b>Consistency across Iris</b> (&times;1)</td>
+      <td class="num">6</td>
+      <td class="num worst">5</td>
+      <td class="num">5</td>
+      <td class="num">7</td>
+      <td class="num best">9</td>
+    </tr>
+    <tr>
+      <td><b>Professional appearance</b> (&times;1)</td>
+      <td class="num">7</td>
+      <td class="num">6</td>
+      <td class="num">6</td>
+      <td class="num">8</td>
+      <td class="num best">9</td>
+    </tr>
+    <tr class="total-row">
+      <td>TOTAL (/50)</td>
+      <td class="num">38</td>
+      <td class="num">30</td>
+      <td class="num">31</td>
+      <td class="num">35</td>
+      <td class="num winner">43</td>
+    </tr>
+  </table>
+  <p style="margin-top:16px;font-size:12px;color:#666;line-height:1.6">
+    <b>Scoring notes:</b><br>
+    <b>A (Canonical)</b> &mdash; Perfect fidelity and distinction but outline-only is hard to read at canvas scale, especially when zoomed out. Complex to implement (custom shapes per type).<br>
+    <b>B (Current)</b> &mdash; Easy (already done) but icons are generic (lucide:boxes for a system?), internal/external only distinguished by shade of grey/blue, unicode dropdown icons inconsistent with canvas.<br>
+    <b>C (FA5)</b> &mdash; Marginal improvement over B with slightly better icon semantics, but adds ~400KB dependency for 9 icons. Still uses non-canonical filled-box style.<br>
+    <b>D (Structurizr)</b> &mdash; Clean, from Simon Brown's tool. No icons removes ambiguity. But type text takes space and types look similar without colour distinction.<br>
+    <b>E (Hybrid)</b> &mdash; Best of both worlds: canonical green/blue/red colour coding makes internal/external/person instantly recognisable. Subtle fills maintain readability. Inline SVG glyphs are lightweight, semantically meaningful, and need no dependency. Consistent across canvas, dropdowns, and element views.
+  </p>
+</div>
+
+</body>
+</html>

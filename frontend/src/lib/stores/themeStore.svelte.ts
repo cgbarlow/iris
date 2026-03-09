@@ -35,6 +35,7 @@ export interface Theme {
 }
 
 let themes = $state<Theme[]>([]);
+let themesLoaded = $state(false);
 let activeThemeIds = $state<Record<string, string>>(
 	typeof localStorage !== 'undefined'
 		? JSON.parse(localStorage.getItem('iris_active_themes') ?? '{}')
@@ -96,6 +97,7 @@ export function resolveNodeVisual(
 		if (typeDefaults.borderColor) { result.borderColor = String(typeDefaults.borderColor); hasValues = true; }
 		if (typeDefaults.fontColor) { result.fontColor = String(typeDefaults.fontColor); hasValues = true; }
 		if (typeDefaults.borderWidth != null) { result.borderWidth = Number(typeDefaults.borderWidth); hasValues = true; }
+		if (typeDefaults.borderStyle) { result.borderStyle = String(typeDefaults.borderStyle); hasValues = true; }
 		if (typeDefaults.italic) { result.italic = true; hasValues = true; }
 	}
 
@@ -140,10 +142,15 @@ export function resolveEdgeVisual(
 	return Object.keys(result).length > 0 ? result : undefined;
 }
 
+export function areThemesLoaded(): boolean {
+	return themesLoaded;
+}
+
 export async function loadThemes(): Promise<void> {
 	try {
 		themes = await apiFetch<Theme[]>('/api/themes');
 	} catch {
 		themes = [];
 	}
+	themesLoaded = true;
 }

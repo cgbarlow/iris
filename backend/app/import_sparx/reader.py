@@ -40,7 +40,9 @@ class QeaElement:
     Fontcolor: int | None = None
     Bordercolor: int | None = None
     BorderWidth: int | None = None
+    Alias: str | None = None
     PDATA1: str | None = None
+    StyleEx: str | None = None
 
 
 @dataclass
@@ -155,7 +157,7 @@ async def read_elements(db_path: str) -> list[QeaElement]:
             "SELECT Object_ID, Object_Type, Name, Package_ID, Note, ea_guid, "
             "Status, Stereotype, Version, Scope, Abstract, Persistence, "
             "Author, Complexity, Phase, CreatedDate, ModifiedDate, GenType, "
-            "Backcolor, Fontcolor, Bordercolor, BorderWidth, PDATA1 "
+            "Backcolor, Fontcolor, Bordercolor, BorderWidth, Alias, PDATA1, StyleEx "
             "FROM t_object"
         )
         rows = await cursor.fetchall()
@@ -183,7 +185,9 @@ async def read_elements(db_path: str) -> list[QeaElement]:
                 Fontcolor=row[19],
                 Bordercolor=row[20],
                 BorderWidth=row[21],
-                PDATA1=row[22],
+                Alias=row[22],
+                PDATA1=row[23],
+                StyleEx=row[24],
             )
             for row in rows
         ]

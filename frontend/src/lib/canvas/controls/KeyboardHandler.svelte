@@ -83,7 +83,10 @@
 			}
 			if (event.key === '0') {
 				event.preventDefault();
-				fitView();
+				fitView({
+					nodes: nodes.filter((n) => n.data.entityType !== 'diagram_frame'),
+					padding: 0.05,
+				});
 				onannounce('Fit to screen');
 				return;
 			}

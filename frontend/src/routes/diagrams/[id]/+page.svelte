@@ -19,6 +19,8 @@
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
 	import RelationshipDialog from '$lib/canvas/controls/RelationshipDialog.svelte';
 	import EdgeStylePanel from '$lib/canvas/controls/EdgeStylePanel.svelte';
+	import NodeStylePanel from '$lib/canvas/controls/NodeStylePanel.svelte';
+	import ElementEditPanel from '$lib/canvas/controls/ElementEditPanel.svelte';
 	import EntityDetailPanel from '$lib/canvas/controls/EntityDetailPanel.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import ElementPicker from '$lib/components/ElementPicker.svelte';
@@ -29,7 +31,7 @@
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
-	import { getActiveThemeId } from '$lib/stores/themeStore.svelte';
+	import { getActiveThemeId, loadThemes, areThemesLoaded } from '$lib/stores/themeStore.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import { createLockManager } from '$lib/utils/locks.svelte';
@@ -83,6 +85,7 @@
 	let diagramRelationships = $state<DiagramRelationship[]>([]);
 	let elementRelationships = $state<ElementRelationship[]>([]);
 	let relationshipsLoading = $state(false);
+	const hasRelationships = $derived(diagramRelationships.length > 0 || elementRelationships.length > 0);
 
 	let showDeleteDialog = $state(false);
 	let showCloneDialog = $state(false);
@@ -149,6 +152,55 @@
 	// Focus view state
 	let focusMode = $state(false);
 
+	/** True when the windowed browse sidebar should be visible (shifts page content). */
+	const windowedBrowseSidebar = $derived(!editing && !focusMode && !!selectedBrowseNode);
+
+	// Comments sidebar state
+	let showCommentsSidebar = $state(false);
+	let commentCount = $state(0);
+
+	/** True when the comments sidebar should shift page content (windowed, non-edit). */
+	const windowedCommentsSidebar = $derived(!editing && !focusMode && showCommentsSidebar);
+
+	// Unsaved changes confirmation state
+	let showUnsavedChangesDialog = $state(false);
+	let pendingModeAction = $state<(() => void) | null>(null);
+
+	/** Toggle from edit to browse mode, prompting to save if dirty. */
+	function handleToggleToBrowseMode() {
+		if (canvasDirty) {
+			pendingModeAction = () => { discardChanges(); };
+			showUnsavedChangesDialog = true;
+		} else {
+			discardChanges();
+		}
+	}
+
+	/** Save and then execute the pending mode switch. */
+	function handleUnsavedSave() {
+		showUnsavedChangesDialog = false;
+		pendingModeAction = null;
+		if (canvasType === 'sequence') {
+			saveSequence();
+		} else {
+			saveCanvas();
+		}
+	}
+
+	/** Discard and execute the pending mode switch. */
+	function handleUnsavedDiscard() {
+		showUnsavedChangesDialog = false;
+		const action = pendingModeAction;
+		pendingModeAction = null;
+		action?.();
+	}
+
+	/** Cancel the mode switch. */
+	function handleUnsavedCancel() {
+		showUnsavedChangesDialog = false;
+		pendingModeAction = null;
+	}
+
 	// Hierarchy tree sidebar state
 	let sidebarOpen = $state(
 		typeof localStorage !== 'undefined' && localStorage.getItem('iris-hierarchy-sidebar-open') === 'true'
@@ -164,6 +216,25 @@
 	let showParentPicker = $state(false);
 	let treeDiagramsOnly = $state(false);
 	let treeExpandedIds = $state(new Set<string>());
+	let sidebarScrollTop = $state(0);
+
+	/** Save sidebar scroll position before navigating away. */
+	function saveSidebarScroll() {
+		const el = document.querySelector('[data-hierarchy-sidebar]');
+		if (el) {
+			sessionStorage.setItem('iris-hierarchy-scroll', String(el.scrollTop));
+		}
+	}
+
+	/** Restore sidebar scroll position after sidebar renders. */
+	function restoreSidebarScroll(node: HTMLElement) {
+		const saved = sessionStorage.getItem('iris-hierarchy-scroll');
+		if (saved) {
+			requestAnimationFrame(() => {
+				node.scrollTop = parseFloat(saved);
+			});
+		}
+	}
 
 	// Export menu state
 	let showExportMenu = $state(false);
@@ -200,7 +271,20 @@
 		relationshipType?: string;
 	} | null>(null);
 
-	// Version rollback — not available for diagrams (only elements have rollback API).
+	async function handleDiagramRollback(version: number) {
+		if (!diagram) return;
+		try {
+			await apiFetch(`/api/diagrams/${diagram.id}/rollback`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'If-Match': String(diagram.current_version) },
+				body: JSON.stringify({ target_version: version }),
+			});
+			await loadDiagram(diagram.id);
+			await loadVersions(diagram.id);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Rollback failed';
+		}
+	}
 
 	let prevSetId = $state<string | undefined>(undefined);
 
@@ -258,8 +342,94 @@
 		return () => document.removeEventListener('edgestylechange', onEdgeStyleChange);
 	});
 
+	// Listen for node style change events from NodeStylePanel (ADR-091-A)
+	$effect(() => {
+		function onNodeStyleChange(e: Event) {
+			const { nodeId, visual: updatedVisual } = (e as CustomEvent).detail;
+			if (!editing) return;
+			history.pushState(canvasNodes, canvasEdges);
+			canvasNodes = canvasNodes.map((node) =>
+				node.id === nodeId
+					? { ...node, data: { ...node.data, visual: updatedVisual } }
+					: node,
+			);
+			canvasDirty = true;
+		}
+		function onNodeDataChange(e: Event) {
+			const { nodeId, field, value } = (e as CustomEvent).detail;
+			if (!editing) return;
+			history.pushState(canvasNodes, canvasEdges);
+			canvasNodes = canvasNodes.map((node) => {
+				if (node.id !== nodeId) return node;
+				const updated = { ...node, data: { ...node.data, [field]: value } };
+				// When entityType changes, also update node.type so SvelteFlow picks the right renderer
+				if (field === 'entityType') updated.type = value;
+				return updated;
+			});
+			canvasDirty = true;
+		}
+		document.addEventListener('nodestylechange', onNodeStyleChange);
+		document.addEventListener('nodedatachange', onNodeDataChange);
+		return () => {
+			document.removeEventListener('nodestylechange', onNodeStyleChange);
+			document.removeEventListener('nodedatachange', onNodeDataChange);
+		};
+	});
+
+	// Listen for element edit saved events from ElementEditPanel
+	$effect(() => {
+		function onElementEditSaved(e: Event) {
+			const { nodeId, name, description, elementType } = (e as CustomEvent).detail;
+			if (!editing) return;
+			history.pushState(canvasNodes, canvasEdges);
+			canvasNodes = canvasNodes.map((node) => {
+				if (node.id !== nodeId) return node;
+				const updated = { ...node, data: { ...node.data, label: name, description, entityType: elementType } };
+				updated.type = elementType;
+				return updated;
+			});
+			canvasDirty = true;
+		}
+		document.addEventListener('elementeditsaved', onElementEditSaved);
+		return () => document.removeEventListener('elementeditsaved', onElementEditSaved);
+	});
+
+	// Live preview: reflect ElementEditPanel changes on canvas instantly (no history/dirty)
+	$effect(() => {
+		function onElementEditPreview(e: Event) {
+			const { nodeId, name, description, elementType } = (e as CustomEvent).detail;
+			if (!editing) return;
+			canvasNodes = canvasNodes.map((node) => {
+				if (node.id !== nodeId) return node;
+				return { ...node, data: { ...node.data, label: name, description, entityType: elementType }, type: elementType };
+			});
+		}
+		document.addEventListener('elementeditpreview', onElementEditPreview);
+		return () => document.removeEventListener('elementeditpreview', onElementEditPreview);
+	});
+
+	// Listen for node resize end events from NodeResizer (ADR-091-A)
+	$effect(() => {
+		function onNodeResizeEnd(e: Event) {
+			if (!editing || !selectedEditNodeId) return;
+			const { width, height } = (e as CustomEvent).detail;
+			history.pushState(canvasNodes, canvasEdges);
+			const w = Math.round(width);
+			const h = Math.round(height);
+			canvasNodes = canvasNodes.map((node) =>
+				node.id === selectedEditNodeId
+					? { ...node, width: w, height: h, data: { ...node.data, visual: { ...node.data.visual, width: w, height: h } } }
+					: node,
+			);
+			canvasDirty = true;
+		}
+		document.addEventListener('noderesizeend', onNodeResizeEnd);
+		return () => document.removeEventListener('noderesizeend', onNodeResizeEnd);
+	});
+
 	// Release lock on navigation and component destroy (ADR-080/086)
 	beforeNavigate(() => {
+		saveSidebarScroll();
 		if (lockManager && lockManager.isOwner) {
 			lockManager.releaseLock();
 			editing = false;
@@ -308,7 +478,12 @@
 		loading = true;
 		error = null;
 		try {
-			diagram = await apiFetch<Diagram>(`/api/diagrams/${id}`);
+			// Load themes in parallel with diagram data to prevent flash
+			const [diagramResult] = await Promise.all([
+				apiFetch<Diagram>(`/api/diagrams/${id}`),
+				areThemesLoaded() ? Promise.resolve() : loadThemes(),
+			]);
+			diagram = diagramResult;
 			parseCanvasData();
 			// Smart default tab: show details if no canvas content
 			if (!userSelectedTab) {
@@ -323,6 +498,8 @@
 			loadInheritedTags();
 			loadAllTags();
 			loadAncestors(id);
+			loadDiagramRelationships(id);
+			loadCommentCount(id);
 			// Initialize lock manager for this diagram (ADR-080/086)
 			if (lockManager) {
 				lockManager.destroy();
@@ -504,7 +681,9 @@
 			sequenceData = { participants: [], messages: [], activations: [] };
 			return;
 		}
-		const data = diagram.data as Record<string, unknown>;
+		// Deep-clone to break shared references — prevents edits from
+		// mutating the original diagram.data (needed for discard to work).
+		const data = JSON.parse(JSON.stringify(diagram.data)) as Record<string, unknown>;
 
 		if (diagram.diagram_type === 'sequence') {
 			sequenceData = {
@@ -513,7 +692,13 @@
 				activations: Array.isArray(data.activations) ? data.activations : [],
 			} as SequenceDiagramData;
 		} else {
-			canvasNodes = (Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[];
+			canvasNodes = ((Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[]).map((n) => {
+				const vw = n.data?.visual?.width ?? n.measured?.width ?? 200;
+				// Don't set explicit height — let SvelteFlow auto-measure from content
+				// so descriptions are fully visible and resize handles are correctly positioned.
+				const { height: _h, measured: _m, ...rest } = n;
+				return { ...rest, width: n.width ?? vw };
+			});
 			canvasEdges = (Array.isArray(data.edges) ? data.edges : []) as CanvasEdge[];
 		}
 		canvasDirty = false;
@@ -543,6 +728,22 @@
 			elementRelationships = [];
 		}
 		relationshipsLoading = false;
+	}
+
+	async function loadCommentCount(id: string) {
+		try {
+			const result = await apiFetch<unknown[]>(`/api/diagrams/${id}/comments`);
+			commentCount = result.length;
+		} catch {
+			commentCount = 0;
+		}
+	}
+
+	function toggleCommentsSidebar() {
+		showCommentsSidebar = !showCommentsSidebar;
+		if (showCommentsSidebar) {
+			selectedBrowseNode = null;
+		}
 	}
 
 	async function deleteDiagramRelationship(relId: string) {
@@ -749,6 +950,7 @@
 				id,
 				type: elementType,
 				position: findOpenPosition(),
+				width: 200,
 				data: {
 					label: name,
 					entityType: elementType,
@@ -903,6 +1105,41 @@
 		return edge?.data ?? null;
 	});
 
+	/** Derived visual overrides for the currently selected node in edit mode. */
+	const selectedNodeVisual = $derived.by(() => {
+		if (!selectedEditNodeId) return null;
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return node?.data?.visual ?? {};
+	});
+
+	/** Derived entity type for the currently selected node. */
+	const selectedNodeEntityType = $derived.by(() => {
+		if (!selectedEditNodeId) return 'component' as SimpleEntityType;
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return (node?.data?.entityType ?? 'component') as SimpleEntityType;
+	});
+
+	/** Derived entityId for the currently selected node (null if not linked). */
+	const selectedNodeEntityId = $derived.by(() => {
+		if (!selectedEditNodeId) return null;
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return node?.data?.entityId ?? null;
+	});
+
+	/** Derived label for the currently selected node (for unlinked ElementEditPanel). */
+	const selectedNodeLabel = $derived.by(() => {
+		if (!selectedEditNodeId) return '';
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return node?.data?.label ?? '';
+	});
+
+	/** Derived description for the currently selected node (for unlinked ElementEditPanel). */
+	const selectedNodeDescription = $derived.by(() => {
+		if (!selectedEditNodeId) return '';
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return node?.data?.description ?? '';
+	});
+
 	function handleConnectNodes(sourceId: string, targetId: string) {
 		pendingConnection = { sourceId, targetId };
 		showRelationshipDialog = true;
@@ -988,6 +1225,7 @@
 			return;
 		}
 		selectedBrowseNode = node;
+		if (node) showCommentsSidebar = false;
 	}
 
 	function handleSequenceParticipantSelect(participant: Participant) {
@@ -1046,6 +1284,7 @@
 			id,
 			type: elementType,
 			position: findOpenPosition(),
+			width: 200,
 			data: {
 				label: element.name,
 				entityType: elementType,
@@ -1066,6 +1305,7 @@
 			id,
 			type: 'modelref',
 			position: findOpenPosition(),
+			width: 200,
 			data: {
 				label: linkedDiagram.name,
 				entityType: 'component' as SimpleEntityType,
@@ -1182,6 +1422,7 @@
 					id: sourceNodeId,
 					type: 'component',
 					position: findOpenPosition(),
+					width: 200,
 					data: { label: sourceName ?? 'Source', entityType: 'component' as SimpleEntityType, entityId: sourceElementId },
 				}];
 			}
@@ -1194,6 +1435,7 @@
 					id: targetNodeId,
 					type: 'component',
 					position: findOpenPosition(),
+					width: 200,
 					data: { label: targetName ?? 'Target', entityType: 'component' as SimpleEntityType, entityId: targetElementId },
 				}];
 			}
@@ -1222,6 +1464,7 @@
 					id: crypto.randomUUID(),
 					type: 'modelref',
 					position: findOpenPosition(),
+					width: 200,
 					data: { label: targetDiagramName ?? 'Diagram', entityType: 'component' as SimpleEntityType, linkedModelId: targetDiagramId },
 				}];
 				canvasDirty = true;
@@ -1260,13 +1503,17 @@
 		}
 	}
 
-	function discardChanges() {
-		parseCanvasData();
-		history.clear();
+	async function discardChanges() {
 		editing = false;
+		history.clear();
 		lockConflictUser = null;
 		if (lockManager) {
 			lockManager.releaseLock();
+		}
+		// Reload from API to guarantee clean state — eliminates any
+		// possibility of stale data from SvelteFlow's bind:nodes writeback.
+		if (diagram) {
+			await loadDiagram(diagram.id);
 		}
 	}
 
@@ -1282,6 +1529,7 @@
 		} else {
 			editing = true;
 		}
+		showCommentsSidebar = false;
 	}
 
 	// Export handlers
@@ -1426,6 +1674,32 @@
 		{error}
 	</div>
 {:else if diagram}
+	<!-- Windowed browse sidebar: fixed right panel + margin on page content -->
+	{#if windowedBrowseSidebar && selectedBrowseNode}
+		<div
+			style="position: fixed; top: 0; right: 0; bottom: 0; width: 316px; z-index: 40; padding: 8px; overflow-y: auto; background: var(--color-bg); border-left: 1px solid var(--color-border);"
+		>
+			<EntityDetailPanel
+				entity={selectedBrowseNode.data}
+				onclose={() => (selectedBrowseNode = null)}
+				currentDiagramId={diagram?.id}
+			/>
+		</div>
+	{/if}
+	<!-- Windowed comments sidebar -->
+	{#if windowedCommentsSidebar}
+		<div
+			style="position: fixed; top: 0; right: 0; bottom: 0; width: 316px; z-index: 40; padding: 8px; overflow-y: auto; background: var(--color-bg); border-left: 1px solid var(--color-border);"
+		>
+			<CommentsPanel
+				targetType="diagram"
+				targetId={diagram.id}
+				onclose={() => (showCommentsSidebar = false)}
+				oncount={(c) => (commentCount = c)}
+			/>
+		</div>
+	{/if}
+	<div style={(windowedBrowseSidebar || windowedCommentsSidebar) ? 'margin-right: 316px; margin-bottom: -24px; transition: margin-right 0.15s ease;' : 'margin-bottom: -24px; transition: margin-right 0.15s ease;'}>
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
 		<ol class="flex flex-wrap items-baseline gap-1">
 			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
@@ -1490,13 +1764,14 @@
 	<!-- Collapsible hierarchy sidebar -->
 	{#if sidebarOpen}
 		<aside
-			style="width: 280px; max-height: calc(100vh - 80px); flex-shrink: 0"
-			class="overflow-y-auto rounded border"
+			data-hierarchy-sidebar
+			style="width: 280px; max-height: calc(100vh - 216px); flex-shrink: 0; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; position: sticky; top: 16px; align-self: flex-start"
+			class="rounded-md border"
 			style:border-color="var(--color-border)"
 			style:background-color="var(--color-surface)"
 			aria-label="Diagram hierarchy"
 		>
-			<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border)">
+			<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border); flex-shrink: 0">
 				<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
 				<div class="flex items-center gap-1">
 					<button
@@ -1557,7 +1832,7 @@
 					</button>
 				</div>
 			</div>
-			<div class="p-2">
+			<div class="p-2" style="flex-shrink: 0; border-bottom: 1px solid var(--color-border)">
 				<input
 					type="search"
 					placeholder="Search tree..."
@@ -1567,7 +1842,7 @@
 					aria-label="Search hierarchy"
 				/>
 			</div>
-			<div class="px-2 pb-2">
+			<div use:restoreSidebarScroll class="px-2 pb-2" style="overflow-y: auto; flex: 1; min-height: 0">
 				{#if hierarchyLoading}
 					<p class="p-2 text-xs" style="color: var(--color-muted)">Loading...</p>
 				{:else if hierarchyTree.length === 0}
@@ -1620,6 +1895,12 @@
 				style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}"
 			>
 				Relationships
+				{#if hasRelationships}
+					<span
+						style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-primary); margin-left: 4px; vertical-align: middle;"
+						aria-label="{diagramRelationships.length + elementRelationships.length} relationship{diagramRelationships.length + elementRelationships.length === 1 ? '' : 's'}"
+					></span>
+				{/if}
 			</button>
 			<button
 				role="tab"
@@ -1979,6 +2260,17 @@
 								</div>
 							{/if}
 						</div>
+						{#if !editing}
+							<button
+								onclick={toggleCommentsSidebar}
+								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								aria-pressed={showCommentsSidebar}
+							>
+								Comments
+								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
+							</button>
+						{/if}
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
@@ -2011,7 +2303,74 @@
 				{:else}
 					{#if focusMode}
 						<FocusView onexit={() => (focusMode = false)}>
-							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden; position: relative">
+							<div style="display: flex; width: 100%; height: 100%;">
+								{#if sidebarOpen}
+									<aside
+										data-hierarchy-sidebar
+										style="width: 280px; max-height: calc(100% - 16px); flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 6px; margin: 8px 0 8px 8px; align-self: flex-start;"
+									>
+										<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border); flex-shrink: 0">
+											<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
+											<div class="flex items-center gap-1">
+												<button
+													onclick={() => (treeDiagramsOnly = !treeDiagramsOnly)}
+													class="rounded px-2 py-1 text-xs"
+													style="border: 1px solid {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}"
+													title="Show only items with child diagrams"
+													aria-pressed={treeDiagramsOnly}
+												>Diagrams</button>
+												<button
+													onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
+													class="rounded p-1 text-xs"
+													style="color: var(--color-muted)"
+													aria-label="Close sidebar"
+												>✕</button>
+											</div>
+										</div>
+										<div class="p-2" style="flex-shrink: 0; border-bottom: 1px solid var(--color-border)">
+											<input type="search" placeholder="Search tree..." bind:value={treeSearchQuery}
+												class="w-full rounded border px-2 py-1 text-xs"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+												aria-label="Search hierarchy" />
+										</div>
+										<div class="px-2 py-2" style="overflow-y: auto; flex: 1; min-height: 0">
+											{#if hierarchyLoading}
+												<p class="p-2 text-xs" style="color: var(--color-muted)">Loading...</p>
+											{:else if hierarchyTree.length === 0}
+												<p class="p-2 text-xs" style="color: var(--color-muted)">No diagrams in this set.</p>
+											{:else}
+												<ul role="tree">
+													{#each hierarchyTree as node (node.id)}
+														<TreeNode {node} currentDiagramId={diagram.id} searchQuery={treeSearchQuery} showDiagramsOnly={treeDiagramsOnly} expandedIds={treeExpandedIds} />
+													{/each}
+												</ul>
+											{/if}
+																					</div>
+									</aside>
+								{/if}
+							<div style="flex: 1; min-width: 0; overflow: hidden; position: relative">
+								<button
+									onclick={toggleSidebar}
+									aria-label="Toggle hierarchy sidebar"
+									aria-pressed={sidebarOpen}
+									style="position: absolute; top: 12px; left: 12px; z-index: 10; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); cursor: pointer;"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="20" height="20"
+										style="color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-muted)'}">
+										<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
+									</svg>
+								</button>
+								{#if !editing}
+									<button
+										onclick={toggleCommentsSidebar}
+										aria-label="Toggle comments"
+										aria-pressed={showCommentsSidebar}
+										style="position: absolute; top: 12px; left: 56px; z-index: 10; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); cursor: pointer; font-size: 13px; color: var(--color-fg);"
+									>
+										Comments
+										<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
+									</button>
+								{/if}
 								<SequenceDiagram
 									data={sequenceData}
 									{selectedMessageId}
@@ -2028,37 +2387,39 @@
 									onzoomout={seqViewport.zoomOut}
 									onfitview={seqViewport.fitView}
 								/>
+								<div class="canvas-mode-badge{editing ? ' canvas-mode-badge--edit' : ''}" aria-live="polite">{editing ? 'Edit Mode' : 'Browse Mode'}</div>
+							</div>
+							{#if !editing && showCommentsSidebar}
+								<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 6px; padding: 12px;">
+									<CommentsPanel
+										targetType="diagram"
+										targetId={diagram.id}
+										onclose={() => (showCommentsSidebar = false)}
+										oncount={(c) => (commentCount = c)}
+									/>
+								</div>
+							{/if}
 							</div>
 						</FocusView>
 					{:else}
-					<div class="flex gap-4">
-						<div class="flex-1" style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden; position: relative">
-							<SequenceDiagram
-								data={sequenceData}
-								{selectedMessageId}
-								onmessageselect={(id) => (selectedMessageId = id)}
-								onparticipantselect={!editing ? handleSequenceParticipantSelect : undefined}
-								viewBox={seqViewport.viewBox}
-								onwheel={seqViewport.handleWheel}
-								onpointerdown={seqViewport.handlePointerDown}
-								onpointermove={seqViewport.handlePointerMove}
-								onpointerup={seqViewport.handlePointerUp}
-							/>
-							<SequenceToolbar
-								onzoomin={seqViewport.zoomIn}
-								onzoomout={seqViewport.zoomOut}
-								onfitview={seqViewport.fitView}
-							/>
-						</div>
-						{#if !editing && selectedBrowseNode}
-							<div style="width: 300px">
-								<EntityDetailPanel
-									entity={selectedBrowseNode.data}
-									onclose={() => (selectedBrowseNode = null)}
-									currentDiagramId={diagram?.id}
-								/>
-							</div>
-						{/if}
+					<div style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden; position: relative">
+						<SequenceDiagram
+							data={sequenceData}
+							{selectedMessageId}
+							onmessageselect={(id) => (selectedMessageId = id)}
+							onparticipantselect={!editing ? handleSequenceParticipantSelect : undefined}
+							viewBox={seqViewport.viewBox}
+							onwheel={seqViewport.handleWheel}
+							onpointerdown={seqViewport.handlePointerDown}
+							onpointermove={seqViewport.handlePointerMove}
+							onpointerup={seqViewport.handlePointerUp}
+						/>
+						<SequenceToolbar
+							onzoomin={seqViewport.zoomIn}
+							onzoomout={seqViewport.zoomOut}
+							onfitview={seqViewport.fitView}
+						/>
+						<div class="canvas-mode-badge{editing ? ' canvas-mode-badge--edit' : ''}" aria-live="polite">{editing ? 'Edit Mode' : 'Browse Mode'}</div>
 					</div>
 					{/if}
 				{/if}
@@ -2198,6 +2559,17 @@
 								</div>
 							{/if}
 						</div>
+						{#if !editing}
+							<button
+								onclick={toggleCommentsSidebar}
+								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								aria-pressed={showCommentsSidebar}
+							>
+								Comments
+								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
+							</button>
+						{/if}
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
@@ -2222,6 +2594,12 @@
 							<div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
 								<!-- Toolbar inside FocusView so edit controls are visible -->
 								<div class="flex items-center gap-4 p-2" style="border-bottom: 1px solid var(--color-border); background: var(--color-surface); flex-shrink: 0;">
+									<button onclick={toggleSidebar} aria-label="Toggle hierarchy sidebar" aria-pressed={sidebarOpen} class="rounded p-1">
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="20" height="20"
+											style="color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-muted)'}">
+											<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
+										</svg>
+									</button>
 									<div class="flex items-center gap-2">
 										<button onclick={() => (showAddElement = true)} class="rounded px-3 py-1.5 text-sm text-white" style="background-color: var(--color-primary)">Add Element</button>
 										<button onclick={() => (showElementPicker = true)} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Link Element</button>
@@ -2239,44 +2617,108 @@
 										{/if}
 									</div>
 								</div>
-								<div style="flex: 1; border: 1px solid var(--color-border); overflow: hidden">
-									<UnifiedCanvas
-										{notation}
-										{preferredThemeId}
-											bind:nodes={canvasNodes}
-										bind:edges={canvasEdges}
-										oncreatenode={() => (showAddElement = true)}
-										ondeletenode={handleDeleteNode}
-										onconnectnodes={handleConnectNodes}
-										ondeleteedge={handleDeleteEdge}
-										onreconnectedge={handleReconnectEdge}
-										onedgeselect={handleEdgeSelect}
-										onnodeselect={handleNodeSelect}
-										onundo={handleUndo}
-										onredo={handleRedo}
-										onnodedragstart={handleNodeDragStart}
-									/>
+								<div style="display: flex; flex: 1; min-height: 0;">
+									{#if sidebarOpen}
+										<aside
+											data-hierarchy-sidebar
+											style="width: 280px; max-height: calc(100% - 16px); flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 6px; margin: 8px 0 8px 8px; align-self: flex-start;"
+										>
+											<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border); flex-shrink: 0">
+												<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
+												<div class="flex items-center gap-1">
+													<button
+														onclick={() => (treeDiagramsOnly = !treeDiagramsOnly)}
+														class="rounded px-2 py-1 text-xs"
+														style="border: 1px solid {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}"
+														title="Show only items with child diagrams"
+														aria-pressed={treeDiagramsOnly}
+													>Diagrams</button>
+													<button
+														onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
+														class="rounded p-1 text-xs"
+														style="color: var(--color-muted)"
+														aria-label="Close sidebar"
+													>✕</button>
+												</div>
+											</div>
+											<div class="p-2" style="flex-shrink: 0; border-bottom: 1px solid var(--color-border)">
+												<input type="search" placeholder="Search tree..." bind:value={treeSearchQuery}
+													class="w-full rounded border px-2 py-1 text-xs"
+													style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+													aria-label="Search hierarchy" />
+											</div>
+											<div class="px-2 py-2" style="overflow-y: auto; flex: 1; min-height: 0">
+												{#if hierarchyLoading}
+													<p class="p-2 text-xs" style="color: var(--color-muted)">Loading...</p>
+												{:else if hierarchyTree.length === 0}
+													<p class="p-2 text-xs" style="color: var(--color-muted)">No diagrams in this set.</p>
+												{:else}
+													<ul role="tree">
+														{#each hierarchyTree as node (node.id)}
+															<TreeNode {node} currentDiagramId={diagram.id} searchQuery={treeSearchQuery} showDiagramsOnly={treeDiagramsOnly} expandedIds={treeExpandedIds} />
+														{/each}
+													</ul>
+												{/if}
+																							</div>
+										</aside>
+									{/if}
+									<div style="flex: 1; min-width: 0; overflow: hidden">
+										<UnifiedCanvas
+											{notation}
+											{preferredThemeId}
+												bind:nodes={canvasNodes}
+											bind:edges={canvasEdges}
+											oncreatenode={() => (showAddElement = true)}
+											ondeletenode={handleDeleteNode}
+											onconnectnodes={handleConnectNodes}
+											ondeleteedge={handleDeleteEdge}
+											onreconnectedge={handleReconnectEdge}
+											onedgeselect={handleEdgeSelect}
+											onnodeselect={handleNodeSelect}
+											onundo={handleUndo}
+											onredo={handleRedo}
+											onnodedragstart={handleNodeDragStart}
+											ontogglemode={handleToggleToBrowseMode}
+											panX={selectedEditNodeId && selectedNodeVisual ? -308 : 0}
+										/>
+									</div>
+									{#if selectedEditNodeId && selectedNodeVisual}
+										<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; display: flex; flex-direction: column; gap: 8px;">
+											<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
+											<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} {notation} entityType={selectedNodeEntityType} />
+										</div>
+									{/if}
 								</div>
 							</div>
 						</FocusView>
 					{:else}
-					<div style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-						<UnifiedCanvas
-							{notation}
-							{preferredThemeId}
-								bind:nodes={canvasNodes}
-							bind:edges={canvasEdges}
-							oncreatenode={() => (showAddElement = true)}
-							ondeletenode={handleDeleteNode}
-							onconnectnodes={handleConnectNodes}
-							ondeleteedge={handleDeleteEdge}
-							onreconnectedge={handleReconnectEdge}
-							onedgeselect={handleEdgeSelect}
-							onnodeselect={handleNodeSelect}
-							onundo={handleUndo}
-							onredo={handleRedo}
-							onnodedragstart={handleNodeDragStart}
-						/>
+					<div class="flex gap-4">
+						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+							<UnifiedCanvas
+								{notation}
+								{preferredThemeId}
+									bind:nodes={canvasNodes}
+								bind:edges={canvasEdges}
+								oncreatenode={() => (showAddElement = true)}
+								ondeletenode={handleDeleteNode}
+								onconnectnodes={handleConnectNodes}
+								ondeleteedge={handleDeleteEdge}
+								onreconnectedge={handleReconnectEdge}
+								onedgeselect={handleEdgeSelect}
+								onnodeselect={handleNodeSelect}
+								onundo={handleUndo}
+								onredo={handleRedo}
+								onnodedragstart={handleNodeDragStart}
+								ontogglemode={handleToggleToBrowseMode}
+								panX={selectedEditNodeId && selectedNodeVisual ? -308 : 0}
+							/>
+						</div>
+						{#if selectedEditNodeId && selectedNodeVisual}
+							<div style="width: 300px; display: flex; flex-direction: column; gap: 8px;">
+								<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
+								<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} {notation} entityType={selectedNodeEntityType} />
+							</div>
+						{/if}
 					</div>
 					{#if selectedEdgeId && selectedEdgeData}
 						<div class="mt-2">
@@ -2297,39 +2739,116 @@
 					</div>
 				{:else}
 					{#if focusMode}
-						<FocusView onexit={() => (focusMode = false)}>
-							<div style="width: 100%; height: 100%; border: 1px solid var(--color-border); overflow: hidden">
-								<UnifiedCanvas
-									{notation}
-									{preferredThemeId}
-									nodes={canvasNodes}
-									edges={canvasEdges}
-									browseMode={true}
-									onnodeselect={handleBrowseNodeSelect}
-								/>
+						<FocusView onexit={() => (focusMode = false)} hideExit={!!selectedBrowseNode || showCommentsSidebar}>
+							<div style="display: flex; width: 100%; height: 100%;">
+								{#if sidebarOpen}
+									<aside
+										data-hierarchy-sidebar
+										style="width: 280px; max-height: calc(100% - 16px); flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 6px; margin: 8px 0 8px 8px; align-self: flex-start;"
+									>
+										<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border); flex-shrink: 0">
+											<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
+											<div class="flex items-center gap-1">
+												<button
+													onclick={() => (treeDiagramsOnly = !treeDiagramsOnly)}
+													class="rounded px-2 py-1 text-xs"
+													style="border: 1px solid {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}"
+													title="Show only items with child diagrams"
+													aria-pressed={treeDiagramsOnly}
+												>Diagrams</button>
+												<button
+													onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
+													class="rounded p-1 text-xs"
+													style="color: var(--color-muted)"
+													aria-label="Close sidebar"
+												>✕</button>
+											</div>
+										</div>
+										<div class="p-2" style="flex-shrink: 0; border-bottom: 1px solid var(--color-border)">
+											<input type="search" placeholder="Search tree..." bind:value={treeSearchQuery}
+												class="w-full rounded border px-2 py-1 text-xs"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+												aria-label="Search hierarchy" />
+										</div>
+										<div class="px-2 py-2" style="overflow-y: auto; flex: 1; min-height: 0">
+											{#if hierarchyLoading}
+												<p class="p-2 text-xs" style="color: var(--color-muted)">Loading...</p>
+											{:else if hierarchyTree.length === 0}
+												<p class="p-2 text-xs" style="color: var(--color-muted)">No diagrams in this set.</p>
+											{:else}
+												<ul role="tree">
+													{#each hierarchyTree as node (node.id)}
+														<TreeNode {node} currentDiagramId={diagram.id} searchQuery={treeSearchQuery} showDiagramsOnly={treeDiagramsOnly} expandedIds={treeExpandedIds} />
+													{/each}
+												</ul>
+											{/if}
+																					</div>
+									</aside>
+								{/if}
+								<div style="flex: 1; min-width: 0; position: relative; overflow: hidden">
+									<button
+										onclick={toggleSidebar}
+										aria-label="Toggle hierarchy sidebar"
+										aria-pressed={sidebarOpen}
+										style="position: absolute; top: 12px; left: 12px; z-index: 10; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); cursor: pointer;"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="20" height="20"
+											style="color: {sidebarOpen ? 'var(--color-primary)' : 'var(--color-muted)'}">
+											<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
+										</svg>
+									</button>
+									<button
+										onclick={toggleCommentsSidebar}
+										aria-label="Toggle comments"
+										aria-pressed={showCommentsSidebar}
+										style="position: absolute; top: 12px; left: 56px; z-index: 10; height: 36px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); cursor: pointer; font-size: 13px; color: var(--color-fg);"
+									>
+										Comments
+										<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
+									</button>
+									<UnifiedCanvas
+										{notation}
+										{preferredThemeId}
+										nodes={canvasNodes}
+										edges={canvasEdges}
+										browseMode={true}
+										onnodeselect={handleBrowseNodeSelect}
+										ontogglemode={handleStartEditing}
+										panX={(selectedBrowseNode || showCommentsSidebar) ? -308 : 0}
+									/>
+								</div>
+								{#if selectedBrowseNode}
+									<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 6px;">
+										<EntityDetailPanel
+											entity={selectedBrowseNode.data}
+											onclose={() => (selectedBrowseNode = null)}
+											currentDiagramId={diagram?.id}
+										/>
+									</div>
+								{:else if showCommentsSidebar}
+									<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 6px; padding: 12px;">
+										<CommentsPanel
+											targetType="diagram"
+											targetId={diagram.id}
+											onclose={() => (showCommentsSidebar = false)}
+											oncount={(c) => (commentCount = c)}
+										/>
+									</div>
+								{/if}
 							</div>
 						</FocusView>
 					{:else}
-					<div class="flex gap-4">
-						<div class="flex-1" style="height: 500px; border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-							<UnifiedCanvas
-								{notation}
-								{preferredThemeId}
-										nodes={canvasNodes}
-								edges={canvasEdges}
-								browseMode={true}
-								onnodeselect={handleBrowseNodeSelect}
-							/>
-						</div>
-						{#if selectedBrowseNode}
-							<div style="width: 300px">
-								<EntityDetailPanel
-									entity={selectedBrowseNode.data}
-									onclose={() => (selectedBrowseNode = null)}
-									currentDiagramId={diagram?.id}
-								/>
-							</div>
-						{/if}
+					<div style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+						<UnifiedCanvas
+							{notation}
+							{preferredThemeId}
+							nodes={canvasNodes}
+							edges={canvasEdges}
+							browseMode={true}
+							onnodeselect={handleBrowseNodeSelect}
+							ontogglemode={handleStartEditing}
+							panX={(selectedBrowseNode || showCommentsSidebar) ? -316 : 0}
+						/>
 					</div>
 					{/if}
 				{/if}
@@ -2441,16 +2960,13 @@
 				{/if}
 			{/if}
 		{:else if activeTab === 'versions'}
-			<VersionHistory {versions} loading={versionsLoading} />
+			<VersionHistory {versions} loading={versionsLoading} currentVersion={diagram?.current_version} onrollback={handleDiagramRollback} />
 		{/if}
 	</div>
 
-	<!-- Comments section -->
-	<section class="mt-8">
-		<CommentsPanel targetType="diagram" targetId={diagram.id} />
-	</section>
 	</div><!-- end main content flex-1 -->
 	</div><!-- end sidebar + content flex wrapper -->
+	</div><!-- end windowed browse sidebar margin wrapper -->
 
 	<DiagramDialog
 		open={showCreateChildDialog}
@@ -2648,6 +3164,44 @@
 		onsave={handleDiagramRelSave}
 		oncancel={() => (showAddDiagramRelDialog = false)}
 	/>
+
+	<!-- Unsaved changes confirmation -->
+	{#if showUnsavedChangesDialog}
+		<dialog
+			open
+			class="fixed inset-0 z-50 flex items-center justify-center rounded-lg p-6 shadow-lg backdrop:bg-black/50"
+			style="background-color: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); min-width: 360px"
+			aria-labelledby="unsaved-changes-title"
+		>
+			<h2 id="unsaved-changes-title" class="text-lg font-bold">Unsaved Changes</h2>
+			<p class="mt-2 text-sm" style="color: var(--color-muted)">
+				You have unsaved changes. Would you like to save or discard them?
+			</p>
+			<div class="mt-4 flex justify-end gap-3">
+				<button
+					onclick={handleUnsavedCancel}
+					class="rounded px-4 py-2 text-sm"
+					style="border: 1px solid var(--color-border); color: var(--color-fg)"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={handleUnsavedDiscard}
+					class="rounded px-4 py-2 text-sm"
+					style="border: 1px solid var(--color-danger); color: var(--color-danger)"
+				>
+					Discard
+				</button>
+				<button
+					onclick={handleUnsavedSave}
+					class="rounded px-4 py-2 text-sm text-white"
+					style="background-color: var(--color-success, #16a34a)"
+				>
+					Save
+				</button>
+			</div>
+		</dialog>
+	{/if}
 
 	<!-- "Add to canvas?" prompt -->
 	{#if showAddToCanvasPrompt}

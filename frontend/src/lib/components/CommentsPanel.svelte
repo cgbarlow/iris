@@ -10,9 +10,11 @@
 	interface Props {
 		targetType: 'diagram' | 'element';
 		targetId: string;
+		onclose?: () => void;
+		oncount?: (count: number) => void;
 	}
 
-	let { targetType, targetId }: Props = $props();
+	let { targetType, targetId, onclose, oncount }: Props = $props();
 
 	let comments = $state<Comment[]>([]);
 	let loading = $state(true);
@@ -21,6 +23,21 @@
 	let submitting = $state(false);
 	let editingId = $state<string | null>(null);
 	let editContent = $state('');
+
+	function formatDate(iso: string): string {
+		const d = new Date(iso);
+		if (isNaN(d.getTime())) return iso;
+		const now = new Date();
+		const diffMs = now.getTime() - d.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		if (diffMins < 1) return 'just now';
+		if (diffMins < 60) return `${diffMins}m ago`;
+		const diffHours = Math.floor(diffMins / 60);
+		if (diffHours < 24) return `${diffHours}h ago`;
+		const diffDays = Math.floor(diffHours / 24);
+		if (diffDays < 7) return `${diffDays}d ago`;
+		return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+	}
 
 	$effect(() => {
 		if (targetId) loadComments();
@@ -37,9 +54,11 @@
 		error = null;
 		try {
 			comments = await apiFetch<Comment[]>(commentsBaseUrl());
+			oncount?.(comments.length);
 		} catch {
 			error = 'Failed to load comments';
 			comments = [];
+			oncount?.(0);
 		}
 		loading = false;
 	}
@@ -104,7 +123,17 @@
 </script>
 
 <div class="comments-panel">
-	<h3 class="text-base font-semibold" style="color: var(--color-fg)">Comments</h3>
+	<div class="flex items-center justify-between">
+		<h3 class="text-base font-semibold" style="color: var(--color-fg)">Comments</h3>
+		{#if onclose}
+			<button
+				onclick={onclose}
+				class="rounded p-1 text-xs"
+				style="color: var(--color-muted)"
+				aria-label="Close comments"
+			>✕</button>
+		{/if}
+	</div>
 
 	{#if error}
 		<div role="alert" class="mt-2 rounded border p-2 text-sm" style="border-color: var(--color-danger); color: var(--color-danger)">
@@ -150,11 +179,12 @@
 								</div>
 							</div>
 						{:else}
+							<div class="mb-1 flex items-center gap-2">
+								<span class="text-xs font-medium" style="color: var(--color-fg)">{comment.username ?? 'Unknown'}</span>
+								<span class="text-xs" style="color: var(--color-muted)" title={comment.created_at}>{formatDate(comment.created_at)}</span>
+							</div>
 							<p class="text-sm" style="color: var(--color-fg)">{comment.content}</p>
 							<div class="mt-2 flex items-center gap-3">
-								<span class="text-xs" style="color: var(--color-muted)">
-									{comment.created_at}
-								</span>
 								<button
 									onclick={() => startEdit(comment)}
 									class="text-xs"

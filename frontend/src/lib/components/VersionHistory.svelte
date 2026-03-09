@@ -2,6 +2,7 @@
 	/**
 	 * VersionHistory: Shared version history display component.
 	 * Card-based layout showing version, change type, summary, date, and author.
+	 * Supports rollback via optional onrollback callback.
 	 * Used by diagram, element, and package detail pages.
 	 */
 
@@ -17,9 +18,26 @@
 	interface Props {
 		versions: VersionEntry[];
 		loading?: boolean;
+		currentVersion?: number;
+		onrollback?: (version: number) => void;
 	}
 
-	let { versions, loading = false }: Props = $props();
+	let { versions, loading = false, currentVersion, onrollback }: Props = $props();
+
+	let confirmingVersion = $state<number | null>(null);
+
+	function handleRestore(version: number) {
+		if (confirmingVersion === version) {
+			onrollback?.(version);
+			confirmingVersion = null;
+		} else {
+			confirmingVersion = version;
+		}
+	}
+
+	function cancelConfirm() {
+		confirmingVersion = null;
+	}
 </script>
 
 {#if loading}
@@ -34,7 +52,37 @@
 					<span class="text-sm font-medium" style="color: var(--color-fg)">
 						v{v.version} — {v.change_type}
 					</span>
-					<span class="text-xs" style="color: var(--color-muted)">{v.created_at}</span>
+					<div class="flex items-center gap-2">
+						<span class="text-xs" style="color: var(--color-muted)">{v.created_at}</span>
+						{#if onrollback && v.version !== currentVersion}
+							{#if confirmingVersion === v.version}
+								<button
+									onclick={() => handleRestore(v.version)}
+									class="rounded px-2 py-0.5 text-xs font-medium"
+									style="background: var(--color-danger); color: #fff"
+								>
+									Confirm
+								</button>
+								<button
+									onclick={cancelConfirm}
+									class="rounded px-2 py-0.5 text-xs"
+									style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								>
+									Cancel
+								</button>
+							{:else}
+								<button
+									onclick={() => handleRestore(v.version)}
+									class="rounded px-2 py-0.5 text-xs"
+									style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								>
+									Restore
+								</button>
+							{/if}
+						{:else if v.version === currentVersion}
+							<span class="rounded px-2 py-0.5 text-xs" style="color: var(--color-success)">Current</span>
+						{/if}
+					</div>
 				</div>
 				{#if v.change_summary}
 					<p class="mt-1 text-sm" style="color: var(--color-muted)">{v.change_summary}</p>

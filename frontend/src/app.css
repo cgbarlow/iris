@@ -74,6 +74,20 @@ a {
 	min-width: 24px;
 }
 
+/* Tab hover — subtle background highlight on section tabs */
+[role='tab']:hover {
+	background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+	border-radius: 4px 4px 0 0;
+}
+[role='tab'][aria-selected='false']:hover {
+	color: var(--color-fg) !important;
+}
+
+/* Hierarchy sidebar toggle hover */
+[aria-label='Toggle hierarchy sidebar']:hover {
+	background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
 /* Reduced motion per WCAG 2.3.3 */
 @media (prefers-reduced-motion: reduce) {
 	*,
@@ -121,9 +135,11 @@ a {
 	border: 2px solid var(--color-border);
 	background: var(--color-surface);
 	color: var(--color-fg);
-	width: 200px;
-	min-width: 140px;
+	width: 100%;
+	height: 100%;
+	min-width: 80px;
 	font-size: 0.875rem;
+	box-sizing: border-box;
 }
 
 .canvas-node--selected {
@@ -238,6 +254,43 @@ a {
 .canvas-edge__label {
 	font-size: 0.7rem;
 	fill: var(--color-muted);
+}
+
+/* ── Node resize handles ── */
+.svelte-flow .svelte-flow__resize-control.handle {
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	background-color: var(--color-primary, #3367d9);
+	border: 1px solid #fff;
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.svelte-flow .svelte-flow__node.selected .svelte-flow__resize-control.handle,
+.svelte-flow .svelte-flow__node:hover .svelte-flow__resize-control.handle {
+	opacity: 1;
+}
+
+.svelte-flow .svelte-flow__resize-control.line {
+	border-color: transparent;
+	transition: border-color 0.15s;
+}
+
+.svelte-flow .svelte-flow__node.selected .svelte-flow__resize-control.line,
+.svelte-flow .svelte-flow__node:hover .svelte-flow__resize-control.line {
+	border-color: var(--color-primary, #3367d9);
+}
+
+/* Wider hit area for line resize controls */
+.svelte-flow .svelte-flow__resize-control.line.left,
+.svelte-flow .svelte-flow__resize-control.line.right {
+	width: 6px;
+}
+
+.svelte-flow .svelte-flow__resize-control.line.top,
+.svelte-flow .svelte-flow__resize-control.line.bottom {
+	height: 6px;
 }
 
 /* Selected edge styling */
@@ -504,8 +557,23 @@ a {
 }
 
 /* ── Browse mode ── */
+/* Hide connection handles in browse mode — only visible when canvas is editable */
+.model-canvas--browse .svelte-flow__handle {
+	opacity: 0 !important;
+	pointer-events: none !important;
+}
+
 .model-canvas--browse {
 	cursor: default;
+}
+
+/* Default arrow cursor on nodes (override grab/pointer from xyflow) */
+.svelte-flow .svelte-flow__node.draggable,
+.svelte-flow .svelte-flow__node.selectable {
+	cursor: default;
+}
+.svelte-flow .svelte-flow__node.draggable.dragging {
+	cursor: grabbing;
 }
 
 .canvas-mode-badge {
@@ -513,6 +581,7 @@ a {
 	top: 8px;
 	left: 8px;
 	padding: 4px 12px;
+	border: none;
 	border-radius: 4px;
 	background: var(--color-muted);
 	color: #fff;
@@ -520,6 +589,37 @@ a {
 	font-weight: 600;
 	z-index: 10;
 	pointer-events: none;
+}
+.canvas-mode-badge--clickable {
+	pointer-events: auto;
+	cursor: pointer;
+	transition: background-color 0.15s, color 0.15s;
+}
+
+.canvas-mode-badge--edit {
+	background: #1a1a2e;
+	color: #ffffff;
+}
+.dark .canvas-mode-badge--edit {
+	background: #e2e8f0;
+	color: #1a1a2e;
+}
+.high-contrast .canvas-mode-badge--edit {
+	background: #000000;
+	color: #ffff00;
+}
+
+/* Position overrides inside fullscreen FocusView */
+.focus-view .canvas-mode-badge {
+	top: 12px;
+}
+/* Browse canvas: shift right to avoid overlapping the overlay hierarchy button */
+.focus-view .canvas-mode-badge--browse-pos {
+	left: 56px;
+}
+/* Edit canvas: no overlay button, snap to left edge */
+.focus-view .canvas-mode-badge--edit-pos {
+	left: 8px;
 }
 
 /* ── Entity detail panel ── */

@@ -14,6 +14,7 @@ from app.diagrams.models import (
     DiagramHierarchyNode,
     DiagramListResponse,
     DiagramResponse,
+    DiagramRollback,
     DiagramUpdate,
     DiagramVersionResponse,
 )
@@ -25,6 +26,7 @@ from app.diagrams.service import (
     get_diagram_hierarchy,
     get_diagram_versions,
     list_diagrams,
+    rollback_diagram,
     set_diagram_parent,
     soft_delete_diagram,
     update_diagram,
@@ -255,6 +257,40 @@ async def get_versions(
     return [DiagramVersionResponse(**v) for v in versions]
 
 
+@router.post("/{diagram_id}/rollback", response_model=DiagramResponse)
+async def rollback(
+    diagram_id: str,
+    body: DiagramRollback,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> DiagramResponse:
+    """Rollback a diagram to a previous version."""
+    if_match = request.headers.get("If-Match")
+    if if_match is None:
+        raise HTTPException(
+            status_code=428, detail="If-Match header required for rollback"
+        )
+    try:
+        expected_version = int(if_match)
+    except ValueError:
+        raise HTTPException(  # noqa: B904
+            status_code=400, detail="If-Match must be an integer version"
+        )
+
+    db = request.app.state.db_manager.main_db
+    result = await rollback_diagram(
+        db,
+        diagram_id,
+        target_version=body.target_version,
+        rolled_back_by=current_user["id"],
+        expected_version=expected_version,
+    )
+    if result is None:
+        raise HTTPException(status_code=409, detail="Version conflict or not found")
+
+    return DiagramResponse(**result)
+
+
 @router.get("/{diagram_id}/thumbnail")
 async def get_diagram_thumbnail(
     diagram_id: str,
@@ -316,5 +352,82 @@ async def remove_tag(
         "DELETE FROM diagram_tags WHERE diagram_id = ? AND tag = ?",
         (diagram_id, tag),
     )
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.get("/{diagram_id}/relationships")
+async def get_diagram_relationships(
+    diagram_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, Any]:
+    """Get all relationships for a diagram: element-to-element and diagram links."""
+    from app.package_relationships.service import list_all_relationships_for_diagram
+
+    db = request.app.state.db_manager.main_db
+
+    # Check diagram exists
+    cursor = await db.execute(
+        "SELECT id FROM diagrams WHERE id = ? AND is_deleted = 0",
+        (diagram_id,),
+    )
+    if await cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Diagram not found")
+
+    rels = await list_all_relationships_for_diagram(db, diagram_id)
+
+    # Fetch diagram links (NavigationCell navigation links)
+    cursor = await db.execute(
+        """
+        SELECT dl.id, dl.source_diagram_id, dl.target_diagram_id,
+               dl.link_type, dl.label, dl.created_by, dl.created_at,
+               sdv.name AS source_name, tdv.name AS target_name
+        FROM diagram_links dl
+        JOIN diagrams sd ON dl.source_diagram_id = sd.id
+        JOIN diagram_versions sdv ON sd.id = sdv.diagram_id AND sd.current_version = sdv.version
+        JOIN diagrams td ON dl.target_diagram_id = td.id
+        JOIN diagram_versions tdv ON td.id = tdv.diagram_id AND td.current_version = tdv.version
+        WHERE dl.source_diagram_id = ? OR dl.target_diagram_id = ?
+        """,
+        (diagram_id, diagram_id),
+    )
+    diagram_links = []
+    async for row in cursor:
+        diagram_links.append({
+            "id": row[0],
+            "source_package_id": row[1],  # Frontend expects this field name
+            "target_package_id": row[2],
+            "relationship_type": row[3],
+            "label": row[4],
+            "description": None,
+            "created_by": row[5],
+            "created_at": row[6],
+            "source_name": row[7] or row[1],
+            "target_name": row[8] or row[2],
+        })
+
+    return {
+        "diagram_relationships": diagram_links,
+        "element_relationships": rels.get("element_relationships", []),
+    }
+
+
+diagram_rel_router = APIRouter(prefix="/api/diagram-relationships", tags=["diagrams"])
+
+
+@diagram_rel_router.delete("/{relationship_id}")
+async def delete_diagram_relationship(
+    relationship_id: str,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Delete a diagram link."""
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "DELETE FROM diagram_links WHERE id = ?", (relationship_id,)
+    )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Diagram link not found")
     await db.commit()
     return {"status": "ok"}

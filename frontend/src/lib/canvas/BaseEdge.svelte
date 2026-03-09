@@ -31,6 +31,8 @@
 		targetY,
 		sourcePosition,
 		targetPosition,
+		sourceHandleId,
+		targetHandleId,
 		style,
 		markerEnd,
 		markerStart,
@@ -58,11 +60,15 @@
 		}
 
 		const pathParams = { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty, sourcePosition, targetPosition };
-		const rt = data?.routingType;
+		// Center-to-center connections default to straight line
+		const rawRt = data?.routingType;
+		const rt = (!rawRt || rawRt === 'default') && sourceHandleId === 'center' && targetHandleId === 'center'
+			? 'straight'
+			: rawRt;
 		if (rt === 'straight') return getStraightPath(pathParams);
 		if (rt === 'step') return getSmoothStepPath({ ...pathParams, borderRadius: 0 });
-		if (rt === 'smoothstep') return getSmoothStepPath(pathParams);
-		if (rt === 'bezier') return getBezierPath(pathParams);
+		if (rt === 'smoothstep') return getSmoothStepPath({ ...pathParams, borderRadius: 20 });
+		if (rt === 'bezier') return getBezierPath({ ...pathParams, curvature: 0.4 });
 		return getBezierPath(pathParams);
 	});
 

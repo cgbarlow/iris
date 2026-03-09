@@ -5,6 +5,91 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-03-09
+
+### Added
+- Comments sidebar — comments moved from page bottom to toggleable right sidebar with badge count
+- Comments button visible in browse mode (windowed and fullscreen), hidden in edit mode
+- Live preview of element edits on canvas (name, description, type reflect instantly while editing)
+- ElementEditPanel component for inline element editing in the canvas sidebar
+- NodeStylePanel wired into diagram page edit-mode sidebar alongside ElementEditPanel
+- Unsaved changes confirmation dialog when switching from edit to browse mode
+- Diagram relationships API endpoint (`GET /api/diagrams/{id}/relationships`) including diagram links
+- Diagram link deletion endpoint (`DELETE /api/diagram-relationships/{id}`)
+- Diagram links migration (`m025_diagram_links`)
+- Hierarchy sidebar in fullscreen mode (browse and edit) with search and filter
+- Hierarchy sidebar scroll position preserved across navigation
+- Sidebar toggle button in fullscreen mode overlay
+- Relationship indicator dot on Relationships tab when relationships exist
+- Comment author username display (resolved via LEFT JOIN on users table)
+- Relative timestamp formatting for comments ("just now", "5m ago", "3h ago", "2d ago")
+- Themes link in admin navigation sidebar
+- `areThemesLoaded()` helper in themeStore for conditional eager loading
+
+### Changed
+- Canvas height uses `calc(100vh - 317px)` to align bottom edge with hierarchy sidebar
+- Canvas area extends to fill space freed by removing bottom comments section
+- Page content shifts with `margin-right: 316px` when any sidebar is open (entity detail or comments)
+- No page scrollbar when all content fits viewport (negative bottom margin technique)
+- Entity detail sidebar and comments sidebar are mutually exclusive
+- Sequence toolbar uses inline SVG icons matching SvelteFlow Controls styling
+- ThemeSelector groups themes by notation with current notation first
+- `discardChanges()` reloads diagram from API to guarantee clean state
+- `parseCanvasData()` deep-clones diagram data to prevent edit mutations
+- New canvas nodes default to `width: 200` for consistent sizing
+- FocusView accepts `hideExit` prop to suppress exit button when sidebar is open
+- Browse-mode canvas uses `panX` to shift viewport when sidebar opens
+
+### Fixed
+- Comments displayed user GUID instead of username — backend now JOINs users table
+- Comment timestamps displayed raw ISO format — now shows friendly relative time
+- Canvas spilling off bottom of screen — aligned with hierarchy sidebar via precise offset calculation
+- Page scrollbar appearing despite content fitting — cancelled parent padding overflow
+
+## [2.4.0] - 2026-03-09
+
+### Added
+- C4 hybrid visual notation with canonical colours and inline SVG type glyphs (ADR-092)
+- C4TypeGlyph and C4TypePicker components for rich C4 type selection
+- `borderStyle` support in theme system (NodeVisualOverrides, visualStyles, themeStore)
+- C4 default theme seed with canonical colours (green person, blue system, red external) and dashed borders
+- NotationPills component — clickable pill notation selector replacing dropdowns
+- Version history restore/rollback UI with confirmation for elements and diagrams
+- Diagram rollback API endpoint (`POST /api/diagrams/{id}/rollback`)
+- Eager theme loading to prevent flash on diagram page
+
+### Changed
+- C4Renderer uses inline SVG glyphs instead of Lucide icons
+- NodeStylePanel uses C4TypePicker for C4 notation nodes
+- EntityDialog renamed "Create Entity" → "Create Element", uses NotationPills and C4TypePicker
+- DiagramDialog uses NotationPills instead of notation dropdown
+- Element detail page uses C4TypePicker in edit mode, C4TypeGlyph in view mode
+- Edit mode badge styling: dark bg with white text (light theme), inverted for dark theme
+- Center-to-center edge connections default to straight line routing
+- Smoothstep edges use borderRadius=20, bezier edges use curvature=0.4
+- Connection handle dots hidden in browse mode
+
+### Fixed
+- Theme loading flash on diagram page initial load
+- ThemeSelector no longer lazy-loads themes (loaded eagerly by page)
+
+## [2.3.6] - 2026-03-08
+
+### Added
+- Node resizing via drag handles in edit mode using SvelteFlow NodeResizer (ADR-091-A)
+- NodeStylePanel wired into diagram page — select a node in edit mode to style it (ADR-091-A)
+- Node resize changes persisted to visual overrides (width/height) on save (ADR-091-A)
+- Lucide icon library (`lucide-svelte`) with 100+ curated architecture modelling icons (ADR-091-B)
+- `IconRef` type and `NodeVisualOverrides.icon` field for per-node icon storage (ADR-091-B)
+- Icon registry (`iconRegistry.ts`) resolving `IconRef` to Lucide Svelte components (ADR-091-B)
+- `IconDisplay.svelte` component for rendering icons at any size from an `IconRef` (ADR-091-B)
+- Semantic icon matcher (`icon_matcher.py`) — matches EA element names/stereotypes to Lucide icons via keyword similarity (ADR-091-B)
+- Set-wide icon consistency: same element name always resolves to same icon across all diagrams in an import (ADR-091-B)
+- NavigationCellNode renders matched Lucide icons when `visual.icon` is set, falls back to NID SVGs (ADR-091-B)
+- Icon picker modal (`IconPicker.svelte`) with search, category filters for browsing and selecting icons (ADR-091-C)
+- Icon section in NodeStylePanel — add, change, or remove node icons via the picker (ADR-091-C)
+- Icon tag index (`iconTags.json`) shared between frontend search and backend matching (ADR-091-B)
+
 ## [2.3.5] - 2026-03-07
 
 ### Fixed

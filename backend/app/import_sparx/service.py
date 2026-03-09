@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from datetime import UTC, datetime
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from app.diagrams.service import create_diagram
 from app.elements.service import create_element
-from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position, format_uml_visibility, parse_diagram_link_geometry, parse_diagram_link_path
+from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position, format_uml_visibility, parse_diagram_link_geometry, parse_diagram_link_path, parse_nid
+from app.import_sparx.icon_matcher import SemanticIconMatcher
 from app.import_sparx.mapper import map_archimate_stereotype, map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
     QeaElement,
@@ -45,6 +47,7 @@ class ImportSummary:
     elements_created: int = 0
     relationships_created: int = 0
     diagrams_created: int = 0
+    diagrams_updated: int = 0
     diagrams_skipped: int = 0
     elements_skipped: int = 0
     connectors_skipped: int = 0
@@ -234,6 +237,9 @@ async def import_sparx_file(
     # Build element index for fast lookups
     element_index = _build_element_index(elements)
 
+    # Initialize semantic icon matcher for NavigationCell icons (ADR-091-B)
+    icon_matcher = SemanticIconMatcher()
+
     # Build tagged values lookup by Object_ID
     tags_by_object: dict[int, list[dict[str, str | None]]] = {}
     for tv in tagged_values:
@@ -389,7 +395,7 @@ async def import_sparx_file(
                 f"{'Note' if iris_type == 'note' else 'Boundary'} {elem.Object_ID}",
             )
         elif iris_type == "navigation_cell" and not elem.Name:
-            # NavigationCell: use target diagram name as element name
+            # NavigationCell: use Alias, then target diagram name, as element name
             nav_target_id = None
             if elem.PDATA1:
                 try:
@@ -397,7 +403,8 @@ async def import_sparx_file(
                 except (ValueError, TypeError):
                     pass
             ea_diag_name_lookup = {d.Diagram_ID: (d.Name or "") for d in diagrams}
-            element_name = ea_diag_name_lookup.get(nav_target_id, f"Navigation {elem.Object_ID}") if nav_target_id else f"Navigation {elem.Object_ID}"
+            fallback = elem.Alias or f"Navigation {elem.Object_ID}"
+            element_name = ea_diag_name_lookup.get(nav_target_id, fallback) if nav_target_id else fallback
         else:
             element_name = elem.Name or f"Element {elem.Object_ID}"
 
@@ -510,10 +517,11 @@ async def import_sparx_file(
     ea_diagram_id_to_iris: dict[int, str] = {}
 
     for diag in diagrams:
-        # Skip if diagram already exists (idempotent re-import)
+        # Check if diagram already exists for update-on-reimport
+        existing_iris_id: str | None = None
         if diag.ea_guid and diag.ea_guid in guid_index:
-            summary.diagrams_skipped += 1
-            continue
+            existing_iris_id = guid_index[diag.ea_guid]
+            ea_diagram_id_to_iris[diag.Diagram_ID] = existing_iris_id
 
         diagram_type, diagram_notation = map_diagram_type(diag.Diagram_Type or "")
         parent_iris_id = package_map.get(diag.Package_ID)
@@ -557,14 +565,18 @@ async def import_sparx_file(
                 node_label = derive_note_label(elem.Note, "Unknown")
             elif elem and iris_type_str == "navigation_cell":
                 # NavigationCell: PDATA1 is the EA Diagram_ID the cell links to.
-                # Use the target diagram's name as the card label.
+                # Use the target diagram's name as the card label, falling back to
+                # Alias (used by Prolaborate for tiles without a target diagram).
                 target_diag_id = None
                 if elem.PDATA1:
                     try:
                         target_diag_id = int(elem.PDATA1)
                     except (ValueError, TypeError):
                         pass
-                node_label = ea_diagram_names.get(target_diag_id, "Unknown") if target_diag_id else "Unknown"
+                if target_diag_id:
+                    node_label = ea_diagram_names.get(target_diag_id, elem.Alias or elem.Name or "Unknown")
+                else:
+                    node_label = elem.Alias or elem.Name or "Unknown"
             else:
                 node_label = (elem.Name or "Unknown") if elem else "Unknown"
 
@@ -575,11 +587,29 @@ async def import_sparx_file(
             }
             # NavigationCell: store target EA diagram ID for post-processing
             # (will be resolved to Iris UUID after all diagrams are created)
-            if elem and iris_type_str == "navigation_cell" and elem.PDATA1:
-                try:
-                    node_data["_targetEaDiagramId"] = int(elem.PDATA1)
-                except (ValueError, TypeError):
-                    pass
+            if elem and iris_type_str == "navigation_cell":
+                if elem.PDATA1:
+                    try:
+                        node_data["_targetEaDiagramId"] = int(elem.PDATA1)
+                    except (ValueError, TypeError):
+                        pass
+                # Extract Prolaborate icon NID from StyleEx (e.g. "NID=2-13;")
+                nid = parse_nid(elem.StyleEx)
+                if nid:
+                    node_data["navIconId"] = nid
+                # Semantic icon matching: use the element's own Name (carries semantic
+                # meaning like "Stakeholder", "Organization") rather than node_label
+                # which is the target diagram's name for NavigationCells.
+                # Don't pass "NavigationCell" as stereotype — it's structural, not semantic,
+                # and its tokens ("navigation", "cell") corrupt matching scores.
+                icon_match_name = elem.Name or elem.Alias or node_label
+                icon_stereotype = elem.Stereotype if elem.Stereotype != "NavigationCell" else None
+                icon_ref = icon_matcher.match(
+                    icon_match_name,
+                    stereotype=icon_stereotype,
+                    note=elem.Note,
+                )
+                node_data["_pendingIcon"] = icon_ref
             # Always populate description from element's Note content
             if elem and elem.Note:
                 node_data["description"] = strip_label_from_note(node_label, elem.Note)
@@ -610,6 +640,10 @@ async def import_sparx_file(
             # typically not rendered as a fill in the EA UI.
             if iris_type_str == "boundary":
                 visual_with_size.pop("bgColor", None)
+            # Merge pending icon into visual overrides (ADR-091-B)
+            pending_icon = node_data.pop("_pendingIcon", None)
+            if pending_icon:
+                visual_with_size["icon"] = {"set": pending_icon["set"], "name": pending_icon["name"]}
             node_data["visual"] = visual_with_size
 
             # Thread element attributes to canvas node for compartment rendering
@@ -812,35 +846,74 @@ async def import_sparx_file(
         if diag.ea_guid:
             diag_metadata["ea_guid"] = diag.ea_guid
 
-        result = await create_diagram(
-            db,
-            diagram_type=diagram_type,
-            name=diag.Name or f"Diagram {diag.Diagram_ID}",
-            description=diag.Notes,
-            data=model_data,
-            created_by=imported_by,
-            parent_package_id=parent_iris_id,
-            set_id=set_id,
-            notation=diagram_notation,
-            metadata=diag_metadata,
-            change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
-        )
-        ea_diagram_id_to_iris[diag.Diagram_ID] = result["id"]
-        summary.diagrams_created += 1
+        if existing_iris_id:
+            # Update existing diagram with rebuilt canvas data
+            cursor = await db.execute(
+                "SELECT current_version FROM diagrams WHERE id = ?",
+                (existing_iris_id,),
+            )
+            ver_row = await cursor.fetchone()
+            if ver_row:
+                current_version = ver_row[0]
+                new_version = current_version + 1
+                now = datetime.now(tz=UTC).isoformat()
+                data_json = json.dumps(model_data)
+                metadata_json = json.dumps(diag_metadata)
+                await db.execute(
+                    "INSERT INTO diagram_versions "
+                    "(diagram_id, version, name, description, data, metadata, "
+                    "change_summary, created_at, created_by) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        existing_iris_id,
+                        new_version,
+                        diag.Name or f"Diagram {diag.Diagram_ID}",
+                        diag.Notes,
+                        data_json,
+                        metadata_json,
+                        f"Re-imported from SparxEA diagram ({diag.Diagram_Type})",
+                        now,
+                        imported_by,
+                    ),
+                )
+                await db.execute(
+                    "UPDATE diagrams SET current_version = ?, updated_at = ? WHERE id = ?",
+                    (new_version, now, existing_iris_id),
+                )
+                await db.commit()
+            summary.diagrams_updated += 1
+        else:
+            result = await create_diagram(
+                db,
+                diagram_type=diagram_type,
+                name=diag.Name or f"Diagram {diag.Diagram_ID}",
+                description=diag.Notes,
+                data=model_data,
+                created_by=imported_by,
+                parent_package_id=parent_iris_id,
+                set_id=set_id,
+                notation=diagram_notation,
+                metadata=diag_metadata,
+                change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
+            )
+            ea_diagram_id_to_iris[diag.Diagram_ID] = result["id"]
+            summary.diagrams_created += 1
 
     # 6. Post-process: link NavigationCell nodes to their target diagrams.
     # NavigationCells use PDATA1 (EA Diagram_ID) to reference the diagram they
-    # navigate to. Now that all diagrams have Iris UUIDs, patch linkedModelId.
+    # navigate to. Now that all diagrams have Iris UUIDs, patch linkedModelId
+    # and create diagram_links records for the relationships tab.
     if ea_diagram_id_to_iris:
         for ea_diag_id, iris_diag_id in ea_diagram_id_to_iris.items():
             cursor = await db.execute(
-                "SELECT data FROM diagram_versions WHERE diagram_id = ? ORDER BY version DESC LIMIT 1",
+                "SELECT version, data FROM diagram_versions WHERE diagram_id = ? ORDER BY version DESC LIMIT 1",
                 (iris_diag_id,),
             )
             row = await cursor.fetchone()
             if not row:
                 continue
-            canvas = json.loads(row[0])
+            latest_version = row[0]
+            canvas = json.loads(row[1])
             patched = False
             for node in canvas.get("nodes", []):
                 nd = node.get("data", {})
@@ -848,12 +921,21 @@ async def import_sparx_file(
                     target_iris_id = ea_diagram_id_to_iris.get(nd["_targetEaDiagramId"])
                     if target_iris_id:
                         nd["linkedModelId"] = target_iris_id
+                        # Create a diagram_links record so this shows in the relationships tab
+                        link_id = str(uuid.uuid4())
+                        await db.execute(
+                            "INSERT OR IGNORE INTO diagram_links "
+                            "(id, source_diagram_id, target_diagram_id, link_type, label, created_by) "
+                            "VALUES (?, ?, ?, 'navigation', ?, ?)",
+                            (link_id, iris_diag_id, target_iris_id, nd.get("label"), imported_by),
+                        )
                     del nd["_targetEaDiagramId"]
                     patched = True
             if patched:
                 await db.execute(
-                    "UPDATE diagram_versions SET data = ? WHERE diagram_id = ? AND version = 1",
-                    (json.dumps(canvas), iris_diag_id),
+                    "UPDATE diagram_versions SET data = ? WHERE diagram_id = ? AND version = ?",
+                    (json.dumps(canvas), iris_diag_id, latest_version),
                 )
+        await db.commit()
 
     return summary

@@ -14,6 +14,8 @@
 		type NotationType,
 	} from '$lib/types/canvas';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import NotationPills from '$lib/components/NotationPills.svelte';
+	import C4TypePicker from '$lib/c4/C4TypePicker.svelte';
 	import { getDefaultNotation } from '$lib/stores/defaultNotation.svelte';
 
 	interface Props {
@@ -257,7 +259,7 @@
 		style="background-color: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); min-width: 360px"
 	>
 		<h2 id="entity-dialog-title" class="text-lg font-bold">
-			{mode === 'create' ? 'Create Entity' : 'Edit Entity'}
+			{mode === 'create' ? 'Create Element' : 'Edit Element'}
 		</h2>
 
 		<form onsubmit={handleSubmit} class="mt-4 flex flex-col gap-4">
@@ -277,19 +279,11 @@
 				<input type="hidden" name="entity-notation" value={selectedNotation} />
 			{:else}
 				<div>
-					<label for="entity-notation" class="block text-sm font-medium">Notation</label>
-					<select
-						id="entity-notation"
-						bind:value={selectedNotation}
-						onchange={handleNotationChange}
-						class="mt-1 w-full rounded border px-3 py-2 text-sm"
-						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-					>
-						<option value="simple">Simple</option>
-						<option value="uml">UML</option>
-						<option value="archimate">ArchiMate</option>
-						<option value="c4">C4</option>
-					</select>
+					<label class="block text-sm font-medium mb-1">Notation</label>
+					<NotationPills
+						value={selectedNotation}
+						onchange={(n) => { selectedNotation = n; handleNotationChange(); }}
+					/>
 				</div>
 			{/if}
 
@@ -328,17 +322,33 @@
 			{/if}
 
 			<div>
-				<label for="entity-type" class="block text-sm font-medium">Type</label>
-				<select
-					id="entity-type"
-					bind:value={entityType}
-					class="mt-1 w-full rounded border px-3 py-2 text-sm"
-					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-				>
-					{#each entityTypeOptions as t}
-						<option value={t.key}>{t.icon} {t.label}</option>
-					{/each}
-				</select>
+				<label for="entity-type" class="block text-sm font-medium">
+					{#if diagramType && !showAllTypes}
+						Type <span class="text-xs font-normal" style="color: var(--color-muted)">(filtered by {selectedNotation} notation)</span>
+					{:else}
+						Type
+					{/if}
+				</label>
+				{#if selectedNotation === 'c4'}
+					<div class="mt-1">
+						<C4TypePicker
+							value={entityType}
+							onchange={(t) => { entityType = t; }}
+							compact
+						/>
+					</div>
+				{:else}
+					<select
+						id="entity-type"
+						bind:value={entityType}
+						class="mt-1 w-full rounded border px-3 py-2 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					>
+						{#each entityTypeOptions as t}
+							<option value={t.key}>{t.icon} {t.label}</option>
+						{/each}
+					</select>
+				{/if}
 				{#if diagramType}
 					<label class="mt-1.5 flex items-center gap-1.5 text-xs cursor-pointer" style="color: var(--color-muted)">
 						<input type="checkbox" bind:checked={showAllTypes} onchange={handleShowAllChange} />

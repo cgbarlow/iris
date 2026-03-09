@@ -178,11 +178,14 @@
 <style>
 	.archimate-node {
 		border-radius: 4px;
+		width: 100%;
+		height: 100%;
 		min-width: 130px;
 		padding: 8px;
 		border: 2px solid #666;
 		font-size: 0.8rem;
 		position: relative;
+		box-sizing: border-box;
 	}
 	.archimate-node--selected {
 		box-shadow: 0 0 0 2px var(--color-primary, #3b82f6);

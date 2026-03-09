@@ -15,6 +15,7 @@
 		data: CanvasNodeData;
 		selected?: boolean;
 		icon?: string;
+		iconSnippet?: Snippet;
 		typeLabel?: string;
 		cssClass?: string;
 		children?: Snippet;
@@ -24,6 +25,7 @@
 		data,
 		selected = false,
 		icon = '⬡',
+		iconSnippet,
 		typeLabel = 'element',
 		cssClass = '',
 		children,
@@ -39,7 +41,11 @@
 	aria-label="{data.label}, {typeLabel}"
 >
 	<div class="canvas-node__header">
-		<span class="canvas-node__icon" aria-hidden="true">{icon}</span>
+		{#if iconSnippet}
+			{@render iconSnippet()}
+		{:else}
+			<span class="canvas-node__icon" aria-hidden="true">{icon}</span>
+		{/if}
 		<span class="canvas-node__label">{data.label}</span>
 	</div>
 	{#if children}

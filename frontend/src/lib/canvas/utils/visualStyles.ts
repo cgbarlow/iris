@@ -3,12 +3,13 @@
 import type { NodeVisualOverrides, EdgeVisualOverrides } from '$lib/types/canvas';
 
 export function nodeOverrideStyle(visual?: NodeVisualOverrides, fixedSize?: boolean): string {
-	if (!visual) return '';
-	const parts: string[] = [];
+	if (!visual) return 'width: 100%; height: 100%';
+	const parts: string[] = ['width: 100%', 'height: 100%'];
 	if (visual.bgColor) parts.push(`background-color: ${visual.bgColor}`);
 	if (visual.borderColor) parts.push(`border-color: ${visual.borderColor}`);
 	if (visual.fontColor) parts.push(`color: ${visual.fontColor}`);
 	if (visual.borderWidth != null) parts.push(`border-width: ${visual.borderWidth}px`);
+	if (visual.borderStyle) parts.push(`border-style: ${visual.borderStyle}`);
 	if (visual.fontSize != null) parts.push(`font-size: ${visual.fontSize}px`);
 	if (visual.bold) parts.push('font-weight: bold');
 	if (visual.italic) parts.push('font-style: italic');

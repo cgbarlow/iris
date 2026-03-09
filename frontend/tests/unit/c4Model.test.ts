@@ -151,7 +151,7 @@ describe('C4Renderer', () => {
 		expect(rendererSrc).toContain('BaseNode');
 	});
 
-	it('has icons for all C4 types', () => {
+	it('has level labels for all C4 types', () => {
 		expect(rendererSrc).toContain("person:");
 		expect(rendererSrc).toContain("software_system:");
 		expect(rendererSrc).toContain("container:");
@@ -167,8 +167,8 @@ describe('C4Renderer', () => {
 		expect(rendererSrc).toContain('c4-node');
 	});
 
-	it('has dark mode styles', () => {
-		expect(rendererSrc).toContain(':global(.dark)');
+	it('uses C4TypeGlyph for icons (ADR-092)', () => {
+		expect(rendererSrc).toContain('C4TypeGlyph');
 	});
 });
 

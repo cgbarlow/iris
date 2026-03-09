@@ -28,6 +28,12 @@ class DiagramUpdate(BaseModel):
     metadata: dict[str, object] | None = None
 
 
+class DiagramRollback(BaseModel):
+    """Request body for rolling back a diagram to a previous version."""
+
+    target_version: int = Field(ge=1)
+
+
 class DiagramResponse(BaseModel):
     """Response for a single diagram."""
 

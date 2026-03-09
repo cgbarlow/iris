@@ -8,6 +8,7 @@
 	 * dedicated components regardless of notation.
 	 */
 	import { getContext } from 'svelte';
+	import { NodeResizer } from '@xyflow/svelte';
 	import type { CanvasNodeData, NotationType, NodeVisualOverrides } from '$lib/types/canvas';
 	import { resolveNodeVisual } from '$lib/stores/themeStore.svelte';
 	import NoteNode from './nodes/NoteNode.svelte';
@@ -87,6 +88,12 @@
 		'work_package', 'deliverable', 'implementation_event', 'plateau', 'gap',
 	]);
 </script>
+
+{#if !effectiveData.browseMode && effectiveData.entityType !== 'diagram_frame'}
+	<NodeResizer minWidth={80} minHeight={40} onResizeEnd={(_, params) => {
+		document.dispatchEvent(new CustomEvent('noderesizeend', { detail: { width: params.width, height: params.height } }));
+	}} />
+{/if}
 
 {#if effectiveData.entityType === 'diagram_frame'}
 	<DiagramFrameNode data={effectiveData} />
