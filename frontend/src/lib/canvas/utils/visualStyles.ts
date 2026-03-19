@@ -10,7 +10,7 @@ export function nodeOverrideStyle(visual?: NodeVisualOverrides, fixedSize?: bool
 	if (visual.fontColor) parts.push(`color: ${visual.fontColor}`);
 	if (visual.borderWidth != null) parts.push(`border-width: ${visual.borderWidth}px`);
 	if (visual.borderStyle) parts.push(`border-style: ${visual.borderStyle}`);
-	if (visual.fontSize != null) parts.push(`font-size: ${visual.fontSize}px`);
+	if (visual.fontSize != null && visual.fontSize > 0) parts.push(`font-size: ${visual.fontSize}px`);
 	if (visual.bold) parts.push('font-weight: bold');
 	if (visual.italic) parts.push('font-style: italic');
 	if (visual.width != null) {
@@ -25,6 +25,30 @@ export function nodeOverrideStyle(visual?: NodeVisualOverrides, fixedSize?: bool
 		// exact for the EA renderer but Iris padding/borders differ slightly.
 		parts.push(`min-height: ${visual.height}px`);
 	}
+	return parts.join('; ');
+}
+
+/** Inline style for title/label elements based on visual overrides. */
+export function titleFontStyle(visual?: NodeVisualOverrides): string {
+	if (!visual) return '';
+	const parts: string[] = [];
+	if (visual.fontColor) parts.push(`color: ${visual.fontColor}`);
+	if (visual.fontSize != null && visual.fontSize > 0) parts.push(`font-size: ${visual.fontSize}px`);
+	if (visual.bold) parts.push('font-weight: bold');
+	if (visual.italic) parts.push('font-style: italic');
+	return parts.join('; ');
+}
+
+/** Inline style for description elements based on visual overrides. */
+export function descFontStyle(visual?: NodeVisualOverrides): string {
+	if (!visual) return '';
+	const parts: string[] = [];
+	if (visual.descFontColor) parts.push(`color: ${visual.descFontColor}`);
+	if (visual.descFontSize != null && visual.descFontSize > 0) parts.push(`font-size: ${visual.descFontSize}px`);
+	if (visual.descBold) parts.push('font-weight: bold');
+	else if (visual.descBold === false) parts.push('font-weight: normal');
+	if (visual.descItalic) parts.push('font-style: italic');
+	else if (visual.descItalic === false) parts.push('font-style: normal');
 	return parts.join('; ');
 }
 

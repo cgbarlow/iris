@@ -48,6 +48,14 @@ async def create_diagram(
     if await cursor.fetchone() is None:
         effective_set_id = DEFAULT_SET_ID
 
+    # Validate parent_package_id exists — clear if not
+    if parent_package_id:
+        cursor = await db.execute(
+            "SELECT 1 FROM packages WHERE id = ?", (parent_package_id,)
+        )
+        if await cursor.fetchone() is None:
+            parent_package_id = None
+
     # Resolve notation: use provided, else default from registry, else 'simple'
     effective_notation = notation
     if not effective_notation:

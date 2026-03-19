@@ -6,7 +6,8 @@
 	 */
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { CanvasNodeData, ArchimateLayer } from '$lib/types/canvas';
-	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
+	import { nodeOverrideStyle, titleFontStyle, descFontStyle } from '$lib/canvas/utils/visualStyles';
+	import IconDisplay from '$lib/icons/IconDisplay.svelte';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -136,6 +137,10 @@
 		if (hasFixedSize) style += (style ? '; ' : '') + 'box-sizing: border-box';
 		return style;
 	});
+	const titleStyle = $derived(titleFontStyle(data.visual));
+	const descStyle = $derived(descFontStyle(data.visual));
+	const hasCustomIcon = $derived(!!data.visual?.icon);
+	const iconColor = $derived(data.visual?.iconColor);
 </script>
 
 <div
@@ -145,7 +150,11 @@
 	style={visualStyle}
 	aria-label="{data.label}, {data.entityType}"
 >
-	{#if iconSvg}
+	{#if hasCustomIcon && data.visual?.icon}
+		<span class="archimate-node__icon" aria-hidden="true">
+			<IconDisplay icon={data.visual.icon} size={14} color={iconColor} />
+		</span>
+	{:else if iconSvg}
 		<span class="archimate-node__icon" aria-hidden="true">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="14" height="14">
 				{@html iconSvg}
@@ -153,10 +162,10 @@
 		</span>
 	{/if}
 	<div class="archimate-node__header">
-		<span class="archimate-node__label">{data.label}</span>
+		<span class="archimate-node__label" style={titleStyle}>{data.label}</span>
 	</div>
 	{#if data.description}
-		<div class="archimate-node__description">{data.description}</div>
+		<div class="archimate-node__description" style={descStyle}>{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
 		<a href="/elements/{data.entityId}" class="canvas-node__browse-link" aria-label="View {data.label} details">

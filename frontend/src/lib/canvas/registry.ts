@@ -11,9 +11,9 @@ import DynamicEdge from './DynamicEdge.svelte';
 /** All node type keys across all notations. */
 const ALL_NODE_TYPE_KEYS = [
 	// Simple view
-	'component', 'service', 'interface', 'package', 'actor', 'database', 'queue',
+	'component', 'service', 'interface', 'package', 'actor', 'database', 'queue', 'navigation_cell',
 	// Universal
-	'note', 'boundary', 'modelref', 'diagram_frame', 'navigation_cell',
+	'note', 'boundary', 'modelref', 'diagram_frame',
 	// UML
 	'class', 'object', 'use_case', 'state', 'activity', 'node',
 	'interface_uml', 'enumeration', 'abstract_class', 'component_uml', 'package_uml',

@@ -79,7 +79,7 @@
 	/** fitView options: exclude diagram_frame nodes from bounding box calculation. */
 	const fitViewOptions = $derived({
 		nodes: nodes.filter((n) => n.data.entityType !== 'diagram_frame'),
-		padding: 0.05,
+		padding: 0.15,
 	});
 
 	/** Default edge type based on notation. */

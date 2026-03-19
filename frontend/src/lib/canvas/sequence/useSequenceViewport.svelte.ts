@@ -38,7 +38,7 @@ export function createSequenceViewport(contentWidth: number, contentHeight: numb
 	}
 
 	function fitView() {
-		zoom = 1;
+		zoom = 1 - ZOOM_STEP;
 		panX = 0;
 		panY = 0;
 	}

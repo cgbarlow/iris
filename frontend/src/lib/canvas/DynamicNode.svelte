@@ -42,10 +42,10 @@
 		);
 		if (!themeVisual && !data.visual) return data;
 		const merged: NodeVisualOverrides = { ...themeVisual, ...data.visual };
-		// ArchiMate types use CSS layer colours; navigation cells use their own card styling.
-		// Don't let theme global defaults (e.g. UML cream #ffffcc) override them —
-		// only per-element explicit colours should take precedence over CSS layers.
-		if (ARCHIMATE_TYPES.has(data.entityType) || data.entityType === 'navigation_cell') {
+		// ArchiMate types use CSS layer colours — don't let theme global defaults
+		// (e.g. UML cream #ffffcc) override them. Only per-element explicit colours
+		// should take precedence over CSS layers.
+		if (ARCHIMATE_TYPES.has(data.entityType)) {
 			if (!data.visual?.bgColor && merged.bgColor) delete merged.bgColor;
 			if (!data.visual?.borderColor && merged.borderColor) delete merged.borderColor;
 		}

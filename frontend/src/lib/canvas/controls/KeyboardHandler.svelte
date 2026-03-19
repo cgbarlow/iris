@@ -85,7 +85,7 @@
 				event.preventDefault();
 				fitView({
 					nodes: nodes.filter((n) => n.data.entityType !== 'diagram_frame'),
-					padding: 0.05,
+					padding: 0.15,
 				});
 				onannounce('Fit to screen');
 				return;

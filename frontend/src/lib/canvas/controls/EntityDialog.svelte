@@ -138,8 +138,8 @@
 				let filtered = SIMPLE_ENTITY_TYPES;
 				if (!showAllTypes && diagramType && SIMPLE_DIAGRAM_TYPE_FILTER[diagramType] !== undefined && SIMPLE_DIAGRAM_TYPE_FILTER[diagramType] !== null) {
 					const allowed = SIMPLE_DIAGRAM_TYPE_FILTER[diagramType]!;
-					// Always include note and boundary (universal annotation types)
-					filtered = filtered.filter((t) => allowed.includes(t.key) || t.key === 'note' || t.key === 'boundary');
+					// Always include note, boundary, and navigation (universal annotation types)
+					filtered = filtered.filter((t) => allowed.includes(t.key) || t.key === 'note' || t.key === 'boundary' || t.key === 'navigation_cell');
 				}
 				types = filtered.map((t) => ({ key: t.key as string, label: t.label, icon: t.icon }));
 				break;

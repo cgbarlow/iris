@@ -31,7 +31,7 @@
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
-	import { getActiveThemeId, loadThemes, areThemesLoaded } from '$lib/stores/themeStore.svelte';
+	import { getActiveThemeId, loadThemes, areThemesLoaded, resolveNodeVisual } from '$lib/stores/themeStore.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import { createLockManager } from '$lib/utils/locks.svelte';
@@ -1110,6 +1110,19 @@
 		if (!selectedEditNodeId) return null;
 		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
 		return node?.data?.visual ?? {};
+	});
+
+	/** Derived theme-resolved visual for the currently selected node (for NodeStylePanel defaults). */
+	const selectedNodeThemeVisual = $derived.by(() => {
+		if (!selectedEditNodeId) return undefined;
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		if (!node) return undefined;
+		return resolveNodeVisual(
+			notation,
+			node.data.entityType,
+			(node.data as Record<string, unknown>).stereotype as string | undefined,
+			preferredThemeId,
+		);
 	});
 
 	/** Derived entity type for the currently selected node. */
@@ -2233,7 +2246,7 @@
 					{/if}
 					<!-- View group (always visible) -->
 					<div class="ml-auto flex items-center gap-2">
-						{#if notation}
+						{#if notation && editing}
 							<ThemeSelector {notation} />
 						{/if}
 						<div class="relative">
@@ -2532,7 +2545,7 @@
 					{/if}
 					<!-- View group (always visible) -->
 					<div class="ml-auto flex items-center gap-2">
-						{#if notation}
+						{#if notation && editing}
 							<ThemeSelector {notation} />
 						{/if}
 						<div class="relative">
@@ -2685,7 +2698,7 @@
 									{#if selectedEditNodeId && selectedNodeVisual}
 										<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; display: flex; flex-direction: column; gap: 8px;">
 											<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
-											<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} {notation} entityType={selectedNodeEntityType} />
+											<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} themeVisual={selectedNodeThemeVisual} {notation} entityType={selectedNodeEntityType} />
 										</div>
 									{/if}
 								</div>
@@ -2716,7 +2729,7 @@
 						{#if selectedEditNodeId && selectedNodeVisual}
 							<div style="width: 300px; display: flex; flex-direction: column; gap: 8px;">
 								<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
-								<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} {notation} entityType={selectedNodeEntityType} />
+								<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} themeVisual={selectedNodeThemeVisual} {notation} entityType={selectedNodeEntityType} />
 							</div>
 						{/if}
 					</div>

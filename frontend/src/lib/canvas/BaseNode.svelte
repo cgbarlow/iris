@@ -9,7 +9,8 @@
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { Snippet } from 'svelte';
 	import type { CanvasNodeData } from '$lib/types/canvas';
-	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
+	import { nodeOverrideStyle, titleFontStyle, descFontStyle } from '$lib/canvas/utils/visualStyles';
+	import IconDisplay from '$lib/icons/IconDisplay.svelte';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -32,6 +33,10 @@
 	}: Props = $props();
 
 	const visualStyle = $derived(nodeOverrideStyle(data.visual));
+	const titleStyle = $derived(titleFontStyle(data.visual));
+	const descStyle = $derived(descFontStyle(data.visual));
+	const hasCustomIcon = $derived(!!data.visual?.icon);
+	const iconColor = $derived(data.visual?.iconColor);
 </script>
 
 <div
@@ -40,8 +45,12 @@
 	style={visualStyle}
 	aria-label="{data.label}, {typeLabel}"
 >
-	<div class="canvas-node__header">
-		{#if iconSnippet}
+	<div class="canvas-node__header" style={titleStyle}>
+		{#if hasCustomIcon && data.visual?.icon}
+			<span class="canvas-node__icon" aria-hidden="true">
+				<IconDisplay icon={data.visual.icon} size={16} color={iconColor} />
+			</span>
+		{:else if iconSnippet}
 			{@render iconSnippet()}
 		{:else}
 			<span class="canvas-node__icon" aria-hidden="true">{icon}</span>
@@ -52,7 +61,7 @@
 		{@render children()}
 	{/if}
 	{#if data.description && !children}
-		<div class="canvas-node__description">{data.description}</div>
+		<div class="canvas-node__description" style={descStyle}>{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
 		<a

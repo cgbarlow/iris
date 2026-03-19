@@ -7,7 +7,8 @@
 	import { getContext } from 'svelte';
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { CanvasNodeData, NotationType } from '$lib/types/canvas';
-	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
+	import { nodeOverrideStyle, titleFontStyle } from '$lib/canvas/utils/visualStyles';
+	import IconDisplay from '$lib/icons/IconDisplay.svelte';
 	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
 	import { getActiveConfig } from '$lib/stores/viewStore.svelte';
 
@@ -86,6 +87,9 @@
 	const isPackage = $derived(data.entityType === 'package_uml');
 	const isComponent = $derived(data.entityType === 'component_uml');
 	const hasFixedSize = $derived(data.visual?.width != null && data.visual?.height != null);
+	const titleStyle = $derived(titleFontStyle(data.visual));
+	const hasCustomIcon = $derived(!!data.visual?.icon);
+	const iconColor = $derived(data.visual?.iconColor);
 	const visualStyle = $derived.by(() => {
 		let style = nodeOverrideStyle(data.visual, hasFixedSize);
 		if (themeBorderRadius != null) style += (style ? '; ' : '') + `border-radius: ${themeBorderRadius}px`;
@@ -104,11 +108,17 @@
 >
 	{#if isPackage && !hideIcons}
 		<div class="uml-node__tab">
-			<span class="uml-node__icon" aria-hidden="true">{icon}</span>
+			{#if hasCustomIcon && data.visual?.icon}
+				<span class="uml-node__icon" aria-hidden="true"><IconDisplay icon={data.visual.icon} size={14} color={iconColor} /></span>
+			{:else}
+				<span class="uml-node__icon" aria-hidden="true">{icon}</span>
+			{/if}
 		</div>
 	{/if}
 	<div class="uml-node__header">
-		{#if !isPackage && !hideIcons && !hasFixedSize}
+		{#if hasCustomIcon && data.visual?.icon && !hasFixedSize}
+			<span class="uml-node__icon{isComponent ? ' uml-node__icon--corner' : ''}" aria-hidden="true"><IconDisplay icon={data.visual.icon} size={14} color={iconColor} /></span>
+		{:else if !isPackage && !hideIcons && !hasFixedSize}
 			<span class="uml-node__icon{isComponent ? ' uml-node__icon--corner' : ''}" aria-hidden="true">{icon}</span>
 		{/if}
 		{#if qualifier}
@@ -117,7 +127,7 @@
 		{#if stereotype}
 			<div class="uml-node__stereotype">&laquo;{stereotype}&raquo;</div>
 		{/if}
-		<span class="uml-node__label" class:uml-node__label--underline={data.entityType === 'object'} class:uml-node__label--italic={isAbstract} class:uml-node__label--no-bold={isAbstract && abstractBoldOverride === false}>{data.label}</span>
+		<span class="uml-node__label" class:uml-node__label--underline={data.entityType === 'object'} class:uml-node__label--italic={isAbstract} class:uml-node__label--no-bold={isAbstract && abstractBoldOverride === false} style={titleStyle}>{data.label}</span>
 	</div>
 	{#if hasCompartments}
 		{#if attributes && attributes.length > 0}

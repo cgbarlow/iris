@@ -230,7 +230,14 @@ async def seed_default_themes(db: aiosqlite.Connection) -> None:
 
     # Iris Default Simple — current defaults
     iris_simple_config = {
-        "element_defaults": {},
+        "element_defaults": {
+            "navigation_cell": {
+                "bgColor": "#f8f9fa",
+                "borderColor": "#999999",
+                "fontColor": "#333333",
+                "borderWidth": 2,
+            },
+        },
         "stereotype_overrides": {},
         "edge_defaults": {},
         "global": {

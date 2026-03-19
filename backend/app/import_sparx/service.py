@@ -841,8 +841,17 @@ async def import_sparx_file(
 
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
+        # Override diagram type for navigation-cell-dominated diagrams.
+        # EA stores these as "Logical" but they should be simple/free_form in Iris.
+        content_nodes = [n for n in nodes if n.get("type") not in ("diagram_frame",)]
+        nav_count = sum(1 for n in content_nodes if n.get("data", {}).get("entityType") == "navigation_cell")  # type: ignore[union-attr]
+        if content_nodes and nav_count > len(content_nodes) / 2:
+            diagram_type = "free_form"
+            diagram_notation = "simple"
+
         # Build diagram metadata with ea_guid and theme
-        diag_metadata: dict[str, object] = {"theme_id": "ea-default-uml"}
+        theme_id = "iris-default-simple" if diagram_notation == "simple" else "ea-default-uml"
+        diag_metadata: dict[str, object] = {"theme_id": theme_id}
         if diag.ea_guid:
             diag_metadata["ea_guid"] = diag.ea_guid
 
