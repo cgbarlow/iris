@@ -28,6 +28,7 @@ async def db():
                 id TEXT PRIMARY KEY,
                 element_type TEXT NOT NULL,
                 current_version INTEGER NOT NULL DEFAULT 1,
+                set_id TEXT REFERENCES sets(id),
                 is_deleted INTEGER NOT NULL DEFAULT 0,
                 created_by TEXT,
                 created_at TEXT,
@@ -42,11 +43,6 @@ async def db():
                 created_by TEXT,
                 created_at TEXT,
                 PRIMARY KEY (element_id, version)
-            );
-            CREATE TABLE set_elements (
-                set_id TEXT NOT NULL REFERENCES sets(id),
-                element_id TEXT NOT NULL REFERENCES elements(id),
-                PRIMARY KEY (set_id, element_id)
             );
             CREATE TABLE relationships (
                 id TEXT PRIMARY KEY,
@@ -96,18 +92,14 @@ async def create_element(db, set_id, name="Element", etype="class", description=
     elem_id = str(uuid.uuid4())
     now = "2026-01-01T00:00:00"
     await db.execute(
-        "INSERT INTO elements (id, element_type, current_version, created_by, created_at, updated_at) "
-        "VALUES (?, ?, 1, 'user1', ?, ?)",
-        (elem_id, etype, now, now),
+        "INSERT INTO elements (id, element_type, current_version, set_id, created_by, created_at, updated_at) "
+        "VALUES (?, ?, 1, ?, 'user1', ?, ?)",
+        (elem_id, etype, set_id, now, now),
     )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, data, created_by, created_at) "
         "VALUES (?, 1, ?, ?, '{}', 'user1', ?)",
         (elem_id, name, description, now),
-    )
-    await db.execute(
-        "INSERT INTO set_elements (set_id, element_id) VALUES (?, ?)",
-        (set_id, elem_id),
     )
     await db.commit()
     return elem_id

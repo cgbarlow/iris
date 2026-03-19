@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
+import uuid
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -227,6 +229,8 @@ async def ask_question(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"LLM provider error: {exc}") from exc
 
     return QAResponse(
         answer=result["answer"],  # type: ignore[arg-type]
@@ -240,34 +244,27 @@ async def ask_question(
 
 
 async def _ask_streaming(
-    db: object,
+    db: Any,
     *,
     set_id: str,
     body: QARequest,
     user_id: str,
 ) -> StreamingResponse:
     """Return a StreamingResponse with SSE chunks from the LLM."""
-    from app.ai import service as svc
-    from app.ai.client import create_ai_client
-    from app.ai.context import build_set_context
 
-    async def _generate() -> object:
-        import aiosqlite  # noqa: F401 — type hint only
-
-        db_conn = db  # type: ignore[assignment]
-
+    async def _generate() -> AsyncGenerator[str, None]:
         try:
             # Resolve provider
             if body.provider_id:
-                provider = await svc.get_provider(db_conn, body.provider_id)  # type: ignore[arg-type]
+                provider = await service.get_provider(db, body.provider_id)
             else:
-                provider = await svc.get_default_provider(db_conn)  # type: ignore[arg-type]
+                provider = await service.get_default_provider(db)
 
             if provider is None:
                 yield "data: " + json.dumps({"error": "No AI provider configured"}) + "\n\n"
                 return
 
-            context = await build_set_context(db_conn, set_id)  # type: ignore[arg-type]
+            context = await service.build_context(db, set_id)
             system_prompt = str(provider.get("system_prompt") or "")
             if system_prompt:
                 system_content = f"{system_prompt}\n\nContext:\n{context}"
@@ -282,6 +279,7 @@ async def _ask_streaming(
                 {"role": "user", "content": body.question},
             ]
 
+            from app.ai.client import create_ai_client
             client = create_ai_client(provider)
             t0 = time.monotonic()
             full_answer: list[str] = []
@@ -292,16 +290,12 @@ async def _ask_streaming(
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             answer = "".join(full_answer)
-
-            # Store conversation
-            import uuid
-            from datetime import UTC, datetime
             conv_id = str(uuid.uuid4())
             now = datetime.now(tz=UTC).isoformat()
             model_used = str(provider["model"])
             context_summary = context[:200] + "..." if len(context) > 200 else context  # noqa: PLR2004
 
-            await db_conn.execute(  # type: ignore[union-attr]
+            await db.execute(
                 "INSERT INTO ai_conversations "
                 "(id, set_id, user_id, question, answer, context_summary, model_used, "
                 "provider_id, duration_ms, created_at) "
@@ -309,13 +303,13 @@ async def _ask_streaming(
                 (conv_id, set_id, user_id, body.question, answer, context_summary,
                  model_used, str(provider["id"]), duration_ms, now),
             )
-            await db_conn.execute(  # type: ignore[union-attr]
+            await db.execute(
                 "INSERT INTO ai_usage_log "
                 "(provider_id, user_id, endpoint, model, duration_ms, status, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (str(provider["id"]), user_id, "ask_stream", model_used, duration_ms, "success", now),
             )
-            await db_conn.commit()  # type: ignore[union-attr]
+            await db.commit()
 
             yield "data: " + json.dumps({
                 "done": True,

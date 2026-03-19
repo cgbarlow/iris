@@ -49,14 +49,13 @@ async def build_set_context(
         header += f"{set_desc}\n"
     header += "\n"
 
-    # 2. Elements in set
+    # 2. Elements in set — elements.set_id column (no join table)
     cursor = await db.execute(
         """
         SELECT e.id, e.element_type, ev.name, ev.description, ev.data
         FROM elements e
         JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version
-        JOIN set_elements se ON se.element_id = e.id
-        WHERE se.set_id = ? AND e.is_deleted = 0
+        WHERE e.set_id = ? AND e.is_deleted = 0
         ORDER BY ev.name ASC
         """,
         (set_id,),

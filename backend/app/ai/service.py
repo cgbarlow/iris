@@ -16,6 +16,9 @@ from app.ai.client import create_ai_client
 from app.ai.context import build_set_context
 from app.ai.models import ProviderTestResult
 
+# Re-export for router convenience
+build_context = build_set_context
+
 if TYPE_CHECKING:
     import aiosqlite
 
