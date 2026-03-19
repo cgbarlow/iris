@@ -14,6 +14,14 @@ async def up(db: aiosqlite.Connection) -> None:
         "SELECT name FROM sqlite_master WHERE type='table' AND name='ai_providers'"
     )
     if await cursor.fetchone():
+        # Table exists — rename api_key_env_var -> api_key if the old column is present
+        col_cursor = await db.execute("PRAGMA table_info(ai_providers)")
+        cols = {row[1] for row in await col_cursor.fetchall()}
+        if "api_key_env_var" in cols and "api_key" not in cols:
+            await db.execute(
+                "ALTER TABLE ai_providers RENAME COLUMN api_key_env_var TO api_key"
+            )
+            await db.commit()
         return
 
     await db.execute("""
