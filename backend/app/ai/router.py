@@ -230,6 +230,8 @@ async def ask_question(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger("app.ai").exception("LLM provider error in ask_question")
         raise HTTPException(status_code=502, detail=f"LLM provider error: {exc}") from exc
 
     return QAResponse(

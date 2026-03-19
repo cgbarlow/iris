@@ -248,7 +248,10 @@
 								{#if testResults[p.id].ok}
 									<span class="text-xs text-green-600">ok ({testResults[p.id].latency_ms}ms)</span>
 								{:else}
-									<span class="text-xs" style="color: var(--color-danger)" title={testResults[p.id].error}>error</span>
+									<span class="text-xs font-medium" style="color: var(--color-danger)">error</span>
+								{#if testResults[p.id].error}
+									<div class="mt-0.5 text-xs break-all" style="color: var(--color-danger); opacity: 0.8">{testResults[p.id].error}</div>
+								{/if}
 								{/if}
 							{:else}
 								<span class="text-xs" style="color: var(--color-muted)">—</span>
