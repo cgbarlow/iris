@@ -233,12 +233,31 @@ async def get_default_provider(
     return _row_to_provider(row) if row else None
 
 
+async def _get_provider_with_key(
+    db: aiosqlite.Connection,
+    provider_id: str,
+) -> dict[str, object] | None:
+    """Fetch provider including api_key — for internal client creation only."""
+    row = await (await db.execute(f"{_SELECT} WHERE id = ?", (provider_id,))).fetchone()
+    return _row_to_provider_with_key(row) if row else None
+
+
+async def _get_default_provider_with_key(
+    db: aiosqlite.Connection,
+) -> dict[str, object] | None:
+    """Fetch default provider including api_key — for internal client creation only."""
+    row = await (await db.execute(
+        f"{_SELECT} WHERE is_default = 1 AND is_active = 1 LIMIT 1"
+    )).fetchone()
+    return _row_to_provider_with_key(row) if row else None
+
+
 async def test_provider(
     db: aiosqlite.Connection,
     provider_id: str,
 ) -> ProviderTestResult:
     """Test a provider's connection. Returns ProviderTestResult."""
-    provider = await get_provider(db, provider_id)
+    provider = await _get_provider_with_key(db, provider_id)
     if provider is None:
         return ProviderTestResult(ok=False, error="Provider not found")
     client = create_ai_client(provider)
@@ -257,11 +276,11 @@ async def ask_question(
 
     Returns a conversation dict.
     """
-    # 1. Resolve provider
+    # 1. Resolve provider (with key for client auth)
     if provider_id:
-        provider = await get_provider(db, provider_id)
+        provider = await _get_provider_with_key(db, provider_id)
     else:
-        provider = await get_default_provider(db)
+        provider = await _get_default_provider_with_key(db)
 
     if provider is None:
         msg = "No AI provider configured. Ask an admin to add a provider."

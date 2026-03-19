@@ -256,9 +256,9 @@ async def _ask_streaming(
         try:
             # Resolve provider
             if body.provider_id:
-                provider = await service.get_provider(db, body.provider_id)
+                provider = await service._get_provider_with_key(db, body.provider_id)
             else:
-                provider = await service.get_default_provider(db)
+                provider = await service._get_default_provider_with_key(db)
 
             if provider is None:
                 yield "data: " + json.dumps({"error": "No AI provider configured"}) + "\n\n"
