@@ -5,7 +5,10 @@
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import type { IrisSet, Diagram, PaginatedResponse } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import SetQA from '$lib/components/SetQA.svelte';
 	import DOMPurify from 'dompurify';
+
+	let showAsk = $state(false);
 
 	let set = $state<IrisSet | null>(null);
 	let diagrams = $state<Diagram[]>([]);
@@ -266,6 +269,23 @@
 	<!-- Info -->
 	<div class="mt-6 text-sm" style="color: var(--color-muted); max-width: 600px">
 		<p>{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}, {set.element_count} element{set.element_count !== 1 ? 's' : ''} in this set</p>
+	</div>
+
+	<!-- Ask AI panel -->
+	<div class="mt-8" style="max-width: 600px">
+		<button
+			onclick={() => { showAsk = !showAsk; }}
+			class="flex items-center gap-2 text-sm font-medium"
+			style="color: var(--color-primary)"
+		>
+			<span>{showAsk ? '▼' : '▶'}</span>
+			Ask AI about this Set
+		</button>
+		{#if showAsk}
+			<div class="mt-3 rounded border p-4" style="border-color: var(--color-border)">
+				<SetQA {setId} />
+			</div>
+		{/if}
 	</div>
 
 	<!-- Danger zone -->

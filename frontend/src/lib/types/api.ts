@@ -285,6 +285,49 @@ export interface BatchResult {
 	errors: string[];
 }
 
+/** AI provider and Q&A types (ADR-093) */
+
+export interface AIProvider {
+	id: string;
+	name: string;
+	provider_type: string;
+	base_url: string | null;
+	api_key_env_var: string | null;
+	model: string;
+	parameters: Record<string, unknown>;
+	system_prompt: string | null;
+	timeout_ms: number;
+	retries: number;
+	is_default: boolean;
+	is_active: boolean;
+	created_by: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface QAResponse {
+	answer: string;
+	model_used: string;
+	provider_name: string;
+	tokens_in: number | null;
+	tokens_out: number | null;
+	duration_ms: number;
+	conversation_id: string;
+}
+
+export interface AIConversation {
+	id: string;
+	set_id: string;
+	question: string;
+	answer: string;
+	model_used: string;
+	provider_id: string | null;
+	tokens_in: number | null;
+	tokens_out: number | null;
+	duration_ms: number | null;
+	created_at: string;
+}
+
 /** @deprecated Use Element instead */
 export type Entity = Element;
 /** @deprecated Use Diagram instead */

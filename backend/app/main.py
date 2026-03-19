@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.ai.router import router as ai_router
 from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.batch.router import router as batch_router
@@ -131,6 +132,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(registry_router)
     app.include_router(locks_router)
     app.include_router(admin_locks_router)
+    app.include_router(ai_router)
 
     return app
 

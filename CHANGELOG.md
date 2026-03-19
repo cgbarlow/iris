@@ -5,6 +5,37 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- AI model management module (`backend/app/ai/`) — DB-backed provider registry, client abstraction, admin CRUD, Set-scoped Q&A (ADR-093)
+- `ai_providers` table — named LLM provider configurations; API keys stored as env var names, resolved at runtime
+- `ai_conversations` table — per-set Q&A conversation history
+- `ai_usage_log` table — usage and cost visibility per provider call
+- `AIClient` ABC with `OpenAICompatibleClient` (openai, ollama, lmstudio, openrouter, custom) and `AnthropicClient`
+- Retry logic: exponential backoff on network/5xx errors; no retry on timeouts or 4xx auth errors (translated from machine-dream_ag patterns)
+- `build_set_context()` — structured text context builder from Set elements, relationships, diagrams
+- Provider CRUD API (`GET/POST /api/ai/providers`, `GET/PUT/DELETE /api/ai/providers/{id}`)
+- Provider test endpoint (`POST /api/ai/providers/{id}/test`) and set-default endpoint
+- Set Q&A endpoint (`POST /api/ai/sets/{set_id}/ask`) with streaming SSE variant
+- Conversation history endpoint (`GET /api/ai/sets/{set_id}/conversations`)
+- Usage log endpoint (`GET /api/ai/usage`)
+- `AIConfig` dataclass with `default_max_context_tokens` and `default_timeout_ms` env var config
+- Admin AI Providers page (`/admin/ai`) — provider list table, add/edit modal, test/set-default actions
+- "AI Providers" card on admin dashboard
+- `SetQA` Svelte component — chat-style Q&A with DOMPurify sanitization, loading state, token metadata
+- "Ask AI" collapsible panel on Set detail page
+- `AIProvider`, `QAResponse`, `AIConversation` TypeScript interfaces in `api.ts`
+- ADR-093 and SPEC-093-A documentation
+
+### Security
+- API keys: env var names in DB only, resolved at runtime via `os.environ.get()` — never stored as values
+- Admin-only provider CRUD via existing `_require_admin()` pattern
+- DOMPurify sanitization on all AI-generated content rendered via `{@html}` (Protocol 7)
+- Input length cap: 4000 chars on question field via Pydantic `max_length`
+- Context token budget (default 8000 tokens) prevents excessive LLM costs
+- All AI calls logged to `ai_usage_log` + `iris_audit.db`
+
 ## [2.4.2] - 2026-03-19
 
 ### Added
