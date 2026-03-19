@@ -171,7 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `ThemeRenderingConfig` extended with `hideTypeStereotypes` and `abstractBoldOverride` fields (ADR-087)
 
-## [2.4.0] - 2026-03-06
+## [2.3.1] - 2026-03-06
 
 ### Added
 - UML class attributes rendered in compartments on canvas nodes (imported and user-created) (ADR-086)
