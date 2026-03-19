@@ -21,7 +21,7 @@ class ProviderCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     provider_type: Literal["openai", "anthropic", "ollama", "lmstudio", "openrouter", "custom"]
     base_url: str | None = None
-    api_key_env_var: str | None = None
+    api_key: str | None = None  # stored in DB, never returned in responses
     model: str = Field(min_length=1, max_length=200)
     parameters: ModelParameters = Field(default_factory=ModelParameters)
     system_prompt: str | None = None
@@ -37,7 +37,7 @@ class ProviderUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     provider_type: Literal["openai", "anthropic", "ollama", "lmstudio", "openrouter", "custom"]
     base_url: str | None = None
-    api_key_env_var: str | None = None
+    api_key: str | None = None  # None = leave existing key unchanged; "" = clear key
     model: str = Field(min_length=1, max_length=200)
     parameters: ModelParameters = Field(default_factory=ModelParameters)
     system_prompt: str | None = None
@@ -48,13 +48,13 @@ class ProviderUpdate(BaseModel):
 
 
 class ProviderResponse(BaseModel):
-    """Response for a single AI provider."""
+    """Response for a single AI provider. API key is never returned."""
 
     id: str
     name: str
     provider_type: str
     base_url: str | None = None
-    api_key_env_var: str | None = None
+    has_api_key: bool = False  # true if a key is stored; key value is never returned
     model: str
     parameters: ModelParameters
     system_prompt: str | None = None

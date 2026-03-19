@@ -26,7 +26,7 @@
 		name: '',
 		provider_type: 'openai' as typeof PROVIDER_TYPES[number],
 		base_url: '',
-		api_key_env_var: '',
+		api_key: '',
 		model: '',
 		system_prompt: '',
 		timeout_ms: 30000,
@@ -59,7 +59,7 @@
 			name: '',
 			provider_type: 'openai',
 			base_url: '',
-			api_key_env_var: '',
+			api_key: '',
 			model: '',
 			system_prompt: '',
 			timeout_ms: 30000,
@@ -80,7 +80,7 @@
 			name: p.name,
 			provider_type: p.provider_type as typeof PROVIDER_TYPES[number],
 			base_url: p.base_url ?? '',
-			api_key_env_var: p.api_key_env_var ?? '',
+			api_key: '',  // never pre-filled — leave blank to keep existing key
 			model: p.model,
 			system_prompt: p.system_prompt ?? '',
 			timeout_ms: p.timeout_ms,
@@ -109,7 +109,7 @@
 			name: form.name,
 			provider_type: form.provider_type,
 			base_url: form.base_url || null,
-			api_key_env_var: form.api_key_env_var || null,
+			api_key: form.api_key || null,
 			model: form.model,
 			parameters,
 			system_prompt: form.system_prompt || null,
@@ -191,7 +191,7 @@
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">AI Providers</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">
-			Configure LLM providers for Set Q&amp;A. API keys are read from environment variables at call time.
+			Configure LLM providers for Set Q&amp;A. API keys are stored securely and never returned by the API.
 		</p>
 	</div>
 	<button
@@ -340,11 +340,14 @@
 				</label>
 
 				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
-					API key env var <span style="color: var(--color-muted)">(env var name, e.g. OPENAI_API_KEY)</span>
-					<input type="text" bind:value={form.api_key_env_var}
-						class="rounded border px-3 py-2 font-mono"
+					API key
+					{#if editingId}
+						<span style="color: var(--color-muted)">(leave blank to keep existing key)</span>
+					{/if}
+					<input type="password" bind:value={form.api_key} autocomplete="new-password"
+						class="rounded border px-3 py-2"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-						placeholder="OPENAI_API_KEY" />
+						placeholder={editingId ? '••••••••' : 'sk-...'} />
 				</label>
 
 				<div class="grid grid-cols-2 gap-3">

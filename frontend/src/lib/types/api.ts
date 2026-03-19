@@ -292,7 +292,7 @@ export interface AIProvider {
 	name: string;
 	provider_type: string;
 	base_url: string | null;
-	api_key_env_var: string | null;
+	has_api_key: boolean;
 	model: string;
 	parameters: Record<string, unknown>;
 	system_prompt: string | null;

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 def _row_to_provider(row: tuple[object, ...]) -> dict[str, object]:
-    """Map a DB row to a provider dict."""
+    """Map a DB row to a provider dict. api_key value is never exposed."""
     params_raw = row[7]
     params = json.loads(str(params_raw)) if params_raw else {}
     return {
@@ -32,7 +32,9 @@ def _row_to_provider(row: tuple[object, ...]) -> dict[str, object]:
         "name": row[1],
         "provider_type": row[2],
         "base_url": row[3],
-        "api_key_env_var": row[4],
+        # api_key is at row[4] — stored but never returned to callers
+        # has_api_key tells callers whether a key exists without revealing it
+        "has_api_key": bool(row[4]),
         "model": row[5],
         "system_prompt": row[6],
         "parameters": params,
@@ -46,8 +48,15 @@ def _row_to_provider(row: tuple[object, ...]) -> dict[str, object]:
     }
 
 
+def _row_to_provider_with_key(row: tuple[object, ...]) -> dict[str, object]:
+    """Like _row_to_provider but includes the raw api_key for internal use (client creation)."""
+    result = _row_to_provider(row)
+    result["api_key"] = row[4]  # only used internally, never sent to clients
+    return result
+
+
 _SELECT = (
-    "SELECT id, name, provider_type, base_url, api_key_env_var, model, "
+    "SELECT id, name, provider_type, base_url, api_key, model, "
     "system_prompt, parameters, timeout_ms, retries, is_default, is_active, "
     "created_by, created_at, updated_at FROM ai_providers"
 )
@@ -59,7 +68,7 @@ async def create_provider(
     name: str,
     provider_type: str,
     base_url: str | None = None,
-    api_key_env_var: str | None = None,
+    api_key: str | None = None,
     model: str,
     parameters: dict[str, object] | None = None,
     system_prompt: str | None = None,
@@ -80,11 +89,11 @@ async def create_provider(
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
         "INSERT INTO ai_providers "
-        "(id, name, provider_type, base_url, api_key_env_var, model, parameters, "
+        "(id, name, provider_type, base_url, api_key, model, parameters, "
         "system_prompt, timeout_ms, retries, is_default, is_active, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
-            provider_id, name, provider_type, base_url, api_key_env_var, model,
+            provider_id, name, provider_type, base_url, api_key or None, model,
             json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
             int(is_default), int(is_active), created_by, now, now,
         ),
@@ -128,7 +137,7 @@ async def update_provider(
     name: str,
     provider_type: str,
     base_url: str | None = None,
-    api_key_env_var: str | None = None,
+    api_key: str | None = None,  # None = leave unchanged; "" = clear
     model: str,
     parameters: dict[str, object] | None = None,
     system_prompt: str | None = None,
@@ -137,23 +146,41 @@ async def update_provider(
     is_default: bool = False,
     is_active: bool = True,
 ) -> dict[str, object] | None:
-    """Update a provider. Returns None if not found."""
+    """Update a provider. Returns None if not found.
+
+    api_key=None leaves the existing key unchanged.
+    api_key="" clears the key.
+    api_key="sk-..." sets a new key.
+    """
     now = datetime.now(tz=UTC).isoformat()
     if is_default:
         await db.execute(
             "UPDATE ai_providers SET is_default = 0, updated_at = ? WHERE id != ?",
             (now, provider_id),
         )
-    cursor = await db.execute(
-        "UPDATE ai_providers SET name=?, provider_type=?, base_url=?, api_key_env_var=?, "
-        "model=?, parameters=?, system_prompt=?, timeout_ms=?, retries=?, "
-        "is_default=?, is_active=?, updated_at=? WHERE id=?",
-        (
-            name, provider_type, base_url, api_key_env_var, model,
-            json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
-            int(is_default), int(is_active), now, provider_id,
-        ),
-    )
+    if api_key is None:
+        # Leave the existing key untouched
+        cursor = await db.execute(
+            "UPDATE ai_providers SET name=?, provider_type=?, base_url=?, "
+            "model=?, parameters=?, system_prompt=?, timeout_ms=?, retries=?, "
+            "is_default=?, is_active=?, updated_at=? WHERE id=?",
+            (
+                name, provider_type, base_url, model,
+                json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
+                int(is_default), int(is_active), now, provider_id,
+            ),
+        )
+    else:
+        cursor = await db.execute(
+            "UPDATE ai_providers SET name=?, provider_type=?, base_url=?, api_key=?, "
+            "model=?, parameters=?, system_prompt=?, timeout_ms=?, retries=?, "
+            "is_default=?, is_active=?, updated_at=? WHERE id=?",
+            (
+                name, provider_type, base_url, api_key or None, model,
+                json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
+                int(is_default), int(is_active), now, provider_id,
+            ),
+        )
     if cursor.rowcount == 0:
         return None
     await db.commit()

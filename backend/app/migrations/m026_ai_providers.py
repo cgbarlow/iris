@@ -22,7 +22,7 @@ async def up(db: aiosqlite.Connection) -> None:
             name TEXT NOT NULL UNIQUE,
             provider_type TEXT NOT NULL,
             base_url TEXT,
-            api_key_env_var TEXT,
+            api_key TEXT,
             model TEXT NOT NULL,
             parameters TEXT NOT NULL DEFAULT '{}',
             system_prompt TEXT,

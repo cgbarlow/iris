@@ -20,7 +20,7 @@ def make_provider(provider_type="openai", model="gpt-4o", **kwargs):
         "name": "Test",
         "provider_type": provider_type,
         "base_url": None,
-        "api_key_env_var": None,
+        "api_key": None,
         "model": model,
         "parameters": "{}",
         "system_prompt": None,
@@ -75,12 +75,11 @@ class TestOpenAICompatibleClient:
         assert tokens_out == 20
 
     @pytest.mark.asyncio
-    async def test_chat_with_api_key(self, respx_mock, monkeypatch):
-        monkeypatch.setenv("MY_KEY", "sk-test123")
+    async def test_chat_with_api_key(self, respx_mock):
         respx_mock.post("https://api.openai.com/v1/chat/completions").mock(
             return_value=httpx.Response(200, json=self._make_chat_response("ok"))
         )
-        provider = make_provider(api_key_env_var="MY_KEY")
+        provider = make_provider(api_key="sk-test123")
         client = OpenAICompatibleClient(provider)
         answer, _, _ = await client.chat([{"role": "user", "content": "ping"}])
         assert answer == "ok"

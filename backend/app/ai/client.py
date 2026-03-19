@@ -8,7 +8,6 @@ retry on network/5xx errors (not on timeouts or 4xx auth).
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -105,8 +104,7 @@ class OpenAICompatibleClient(AIClient):
         import json
         params_raw = provider_row.get("parameters") or "{}"
         self._params: dict[str, object] = json.loads(str(params_raw)) if isinstance(params_raw, str) else {}
-        env_var = provider_row.get("api_key_env_var")
-        self._api_key: str | None = os.environ.get(str(env_var)) if env_var else None
+        self._api_key: str | None = str(provider_row["api_key"]) if provider_row.get("api_key") else None
 
     def _headers(self) -> dict[str, str]:
         h: dict[str, str] = {"Content-Type": "application/json"}
@@ -198,8 +196,7 @@ class AnthropicClient(AIClient):
         import json
         params_raw = provider_row.get("parameters") or "{}"
         self._params: dict[str, object] = json.loads(str(params_raw)) if isinstance(params_raw, str) else {}
-        env_var = provider_row.get("api_key_env_var")
-        self._api_key: str | None = os.environ.get(str(env_var)) if env_var else None
+        self._api_key: str | None = str(provider_row["api_key"]) if provider_row.get("api_key") else None
         self._system_prompt: str | None = str(provider_row["system_prompt"]) if provider_row.get("system_prompt") else None  # noqa: E501
 
     def _headers(self) -> dict[str, str]:
