@@ -2,6 +2,7 @@
 	/** Dialog for creating/editing diagrams — notation-first flow (ADR-081). */
 	import DOMPurify from 'dompurify';
 	import TagInput from '$lib/components/TagInput.svelte';
+	import NotationPills from '$lib/components/NotationPills.svelte';
 	import { apiFetch } from '$lib/utils/api';
 	import type { DiagramTypeRegistry, NotationMapping } from '$lib/types/api';
 	import { getDefaultNotation } from '$lib/stores/defaultNotation.svelte';
@@ -192,19 +193,11 @@
 			</div>
 
 			<div>
-				<label for="diagram-notation" class="block text-sm font-medium">Notation</label>
-				<select
-					id="diagram-notation"
-					bind:value={notation}
-					onchange={handleNotationChange}
-					class="mt-1 w-full rounded border px-3 py-2 text-sm"
-					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-				>
-					<option value="simple">Simple</option>
-					<option value="uml">UML</option>
-					<option value="archimate">ArchiMate</option>
-					<option value="c4">C4</option>
-				</select>
+				<label class="block text-sm font-medium mb-1">Notation</label>
+				<NotationPills
+					value={notation}
+					onchange={(n) => { notation = n; handleNotationChange(); }}
+				/>
 			</div>
 
 			<div>

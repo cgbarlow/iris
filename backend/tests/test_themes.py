@@ -104,7 +104,7 @@ async def test_delete_default_theme_fails(db):
 async def test_seed_default_themes(db):
     await seed_default_themes(db)
     all_themes = await list_themes(db)
-    assert len(all_themes) >= 3  # iris-default-uml, ea-default-uml, iris-default-simple
+    assert len(all_themes) >= 4  # iris-default-uml, ea-default-uml, iris-default-simple, c4-default
 
     # Verify EA theme has correct structure
     ea_themes = [t for t in all_themes if "EA" in str(t["name"])]
@@ -113,6 +113,37 @@ async def test_seed_default_themes(db):
     assert ea["notation"] == "uml"
     assert "stereotype_overrides" in ea["config"]
     assert "feature" in ea["config"]["stereotype_overrides"]
+
+
+@pytest.mark.asyncio
+async def test_c4_default_theme_seed(db):
+    """C4 default theme has canonical hybrid colours (ADR-092)."""
+    await seed_default_themes(db)
+    c4 = await get_theme(db, "c4-default")
+    assert c4 is not None
+    assert c4["notation"] == "c4"
+    assert c4["is_default"] is True
+
+    cfg = c4["config"]
+    ed = cfg["element_defaults"]
+
+    # Canonical colours
+    assert ed["person"]["borderColor"] == "#2d8a4e"  # green
+    assert ed["software_system"]["borderColor"] == "#1168bd"  # blue
+    assert ed["software_system_external"]["borderColor"] == "#c0392b"  # red
+
+    # Dashed borders for deployment types
+    assert ed["deployment_node"]["borderStyle"] == "dashed"
+    assert ed["infrastructure_node"]["borderStyle"] == "dashed"
+    assert ed["container_instance"]["borderStyle"] == "dashed"
+
+    # Subtle tinted fills (not opaque fills)
+    assert ed["person"]["bgColor"] == "#f0fdf4"
+    assert ed["software_system"]["bgColor"] == "#eff6ff"
+    assert ed["software_system_external"]["bgColor"] == "#fef2f2"
+
+    # Edge defaults
+    assert cfg["edge_defaults"]["c4_relationship"]["lineColor"] == "#666666"
 
 
 @pytest.mark.asyncio

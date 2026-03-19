@@ -31,6 +31,8 @@
 		targetY,
 		sourcePosition,
 		targetPosition,
+		sourceHandleId,
+		targetHandleId,
 		style,
 		markerEnd,
 		markerStart,
@@ -38,13 +40,35 @@
 		dashArray = 'none',
 	}: Props = $props();
 
+	/** Build polyline path through waypoints. */
+	function buildWaypointPath(sx: number, sy: number, tx: number, ty: number, wps: { x: number; y: number }[]): [string, number, number] {
+		const points = [{ x: sx, y: sy }, ...wps, { x: tx, y: ty }];
+		const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
+		// Label position at midpoint of path
+		const mid = points[Math.floor(points.length / 2)];
+		return [d, mid.x, mid.y];
+	}
+
 	const path = $derived.by(() => {
-		const pathParams = { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition };
-		const rt = data?.routingType;
+		// Use SvelteFlow's computed handle positions (correctly placed on node edges)
+		let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY;
+
+		// Waypoint-based polyline routing
+		const waypoints = data?.waypoints as { x: number; y: number }[] | undefined;
+		if (waypoints && waypoints.length > 0) {
+			return buildWaypointPath(sx, sy, tx, ty, waypoints);
+		}
+
+		const pathParams = { sourceX: sx, sourceY: sy, targetX: tx, targetY: ty, sourcePosition, targetPosition };
+		// Center-to-center connections default to straight line
+		const rawRt = data?.routingType;
+		const rt = (!rawRt || rawRt === 'default') && sourceHandleId === 'center' && targetHandleId === 'center'
+			? 'straight'
+			: rawRt;
 		if (rt === 'straight') return getStraightPath(pathParams);
 		if (rt === 'step') return getSmoothStepPath({ ...pathParams, borderRadius: 0 });
-		if (rt === 'smoothstep') return getSmoothStepPath(pathParams);
-		if (rt === 'bezier') return getBezierPath(pathParams);
+		if (rt === 'smoothstep') return getSmoothStepPath({ ...pathParams, borderRadius: 20 });
+		if (rt === 'bezier') return getBezierPath({ ...pathParams, curvature: 0.4 });
 		return getBezierPath(pathParams);
 	});
 
@@ -90,6 +114,7 @@
 		targetCardinality={showCardinality ? edgeData?.targetCardinality : undefined}
 		sourceRole={showRoleNames ? edgeData?.sourceRole : undefined}
 		targetRole={showRoleNames ? edgeData?.targetRole : undefined}
+		labelPositions={edgeData?.labelPositions}
 	/>
 {/if}
 <EdgeReconnectAnchor type="source" position={{ x: sourceX, y: sourceY }} />

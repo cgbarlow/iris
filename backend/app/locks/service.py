@@ -218,9 +218,15 @@ async def list_active_locks(db: aiosqlite.Connection) -> list[dict]:
     await cleanup_expired_locks(db)
 
     cursor = await db.execute(
-        "SELECT id, target_type, target_id, user_id, username, "
-        "acquired_at, expires_at, last_heartbeat "
-        "FROM edit_locks ORDER BY acquired_at DESC"
+        "SELECT el.id, el.target_type, el.target_id, el.user_id, el.username, "
+        "el.acquired_at, el.expires_at, el.last_heartbeat, "
+        "COALESCE(dv.name, ev.name, el.target_id) AS target_name "
+        "FROM edit_locks el "
+        "LEFT JOIN diagrams d ON el.target_type = 'diagram' AND el.target_id = d.id "
+        "LEFT JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
+        "LEFT JOIN elements e ON el.target_type = 'element' AND el.target_id = e.id "
+        "LEFT JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+        "ORDER BY el.acquired_at DESC"
     )
     rows = await cursor.fetchall()
     return [
@@ -228,6 +234,7 @@ async def list_active_locks(db: aiosqlite.Connection) -> list[dict]:
             "id": r[0], "target_type": r[1], "target_id": r[2],
             "user_id": r[3], "username": r[4], "acquired_at": r[5],
             "expires_at": r[6], "last_heartbeat": r[7],
+            "target_name": r[8],
         }
         for r in rows
     ]

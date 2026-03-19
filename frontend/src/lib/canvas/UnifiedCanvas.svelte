@@ -11,12 +11,14 @@
 
 	import { unifiedNodeTypes, unifiedEdgeTypes } from './registry';
 	import UmlMarkerDefs from './uml/UmlMarkerDefs.svelte';
+	import FitViewTrigger from './FitViewTrigger.svelte';
 	import CanvasAnnouncer from './controls/CanvasAnnouncer.svelte';
 	import KeyboardHandler from './controls/KeyboardHandler.svelte';
 	import type { CanvasNode, CanvasEdge, NotationType } from '$lib/types/canvas';
 
 	interface Props {
 		notation: NotationType;
+		preferredThemeId?: string;
 		nodes: CanvasNode[];
 		edges: CanvasEdge[];
 		browseMode?: boolean;
@@ -30,10 +32,13 @@
 		onundo?: () => void;
 		onredo?: () => void;
 		onnodedragstart?: () => void;
+		ontogglemode?: () => void;
+		panX?: number;
 	}
 
 	let {
 		notation,
+		preferredThemeId,
 		nodes = $bindable([]),
 		edges = $bindable([]),
 		browseMode = false,
@@ -47,10 +52,13 @@
 		onundo,
 		onredo,
 		onnodedragstart,
+		ontogglemode,
+		panX = 0,
 	}: Props = $props();
 
 	// Set notation context for DynamicNode/DynamicEdge to read
 	setContext('notation', notation);
+	setContext('preferredThemeId', preferredThemeId);
 
 	let announcer: CanvasAnnouncer | undefined = $state();
 	let keyboardHandler: KeyboardHandler | undefined = $state();
@@ -59,6 +67,7 @@
 	let selectedEdgeId = $state<string | null>(null);
 	let connectMode = $state(false);
 	let connectSourceId = $state<string | null>(null);
+	let badgeHovered = $state(false);
 
 	/** Map nodes to include browseMode flag when in browse mode. */
 	const displayNodes = $derived(
@@ -66,6 +75,12 @@
 			? nodes.map((n) => ({ ...n, data: { ...n.data, browseMode: true } }))
 			: nodes
 	);
+
+	/** fitView options: exclude diagram_frame nodes from bounding box calculation. */
+	const fitViewOptions = $derived({
+		nodes: nodes.filter((n) => n.data.entityType !== 'diagram_frame'),
+		padding: 0.15,
+	});
 
 	/** Default edge type based on notation. */
 	const defaultEdgeType = $derived(
@@ -199,6 +214,13 @@
 		announcer?.announce(message);
 	}
 
+	function handlePaneClick() {
+		selectedNodeId = null;
+		selectedEdgeId = null;
+		onnodeselect?.(null);
+		onedgeselect?.(null);
+	}
+
 	function handleKeydown(event: KeyboardEvent) {
 		keyboardHandler?.handleKeydown(event);
 	}
@@ -219,17 +241,20 @@
 			nodeTypes={unifiedNodeTypes}
 			edgeTypes={unifiedEdgeTypes}
 			fitView
+			{fitViewOptions}
 			onnodeclick={handleNodeClick}
+			onpaneclick={handlePaneClick}
 			proOptions={{ hideAttribution: true }}
 			nodesDraggable={false}
 			nodesConnectable={false}
 			elementsSelectable={true}
 		>
-			<Controls showLock={false} />
+			<Controls showLock={false} {fitViewOptions} />
 			<Background />
 			{#if notation === 'uml'}
 				<UmlMarkerDefs />
 			{/if}
+			<FitViewTrigger {panX} />
 		</SvelteFlow>
 	{:else}
 		<SvelteFlow
@@ -238,9 +263,11 @@
 			nodeTypes={unifiedNodeTypes}
 			edgeTypes={unifiedEdgeTypes}
 			fitView
+			{fitViewOptions}
 			connectionMode={ConnectionMode.Loose}
 			onnodeclick={handleNodeClick}
 			onedgeclick={handleEdgeClick}
+			onpaneclick={handlePaneClick}
 			onreconnect={handleReconnect}
 			onnodedragstart={() => onnodedragstart?.()}
 			proOptions={{ hideAttribution: true }}
@@ -249,7 +276,7 @@
 			nodesConnectable={!connectMode}
 			elementsSelectable={true}
 		>
-			<Controls showLock={false} />
+			<Controls showLock={false} {fitViewOptions} />
 			<Background />
 			{#if notation === 'uml'}
 				<UmlMarkerDefs />
@@ -273,6 +300,7 @@
 				{onundo}
 				{onredo}
 			/>
+			<FitViewTrigger {panX} />
 		</SvelteFlow>
 	{/if}
 
@@ -283,7 +311,27 @@
 	{/if}
 
 	{#if browseMode}
-		<div class="canvas-mode-badge" aria-live="polite">Browse Mode</div>
+		<button
+			class="canvas-mode-badge canvas-mode-badge--browse-pos"
+			class:canvas-mode-badge--edit={ontogglemode && badgeHovered}
+			class:canvas-mode-badge--clickable={!!ontogglemode}
+			aria-live="polite"
+			onclick={ontogglemode}
+			disabled={!ontogglemode}
+			onmouseenter={() => { if (ontogglemode) badgeHovered = true; }}
+			onmouseleave={() => { badgeHovered = false; }}
+		>{badgeHovered && ontogglemode ? 'Edit Mode' : 'Browse Mode'}</button>
+	{:else}
+		<button
+			class="canvas-mode-badge canvas-mode-badge--edit-pos"
+			class:canvas-mode-badge--edit={!badgeHovered || !ontogglemode}
+			class:canvas-mode-badge--clickable={!!ontogglemode}
+			aria-live="polite"
+			onclick={ontogglemode}
+			disabled={!ontogglemode}
+			onmouseenter={() => { if (ontogglemode) badgeHovered = true; }}
+			onmouseleave={() => { badgeHovered = false; }}
+		>{badgeHovered && ontogglemode ? 'Browse Mode' : 'Edit Mode'}</button>
 	{/if}
 
 	<CanvasAnnouncer bind:this={announcer} />

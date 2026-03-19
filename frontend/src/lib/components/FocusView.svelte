@@ -4,10 +4,11 @@
 
 	interface Props {
 		onexit: () => void;
+		hideExit?: boolean;
 		children: Snippet;
 	}
 
-	let { onexit, children }: Props = $props();
+	let { onexit, hideExit = false, children }: Props = $props();
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
@@ -25,14 +26,16 @@
 	role="dialog"
 	aria-label="Focus view"
 >
-	<button
-		onclick={onexit}
-		class="focus-view__exit"
-		aria-label="Exit focus view"
-		title="Exit focus view (Escape)"
-	>
-		&times;
-	</button>
+	{#if !hideExit}
+		<button
+			onclick={onexit}
+			class="focus-view__exit"
+			aria-label="Exit focus view"
+			title="Exit focus view (Escape)"
+		>
+			&times;
+		</button>
+	{/if}
 	<div class="focus-view__content">
 		{@render children()}
 	</div>

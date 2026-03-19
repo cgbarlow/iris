@@ -185,6 +185,7 @@ async def _hard_delete_single(
         await db.execute("DELETE FROM diagrams_fts WHERE diagram_id = ?", (item_id,))
         await db.execute("DELETE FROM bookmarks WHERE diagram_id = ?", (item_id,))
         await db.execute("DELETE FROM diagram_versions WHERE diagram_id = ?", (item_id,))
+        await db.execute("UPDATE sets SET thumbnail_diagram_id = NULL WHERE thumbnail_diagram_id = ?", (item_id,))
         await db.execute("DELETE FROM diagrams WHERE id = ?", (item_id,))
     elif item_type == "element":
         # Delete relationships referencing this element (and their versions)

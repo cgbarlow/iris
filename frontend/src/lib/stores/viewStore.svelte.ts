@@ -22,6 +22,7 @@ export interface ViewConfig {
 		show_role_names?: boolean;
 		show_stereotypes?: boolean;
 		show_description_on_nodes?: boolean;
+		sort_attributes?: 'pos' | 'alpha';
 	};
 }
 
@@ -36,7 +37,9 @@ export interface View {
 }
 
 let views = $state<View[]>([]);
-let activeViewId = $state<string>(localStorage.getItem('iris_active_view') ?? 'advanced');
+let activeViewId = $state<string>(
+	typeof localStorage !== 'undefined' ? (localStorage.getItem('iris_active_view') ?? 'advanced') : 'advanced'
+);
 
 export function getViews(): View[] {
 	return views;

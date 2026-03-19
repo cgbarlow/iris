@@ -7,11 +7,20 @@
 import { apiFetch } from '$lib/utils/api';
 import type { NodeVisualOverrides, EdgeVisualOverrides } from '$lib/types/canvas';
 
+export interface ThemeRenderingConfig {
+	hideIcons?: boolean;
+	borderRadius?: number;
+	attrFontColor?: string;
+	hideTypeStereotypes?: boolean;
+	abstractBoldOverride?: boolean;
+}
+
 export interface ThemeConfig {
-	element_defaults: Record<string, Record<string, string | number>>;
+	element_defaults: Record<string, Record<string, string | number | boolean>>;
 	stereotype_overrides: Record<string, Record<string, string | number>>;
 	edge_defaults: Record<string, Record<string, string | number>>;
 	global: Record<string, string | number>;
+	rendering?: ThemeRenderingConfig;
 }
 
 export interface Theme {
@@ -26,8 +35,11 @@ export interface Theme {
 }
 
 let themes = $state<Theme[]>([]);
+let themesLoaded = $state(false);
 let activeThemeIds = $state<Record<string, string>>(
-	JSON.parse(localStorage.getItem('iris_active_themes') ?? '{}')
+	typeof localStorage !== 'undefined'
+		? JSON.parse(localStorage.getItem('iris_active_themes') ?? '{}')
+		: {}
 );
 
 export function getThemes(): Theme[] {
@@ -58,8 +70,15 @@ export function resolveNodeVisual(
 	notation: string,
 	entityType: string,
 	stereotype?: string,
+	preferredThemeId?: string,
 ): NodeVisualOverrides | undefined {
-	const theme = getActiveTheme(notation);
+	// User-selected active theme wins over diagram's preferred theme
+	const explicitActive = getActiveThemeId(notation);
+	const theme = explicitActive
+		? themes.find((t) => t.id === explicitActive) ?? getActiveTheme(notation)
+		: preferredThemeId
+			? themes.find((t) => t.id === preferredThemeId) ?? getActiveTheme(notation)
+			: getActiveTheme(notation);
 	if (!theme) return undefined;
 	const cfg = theme.config;
 
@@ -77,6 +96,9 @@ export function resolveNodeVisual(
 		if (typeDefaults.bgColor) { result.bgColor = String(typeDefaults.bgColor); hasValues = true; }
 		if (typeDefaults.borderColor) { result.borderColor = String(typeDefaults.borderColor); hasValues = true; }
 		if (typeDefaults.fontColor) { result.fontColor = String(typeDefaults.fontColor); hasValues = true; }
+		if (typeDefaults.borderWidth != null) { result.borderWidth = Number(typeDefaults.borderWidth); hasValues = true; }
+		if (typeDefaults.borderStyle) { result.borderStyle = String(typeDefaults.borderStyle); hasValues = true; }
+		if (typeDefaults.italic) { result.italic = true; hasValues = true; }
 	}
 
 	// Layer 3: stereotype override
@@ -88,6 +110,17 @@ export function resolveNodeVisual(
 	}
 
 	return hasValues ? result : undefined;
+}
+
+export function getThemeRendering(notation: string, preferredThemeId?: string): ThemeRenderingConfig | undefined {
+	// User-selected active theme wins over diagram's preferred theme
+	const explicitActive = getActiveThemeId(notation);
+	const theme = explicitActive
+		? themes.find((t) => t.id === explicitActive) ?? getActiveTheme(notation)
+		: preferredThemeId
+			? themes.find((t) => t.id === preferredThemeId) ?? getActiveTheme(notation)
+			: getActiveTheme(notation);
+	return theme?.config?.rendering;
 }
 
 export function resolveEdgeVisual(
@@ -109,10 +142,15 @@ export function resolveEdgeVisual(
 	return Object.keys(result).length > 0 ? result : undefined;
 }
 
+export function areThemesLoaded(): boolean {
+	return themesLoaded;
+}
+
 export async function loadThemes(): Promise<void> {
 	try {
 		themes = await apiFetch<Theme[]>('/api/themes');
 	} catch {
 		themes = [];
 	}
+	themesLoaded = true;
 }

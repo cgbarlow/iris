@@ -47,7 +47,14 @@
 	<p class="mt-4" style="color: var(--color-muted)">No active locks.</p>
 {:else}
 	<div class="mt-4 overflow-x-auto">
-		<table class="w-full text-sm" style="color: var(--color-fg)">
+		<table class="w-full text-sm" style="color: var(--color-fg); table-layout: fixed">
+			<colgroup>
+				<col style="width: 45%">
+				<col style="width: 15%">
+				<col style="width: 14%">
+				<col style="width: 14%">
+				<col style="width: 12%">
+			</colgroup>
 			<thead>
 				<tr style="border-bottom: 2px solid var(--color-border)">
 					<th class="px-3 py-2 text-left font-semibold">Target</th>
@@ -60,13 +67,13 @@
 			<tbody>
 				{#each locks as lock}
 					<tr style="border-bottom: 1px solid var(--color-border)">
-						<td class="px-3 py-2">
+						<td class="px-3 py-2" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
 							<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">{lock.target_type}</span>
-							<span class="ml-1 text-xs" style="color: var(--color-muted)">{lock.target_id.slice(0, 8)}...</span>
+							<span class="ml-1" title={lock.target_id}>{lock.target_name ?? lock.target_id}</span>
 						</td>
 						<td class="px-3 py-2">{lock.username}</td>
-						<td class="px-3 py-2">{new Date(lock.acquired_at).toLocaleString()}</td>
-						<td class="px-3 py-2">{new Date(lock.expires_at).toLocaleString()}</td>
+						<td class="px-3 py-2" style="white-space: nowrap">{new Date(lock.acquired_at).toLocaleString()}</td>
+						<td class="px-3 py-2" style="white-space: nowrap">{new Date(lock.expires_at).toLocaleString()}</td>
 						<td class="px-3 py-2">
 							<button
 								onclick={() => forceRelease(lock.id)}

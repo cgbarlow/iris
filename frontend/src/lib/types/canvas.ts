@@ -5,13 +5,14 @@ import type { Node, Edge } from '@xyflow/svelte';
 /** Diagram notation type — determines how elements render on canvas. */
 export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4';
 
-/** Simple View entity types (5 domain + 2 universal = 7 total). */
+/** Simple View entity types (6 domain + 2 universal = 8 total). */
 export type SimpleEntityType =
 	| 'component'
 	| 'service'
 	| 'interface'
 	| 'actor'
 	| 'database'
+	| 'navigation_cell'
 	| 'note'
 	| 'boundary';
 
@@ -42,6 +43,12 @@ export type ArchimateRelationshipType =
 	| 'assignment'
 	| 'association_archimate';
 
+/** Reference to an icon in a named icon set (ADR-091-B). */
+export interface IconRef {
+	set: 'lucide' | 'archimate' | 'custom';
+	name: string;
+}
+
 /** Per-element visual overrides (from EA import or manual styling). */
 export interface NodeVisualOverrides {
 	bgColor?: string;
@@ -51,8 +58,17 @@ export interface NodeVisualOverrides {
 	fontSize?: number;
 	bold?: boolean;
 	italic?: boolean;
+	borderStyle?: string;
 	width?: number;
 	height?: number;
+	icon?: IconRef;
+	/** Icon colour override (for navigation cell NID icons). */
+	iconColor?: string;
+	/** Description-specific font overrides. */
+	descFontSize?: number;
+	descFontColor?: string;
+	descBold?: boolean;
+	descItalic?: boolean;
 }
 
 /** Per-edge visual overrides (from EA import or manual styling). */
@@ -97,6 +113,12 @@ export interface CanvasEdgeData {
 	direction?: string;
 	technology?: string;
 	visual?: EdgeVisualOverrides;
+	labelPositions?: {
+		llb?: { cx: number; cy: number };
+		llt?: { cx: number; cy: number };
+		lrt?: { cx: number; cy: number };
+		lrb?: { cx: number; cy: number };
+	};
 	[key: string]: unknown;
 }
 
@@ -135,13 +157,14 @@ export interface EntityTypeInfo {
 	description: string;
 }
 
-/** All Simple View entity types with display metadata (5 domain + 2 universal). */
+/** All Simple View entity types with display metadata (6 domain + 2 universal). */
 export const SIMPLE_ENTITY_TYPES: EntityTypeInfo[] = [
 	{ key: 'component', label: 'Component', icon: '⬡', description: 'A modular unit or generic box' },
 	{ key: 'service', label: 'Service', icon: '◎', description: 'A deployed or logical service' },
 	{ key: 'interface', label: 'Interface', icon: '◯', description: 'An API or contract' },
 	{ key: 'actor', label: 'Actor', icon: '👤', description: 'A person or external system' },
 	{ key: 'database', label: 'Database', icon: '▦', description: 'A data store' },
+	{ key: 'navigation_cell', label: 'Navigation', icon: '🧭', description: 'A clickable tile that links to another diagram' },
 	{ key: 'note', label: 'Note', icon: '📝', description: 'An annotation or documentation note' },
 	{ key: 'boundary', label: 'Boundary', icon: '▧', description: 'A visual grouping boundary' },
 ];

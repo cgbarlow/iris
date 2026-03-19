@@ -69,6 +69,7 @@ async def import_sparx(
             "elements_created": summary.elements_created,
             "relationships_created": summary.relationships_created,
             "diagrams_created": summary.diagrams_created,
+            "diagrams_updated": summary.diagrams_updated,
             "diagrams_skipped": summary.diagrams_skipped,
             "elements_skipped": summary.elements_skipped,
             "connectors_skipped": summary.connectors_skipped,

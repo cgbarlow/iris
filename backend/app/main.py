@@ -17,6 +17,7 @@ from app.config import AppConfig, get_config
 from app.database import DatabaseManager
 from app.diagrams.registry_router import router as registry_router
 from app.diagrams.router import admin_router as admin_thumbnails_router
+from app.diagrams.router import diagram_rel_router
 from app.diagrams.router import router as diagrams_router
 from app.locks.router import admin_router as admin_locks_router
 from app.locks.router import router as locks_router
@@ -111,6 +112,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(elements_router)
     app.include_router(relationships_router)
     app.include_router(diagrams_router)
+    app.include_router(diagram_rel_router)
     app.include_router(packages_router)
     app.include_router(users_router)
     app.include_router(comments_router)

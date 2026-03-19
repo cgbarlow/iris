@@ -1,0 +1,5522 @@
+[
+  {
+    "model": "AIXM",
+    "id": "fcf34032-c372-4c5f-ab0d-4c0f32162869",
+    "name": "GM_Point_Profile",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_GM_Point_Profile.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 1,
+    "edge_count": 0,
+    "node_types": {
+      "class": 1
+    },
+    "edge_types": {},
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 1 content nodes, DOM has 2 (-1 missing)"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "1 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "b63d4890-3433-412a-a806-0925e1541e96",
+    "name": "GM_Curve Profile",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_GM_Curve%20Profile.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 7,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "generalization": 6,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "2 nodes have horizontal text overflow: GM_GeodesicString, GM_CurveSegment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "6cd997c4-f2ae-41ca-bdc0-a142755872b3",
+    "name": "Aggregation",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_Aggregation.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 0,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {},
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "1 nodes have horizontal text overflow: GM_MultiSurface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "28ee6c16-9c91-4423-aab8-7c51c563a925",
+    "name": "Basic Message",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_Basic%20Message.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 2
+    },
+    "edge_types": {
+      "composition": 1,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "4 nodes have horizontal text overflow: AIXMFeature, BasicMessageMemberAIXM, BasicMessageMemberAIXM, AIXMBasicMessage"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "a5093adc-7f54-43be-8d75-639d730bd46c",
+    "name": "2 - Surveillance Equipment",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Surveillance%20Equipment.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 15,
+    "node_types": {
+      "class": 9,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "generalization": 4,
+      "composition": 6,
+      "association": 4,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "32 nodes have horizontal text overflow: RadioFrequencyArea, RadioFrequencyArea, RadioFrequencyArea, EquipmentChoice, SecondarySurveillanceRadar"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "996c7042-4808-41ac-b91f-522fba04dc13",
+    "name": "1 - Surveillance System",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Surveillance%20System.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 10,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 6,
+      "self_loop": 1,
+      "composition": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "28 nodes have horizontal text overflow: ElevatedPoint, ElevatedPoint, ElevatedPoint, ElevatedPoint, Runway"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "e645fa10-c7d1-45be-87ce-e4f0ddc21bd0",
+    "name": "2 - Obstacle Assessment Associations",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Obstacle%20Assessment%20Associations.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 6,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "22 nodes have horizontal text overflow: ApproachCondition, ApproachCondition, RouteSegment, RouteSegment, RouteSegment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "00a599b0-920c-422b-af3a-018790db49c5",
+    "name": "1 - Obstacle Assessment Feature",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Obstacle%20Assessment%20Feature.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 7,
+    "node_types": {
+      "class": 8
+    },
+    "edge_types": {
+      "composition": 6,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "20 nodes have horizontal text overflow: Surface, AircraftCharacteristic, AircraftCharacteristic, Curve, ObstacleAssessmentArea"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "4c3a5f91-3856-4965-a631-24732168ed1d",
+    "name": "1 - Standard Levels",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Standard%20Levels.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 5,
+    "node_types": {
+      "class": 6
+    },
+    "edge_types": {
+      "association": 4,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: AirspaceLayer, AirspaceLayer, AirspaceLayer, Airspace, Airspace"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "558f5034-b493-4723-93c7-125a7fccf61d",
+    "name": "1 - Properties with Schedule",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Properties%20with%20Schedule.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 4,
+    "node_types": {
+      "class": 3,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 1,
+      "self_loop": 1,
+      "association": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "8 nodes have horizontal text overflow: SpecialDate, SpecialDate, SpecialDate, OrganisationAuthority, OrganisationAuthority"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "485098e9-36d6-419c-ad5a-580f155a284b",
+    "name": "1 - Radio Frequency Limitation",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Radio%20Frequency%20Limitation.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 8,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 6,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "22 nodes have horizontal text overflow: PrecisionApproachRadar, SecondarySurveillanceRadar, SecondarySurveillanceRadar, SecondarySurveillanceRadar, SpecialNavigationStation"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "56302abd-be68-44aa-9083-4f14c18edcf0",
+    "name": "1 - Light Element",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Light%20Element.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 3,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 3
+    },
+    "edge_types": {
+      "generalization": 1,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "8 nodes have horizontal text overflow: PropertiesWithSchedule, LightElementStatus, ElevatedPoint, ElevatedPoint, ElevatedPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "832d6de1-6f2b-459b-9918-9f99b89fac64",
+    "name": "2 - Flight Characteristics",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Flight%20Characteristics.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 1,
+    "edge_count": 0,
+    "node_types": {
+      "class": 1
+    },
+    "edge_types": {},
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 1 content nodes, DOM has 2 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: FlightCharacteristic, FlightCharacteristic, FlightCharacteristic, FlightCharacteristic, FlightCharacteristic"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "1 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "0be49590-6e8f-4ef3-811c-abb2a91cc20a",
+    "name": "1 - Aircraft Characteristics",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Aircraft%20Characteristics.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 1,
+    "edge_count": 0,
+    "node_types": {
+      "class": 1
+    },
+    "edge_types": {},
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 1 content nodes, DOM has 2 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "2 nodes have horizontal text overflow: AircraftCharacteristic, AircraftCharacteristic"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "1 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "e14ba925-f5f9-44c4-ad3f-531f31c29707",
+    "name": "1 - Address",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Address.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 6,
+    "node_types": {
+      "class": 4,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "generalization": 3,
+      "composition": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "10 nodes have horizontal text overflow: ContactInformation, ContactInformation, ContactInformation, TelephoneContact, TelephoneContact"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "7d313575-91bb-4e7f-a2dd-bbe2f30c427e",
+    "name": "7 - Search and Rescue Services",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_7%20-%20Search%20and%20Rescue%20Services.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {
+      "composition": 1,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: Airspace, Airspace, Airspace, SearchRescueService, SearchRescueService"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "86dc9bb1-5346-49e6-921e-41660f853967",
+    "name": "6 - Air Traffic Management",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_6%20-%20Air%20Traffic%20Management.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 5,
+    "node_types": {
+      "class": 4
+    },
+    "edge_types": {
+      "composition": 1,
+      "association": 3,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "10 nodes have horizontal text overflow: AerialRefuelling, AerialRefuelling, AerialRefuelling, AerialRefuelling, AerialRefuelling"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "935dce6a-60da-4b36-bcbc-0be6f34f803f",
+    "name": "5 - Air Traffic Control Services",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_5%20-%20Air%20Traffic%20Control%20Services.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 12,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "generalization": 2,
+      "composition": 1,
+      "association": 8,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "21 nodes have horizontal text overflow: Procedure, Procedure, HoldingPattern, HoldingPattern, HoldingPattern"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "df7f32bd-35bd-4f47-9e12-a64e85b6e76f",
+    "name": "4 - Information Service",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Information%20Service.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 10,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 1,
+      "association": 8,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "19 nodes have horizontal text overflow: Procedure, Procedure, HoldingPattern, HoldingPattern, HoldingPattern"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "3a484f01-5072-48ec-8f22-4b67b69672ca",
+    "name": "3 - Airport Ground Services",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Airport%20Ground%20Services.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 11,
+    "node_types": {
+      "class": 11,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "generalization": 5,
+      "composition": 4,
+      "association": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "19 nodes have horizontal text overflow: Oxygen, Nitrogen, Oil, Fuel, ApronElement"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "12 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "f3028a2b-0b7b-4f40-a2a5-6ecf8e9313de",
+    "name": "2 - Communication Channel",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Communication%20Channel.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 11,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "association": 3,
+      "generalization": 2,
+      "composition": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "20 nodes have horizontal text overflow: Surface, RadioFrequencyArea, RadioFrequencyArea, RadioFrequencyArea, EquipmentChoice"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "a1f1a9b9-71b5-4eb5-ada4-d448eb1e055e",
+    "name": "1 - Service Overview",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Service%20Overview.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 19,
+    "edge_count": 22,
+    "node_types": {
+      "class": 16,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "generalization": 12,
+      "composition": 3,
+      "self_loop": 2,
+      "association": 5
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 19 content nodes, DOM has 20 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "32 nodes have horizontal text overflow: AirportClearanceService, AirportClearanceService, AirportSuppliesService, FireFightingService, FireFightingService"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "11 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "04746a1c-1966-4444-8cfb-3d97a7272ae8",
+    "name": "1 - RulesProcedures",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20RulesProcedures.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {
+      "association": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "8 nodes have horizontal text overflow: Airspace, Airspace, Airspace, AirportHeliport, AirportHeliport"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "77cdb566-c4c1-4add-afac-d547617e8a48",
+    "name": "3 - Flight restriction - routings",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Flight%20restriction%20-%20routings.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 11,
+    "edge_count": 18,
+    "node_types": {
+      "class": 9,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 4,
+      "association": 13,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 11 content nodes, DOM has 12 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "22 nodes have horizontal text overflow: StandardInstrumentDeparture, StandardInstrumentDeparture, StandardInstrumentDeparture, StandardInstrumentArrival, StandardInstrumentArrival"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "57fd94ad-64f3-40f5-ae42-70cd77d1334c",
+    "name": "2 - Flight restrictions - conditions",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Flight%20restrictions%20-%20conditions.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 20,
+    "edge_count": 33,
+    "node_types": {
+      "class": 17,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "composition": 11,
+      "generalization": 2,
+      "association": 18,
+      "self_loop": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 20 content nodes, DOM has 21 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "36 nodes have horizontal text overflow: OrganisationAuthority, OrganisationAuthority, StandardInstrumentDeparture, StandardInstrumentDeparture, StandardInstrumentDeparture"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "c95b7a1e-42a5-4347-87eb-7baac94090f1",
+    "name": "1 - Flight Restrictions",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Flight%20Restrictions.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 11,
+    "node_types": {
+      "class": 8,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 10,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: ContactInformation, ContactInformation, ContactInformation, FlightRoutingElement, FlightRoutingElement"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "e13e48e0-6961-4c55-bc1e-0ba1f7054ba3",
+    "name": "6 - Route Portion DME",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_6%20-%20Route%20Portion%20DME.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {
+      "composition": 1,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: DME, DME, DME, RouteDME, RouteDME"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "9dfd1720-41d6-4f69-8544-b99c350bd2f7",
+    "name": "5 - Route Portion Change Over Points",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_5%20-%20Route%20Portion%20Change%20Over%20Points.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 5,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 2
+    },
+    "edge_types": {
+      "composition": 2,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "2 nodes have horizontal text overflow: ChangeOverPoint, ChangeOverPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "fe8511e7-5db9-4bf7-89bc-a090828cab0c",
+    "name": "4 - Route Availability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Route%20Availability.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 6,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 1,
+      "composition": 3,
+      "generalization": 1,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "17 nodes have horizontal text overflow: StandardLevelColumn, AirspaceLayer, AirspaceLayer, AirspaceLayer, AerialRefuelling"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "c16913c4-d31c-4fc1-b049-3801413ed43e",
+    "name": "3 - Route Portion",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Route%20Portion.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 7,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "12 nodes have horizontal text overflow: RouteSegment, RouteSegment, RouteSegment, RouteSegment, RouteSegment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "62010a77-8f68-4c40-865e-041fb3c50bb0",
+    "name": "2 - Route Segment",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Route%20Segment.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 7,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 5
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 1,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: SegmentPoint, SegmentPoint, EnRouteSegmentPoint, Curve, ObstacleAssessmentArea"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "6dbf349b-fdf3-4024-91cc-30799478db0b",
+    "name": "1 - Routes",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Routes.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 4,
+    "node_types": {
+      "class": 4
+    },
+    "edge_types": {
+      "association": 3,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "10 nodes have horizontal text overflow: RouteSegment, RouteSegment, RouteSegment, RouteSegment, RouteSegment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "778f39c0-6873-4a3d-b9b5-df002e023dac",
+    "name": "XMLSchemaDatatypes",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_XMLSchemaDatatypes.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 47,
+    "edge_count": 46,
+    "node_types": {
+      "class": 47
+    },
+    "edge_types": {
+      "generalization": 46
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 47 content nodes, DOM has 48 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "18 nodes have horizontal text overflow: normalizedString, anySimpleType, anyAtomicType, integer, nonNegativeInteger"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "18 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "75d79de9-5a1e-4a44-a076-258569a56837",
+    "name": "Temp",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_Temp.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 13,
+    "edge_count": 12,
+    "node_types": {
+      "class": 13
+    },
+    "edge_types": {
+      "generalization": 12
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 13 content nodes, DOM has 14 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: CodeBuoyDesignatorBaseType, CodeBuoyDesignatorType, CodeBuoyDesignatorType, AlphanumericType, CodeICAOCountryBaseType"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "970c79de-b937-4ef1-91f4-ddc5f1489b4f",
+    "name": "GM_Surface Profile",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_GM_Surface%20Profile.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 5,
+    "node_types": {
+      "note": 2,
+      "class": 2,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "note_link": 2,
+      "generalization": 2,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "1 nodes have horizontal text overflow: GM_SurfacePatch"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "12ed2002-8fb5-4a14-bbc6-87523d73dc92",
+    "name": "3 - Segment Leg",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Segment%20Leg.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 13,
+    "edge_count": 15,
+    "node_types": {
+      "class": 10,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "composition": 8,
+      "generalization": 4,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 13 content nodes, DOM has 14 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "33 nodes have horizontal text overflow: Curve, AngleIndication, AngleIndication, AngleIndication, DistanceIndication"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "afccda98-a1a3-4c8d-baa2-390fc6afd130",
+    "name": "2 - Restricted Navigation",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Restricted%20Navigation.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 4,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 4
+    },
+    "edge_types": {
+      "composition": 3,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: Procedure, Procedure, CircleSector, CircleSector, CircleSector"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "d95890c2-95f6-433b-aa81-55a650dbf5c5",
+    "name": "1 - Overview",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Overview.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 14,
+    "edge_count": 17,
+    "node_types": {
+      "abstract_class": 4,
+      "class": 10
+    },
+    "edge_types": {
+      "composition": 5,
+      "generalization": 6,
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 14 content nodes, DOM has 15 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "26 nodes have horizontal text overflow: AircraftCharacteristic, AircraftCharacteristic, ArrivalLeg, DepartureLeg, InstrumentApproachProcedure"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "8b01514a-8340-40be-918a-615d8baf5308",
+    "name": "1- Minimum and Emergency Safe Altitude",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1-%20Minimum%20and%20Emergency%20Safe%20Altitude.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 11,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 5,
+      "dependency": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "17 nodes have horizontal text overflow: CircleSector, CircleSector, CircleSector, AltitudeAdjustment, AltitudeAdjustment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "c857cf86-466f-4b40-b215-e9f37b155d29",
+    "name": "5 - Navigation System Checkpoint",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_5%20-%20Navigation%20System%20Checkpoint.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 8,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "generalization": 3,
+      "association": 2,
+      "composition": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "19 nodes have horizontal text overflow: ElevatedPoint, ElevatedPoint, ElevatedPoint, ElevatedPoint, NavaidEquipment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "97fdb239-861e-4cb2-9a2b-1f1dc4e3201b",
+    "name": "4 - Special Navigation System",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Special%20Navigation%20System.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 8,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 7
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "association": 4,
+      "composition": 2,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: PropertiesWithSchedule, SpecialNavigationStationStatus, SpecialNavigationStationStatus, ElevatedPoint, ElevatedPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "5ec9c95e-895a-4e9c-aa21-bea6c7f8d40c",
+    "name": "3 - Navaid Limitation",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Navaid%20Limitation.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 6,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 4,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "18 nodes have horizontal text overflow: CircleSector, CircleSector, CircleSector, SpecialNavigationStation, SpecialNavigationStation"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "e3a6576b-cf95-44de-bce5-43a17d7f2117",
+    "name": "2 - Navaid Equipment",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Navaid%20Equipment.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 11,
+    "node_types": {
+      "class": 11,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "generalization": 11
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "38 nodes have horizontal text overflow: Azimuth, Azimuth, Azimuth, Azimuth, Azimuth"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "2dc9ff2a-2a55-4d5e-a4c4-f3d194d85153",
+    "name": "1 - ProcedureUsage",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20ProcedureUsage.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "abstract_class": 2,
+      "class": 1
+    },
+    "edge_types": {
+      "generalization": 1,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "4 nodes have horizontal text overflow: PropertiesWithSchedule, Procedure, Procedure, ProcedureAvailability"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "cefcb64e-e7b6-4b21-a482-efb4d95e6f82",
+    "name": "6 - Segment Leg DME",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_6%20-%20Segment%20Leg%20DME.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 2
+    },
+    "edge_types": {
+      "association": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "14 nodes have horizontal text overflow: SegmentLeg, SegmentLeg, SegmentLeg, SegmentLeg, SegmentLeg"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "f4ac674f-a0d4-476e-aef1-cb55ee6ebd5a",
+    "name": "5 - LandingTakeOffArea",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_5%20-%20LandingTakeOffArea.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 5,
+    "node_types": {
+      "class": 6
+    },
+    "edge_types": {
+      "composition": 3,
+      "association": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: TouchDownLiftOff, RunwayDirection, RunwayDirection, StandardInstrumentDeparture, StandardInstrumentDeparture"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "8cd40db8-8be4-4563-921f-2111ddb2e3d0",
+    "name": "4 - SegmentLegSpecialization",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20SegmentLegSpecialization.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 15,
+    "edge_count": 18,
+    "node_types": {
+      "class": 12,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "generalization": 8,
+      "association": 3,
+      "composition": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 15 content nodes, DOM has 16 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "34 nodes have horizontal text overflow: TerminalSegmentPoint, TerminalSegmentPoint, TerminalSegmentPoint, TerminalSegmentPoint, TerminalSegmentPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "31d9abf1-d59d-4612-a443-679e5281b95d",
+    "name": "2 - NavigationArea",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20NavigationArea.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 8,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 2,
+      "dependency": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: Surface, CircleSector, CircleSector, CircleSector, SectorDesign"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "b1c564f3-d59b-4d9d-962c-3c518b0dafb9",
+    "name": "1 - SID",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20SID.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 14,
+    "node_types": {
+      "class": 9,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "generalization": 3,
+      "composition": 8,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "28 nodes have horizontal text overflow: AircraftCharacteristic, AircraftCharacteristic, DepartureArrivalCondition, DepartureArrivalCondition, DepartureArrivalCondition"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "a1df012a-ac2f-4eb2-839f-34aba02fec00",
+    "name": "1 - STAR",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20STAR.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 10,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 5,
+      "composition": 3,
+      "generalization": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "21 nodes have horizontal text overflow: SafeAltitudeArea, AirportHeliport, AirportHeliport, AirportHeliport, LandingTakeoffAreaCollection"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "48383dd1-7613-4143-aeea-3e60b88359f5",
+    "name": "1 - Minima",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Minima.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 4,
+    "node_types": {
+      "class": 5
+    },
+    "edge_types": {
+      "composition": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "18 nodes have horizontal text overflow: EquipmentUnavailableAdjustmentColumn, EquipmentUnavailableAdjustmentColumn, EquipmentUnavailableAdjustmentColumn, EquipmentUnavailableAdjustmentColumn, EquipmentUnavailableAdjustmentColumn"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "40a0e8f3-d467-4fde-8a14-750dbc55c02d",
+    "name": "1 - Circling",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Circling.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 11,
+    "edge_count": 16,
+    "node_types": {
+      "class": 10,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 14,
+      "generalization": 1,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 11 content nodes, DOM has 12 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "24 nodes have horizontal text overflow: AircraftCharacteristic, AircraftCharacteristic, InstrumentApproachProcedure, InstrumentApproachProcedure, LandingTakeoffAreaCollection"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "bb79b3c6-d3b1-4312-ac5a-7aceda5258f8",
+    "name": "1 - Final Segment Leg Conditions",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Final%20Segment%20Leg%20Conditions.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 8,
+    "node_types": {
+      "class": 8
+    },
+    "edge_types": {
+      "composition": 7,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "29 nodes have horizontal text overflow: AltimeterSource, AltimeterSource, LandingTakeoffAreaCollection, Minima, Minima"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "0174bbe5-19ae-40b7-9880-f1cde5e118f1",
+    "name": "1 - Terminal Arrival Area",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Terminal%20Arrival%20Area.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 11,
+    "node_types": {
+      "class": 8,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 6,
+      "association": 4,
+      "dependency": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "17 nodes have horizontal text overflow: AltitudeAdjustment, AltitudeAdjustment, Obstruction, Obstruction, Obstruction"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "89183bcb-14cf-40db-b307-1541a70f0b8b",
+    "name": "2 - Approach Procedure Tables",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Approach%20Procedure%20Tables.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 4,
+    "node_types": {
+      "class": 5
+    },
+    "edge_types": {
+      "composition": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "8 nodes have horizontal text overflow: ApproachAltitudeTable, ApproachAltitudeTable, ApproachDistanceTable, ApproachDistanceTable, ApproachTimingTable"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "23cdc4a9-8107-4dcc-8da8-d53a550a5c98",
+    "name": "1 - Approach Procedure Overview",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Approach%20Procedure%20Overview.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 13,
+    "edge_count": 15,
+    "node_types": {
+      "class": 11,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 8,
+      "composition": 6,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 13 content nodes, DOM has 14 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "28 nodes have horizontal text overflow: ProcedureTransitionLeg, SegmentLeg, SegmentLeg, SegmentLeg, SegmentLeg"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "247d1e51-14c7-4fda-9e56-9df3ae23abb2",
+    "name": "2 - Unit",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Unit.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 12,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "self_loop": 2,
+      "association": 5,
+      "composition": 4,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: UnitDependency, AirportHeliport, AirportHeliport, AirportHeliport, PropertiesWithSchedule"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "4690b35d-406d-46b0-89a2-85900eaebd31",
+    "name": "1 - Organisation/Authority",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Organisation/Authority.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: ContactInformation, ContactInformation, ContactInformation, OrganisationAuthorityAssociation, OrganisationAuthorityAssociation"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "452e5f9f-6a27-4ed4-9cc5-b82d58824a1c",
+    "name": "3 - Obstacle Areas",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Obstacle%20Areas.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 9,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "association": 7,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "14 nodes have horizontal text overflow: VerticalStructure, VerticalStructure, VerticalStructure, VerticalStructure, Surface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "45fc8db6-d0ce-47e3-95b3-a2feb0337a3d",
+    "name": "2 - Vertical Structure Associations",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Vertical%20Structure%20Associations.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 13,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "self_loop": 2,
+      "association": 11
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "19 nodes have horizontal text overflow: PassengerService, GroundLightSystem, GroundLightSystem, NavaidEquipment, NavaidEquipment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "a3c012e7-c538-44fe-8f2c-00c924e7186b",
+    "name": "1 - Vertical Structures",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Vertical%20Structures.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 11,
+    "edge_count": 13,
+    "node_types": {
+      "class": 9,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "generalization": 3,
+      "composition": 6,
+      "association": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 11 content nodes, DOM has 12 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "29 nodes have horizontal text overflow: LightElement, LightElement, ElevatedPoint, ElevatedPoint, ElevatedPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "b93be70b-9040-47c3-9278-42e93dfb13d9",
+    "name": "1 - Notes",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Notes.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 3,
+    "node_types": {
+      "abstract_class": 2,
+      "class": 2
+    },
+    "edge_types": {
+      "composition": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "4 nodes have horizontal text overflow: AIXMFeature, LinguisticNote, Note, Note"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "786c6fb7-641a-4e65-9428-7a68bb8194f3",
+    "name": "1 - GroundLight",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20GroundLight.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 4,
+    "node_types": {
+      "class": 4
+    },
+    "edge_types": {
+      "association": 2,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: ElevatedPoint, ElevatedPoint, ElevatedPoint, ElevatedPoint, VerticalStructure"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "01bc52b5-8d5d-48b6-8862-4a680f397edf",
+    "name": "2 - Designated Point",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Designated%20Point.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 10,
+    "node_types": {
+      "class": 8
+    },
+    "edge_types": {
+      "association": 9,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: Point, AngleIndication, AngleIndication, AngleIndication, PointReference"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "b77484b2-b885-4507-afaa-60f6828096ff",
+    "name": "1 - Significant Points",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Significant%20Points.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 13,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 11,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "12 nodes have horizontal text overflow: Point, DesignatedPoint, TouchDownLiftOff, AirportHeliport, AirportHeliport"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "73cc91a6-ac13-471f-9fe1-f2b74d9534d8",
+    "name": "2 - Point Reference",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Point%20Reference.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 15,
+    "node_types": {
+      "class": 8,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 10,
+      "composition": 4,
+      "dependency": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: Navaid, Navaid, Navaid, Point, Surface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "c46ac5cf-0e73-4947-be17-59766d8d9ff9",
+    "name": "1 - Segment Points",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Segment%20Points.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 6,
+    "node_types": {
+      "abstract_class": 2,
+      "class": 4
+    },
+    "edge_types": {
+      "association": 1,
+      "generalization": 2,
+      "composition": 2,
+      "dependency": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: Surface, TerminalSegmentPoint, TerminalSegmentPoint, TerminalSegmentPoint, TerminalSegmentPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "af5b2065-1ce2-475a-8c96-64a62ce3fe1b",
+    "name": "1 - Navaids",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Navaids.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 18,
+    "node_types": {
+      "class": 10,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "association": 8,
+      "generalization": 2,
+      "composition": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "30 nodes have horizontal text overflow: AirportHeliport, AirportHeliport, AirportHeliport, TouchDownLiftOff, RunwayDirection"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "9e29b99e-b46e-46d3-88cb-58a7c2fe6678",
+    "name": "1 - Guidance Service",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Guidance%20Service.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 3,
+    "node_types": {
+      "class": 3,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "6 nodes have horizontal text overflow: Navaid, Navaid, Navaid, RadarSystem, RadarSystem"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "f4e6ce77-1acb-4766-8ece-39836907dd66",
+    "name": "2 - Unplanned Holding",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Unplanned%20Holding.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 8,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: ObstacleAssessmentArea, ObstacleAssessmentArea, ObstacleAssessmentArea, ObstacleAssessmentArea, HoldingPattern"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "13335563-e61d-448b-92c7-709061625b2c",
+    "name": "1 - Holding Pattern",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Holding%20Pattern.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 6,
+    "node_types": {
+      "class": 4,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 3,
+      "composition": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: HoldingPatternDuration, HoldingPatternDuration, HoldingPatternDistance, HoldingPatternDistance, HoldingPatternLength"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "591da472-72c8-4c6e-a482-fa792f5edc03",
+    "name": "1 - Geometry",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Geometry.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 6,
+    "node_types": {
+      "class": 9
+    },
+    "edge_types": {
+      "generalization": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: ElevatedPoint, ElevatedPoint, ElevatedPoint, ElevatedPoint, ElevatedSurface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "97b2e326-ef1f-42a3-81ac-b3e8850abddf",
+    "name": "4 - Airspace Activation",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Airspace%20Activation.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 8,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 3,
+      "self_loop": 1,
+      "composition": 3,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "14 nodes have horizontal text overflow: AircraftCharacteristic, AircraftCharacteristic, StandardLevelColumn, AirspaceLayer, AirspaceLayer"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "86ae4a7b-a001-4d3e-b035-d05c834ded4b",
+    "name": "3 - Airspace Classification",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Airspace%20Classification.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 3,
+    "node_types": {
+      "abstract_class": 1,
+      "class": 3
+    },
+    "edge_types": {
+      "generalization": 1,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "8 nodes have horizontal text overflow: PropertiesWithSchedule, AirspaceLayer, AirspaceLayer, AirspaceLayer, AirspaceLayerClass"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "455b0a46-1bc3-405b-978d-17f9742dade0",
+    "name": "2 - Airspace Associations",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Airspace%20Associations.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 8,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "association": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "13 nodes have horizontal text overflow: RulesProcedures, RulesProcedures, OrganisationAuthority, OrganisationAuthority, AuthorityForAirspace"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "043800f8-2f46-43fb-a561-0264e960901c",
+    "name": "1 - Airspace Feature",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Airspace%20Feature.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 7,
+    "node_types": {
+      "class": 7,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "dependency": 2,
+      "composition": 4,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: Curve, GeoBorder, GeoBorder, Surface, AirspaceVolumeDependency"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "a05e0c4f-7a98-45ab-b882-23ff92888079",
+    "name": "3 - Taxi Holding Position",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Taxi%20Holding%20Position.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 5,
+    "node_types": {
+      "class": 6
+    },
+    "edge_types": {
+      "association": 4,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "21 nodes have horizontal text overflow: TaxiHoldingPositionLightSystem, TaxiHoldingPositionLightSystem, ElevatedPoint, ElevatedPoint, ElevatedPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "987cf6d8-f508-4f04-96b0-cf1763108a9c",
+    "name": "2 - Guidance Line",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Guidance%20Line.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 8,
+    "node_types": {
+      "class": 9
+    },
+    "edge_types": {
+      "association": 7,
+      "composition": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "19 nodes have horizontal text overflow: GuidanceLineLightSystem, ElevatedCurve, ElevatedCurve, ElevatedCurve, ElevatedCurve"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "c7d2a5db-da80-46e3-8ef1-6af43ba3234e",
+    "name": "1 - Taxiway",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Taxiway.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 12,
+    "node_types": {
+      "class": 8
+    },
+    "edge_types": {
+      "composition": 6,
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "22 nodes have horizontal text overflow: TaxiwayLightSystem, ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "a70f951d-5524-4111-9e7d-bda1529756ca",
+    "name": "1 - Surface Contamination",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Surface%20Contamination.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 17,
+    "edge_count": 25,
+    "node_types": {
+      "class": 16,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 13,
+      "generalization": 7,
+      "association": 5
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 17 content nodes, DOM has 18 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "50 nodes have horizontal text overflow: AircraftStand, AircraftStandContamination, Apron, ApronContamination, AirportHeliport"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "12 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "1b6f00fb-5733-4a65-bc6e-8099856dedcc",
+    "name": "1 - Seaplanes",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Seaplanes.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 8,
+    "node_types": {
+      "class": 7
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: ElevatedPoint, ElevatedPoint, ElevatedPoint, ElevatedPoint, MarkingBuoy"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "839e5e9d-4fe1-42db-b497-475bf03e64b2",
+    "name": "6 - Runway Blast Pad",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_6%20-%20Runway%20Blast%20Pad.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 3,
+    "node_types": {
+      "class": 4
+    },
+    "edge_types": {
+      "composition": 2,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "14 nodes have horizontal text overflow: ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface, RunwayDirection"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "1d844d7c-6e8c-4364-a9aa-2fe87335ae02",
+    "name": "5 - Runway Visual Range",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_5%20-%20Runway%20Visual%20Range.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 2,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {
+      "composition": 1,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: RunwayDirection, RunwayDirection, ElevatedPoint, ElevatedPoint, ElevatedPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "90cb436b-097d-43f2-bc8c-c2074da53a9e",
+    "name": "4 - Runway Protection",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Runway%20Protection.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 6,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 2,
+      "generalization": 2,
+      "composition": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "22 nodes have horizontal text overflow: AirportProtectionAreaMarking, ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "22771655-56c1-4ca0-b9e5-b105bbb4b3d7",
+    "name": "3 - Runway Operational Point",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Runway%20Operational%20Point.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 12,
+    "node_types": {
+      "class": 10,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 6,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "32 nodes have horizontal text overflow: NavaidEquipmentDistance, NavaidEquipmentDistance, NavaidEquipmentDistance, NavaidEquipment, NavaidEquipment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "5aa7b5b2-983f-43e4-9f9c-1c097eaae07d",
+    "name": "2 - Runway Direction",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Runway%20Direction.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 14,
+    "node_types": {
+      "class": 10,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 4,
+      "association": 8,
+      "generalization": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "43 nodes have horizontal text overflow: ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedCurve"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "7e18bb04-c6d9-4794-84b6-519b85f7d404",
+    "name": "1 - Runway",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Runway.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 13,
+    "node_types": {
+      "class": 8
+    },
+    "edge_types": {
+      "composition": 6,
+      "association": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "29 nodes have horizontal text overflow: ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface, RunwayMarking"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "f9649bbc-b2f0-47db-b59f-35bf2dbc4790",
+    "name": "1 - Surface Marking",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Surface%20Marking.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 24,
+    "edge_count": 41,
+    "node_types": {
+      "class": 21,
+      "abstract_class": 3
+    },
+    "edge_types": {
+      "association": 20,
+      "composition": 12,
+      "generalization": 9
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 24 content nodes, DOM has 25 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "51 nodes have horizontal text overflow: AircraftStand, TouchDownLiftOff, AirportHeliportProtectionArea, AirportHeliportProtectionArea, AirportHeliportProtectionArea"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "14 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "e6ad3c0a-a69c-44b6-bb7f-e241e5da6225",
+    "name": "3 - Pilot Controlled Lighting",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Pilot%20Controlled%20Lighting.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 3,
+    "node_types": {
+      "class": 3,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 1,
+      "generalization": 1,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: LightActivation, LightActivation, ApproachLightingSystem, ApproachLightingSystem, ApproachLightingSystem"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "09264acd-f641-46ac-92df-7aa543a8da65",
+    "name": "2 - Surface Lighting Elements",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Surface%20Lighting%20Elements.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 16,
+    "edge_count": 21,
+    "node_types": {
+      "class": 15,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 13,
+      "generalization": 8
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 16 content nodes, DOM has 17 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "29 nodes have horizontal text overflow: GuidanceLine, GuidanceLine, GuidanceLineLightSystem, RunwayProtectArea, RunwayProtectArea"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "326dc5d3-3fce-4ea3-9f4a-733e1757c63b",
+    "name": "1 - Surface Lighting",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Surface%20Lighting.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 4,
+    "node_types": {
+      "abstract_class": 2,
+      "class": 3
+    },
+    "edge_types": {
+      "composition": 3,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "10 nodes have horizontal text overflow: PropertiesWithSchedule, GroundLightingAvailability, ElevatedPoint, ElevatedPoint, ElevatedPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "48ff00b3-98e3-4190-9e8c-fb21cd43fe7b",
+    "name": "2 - TLOF Protection Area",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20TLOF%20Protection%20Area.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 7,
+    "edge_count": 8,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 4,
+      "association": 2,
+      "generalization": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "21 nodes have horizontal text overflow: SurfaceCharacteristics, SurfaceCharacteristics, SurfaceCharacteristics, SurfaceCharacteristics, SurfaceCharacteristics"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "4583d391-04b6-4da2-a16b-b35ad2deff9f",
+    "name": "1 - TLOF",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20TLOF.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 13,
+    "node_types": {
+      "class": 10
+    },
+    "edge_types": {
+      "composition": 8,
+      "association": 5
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "36 nodes have horizontal text overflow: TouchDownLiftOffLightSystem, TouchDownLiftOffLightSystem, TouchDownLiftOffMarking, ManoeuvringAreaAvailability, ManoeuvringAreaAvailability"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "254dbd17-a7ba-459c-b1e9-d9ab59bb5a37",
+    "name": "4 - Passenger Loading Bridge",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Passenger%20Loading%20Bridge.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 3,
+    "edge_count": 3,
+    "node_types": {
+      "class": 3
+    },
+    "edge_types": {
+      "composition": 2,
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface, AircraftStand"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "3c648452-3904-4c54-8750-229ac8bb9c07",
+    "name": "3 - Roads",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20Roads.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 5,
+    "edge_count": 7,
+    "node_types": {
+      "class": 5
+    },
+    "edge_types": {
+      "composition": 5,
+      "association": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "18 nodes have horizontal text overflow: ElevatedSurface, ElevatedSurface, ElevatedSurface, ElevatedSurface, SurfaceCharacteristics"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "f59fffd3-05fc-487e-8339-d86e9f5ae7e6",
+    "name": "2 - Aircraft Stands",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Aircraft%20Stands.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 6,
+    "edge_count": 7,
+    "node_types": {
+      "class": 6
+    },
+    "edge_types": {
+      "composition": 4,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "16 nodes have horizontal text overflow: SurfaceCharacteristics, SurfaceCharacteristics, SurfaceCharacteristics, SurfaceCharacteristics, SurfaceCharacteristics"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "d35f3b13-c62a-41f3-baae-1de21ab70e0f",
+    "name": "1 - Apron",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Apron.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 9,
+    "edge_count": 12,
+    "node_types": {
+      "class": 9
+    },
+    "edge_types": {
+      "association": 6,
+      "composition": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "22 nodes have horizontal text overflow: ApronMarking, ApronLightSystem, ElevatedSurface, ElevatedSurface, ElevatedSurface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "29d2140c-ed58-4743-839f-f2b8e4b1d31d",
+    "name": "5 - Apron Area Availability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_5%20-%20Apron%20Area%20Availability.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 11,
+    "node_types": {
+      "class": 6,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "composition": 5,
+      "generalization": 2,
+      "association": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "12 nodes have horizontal text overflow: AircraftStand, PropertiesWithSchedule, UsageCondition, UsageCondition, ApronAreaUsage"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "3ad4403a-c8a2-4e8a-96c0-5def0aa48310",
+    "name": "4 - Manoeuvering Area Availability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_4%20-%20Manoeuvering%20Area%20Availability.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 11,
+    "node_types": {
+      "class": 8,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "association": 2,
+      "generalization": 2,
+      "composition": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "18 nodes have horizontal text overflow: TouchDownLiftOff, PropertiesWithSchedule, UsageCondition, UsageCondition, ManoeuvringAreaUsage"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "d0a778e0-7a88-4dc1-be39-06f6f7d99025",
+    "name": "3 - AirportHeliport Availability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_3%20-%20AirportHeliport%20Availability.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 12,
+    "node_types": {
+      "class": 8,
+      "abstract_class": 2
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "generalization": 3,
+      "composition": 8
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "21 nodes have horizontal text overflow: FlightCharacteristic, FlightCharacteristic, FlightCharacteristic, FlightCharacteristic, AircraftCharacteristic"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "43d76c1c-4e86-41b3-8f62-ef3ba237c980",
+    "name": "2 - AirportHeliport Association",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20AirportHeliport%20Association.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 15,
+    "edge_count": 21,
+    "node_types": {
+      "class": 14,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "association": 14,
+      "composition": 6,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 15 content nodes, DOM has 16 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "39 nodes have horizontal text overflow: Apron, Runway, Runway, Runway, Runway"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "11 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "ef4a92d8-cb4d-4d72-9a4e-106cdbb9fd40",
+    "name": "1 - AirportHeliport",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20AirportHeliport.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 12,
+    "edge_count": 16,
+    "node_types": {
+      "class": 11,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "self_loop": 1,
+      "composition": 8,
+      "association": 5,
+      "generalization": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "27 nodes have horizontal text overflow: AirportHotSpot, AirportHotSpot, ElevatedSurface, ElevatedSurface, ElevatedSurface"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "9e0d076b-9c00-41f4-84cc-d1361c156abb",
+    "name": "2 - Aerial Refuelling Availability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_2%20-%20Aerial%20Refuelling%20Availability.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 4,
+    "edge_count": 4,
+    "node_types": {
+      "class": 3,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "composition": 2,
+      "generalization": 1,
+      "self_loop": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 4 content nodes, DOM has 5 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: AirspaceLayer, AirspaceLayer, AirspaceLayer, PropertiesWithSchedule, RouteAvailability"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "4 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "6c5987ad-8dbd-455a-abad-a13112d603dd",
+    "name": "1 - Aerial Refuelling",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_1%20-%20Aerial%20Refuelling.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 11,
+    "edge_count": 13,
+    "node_types": {
+      "class": 10,
+      "abstract_class": 1
+    },
+    "edge_types": {
+      "self_loop": 2,
+      "composition": 8,
+      "association": 2,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 11 content nodes, DOM has 12 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "23 nodes have horizontal text overflow: AirspaceLayer, AirspaceLayer, AirspaceLayer, SegmentPoint, SegmentPoint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "296f6d81-1685-4bbe-bdf3-380efb8b396b",
+    "name": "Basic Types",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_Basic%20Types.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 5,
+    "node_types": {
+      "class": 10
+    },
+    "edge_types": {
+      "generalization": 5
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "4 nodes have horizontal text overflow: XHTMLType, Character2Type, AlphanumericType, anySimpleType"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "11 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "0796ee61-efed-4e53-9c85-df82cb534c1d",
+    "name": "Main",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_Main.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 8,
+    "edge_count": 8,
+    "node_types": {
+      "note": 1,
+      "abstract_class": 6,
+      "class": 1
+    },
+    "edge_types": {
+      "note_link": 1,
+      "dependency": 3,
+      "association": 1,
+      "composition": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: AIXMMessage, AIXMFeaturePropertyGroup, AIXMFeaturePropertyGroup, AIXMTimeSlice, AIXMFeature"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "AIXM",
+    "id": "b1797197-ec99-4ba8-b630-edac9b36f1da",
+    "name": "AIXM_v.5.1.1",
+    "diagram_type": "pkg",
+    "notation": "simple",
+    "ground_truth": "https://aixm.aero/sites/default/files/imce/AIXM511HTML/AIXM/Diagram_AIXM_v.5.1.1.html",
+    "ground_truth_type": "HTML (AIXM 5.1.1 documentation)",
+    "node_count": 10,
+    "edge_count": 6,
+    "node_types": {
+      "note": 2,
+      "package_uml": 7,
+      "boundary": 1
+    },
+    "edge_types": {
+      "dependency": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "6 nodes have horizontal text overflow: XMLSchemaDatatypes, AIXM Data Types, ISO 19107  Geometry, ISO 19115 Metadata, AIXM Abstract Feature"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "missing_packages",
+        "detail": "7 package nodes missing from DOM"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "11 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "893fdfa0-6261-4b1a-8133-8cc1b3561d32",
+    "name": "NasTmiTrajectoryOptions",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 21",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 19,
+    "edge_count": 20,
+    "node_types": {
+      "class": 9,
+      "enumeration": 9,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 19,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 19 content nodes, DOM has 20 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "26 nodes have horizontal text overflow: TrajectoryOptionRoute, CodedDepartureRoute, IcaoRouteString, ConstrainedAirspaceRemarksList, ConstrainedAirspaceRemarks"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "14 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "a29680f0-e8f9-41b7-b6d3-e346e8e33bee",
+    "name": "NasTmiData",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 20",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 27,
+    "edge_count": 28,
+    "node_types": {
+      "class": 14,
+      "enumeration": 12,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 28
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 27 content nodes, DOM has 28 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "36 nodes have horizontal text overflow: ConstraintSatisfactionPointName, ControlIndicator, ControlIndicator, CanMoveIndicator, CenterConformanceIndicator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "26 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "335dcafb-20b3-4070-9add-62ee78d52d80",
+    "name": "NasTmiConstrainedAirspace",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 19",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 8,
+    "edge_count": 6,
+    "node_types": {
+      "class": 5,
+      "enumeration": 2,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: NasIntersection, FlightExitIndicator, AirspaceAcceptableSlotSubstitution, SlotYieldedIndicator, AirspaceExitTime"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "27f22188-dab0-4cbd-9556-57d43e065d64",
+    "name": "NasTfdm",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 18",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 11,
+    "edge_count": 8,
+    "node_types": {
+      "class": 9,
+      "enumeration": 1,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 8
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 11 content nodes, DOM has 12 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "12 nodes have horizontal text overflow: StabilityOfMeteringTimes, StabilityOfMeteringTimes, ActualVersusPredictedFlightTimes, AccuracyOfPredictedTimes, MeteringTimeCompliance"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "8cf0c824-5783-4219-9aed-4fd0612860eb",
+    "name": "NasStatus",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 17",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 14,
+    "edge_count": 12,
+    "node_types": {
+      "class": 4,
+      "enumeration": 9,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 11,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 14 content nodes, DOM has 15 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "14 nodes have horizontal text overflow: CancellationStatusReasonList, SpuriousFlightIndicator, SpuriousFlightIndicator, CanceledButFlewIndicator, CanceledButFlewIndicator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "15 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "664d3200-9203-423f-b216-74bed84d6c9e",
+    "name": "NasRoute",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 16",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 30,
+    "edge_count": 31,
+    "node_types": {
+      "enumeration": 14,
+      "class": 15,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 30,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 30 content nodes, DOM has 31 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "39 nodes have horizontal text overflow: EstimatedTimeEnRouteSource, AmendmentRequestType, NasRouteAmendment, NasRouteAmendment, NasRouteAmendment"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "22 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "27cc10b8-0a7b-4e58-b4e8-8affc696f4ca",
+    "name": "NasPosition",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 15",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 15,
+    "edge_count": 22,
+    "node_types": {
+      "class": 13,
+      "component": 1,
+      "enumeration": 1
+    },
+    "edge_types": {
+      "association": 22
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 15 content nodes, DOM has 16 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "8 nodes have horizontal text overflow: SurfaceMovementRadar, SurfaceMovementRadar, NasAcceleration, PlannedReportingPosition, PlannedReportingPosition"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "15 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "e0faea49-8ceb-4731-9c46-742bbbb7808a",
+    "name": "NasOrganization",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 14",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 3,
+    "edge_count": 1,
+    "node_types": {
+      "component": 1,
+      "enumeration": 1,
+      "class": 1
+    },
+    "edge_types": {
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "3 nodes have horizontal text overflow: CdmParticipantIndicator, CdmParticipantIndicator, NasAircraftOperator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "b9b3ab5d-cfb7-4837-b6e8-d44df00cc863",
+    "name": "NasMessage",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 13",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 40,
+    "edge_count": 41,
+    "node_types": {
+      "enumeration": 24,
+      "class": 15,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 40,
+      "generalization": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 40 content nodes, DOM has 41 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "33 nodes have horizontal text overflow: AdsbTrackIndicator, PseudoTrackIndicator, NewTrackIndicator, FrozenTrackIndicator, TaisTrackProvenance"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "26 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "0e77f4b9-dabc-40f3-ab8d-37c34e6affae",
+    "name": "NasMeasures",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 12",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 10,
+    "edge_count": 3,
+    "node_types": {
+      "class": 6,
+      "enumeration": 3,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "6 nodes have horizontal text overflow: NasIndicatedAirspeed, NasIndicatedAirspeed, VerticalRateSource, UomAcceleration, CalibratedAirspeed"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "1045b65a-6ac9-450f-9fb6-3c493f0ba6ee",
+    "name": "NasFlightIntent",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 11",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 3,
+    "edge_count": 1,
+    "node_types": {
+      "component": 1,
+      "enumeration": 1,
+      "class": 1
+    },
+    "edge_types": {
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "1 nodes have horizontal text overflow: MovementAreaHoldInformation"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "1404ba40-b89f-44c9-985e-ff35bbb3c43e",
+    "name": "NasFlightData",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 10",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 32,
+    "edge_count": 30,
+    "node_types": {
+      "class": 19,
+      "component": 1,
+      "enumeration": 12
+    },
+    "edge_types": {
+      "association": 28,
+      "generalization": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 32 content nodes, DOM has 33 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "34 nodes have horizontal text overflow: NasFlight, NasFlightIdentification, NasCoordination, CoordinationTimeType, DiversionState"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "26 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "26e92b71-debe-4815-9670-ecbf762d1318",
+    "name": "NasEnRoute",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 9",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 11,
+    "edge_count": 8,
+    "node_types": {
+      "enumeration": 3,
+      "class": 7,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 8
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 11 content nodes, DOM has 12 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: OwnershipChangeReasonType, OwnershipChangeReasonType, NasAtcUnitReferenceExtension, RvsmFlightIndicator, NasBoundaryCrossing"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "11 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "4454e146-195a-45cb-a365-5f05bc708f3b",
+    "name": "NasDeparture",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 8",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 31,
+    "edge_count": 31,
+    "node_types": {
+      "enumeration": 17,
+      "class": 13,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 31
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 31 content nodes, DOM has 32 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "38 nodes have horizontal text overflow: MeteringTimeReclamationIndicator, MeteringTimeReclamationIndicator, MeteringTimeReclamationWarningIndicator, MeteringTimeReclamationWarningIndicator, SmpIdentificationKey"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "22 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "ecf1a91f-0a40-4c6f-a020-2ac764ae1681",
+    "name": "NasCommon",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 7",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 22,
+    "edge_count": 11,
+    "node_types": {
+      "class": 16,
+      "enumeration": 5,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 11
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 22 content nodes, DOM has 23 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "24 nodes have horizontal text overflow: SurfaceRegionName, CharacterString20, NasSignificantPointInformation, NasSignificantPointInformation, AirportMonitoringStatus"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "16 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "b9c7e179-144e-47cf-82ae-5e3fd616d122",
+    "name": "NasCapability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 6",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 7,
+    "edge_count": 5,
+    "node_types": {
+      "enumeration": 4,
+      "class": 2,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 5
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: NasAirborneEquipmentQualifier, PerformanceBasedAccuracy, PerformanceBasedAccuracy, NasPerformanceBasedNavigationPhase, PerformanceBasedAccuracyType"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "9d4d01a6-2ab0-4888-ac78-d3bacd2a7fe2",
+    "name": "NasArrival",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 5",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 14,
+    "edge_count": 13,
+    "node_types": {
+      "class": 8,
+      "enumeration": 5,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 13
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 14 content nodes, DOM has 15 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "20 nodes have horizontal text overflow: NasArrivalTaxiTime, PredictedGateConflictIndicator, PredictedGateConflictIndicator, SlotYieldedIndicator, InstrumentRouteDesignator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "14 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "30752a9c-aac5-410a-bf15-2e471c1eff9e",
+    "name": "NasAltitude",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 4",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 10,
+    "edge_count": 6,
+    "node_types": {
+      "enumeration": 4,
+      "class": 5,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "10 nodes have horizontal text overflow: InvalidIndicator, BlockAltitude, BlockAltitude, AltFixAltAltitude, AltFixAltAltitude"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "3d0c7bd1-2059-4d16-bb8c-d2a6393c99f4",
+    "name": "NasAirspace",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 3",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 3,
+    "edge_count": 1,
+    "node_types": {
+      "component": 1,
+      "enumeration": 1,
+      "class": 1
+    },
+    "edge_types": {
+      "association": 1
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 3 content nodes, DOM has 4 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "4 nodes have horizontal text overflow: TfmsRouteType, TfmsRouteType, InstrumentRouteDesignator, InstrumentRouteDesignator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "3 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "30f44475-e545-4e93-ae67-e57ac41dcd39",
+    "name": "NasAircraft",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "FIXM_US_Extension_v4.4.0_Logical_Model_Diagrams.pdf, page 2",
+    "ground_truth_type": "PDF (FIXM US Extension v4.4.0)",
+    "node_count": 9,
+    "edge_count": 6,
+    "node_types": {
+      "enumeration": 5,
+      "component": 1,
+      "class": 3
+    },
+    "edge_types": {
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 9 content nodes, DOM has 10 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: TfmsAircraftCategory, TfmsAircraftCategory, TfmsAircraftWeightClass, TfmsSpecialAircraftQualifier, WakeTurbulenceCategoryExtended"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "c3d9740e-b2ab-452c-b34b-5d8b3aaa4bd2",
+    "name": "Capability",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 28,
+    "edge_count": 26,
+    "node_types": {
+      "class": 17,
+      "enumeration": 10,
+      "component": 1
+    },
+    "edge_types": {
+      "generalization": 9,
+      "association": 17
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 28 content nodes, DOM has 29 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "26 nodes have horizontal text overflow: EltHexIdentifierList, EltHexIdentifier, LifeJacketTypeList, CommunicationCapabilityCodeList, StandardCapabilitiesIndicator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "22 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "398db6da-7d0e-4d2d-9923-107c48ea9523",
+    "name": "BasicMessage",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 8,
+    "edge_count": 6,
+    "node_types": {
+      "class": 5,
+      "abstract_class": 2,
+      "component": 1
+    },
+    "edge_types": {
+      "generalization": 2,
+      "association": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "6 nodes have horizontal text overflow: Message, MessageCollection, Flight, Flight, MessageCollectionExtension"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "24d6ca7e-7839-4cfc-8b4e-e0bab4f9bcdf",
+    "name": "Constraints",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 7,
+    "edge_count": 6,
+    "node_types": {
+      "enumeration": 2,
+      "class": 4,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 7 content nodes, DOM has 8 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: Activation, DepartureOrArrivalIndicator, RouteTrajectoryConstraint, RouteTrajectoryConstraint, TimeConstraint"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "7 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "1cbc67f8-1fc8-435e-9b27-b17f6cad1895",
+    "name": "RouteTrajectory",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 24,
+    "edge_count": 24,
+    "node_types": {
+      "enumeration": 6,
+      "class": 17,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 24
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 24 content nodes, DOM has 25 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "28 nodes have horizontal text overflow: OtherRouteDesignator, RouteDesignatorToNextElementChoice, RouteDesignatorToNextElementChoice, RouteDesignatorToNextElementChoice, RouteTruncationIndicator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "24 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "7e003e0d-d88f-4e21-9a65-de87fdac403d",
+    "name": "RouteChanges",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 8,
+    "edge_count": 7,
+    "node_types": {
+      "enumeration": 2,
+      "component": 1,
+      "class": 5
+    },
+    "edge_types": {
+      "association": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 8 content nodes, DOM has 9 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "11 nodes have horizontal text overflow: Activation, AtOrAboveIndicator, AtOrAboveIndicator, CruisingLevelChange, CruiseClimbStart"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "fb88df56-668b-4cc0-9090-2731226620b9",
+    "name": "FlightData",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 25,
+    "edge_count": 26,
+    "node_types": {
+      "class": 21,
+      "component": 1,
+      "enumeration": 3
+    },
+    "edge_types": {
+      "association": 24,
+      "generalization": 2
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 25 content nodes, DOM has 26 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "43 nodes have horizontal text overflow: IataFlightDesignator, Flight, SupplementaryInformationSourceChoice, SupplementaryInformationSourceChoice, Arrival"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "21 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "2f796672-ec10-43ed-bed8-46c536989671",
+    "name": "EnRoute",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 5,
+    "edge_count": 3,
+    "node_types": {
+      "enumeration": 1,
+      "component": 1,
+      "class": 3
+    },
+    "edge_types": {
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "5 nodes have horizontal text overflow: BoundaryCrossingCondition, AltitudeInTransition, BoundaryCrossing, BoundaryCrossing, BoundaryCrossing"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "f1999b42-6dde-4db2-9578-08c171d2d63b",
+    "name": "Emergency",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 6,
+    "edge_count": 4,
+    "node_types": {
+      "component": 1,
+      "class": 4,
+      "enumeration": 1
+    },
+    "edge_types": {
+      "association": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "3 nodes have horizontal text overflow: RadioCommunicationFailure, EmergencyPhase, EmergencyPhase"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "ee729295-1ff6-4bd8-bf3f-b3d52379d777",
+    "name": "Departure",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 10,
+    "edge_count": 9,
+    "node_types": {
+      "enumeration": 2,
+      "component": 1,
+      "class": 7
+    },
+    "edge_types": {
+      "association": 9
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "17 nodes have horizontal text overflow: Departure, Departure, Departure, DepartureTimeChoice, DepartureTimeChoice"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "8 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "a66753bf-5761-4abc-a639-a5b2dd35b04e",
+    "name": "RadioactiveMaterials",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 5,
+    "edge_count": 3,
+    "node_types": {
+      "class": 3,
+      "enumeration": 1,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "3 nodes have horizontal text overflow: TransportIndex, CriticalSafetyIndex, RadioactiveMaterialCategory"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "128203a8-21ce-4c07-a9b8-50911b66cc71",
+    "name": "Packaging",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 13,
+    "edge_count": 13,
+    "node_types": {
+      "enumeration": 2,
+      "class": 10,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 13
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 13 content nodes, DOM has 14 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "9 nodes have horizontal text overflow: AircraftDangerousGoodsLimitation, AircraftDangerousGoodsLimitation, RestrictedHazardClass, HazardDivision, RadioactiveMaterial"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "643a24ef-73d2-4ddc-8a14-b961dfd5a04c",
+    "name": "DangerousGoods",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 6,
+    "edge_count": 4,
+    "node_types": {
+      "enumeration": 1,
+      "component": 1,
+      "class": 4
+    },
+    "edge_types": {
+      "association": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 6 content nodes, DOM has 7 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "3 nodes have horizontal text overflow: AircraftDangerousGoodsLimitation, AircraftDangerousGoodsLimitation, DangerousGoodsPackageGroup"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "6 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "0dfb75b6-c94d-4d4d-b4b7-682947202c72",
+    "name": "Arrival",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 5,
+    "edge_count": 3,
+    "node_types": {
+      "class": 3,
+      "component": 1,
+      "enumeration": 1
+    },
+    "edge_types": {
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: Arrival, Arrival, Arrival, ReclearanceInFlight, ActualTimeOfArrival"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "db2343db-0d0c-4d83-9ccc-65fd7c0a6821",
+    "name": "Aircraft",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 10,
+    "edge_count": 8,
+    "node_types": {
+      "class": 7,
+      "component": 1,
+      "enumeration": 2
+    },
+    "edge_types": {
+      "generalization": 1,
+      "association": 7
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "7 nodes have horizontal text overflow: AircraftRegistrationList, AircraftAddress, AircraftRegistration, WakeTurbulenceCategory, AircraftApproachCategory"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "10 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "e52970a0-fcbd-4c49-ac8e-72375201736c",
+    "name": "Types",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 21,
+    "edge_count": 15,
+    "node_types": {
+      "enumeration": 1,
+      "class": 19,
+      "component": 1
+    },
+    "edge_types": {
+      "generalization": 11,
+      "association": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 21 content nodes, DOM has 22 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "12 nodes have horizontal text overflow: NamespaceDomain, NamespaceDomain, RestrictedUniversallyUniqueIdentifier, AirportSlotIdentification, AircraftTypeDesignator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "16 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "7d9b124b-7c98-488b-bbd7-7c35c6dde7e1",
+    "name": "Organization",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 5,
+    "edge_count": 3,
+    "node_types": {
+      "class": 4,
+      "component": 1
+    },
+    "edge_types": {
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 5 content nodes, DOM has 6 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "3 nodes have horizontal text overflow: AircraftOperatorDesignator, AircraftOperator, ContactInformation"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "5 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "fa142b95-4f43-4960-9f3f-4e1cf53c2ced",
+    "name": "UnitsOfMeasure",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 16,
+    "edge_count": 0,
+    "node_types": {
+      "enumeration": 15,
+      "component": 1
+    },
+    "edge_types": {},
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 16 content nodes, DOM has 17 (-1 missing)"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "16 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "6fc55d6f-4d36-4b6a-92bc-c8419c91fec2",
+    "name": "Measures",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 31,
+    "edge_count": 29,
+    "node_types": {
+      "abstract_class": 7,
+      "class": 20,
+      "enumeration": 3,
+      "component": 1
+    },
+    "edge_types": {
+      "generalization": 26,
+      "association": 3
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 31 content nodes, DOM has 32 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "6 nodes have horizontal text overflow: RestrictedMeasure, AltitudeWithSource, RestrictedVerticalDistance, ZeroBearingType, VerticalReference"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "22 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "e8b3d5b9-be36-4c37-86d8-8555ab239eae",
+    "name": "Extension",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 72,
+    "edge_count": 0,
+    "node_types": {
+      "abstract_class": 71,
+      "component": 1
+    },
+    "edge_types": {},
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 72 content nodes, DOM has 73 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "68 nodes have horizontal text overflow: TrajectoryPointReferenceExtension, IataFlightDesignatorExtension, TimeRangeExtension, TrueAirspeedRangeExtension, VerticalRangeExtension"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "61 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "a47aa99d-f1c3-4600-9b63-d9c01df1c8c3",
+    "name": "AeronauticalReference",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 27,
+    "edge_count": 26,
+    "node_types": {
+      "class": 25,
+      "component": 1,
+      "enumeration": 1
+    },
+    "edge_types": {
+      "association": 22,
+      "generalization": 4
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 27 content nodes, DOM has 28 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "15 nodes have horizontal text overflow: SidStarDesignator, NavaidDesignator, DesignatedPoint, LatLongPosList, SidStarAbbreviatedDesignator"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "22 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "e346d87b-e89e-4a35-b0d3-2fd58ca089dc",
+    "name": "Address",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 12,
+    "edge_count": 13,
+    "node_types": {
+      "enumeration": 1,
+      "component": 1,
+      "class": 10
+    },
+    "edge_types": {
+      "association": 13
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 12 content nodes, DOM has 13 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "9 nodes have horizontal text overflow: TelecomNetworkType, TextCountryCode, TextCountryName, PostalAddress, OnlineContact"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "12 node pairs overlap significantly"
+      }
+    ]
+  },
+  {
+    "model": "FIXM",
+    "id": "30c2f769-f805-4aef-8e82-a3f3060ea272",
+    "name": "RangesAndChoices",
+    "diagram_type": "class",
+    "notation": "uml",
+    "ground_truth": "No ground truth PDF available (core FIXM diagram)",
+    "ground_truth_type": "None",
+    "node_count": 10,
+    "edge_count": 6,
+    "node_types": {
+      "component": 1,
+      "class": 8,
+      "enumeration": 1
+    },
+    "edge_types": {
+      "association": 6
+    },
+    "post_fix_issues": [
+      {
+        "type": "missing_nodes",
+        "detail": "Node count mismatch: API has 10 content nodes, DOM has 11 (-1 missing)"
+      },
+      {
+        "type": "text_overflow",
+        "detail": "14 nodes have horizontal text overflow: TimeChoice, TrueAirspeedChoice, TrueAirspeedChoice, FlightLevelOrAltitudeChoice, FlightLevelOrAltitudeChoice"
+      },
+      {
+        "type": "missing_frame",
+        "detail": "Diagram frame node in API data but not rendered"
+      },
+      {
+        "type": "overlapping_nodes",
+        "detail": "9 node pairs overlap significantly"
+      }
+    ]
+  }
+]

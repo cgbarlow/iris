@@ -5,6 +5,172 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2] - 2026-03-19
+
+### Added
+- Title/description font controls in NodeStylePanel (separate colour, size, bold, italic for title vs description)
+- Icon colour picker in NodeStylePanel
+- Theme-aware fallback chain (per-element → theme → CSS fallback) in NodeStylePanel
+
+### Changed
+- NavigationCellNode refactored for faithful EA card rendering
+- NodeStylePanel split into Node, Title Font, and Description Font sections
+- Import service auto-detects navigation-cell-dominated diagrams as `free_form/simple`
+- iris-default-simple theme seeds navigation_cell element defaults
+
+### Fixed
+- Parent package validation on diagram creation (clears invalid parent_package_id)
+- ArchiMate/UML renderer visual override propagation
+- Sequence viewport edge case
+
+## [2.4.1] - 2026-03-09
+
+### Added
+- Comments sidebar — comments moved from page bottom to toggleable right sidebar with badge count
+- Comments button visible in browse mode (windowed and fullscreen), hidden in edit mode
+- Live preview of element edits on canvas (name, description, type reflect instantly while editing)
+- ElementEditPanel component for inline element editing in the canvas sidebar
+- NodeStylePanel wired into diagram page edit-mode sidebar alongside ElementEditPanel
+- Unsaved changes confirmation dialog when switching from edit to browse mode
+- Diagram relationships API endpoint (`GET /api/diagrams/{id}/relationships`) including diagram links
+- Diagram link deletion endpoint (`DELETE /api/diagram-relationships/{id}`)
+- Diagram links migration (`m025_diagram_links`)
+- Hierarchy sidebar in fullscreen mode (browse and edit) with search and filter
+- Hierarchy sidebar scroll position preserved across navigation
+- Sidebar toggle button in fullscreen mode overlay
+- Relationship indicator dot on Relationships tab when relationships exist
+- Comment author username display (resolved via LEFT JOIN on users table)
+- Relative timestamp formatting for comments ("just now", "5m ago", "3h ago", "2d ago")
+- Themes link in admin navigation sidebar
+- `areThemesLoaded()` helper in themeStore for conditional eager loading
+
+### Changed
+- Canvas height uses `calc(100vh - 317px)` to align bottom edge with hierarchy sidebar
+- Canvas area extends to fill space freed by removing bottom comments section
+- Page content shifts with `margin-right: 316px` when any sidebar is open (entity detail or comments)
+- No page scrollbar when all content fits viewport (negative bottom margin technique)
+- Entity detail sidebar and comments sidebar are mutually exclusive
+- Sequence toolbar uses inline SVG icons matching SvelteFlow Controls styling
+- ThemeSelector groups themes by notation with current notation first
+- `discardChanges()` reloads diagram from API to guarantee clean state
+- `parseCanvasData()` deep-clones diagram data to prevent edit mutations
+- New canvas nodes default to `width: 200` for consistent sizing
+- FocusView accepts `hideExit` prop to suppress exit button when sidebar is open
+- Browse-mode canvas uses `panX` to shift viewport when sidebar opens
+
+### Fixed
+- Comments displayed user GUID instead of username — backend now JOINs users table
+- Comment timestamps displayed raw ISO format — now shows friendly relative time
+- Canvas spilling off bottom of screen — aligned with hierarchy sidebar via precise offset calculation
+- Page scrollbar appearing despite content fitting — cancelled parent padding overflow
+
+## [2.4.0] - 2026-03-09
+
+### Added
+- C4 hybrid visual notation with canonical colours and inline SVG type glyphs (ADR-092)
+- C4TypeGlyph and C4TypePicker components for rich C4 type selection
+- `borderStyle` support in theme system (NodeVisualOverrides, visualStyles, themeStore)
+- C4 default theme seed with canonical colours (green person, blue system, red external) and dashed borders
+- NotationPills component — clickable pill notation selector replacing dropdowns
+- Version history restore/rollback UI with confirmation for elements and diagrams
+- Diagram rollback API endpoint (`POST /api/diagrams/{id}/rollback`)
+- Eager theme loading to prevent flash on diagram page
+
+### Changed
+- C4Renderer uses inline SVG glyphs instead of Lucide icons
+- NodeStylePanel uses C4TypePicker for C4 notation nodes
+- EntityDialog renamed "Create Entity" → "Create Element", uses NotationPills and C4TypePicker
+- DiagramDialog uses NotationPills instead of notation dropdown
+- Element detail page uses C4TypePicker in edit mode, C4TypeGlyph in view mode
+- Edit mode badge styling: dark bg with white text (light theme), inverted for dark theme
+- Center-to-center edge connections default to straight line routing
+- Smoothstep edges use borderRadius=20, bezier edges use curvature=0.4
+- Connection handle dots hidden in browse mode
+
+### Fixed
+- Theme loading flash on diagram page initial load
+- ThemeSelector no longer lazy-loads themes (loaded eagerly by page)
+
+## [2.3.6] - 2026-03-08
+
+### Added
+- Node resizing via drag handles in edit mode using SvelteFlow NodeResizer (ADR-091-A)
+- NodeStylePanel wired into diagram page — select a node in edit mode to style it (ADR-091-A)
+- Node resize changes persisted to visual overrides (width/height) on save (ADR-091-A)
+- Lucide icon library (`lucide-svelte`) with 100+ curated architecture modelling icons (ADR-091-B)
+- `IconRef` type and `NodeVisualOverrides.icon` field for per-node icon storage (ADR-091-B)
+- Icon registry (`iconRegistry.ts`) resolving `IconRef` to Lucide Svelte components (ADR-091-B)
+- `IconDisplay.svelte` component for rendering icons at any size from an `IconRef` (ADR-091-B)
+- Semantic icon matcher (`icon_matcher.py`) — matches EA element names/stereotypes to Lucide icons via keyword similarity (ADR-091-B)
+- Set-wide icon consistency: same element name always resolves to same icon across all diagrams in an import (ADR-091-B)
+- NavigationCellNode renders matched Lucide icons when `visual.icon` is set, falls back to NID SVGs (ADR-091-B)
+- Icon picker modal (`IconPicker.svelte`) with search, category filters for browsing and selecting icons (ADR-091-C)
+- Icon section in NodeStylePanel — add, change, or remove node icons via the picker (ADR-091-C)
+- Icon tag index (`iconTags.json`) shared between frontend search and backend matching (ADR-091-B)
+
+## [2.3.5] - 2026-03-07
+
+### Fixed
+- All 144 diagrams now have correct node background colors — EA default white (#FFFFFF) emitted when Backcolor is unset (ADR-090)
+- All 40 diagrams with unstyled edges now have explicit black line color — EA default #000000 emitted when LineColor is unset (ADR-090)
+- 3 edges with stereotype but no name now display stereotype text as label with guillemets (ADR-090)
+
+### Added
+- Iterative visual audit framework (ea-audit.mjs) with comparison tracking across iterations (ADR-090)
+
+## [2.3.4] - 2026-03-07
+
+### Fixed
+- All 149 diagrams now render edges correctly — unified handle IDs between backend and frontend (ADR-089)
+- Node content no longer clipped — switched from fixed `height` to `min-height` for EA-imported nodes (ADR-089)
+- Long text in fixed-width nodes truncated with ellipsis instead of hidden (ADR-089)
+- All node types (UML, ArchiMate, C4, Boundary) now have dual source+target handles at every position (ADR-089)
+
+### Added
+- Comprehensive automated diagram audit script (`frontend/audit-diagrams.mjs`) covering 14 check categories (ADR-089)
+
+## [2.3.3] - 2026-03-07
+
+### Fixed
+- Note "Feature Properties" no longer duplicates title in body — label prefix stripped from description (ADR-088)
+- Attribute text in abstract classes renders upright — `font-style: normal` blocks italic inheritance (ADR-088)
+- Node widths match EA dimensions exactly — `fixedSize` mode with `overflow: hidden` (ADR-088)
+- Composition/aggregation edges show both diamond source marker and open arrow target marker (ADR-088)
+- Diamond markers extend outward from node — `refX=0` instead of `18` (ADR-088)
+- Edges auto-route via geometrically optimal handles when EA specifies auto-routing (ADR-088)
+- Edge cardinality and role labels positioned per EA's stored LLB/LLT/LRT/LRB coordinates (ADR-088)
+- Diagram frame zooms and pans with canvas — converted from absolute-positioned SVG to SvelteFlow node (ADR-088)
+- Fixed-size node content no longer clipped — UML icons hidden and compact padding/line-height applied (ADR-088 R3)
+- Package nodes now appear on diagrams — no longer skipped during import (ADR-088 R3)
+- Diagram frame type label shows mapped type ("class", "pkg") instead of raw EA type ("Logical", "Package") (ADR-088 R3)
+
+### Added
+- Dual-type handles on UML nodes — each side accepts both source and target connections (ADR-088)
+- `compute_auto_handles()` backend function for geometry-based handle selection (ADR-088)
+- `DiagramFrameNode.svelte` component for canvas-integrated diagram frames (ADR-088)
+- EA label position parsing (LLB/LLT/LRT/LRB) from `t_diagramlinks.Geometry` (ADR-088)
+
+## [2.3.2] - 2026-03-06
+
+### Added
+- Diagram frame/title block for imported EA diagrams — shows `[type] [name]` tab with border (ADR-087)
+- Attribute sort option (`pos` or `alpha`) in view config for canvas (ADR-087)
+- EA connector `Start_Edge`/`End_Edge` mapped to SvelteFlow handles for explicit connection points (ADR-087)
+- EA orthogonal routing via `t_diagramlinks.Path` waypoints rendered as polyline edges (ADR-087)
+- EA absolute connection points (`PtStartX/Y`, `PtEndX/Y`) override auto-computed handle positions (ADR-087)
+
+### Fixed
+- Abstract class `«abstract»` stereotype text no longer shown when EA theme active — italic-only conveys abstract (ADR-087)
+- UML class name labels properly centered in node header (ADR-087)
+- Abstract class names render as italic-only (not bold+italic) when EA theme active (ADR-087)
+- Note elements use original EA dimensions — fixes overlap with adjacent elements (ADR-087)
+- Theme selector dropdown now overrides diagram's preferred theme when explicitly changed (ADR-087)
+- Note background and border colors respect theme configuration via CSS variables (ADR-087)
+- SVG markers (diamonds/arrows) visible at all zoom levels with `overflow: visible` (ADR-087)
+
+### Changed
+- `ThemeRenderingConfig` extended with `hideTypeStereotypes` and `abstractBoldOverride` fields (ADR-087)
+
 ## [2.3.1] - 2026-03-06
 
 ### Added

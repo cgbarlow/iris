@@ -5,6 +5,16 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class ThemeRenderingConfig(BaseModel):
+    """Presentation hints for theme rendering (e.g. hide icons, border radius)."""
+
+    hideIcons: bool | None = None
+    borderRadius: int | None = None
+    attrFontColor: str | None = None
+    hideTypeStereotypes: bool | None = None
+    abstractBoldOverride: bool | None = None
+
+
 class ThemeConfig(BaseModel):
     """Theme configuration with element defaults and stereotype overrides."""
 
@@ -14,6 +24,7 @@ class ThemeConfig(BaseModel):
     stereotype_overrides: dict[str, dict[str, object]] = Field(default_factory=dict)
     edge_defaults: dict[str, dict[str, object]] = Field(default_factory=dict)
     global_defaults: dict[str, object] = Field(default_factory=dict, alias="global")
+    rendering: ThemeRenderingConfig | None = None
 
 
 class ThemeCreate(BaseModel):

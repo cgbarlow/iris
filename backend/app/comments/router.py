@@ -21,10 +21,12 @@ async def _list_comments(
 ) -> list[CommentResponse]:
     """List comments for a target."""
     cursor = await db.execute(  # type: ignore[union-attr]
-        "SELECT id, target_type, target_id, user_id, content, "
-        "created_at, updated_at "
-        "FROM comments WHERE target_type = ? AND target_id = ? "
-        "AND is_deleted = 0 ORDER BY created_at ASC",
+        "SELECT c.id, c.target_type, c.target_id, c.user_id, c.content, "
+        "c.created_at, c.updated_at, u.username "
+        "FROM comments c "
+        "LEFT JOIN users u ON c.user_id = u.id "
+        "WHERE c.target_type = ? AND c.target_id = ? "
+        "AND c.is_deleted = 0 ORDER BY c.created_at ASC",
         (target_type, target_id),
     )
     rows = await cursor.fetchall()
@@ -32,6 +34,7 @@ async def _list_comments(
         CommentResponse(
             id=r[0], target_type=r[1], target_id=r[2],
             user_id=r[3], content=r[4], created_at=r[5], updated_at=r[6],
+            username=r[7] or "Unknown",
         )
         for r in rows
     ]
@@ -75,8 +78,8 @@ async def create_element_comment(
     await db.commit()
     return CommentResponse(
         id=comment_id, target_type="element", target_id=element_id,
-        user_id=current_user["id"], content=body.content,
-        created_at=now, updated_at=now,
+        user_id=current_user["id"], username=current_user["username"],
+        content=body.content, created_at=now, updated_at=now,
     )
 
 
@@ -118,8 +121,8 @@ async def create_diagram_comment(
     await db.commit()
     return CommentResponse(
         id=comment_id, target_type="diagram", target_id=diagram_id,
-        user_id=current_user["id"], content=body.content,
-        created_at=now, updated_at=now,
+        user_id=current_user["id"], username=current_user["username"],
+        content=body.content, created_at=now, updated_at=now,
     )
 
 
@@ -137,9 +140,11 @@ async def update_comment(
     """Update a comment (owner only)."""
     db = request.app.state.db_manager.main_db
     cursor = await db.execute(
-        "SELECT id, target_type, target_id, user_id, content, "
-        "created_at, updated_at FROM comments "
-        "WHERE id = ? AND is_deleted = 0",
+        "SELECT c.id, c.target_type, c.target_id, c.user_id, c.content, "
+        "c.created_at, c.updated_at, u.username "
+        "FROM comments c "
+        "LEFT JOIN users u ON c.user_id = u.id "
+        "WHERE c.id = ? AND c.is_deleted = 0",
         (comment_id,),
     )
     row = await cursor.fetchone()
@@ -156,8 +161,8 @@ async def update_comment(
     await db.commit()
     return CommentResponse(
         id=row[0], target_type=row[1], target_id=row[2],
-        user_id=row[3], content=body.content,
-        created_at=row[5], updated_at=now,
+        user_id=row[3], username=row[7] or "Unknown",
+        content=body.content, created_at=row[5], updated_at=now,
     )
 
 

@@ -9,12 +9,14 @@
 	import { Handle, Position } from '@xyflow/svelte';
 	import type { Snippet } from 'svelte';
 	import type { CanvasNodeData } from '$lib/types/canvas';
-	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
+	import { nodeOverrideStyle, titleFontStyle, descFontStyle } from '$lib/canvas/utils/visualStyles';
+	import IconDisplay from '$lib/icons/IconDisplay.svelte';
 
 	interface Props {
 		data: CanvasNodeData;
 		selected?: boolean;
 		icon?: string;
+		iconSnippet?: Snippet;
 		typeLabel?: string;
 		cssClass?: string;
 		children?: Snippet;
@@ -24,12 +26,17 @@
 		data,
 		selected = false,
 		icon = '⬡',
+		iconSnippet,
 		typeLabel = 'element',
 		cssClass = '',
 		children,
 	}: Props = $props();
 
 	const visualStyle = $derived(nodeOverrideStyle(data.visual));
+	const titleStyle = $derived(titleFontStyle(data.visual));
+	const descStyle = $derived(descFontStyle(data.visual));
+	const hasCustomIcon = $derived(!!data.visual?.icon);
+	const iconColor = $derived(data.visual?.iconColor);
 </script>
 
 <div
@@ -38,15 +45,23 @@
 	style={visualStyle}
 	aria-label="{data.label}, {typeLabel}"
 >
-	<div class="canvas-node__header">
-		<span class="canvas-node__icon" aria-hidden="true">{icon}</span>
+	<div class="canvas-node__header" style={titleStyle}>
+		{#if hasCustomIcon && data.visual?.icon}
+			<span class="canvas-node__icon" aria-hidden="true">
+				<IconDisplay icon={data.visual.icon} size={16} color={iconColor} />
+			</span>
+		{:else if iconSnippet}
+			{@render iconSnippet()}
+		{:else}
+			<span class="canvas-node__icon" aria-hidden="true">{icon}</span>
+		{/if}
 		<span class="canvas-node__label">{data.label}</span>
 	</div>
 	{#if children}
 		{@render children()}
 	{/if}
 	{#if data.description && !children}
-		<div class="canvas-node__description">{data.description}</div>
+		<div class="canvas-node__description" style={descStyle}>{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
 		<a
@@ -58,9 +73,13 @@
 		</a>
 	{/if}
 	<Handle type="target" position={Position.Top} id="top" />
+	<Handle type="source" position={Position.Top} id="top" style="top:0" />
 	<Handle type="source" position={Position.Bottom} id="bottom" />
+	<Handle type="target" position={Position.Bottom} id="bottom" style="bottom:0;top:auto" />
 	<Handle type="target" position={Position.Left} id="left" />
+	<Handle type="source" position={Position.Left} id="left" style="left:0" />
 	<Handle type="source" position={Position.Right} id="right" />
+	<Handle type="target" position={Position.Right} id="right" style="right:0;left:auto" />
 	<Handle type="source" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 	<Handle type="target" position={Position.Top} id="center" class="center-handle" style="left:50%;top:50%;transform:translate(-50%,-50%);" />
 </div>

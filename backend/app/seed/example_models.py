@@ -1,23 +1,21 @@
-"""Idempotent seed: example diagrams covering all 31 diagram-type/notation permutations.
+"""Idempotent seed: example diagrams covering all diagram-type/notation permutations.
 
 Creates elements representing the Iris system and 32 diagrams organised
 into a 5-package hierarchy by notation:
 
   Iris (root package)
+  ├── Iris Navigation (root — navigation_cell tiles → each notation)
   ├── Simple Notation   — 10 diagrams
   ├── UML Notation      — 8 diagrams
   ├── ArchiMate Notation — 7 diagrams
-  ├── C4 Notation       — 6 diagrams
-  └── Iris System Overview (component — modelrefs to key diagrams)
+  └── C4 Notation       — 6 diagrams
 
-All elements are tagged with 'iris' and 'example'; diagrams are tagged with
-'iris', 'example', and 'template'.
+v4 revision: intentional layouts, explicit edge routing via sourceHandle/
+targetHandle, navigation_cell overview with diagram_links, boundary nodes.
 
 Idempotency:
-  - If _gen_id("pkg", 4) exists → already v3, skip
-  - If _gen_id("pkg", 0) exists but no pkg-4 → v2, clear + reseed v3
-  - If element_tags with tag='example' exist but no root package → v1, clear + reseed
-  - Otherwise → fresh seed
+  - If _gen_id("diagram", 31) has v4 marker in metadata → already v4, skip
+  - Otherwise → clear + reseed v4
 """
 
 from __future__ import annotations
@@ -43,26 +41,80 @@ def _gen_id(prefix: str, index: int) -> str:
     return str(uuid.uuid5(namespace, f"{prefix}-{index}"))
 
 
-def _grid_nodes(
-    node_defs: list[dict],
-    cols: int = 3,
-    x_gap: int = 300,
-    y_gap: int = 250,
-    x_start: int = 60,
-    y_start: int = 50,
-) -> list[dict]:
-    """Generate positioned nodes in a grid layout."""
-    nodes = []
-    for i, nd in enumerate(node_defs):
-        col = i % cols
-        row = i // cols
-        nodes.append({
-            "id": nd["id"],
-            "type": nd["type"],
-            "position": {"x": x_start + col * x_gap, "y": y_start + row * y_gap},
-            "data": nd["data"],
-        })
-    return nodes
+def _icon(name: str) -> dict:
+    """Build a Lucide icon ref."""
+    return {"set": "lucide", "name": name}
+
+
+def _node(
+    nid: str,
+    ntype: str,
+    data: dict,
+    x: int,
+    y: int,
+    w: int = 180,
+    h: int = 80,
+    icon: str | None = None,
+    **extra: object,
+) -> dict:
+    """Build a positioned node dict with explicit size and optional icon."""
+    result: dict = {
+        "id": nid,
+        "type": ntype,
+        "position": {"x": x, "y": y},
+        "data": data,
+        "measured": {"width": w, "height": h},
+    }
+    if "visual" not in data:
+        data["visual"] = {"width": w, "height": h}
+    else:
+        data["visual"]["width"] = w
+        data["visual"]["height"] = h
+    if icon:
+        data["visual"]["icon"] = _icon(icon)
+    result.update(extra)
+    return result
+
+
+def _edge(
+    eid: str,
+    source: str,
+    target: str,
+    etype: str,
+    label: str,
+    *,
+    rel_id: str = "",
+    source_handle: str | None = None,
+    target_handle: str | None = None,
+    **extra_data: object,
+) -> dict:
+    """Build an edge dict with explicit routing handles."""
+    data: dict = {"relationshipType": etype, "label": label}
+    if rel_id:
+        data["relationshipId"] = rel_id
+    data.update(extra_data)
+    result: dict = {"id": eid, "source": source, "target": target, "type": etype, "data": data}
+    if source_handle:
+        result["sourceHandle"] = source_handle
+    if target_handle:
+        result["targetHandle"] = target_handle
+    return result
+
+
+def _boundary(nid: str, label: str, x: int, y: int, w: int, h: int) -> dict:
+    """Build a boundary (group) node."""
+    return {
+        "id": nid,
+        "type": "boundary",
+        "position": {"x": x, "y": y},
+        "data": {
+            "label": label,
+            "entityType": "boundary",
+            "visual": {"width": w, "height": h},
+        },
+        "measured": {"width": w, "height": h},
+        "zIndex": -1,
+    }
 
 
 # ── Element definitions ─────────────────────────────────────────────────────
@@ -314,7 +366,7 @@ _PACKAGES = [
 ]
 
 
-# ── Diagram builder functions ────────────────────────────────────────────────
+# ── Diagram builder helpers ─────────────────────────────────────────────────
 
 def _e(eids: dict, nid: str) -> dict:
     """Build entity data dict for a node referencing an element."""
@@ -328,37 +380,46 @@ def _r(rids: dict, idx: int) -> str:
     return rids.get(f"r{idx}", "")
 
 
+def _ae(eids: dict, nid: str, layer: str, archimate_type: str) -> dict:
+    """Build ArchiMate entity data with layer info."""
+    return {**_e(eids, nid), "layer": layer, "archimateType": archimate_type}
+
+
 # ── Simple Notation Diagrams (10, indices 0–9) ───────────────────────────────
 
 def _build_simple_component(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple component: Iris Architecture overview."""
-    nodes = _grid_nodes([
-        {"id": "n10", "type": "actor", "data": _e(eids, "n10")},
-        {"id": "n11", "type": "actor", "data": _e(eids, "n11")},
-        {"id": "n9", "type": "interface", "data": _e(eids, "n9")},
-        {"id": "n1", "type": "component", "data": _e(eids, "n1")},
-        {"id": "n2", "type": "component", "data": _e(eids, "n2")},
-        {"id": "n5", "type": "component", "data": _e(eids, "n5")},
-        {"id": "n4", "type": "service", "data": _e(eids, "n4")},
-        {"id": "n3", "type": "database", "data": _e(eids, "n3")},
-    ])
+    """Simple component: Iris Architecture — layered top-down layout."""
+    nodes = [
+        # Row 1: Actors
+        _node("n10", "actor", _e(eids, "n10"), 100, 30, 140, 70, icon="user"),
+        _node("n11", "actor", _e(eids, "n11"), 380, 30, 140, 70, icon="shield"),
+        # Row 2: Frontend + API
+        _node("n1", "component", _e(eids, "n1"), 60, 170, 200, 80, icon="monitor"),
+        _node("n9", "interface", _e(eids, "n9"), 360, 170, 180, 80, icon="plug"),
+        # Row 3: Backend services
+        _node("n2", "component", _e(eids, "n2"), 200, 340, 200, 80, icon="server"),
+        _node("n5", "component", _e(eids, "n5"), 10, 340, 170, 80, icon="pen-tool"),
+        _node("n4", "service", _e(eids, "n4"), 440, 340, 160, 80, icon="lock"),
+        # Row 4: Data
+        _node("n3", "database", _e(eids, "n3"), 250, 510, 160, 70, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "n10", "target": "n1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Browses", "relationshipId": _r(rids, 0)}},
-        {"id": "e1", "source": "n11", "target": "n1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Manages", "relationshipId": _r(rids, 1)}},
-        {"id": "e2", "source": "n1", "target": "n9", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "API calls", "relationshipId": _r(rids, 2)}},
-        {"id": "e3", "source": "n9", "target": "n2", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Serves", "relationshipId": _r(rids, 3)}},
-        {"id": "e4", "source": "n1", "target": "n5", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Embeds", "relationshipId": _r(rids, 4)}},
-        {"id": "e5", "source": "n2", "target": "n4", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Auth", "relationshipId": _r(rids, 7)}},
-        {"id": "e6", "source": "n2", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "SQL", "relationshipId": _r(rids, 8)}},
-        {"id": "e7", "source": "n4", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Users", "relationshipId": _r(rids, 9)}},
+        _edge("e0", "n10", "n1", "uses", "Browses", rel_id=_r(rids, 0),
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "n11", "n9", "uses", "Manages", rel_id=_r(rids, 1),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "n1", "n9", "uses", "API calls", rel_id=_r(rids, 2),
+              source_handle="right", target_handle="left"),
+        _edge("e3", "n9", "n2", "uses", "Serves", rel_id=_r(rids, 3),
+              source_handle="bottom", target_handle="top"),
+        _edge("e4", "n1", "n5", "uses", "Embeds", rel_id=_r(rids, 4),
+              source_handle="bottom", target_handle="top"),
+        _edge("e5", "n2", "n4", "uses", "Auth", rel_id=_r(rids, 7),
+              source_handle="right", target_handle="left"),
+        _edge("e6", "n2", "n3", "uses", "SQL", rel_id=_r(rids, 8),
+              source_handle="bottom", target_handle="top"),
+        _edge("e7", "n4", "n3", "uses", "Users", rel_id=_r(rids, 9),
+              source_handle="bottom", target_handle="right"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -393,71 +454,73 @@ def _build_simple_sequence(eids: dict, rids: dict, **_kw: object) -> dict:
 
 
 def _build_simple_deployment(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple deployment: Iris data infrastructure."""
-    nodes = _grid_nodes([
-        {"id": "n3", "type": "database", "data": _e(eids, "n3")},
-        {"id": "n6", "type": "service", "data": _e(eids, "n6")},
-        {"id": "n7", "type": "service", "data": _e(eids, "n7")},
-        {"id": "n13", "type": "component", "data": _e(eids, "n13")},
-        {"id": "n12", "type": "component", "data": _e(eids, "n12")},
-        {"id": "n8", "type": "component", "data": _e(eids, "n8")},
-    ])
+    """Simple deployment: Iris data infrastructure — hub-and-spoke layout."""
+    nodes = [
+        # Centre: Database hub
+        _node("n3", "database", _e(eids, "n3"), 250, 220, 180, 80, icon="database"),
+        # Spokes around the DB
+        _node("n6", "service", _e(eids, "n6"), 30, 50, 180, 70, icon="search"),
+        _node("n7", "service", _e(eids, "n7"), 490, 50, 180, 70, icon="file-text"),
+        _node("n12", "component", _e(eids, "n12"), 30, 400, 180, 70, icon="git-branch"),
+        _node("n8", "component", _e(eids, "n8"), 490, 400, 180, 70, icon="image"),
+        _node("n13", "component", _e(eids, "n13"), 490, 220, 180, 70, icon="radio"),
+    ]
     edges = [
-        {"id": "e0", "source": "n6", "target": "n3", "type": "depends_on",
-         "data": {"relationshipType": "depends_on", "label": "FTS5", "relationshipId": _r(rids, 14)}},
-        {"id": "e1", "source": "n7", "target": "n13", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Events", "relationshipId": _r(rids, 15)}},
-        {"id": "e2", "source": "n13", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Persist", "relationshipId": _r(rids, 16)}},
-        {"id": "e3", "source": "n12", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Versions", "relationshipId": _r(rids, 13)}},
-        {"id": "e4", "source": "n8", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Read", "relationshipId": _r(rids, 17)}},
+        _edge("e0", "n6", "n3", "depends_on", "FTS5", rel_id=_r(rids, 14),
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "n7", "n13", "uses", "Events", rel_id=_r(rids, 15),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "n13", "n3", "uses", "Persist", rel_id=_r(rids, 16),
+              source_handle="left", target_handle="right"),
+        _edge("e3", "n12", "n3", "uses", "Versions", rel_id=_r(rids, 13),
+              source_handle="top", target_handle="bottom"),
+        _edge("e4", "n8", "n3", "uses", "Read", rel_id=_r(rids, 17),
+              source_handle="top", target_handle="bottom"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_simple_process(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple process: Diagram creation flow."""
-    nodes = _grid_nodes([
-        {"id": "n10", "type": "actor", "data": _e(eids, "n10")},
-        {"id": "n1", "type": "component", "data": _e(eids, "n1")},
-        {"id": "n5", "type": "component", "data": _e(eids, "n5")},
-        {"id": "n2", "type": "component", "data": _e(eids, "n2")},
-        {"id": "n3", "type": "database", "data": _e(eids, "n3")},
-    ], cols=5, x_gap=250)
+    """Simple process: Diagram creation — left-to-right flow."""
+    nodes = [
+        _node("n10", "actor", _e(eids, "n10"), 0, 60, 130, 70),
+        _node("n1", "component", _e(eids, "n1"), 200, 60, 170, 70),
+        _node("n5", "component", _e(eids, "n5"), 440, 60, 170, 70),
+        _node("n2", "component", _e(eids, "n2"), 680, 60, 170, 70),
+        _node("n3", "database", _e(eids, "n3"), 920, 60, 140, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "n10", "target": "n1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Opens app", "relationshipId": _r(rids, 0)}},
-        {"id": "e1", "source": "n1", "target": "n5", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Opens canvas", "relationshipId": _r(rids, 4)}},
-        {"id": "e2", "source": "n1", "target": "n2", "type": "depends_on",
-         "data": {"relationshipType": "depends_on", "label": "Save diagram", "relationshipId": _r(rids, 6)}},
-        {"id": "e3", "source": "n2", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Persist", "relationshipId": _r(rids, 8)}},
+        _edge("e0", "n10", "n1", "uses", "Opens app", rel_id=_r(rids, 0),
+              source_handle="right", target_handle="left"),
+        _edge("e1", "n1", "n5", "uses", "Opens canvas", rel_id=_r(rids, 4),
+              source_handle="right", target_handle="left"),
+        _edge("e2", "n5", "n2", "depends_on", "Save diagram", rel_id=_r(rids, 6),
+              source_handle="right", target_handle="left"),
+        _edge("e3", "n2", "n3", "uses", "Persist", rel_id=_r(rids, 8),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_simple_roadmap(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple roadmap: Iris product milestones."""
-    nodes = _grid_nodes([
-        {"id": "v1", "type": "component", "data": {"label": "v1.0 — Foundation", "entityType": "component",
-         "description": "Core CRUD, authentication, canvas, and versioning"}},
-        {"id": "v2", "type": "component", "data": {"label": "v2.0 — Multi-Notation", "entityType": "component",
-         "description": "UML, ArchiMate, C4 support, import, sets, packages"}},
-        {"id": "v3", "type": "component", "data": {"label": "v3.0 — Enterprise", "entityType": "component",
-         "description": "Collaboration, real-time editing, cloud deployment"}},
-        {"id": "v4", "type": "component", "data": {"label": "v4.0 — AI-Assisted", "entityType": "component",
-         "description": "AI-powered diagram generation and analysis"}},
-    ], cols=4, x_gap=280)
+    """Simple roadmap: Iris product milestones — left-to-right timeline."""
+    nodes = [
+        _node("v1", "component", {"label": "v1.0 — Foundation", "entityType": "component",
+              "description": "Core CRUD, authentication, canvas, and versioning"}, 0, 60, 200, 80),
+        _node("v2", "component", {"label": "v2.0 — Multi-Notation", "entityType": "component",
+              "description": "UML, ArchiMate, C4 support, import, sets, packages"}, 280, 60, 210, 80),
+        _node("v3", "component", {"label": "v3.0 — Enterprise", "entityType": "component",
+              "description": "Collaboration, real-time editing, cloud deployment"}, 570, 60, 200, 80),
+        _node("v4", "component", {"label": "v4.0 — AI-Assisted", "entityType": "component",
+              "description": "AI-powered diagram generation and analysis"}, 850, 60, 200, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "v1", "target": "v2", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Builds on"}},
-        {"id": "e1", "source": "v2", "target": "v3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Evolves to"}},
-        {"id": "e2", "source": "v3", "target": "v4", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Evolves to"}},
+        _edge("e0", "v1", "v2", "uses", "Builds on",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "v2", "v3", "uses", "Evolves to",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "v3", "v4", "uses", "Evolves to",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -486,12 +549,13 @@ def _build_simple_free_form(eids: dict, rids: dict, **_kw: object) -> dict:
         ("t_settings", "settings", "key, value, updated_at, updated_by"),
         ("t_audit", "audit_log", "Separate DB: id, timestamp, user_id, action, hash chain"),
     ]
-    node_defs = [
-        {"id": tid, "type": "database",
-         "data": {"label": name, "entityType": "database", "description": desc}}
-        for tid, name, desc in tables
+    cols, x_gap, y_gap = 4, 310, 200
+    nodes = [
+        _node(tid, "database",
+              {"label": name, "entityType": "database", "description": desc},
+              60 + (i % cols) * x_gap, 50 + (i // cols) * y_gap, 250, 70)
+        for i, (tid, name, desc) in enumerate(tables)
     ]
-    nodes = _grid_nodes(node_defs, cols=4, x_gap=300, y_gap=200)
     fk_edges = [
         ("t_role_perms", "t_roles"), ("t_users", "t_roles"),
         ("t_pwd_hist", "t_users"), ("t_refresh", "t_users"),
@@ -502,106 +566,106 @@ def _build_simple_free_form(eids: dict, rids: dict, **_kw: object) -> dict:
         ("t_bookmarks", "t_diagrams"), ("t_thumbs", "t_diagrams"),
     ]
     edges = [
-        {"id": f"fk{i}", "source": src, "target": tgt, "type": "depends_on",
-         "data": {"relationshipType": "depends_on", "label": "FK"}}
+        _edge(f"fk{i}", src, tgt, "depends_on", "FK",
+              source_handle="bottom", target_handle="top")
         for i, (src, tgt) in enumerate(fk_edges)
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_simple_use_case(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple use_case: User interactions with Iris."""
-    nodes = _grid_nodes([
-        {"id": "n10", "type": "actor", "data": _e(eids, "n10")},
-        {"id": "n11", "type": "actor", "data": _e(eids, "n11")},
-        {"id": "uc1", "type": "component", "data": {"label": "Create Diagram", "entityType": "component",
-         "description": "User creates a new diagram on the canvas"}},
-        {"id": "uc2", "type": "component", "data": {"label": "Import Model", "entityType": "component",
-         "description": "User imports a SparxEA .qea file"}},
-        {"id": "uc3", "type": "component", "data": {"label": "Manage Users", "entityType": "component",
-         "description": "Admin creates and manages user accounts"}},
-    ])
+    """Simple use_case: User interactions — actors left, use cases right."""
+    nodes = [
+        _node("n10", "actor", _e(eids, "n10"), 30, 60, 120, 70),
+        _node("n11", "actor", _e(eids, "n11"), 30, 260, 120, 70),
+        _node("uc1", "component", {"label": "Create Diagram", "entityType": "component",
+              "description": "User creates a new diagram on the canvas"}, 300, 30, 200, 70),
+        _node("uc2", "component", {"label": "Import Model", "entityType": "component",
+              "description": "User imports a SparxEA .qea file"}, 300, 160, 200, 70),
+        _node("uc3", "component", {"label": "Manage Users", "entityType": "component",
+              "description": "Admin creates and manages user accounts"}, 300, 290, 200, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "n10", "target": "uc1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Performs"}},
-        {"id": "e1", "source": "n10", "target": "uc2", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Performs"}},
-        {"id": "e2", "source": "n11", "target": "uc3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Performs"}},
-        {"id": "e3", "source": "n11", "target": "uc1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Performs"}},
+        _edge("e0", "n10", "uc1", "uses", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "n10", "uc2", "uses", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "n11", "uc3", "uses", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e3", "n11", "uc1", "uses", "Performs",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_simple_state_machine(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple state_machine: Diagram lifecycle states."""
-    nodes = _grid_nodes([
-        {"id": "s1", "type": "component", "data": {"label": "Draft", "entityType": "component",
-         "description": "Diagram is being created or edited"}},
-        {"id": "s2", "type": "component", "data": {"label": "Published", "entityType": "component",
-         "description": "Diagram is finalized and shared"}},
-        {"id": "s3", "type": "component", "data": {"label": "Archived", "entityType": "component",
-         "description": "Diagram is archived for reference"}},
-        {"id": "s4", "type": "component", "data": {"label": "Deleted", "entityType": "component",
-         "description": "Diagram is soft-deleted in recycle bin"}},
-    ], cols=4, x_gap=280)
+    """Simple state_machine: Diagram lifecycle — circular flow."""
+    nodes = [
+        _node("s1", "component", {"label": "Draft", "entityType": "component",
+              "description": "Diagram is being created or edited"}, 60, 30, 160, 70),
+        _node("s2", "component", {"label": "Published", "entityType": "component",
+              "description": "Diagram is finalized and shared"}, 360, 30, 160, 70),
+        _node("s3", "component", {"label": "Archived", "entityType": "component",
+              "description": "Diagram is archived for reference"}, 360, 210, 160, 70),
+        _node("s4", "component", {"label": "Deleted", "entityType": "component",
+              "description": "Diagram is soft-deleted in recycle bin"}, 60, 210, 160, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "s1", "target": "s2", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Publish"}},
-        {"id": "e1", "source": "s2", "target": "s3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Archive"}},
-        {"id": "e2", "source": "s2", "target": "s1", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Edit"}},
-        {"id": "e3", "source": "s3", "target": "s4", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Delete"}},
+        _edge("e0", "s1", "s2", "uses", "Publish",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "s2", "s3", "uses", "Archive",
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "s2", "s1", "uses", "Edit",
+              source_handle="top", target_handle="top"),
+        _edge("e3", "s3", "s4", "uses", "Delete",
+              source_handle="left", target_handle="right"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_simple_system_context(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple system_context: Iris system boundary."""
-    nodes = _grid_nodes([
-        {"id": "n10", "type": "actor", "data": _e(eids, "n10")},
-        {"id": "n11", "type": "actor", "data": _e(eids, "n11")},
-        {"id": "sys", "type": "component", "data": {"label": "Iris Platform", "entityType": "component",
-         "description": "Architecture modelling platform"}},
-        {"id": "browser", "type": "component", "data": {"label": "Web Browser", "entityType": "component",
-         "description": "Client-side rendering"}},
-        {"id": "sqlite", "type": "database", "data": {"label": "SQLite", "entityType": "database",
-         "description": "Embedded database engine"}},
-    ])
+    """Simple system_context: Iris system boundary — centre-focused."""
+    nodes = [
+        _node("n10", "actor", _e(eids, "n10"), 30, 50, 130, 70, icon="user"),
+        _node("n11", "actor", _e(eids, "n11"), 30, 250, 130, 70, icon="shield"),
+        _node("sys", "component", {"label": "Iris Platform", "entityType": "component",
+              "description": "Architecture modelling platform"}, 260, 130, 200, 100, icon="boxes"),
+        _node("browser", "component", {"label": "Web Browser", "entityType": "component",
+              "description": "Client-side rendering"}, 560, 50, 170, 70, icon="globe"),
+        _node("sqlite", "database", {"label": "SQLite", "entityType": "database",
+              "description": "Embedded database engine"}, 560, 250, 160, 70, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "n10", "target": "sys", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Uses"}},
-        {"id": "e1", "source": "n11", "target": "sys", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Administers"}},
-        {"id": "e2", "source": "sys", "target": "browser", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Delivers to"}},
-        {"id": "e3", "source": "sys", "target": "sqlite", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Persists in"}},
+        _edge("e0", "n10", "sys", "uses", "Uses",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "n11", "sys", "uses", "Administers",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "sys", "browser", "uses", "Delivers to",
+              source_handle="right", target_handle="left"),
+        _edge("e3", "sys", "sqlite", "uses", "Persists in",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_simple_container(eids: dict, rids: dict, **_kw: object) -> dict:
-    """Simple container: Iris container view."""
-    nodes = _grid_nodes([
-        {"id": "n1", "type": "component", "data": _e(eids, "n1")},
-        {"id": "n2", "type": "component", "data": _e(eids, "n2")},
-        {"id": "n3", "type": "database", "data": _e(eids, "n3")},
-        {"id": "n4", "type": "service", "data": _e(eids, "n4")},
-        {"id": "n5", "type": "component", "data": _e(eids, "n5")},
-    ])
+    """Simple container: Iris container view — top-down 3-tier."""
+    nodes = [
+        _node("n1", "component", _e(eids, "n1"), 150, 30, 200, 80, icon="monitor"),
+        _node("n5", "component", _e(eids, "n5"), 420, 30, 170, 80, icon="pen-tool"),
+        _node("n2", "component", _e(eids, "n2"), 200, 200, 200, 80, icon="server"),
+        _node("n4", "service", _e(eids, "n4"), 470, 200, 160, 80, icon="lock"),
+        _node("n3", "database", _e(eids, "n3"), 250, 370, 160, 70, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "n1", "target": "n2", "type": "depends_on",
-         "data": {"relationshipType": "depends_on", "label": "REST", "relationshipId": _r(rids, 6)}},
-        {"id": "e1", "source": "n2", "target": "n3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "SQL", "relationshipId": _r(rids, 8)}},
-        {"id": "e2", "source": "n2", "target": "n4", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Auth", "relationshipId": _r(rids, 7)}},
-        {"id": "e3", "source": "n1", "target": "n5", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Embeds", "relationshipId": _r(rids, 4)}},
+        _edge("e0", "n1", "n2", "depends_on", "REST", rel_id=_r(rids, 6),
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "n2", "n3", "uses", "SQL", rel_id=_r(rids, 8),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "n2", "n4", "uses", "Auth", rel_id=_r(rids, 7),
+              source_handle="right", target_handle="left"),
+        _edge("e3", "n1", "n5", "uses", "Embeds", rel_id=_r(rids, 4),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -609,23 +673,23 @@ def _build_simple_container(eids: dict, rids: dict, **_kw: object) -> dict:
 # ── UML Notation Diagrams (8, indices 10–17) ─────────────────────────────────
 
 def _build_uml_component(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML component: Iris service modules."""
-    nodes = _grid_nodes([
-        {"id": "u3", "type": "class", "data": _e(eids, "u3")},
-        {"id": "u5", "type": "interface_uml", "data": _e(eids, "u5")},
-        {"id": "u6", "type": "interface_uml", "data": _e(eids, "u6")},
-        {"id": "u1", "type": "class", "data": _e(eids, "u1")},
-        {"id": "u2", "type": "class", "data": _e(eids, "u2")},
-    ])
+    """UML component: Iris service modules — controller on top, services below."""
+    nodes = [
+        _node("u3", "class", _e(eids, "u3"), 200, 30, 200, 80),
+        _node("u5", "interface_uml", _e(eids, "u5"), 30, 200, 180, 70),
+        _node("u6", "interface_uml", _e(eids, "u6"), 30, 340, 180, 70),
+        _node("u1", "class", _e(eids, "u1"), 300, 270, 200, 80),
+        _node("u2", "class", _e(eids, "u2"), 560, 270, 200, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "u3", "target": "u1", "type": "dependency",
-         "data": {"relationshipType": "dependency", "label": "Uses", "relationshipId": _r(rids, 22)}},
-        {"id": "e1", "source": "u3", "target": "u2", "type": "dependency",
-         "data": {"relationshipType": "dependency", "label": "Uses", "relationshipId": _r(rids, 23)}},
-        {"id": "e2", "source": "u5", "target": "u1", "type": "realization",
-         "data": {"relationshipType": "realization", "label": "Renders", "relationshipId": _r(rids, 25)}},
-        {"id": "e3", "source": "u6", "target": "u1", "type": "realization",
-         "data": {"relationshipType": "realization", "label": "Exports", "relationshipId": _r(rids, 26)}},
+        _edge("e0", "u3", "u1", "dependency", "Uses", rel_id=_r(rids, 22),
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "u3", "u2", "dependency", "Uses", rel_id=_r(rids, 23),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "u5", "u1", "realization", "Renders", rel_id=_r(rids, 25),
+              source_handle="right", target_handle="left"),
+        _edge("e3", "u6", "u1", "realization", "Exports", rel_id=_r(rids, 26),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -666,134 +730,143 @@ def _build_uml_sequence(eids: dict, rids: dict, **_kw: object) -> dict:
 
 
 def _build_uml_class(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML class: Iris domain model."""
-    nodes = _grid_nodes([
-        {"id": "u7", "type": "abstract_class", "data": _e(eids, "u7")},
-        {"id": "u8", "type": "enumeration", "data": _e(eids, "u8")},
-        {"id": "u1", "type": "class", "data": _e(eids, "u1")},
-        {"id": "u2", "type": "class", "data": _e(eids, "u2")},
-        {"id": "u4", "type": "class", "data": _e(eids, "u4")},
-        {"id": "u3", "type": "class", "data": _e(eids, "u3")},
-    ])
+    """UML class: Iris domain model — base class top, subclasses below, enum to side."""
+    nodes = [
+        # Base class centred at top
+        _node("u7", "abstract_class", _e(eids, "u7"), 230, 30, 220, 80),
+        # Subclasses fanned below
+        _node("u1", "class", _e(eids, "u1"), 30, 230, 200, 80),
+        _node("u2", "class", _e(eids, "u2"), 270, 230, 200, 80),
+        _node("u4", "class", _e(eids, "u4"), 510, 230, 200, 80),
+        # Enum to the right
+        _node("u8", "enumeration", _e(eids, "u8"), 530, 30, 180, 80),
+        # Controller below
+        _node("u3", "class", _e(eids, "u3"), 150, 410, 200, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "u1", "target": "u7", "type": "generalization",
-         "data": {"relationshipType": "generalization", "label": "Extends", "relationshipId": _r(rids, 20)}},
-        {"id": "e1", "source": "u2", "target": "u7", "type": "generalization",
-         "data": {"relationshipType": "generalization", "label": "Extends", "relationshipId": _r(rids, 21)}},
-        {"id": "e2", "source": "u4", "target": "u7", "type": "generalization",
-         "data": {"relationshipType": "generalization", "label": "Extends", "relationshipId": _r(rids, 24)}},
-        {"id": "e3", "source": "u1", "target": "u8", "type": "dependency",
-         "data": {"relationshipType": "dependency", "label": "Uses", "relationshipId": _r(rids, 27)}},
+        _edge("e0", "u1", "u7", "generalization", "Extends", rel_id=_r(rids, 20),
+              source_handle="top", target_handle="bottom"),
+        _edge("e1", "u2", "u7", "generalization", "Extends", rel_id=_r(rids, 21),
+              source_handle="top", target_handle="bottom"),
+        _edge("e2", "u4", "u7", "generalization", "Extends", rel_id=_r(rids, 24),
+              source_handle="top", target_handle="bottom"),
+        _edge("e3", "u1", "u8", "dependency", "Uses", rel_id=_r(rids, 27),
+              source_handle="right", target_handle="bottom"),
+        _edge("e4", "u3", "u1", "dependency", "Delegates", rel_id=_r(rids, 22),
+              source_handle="top", target_handle="bottom"),
+        _edge("e5", "u3", "u2", "dependency", "Delegates", rel_id=_r(rids, 23),
+              source_handle="top", target_handle="bottom"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_uml_deployment(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML deployment: Iris runtime deployment."""
-    nodes = _grid_nodes([
-        {"id": "u3", "type": "class", "data": _e(eids, "u3")},
-        {"id": "u1", "type": "class", "data": _e(eids, "u1")},
-        {"id": "u2", "type": "class", "data": _e(eids, "u2")},
-        {"id": "u4", "type": "class", "data": _e(eids, "u4")},
-    ])
+    """UML deployment: Iris runtime — controller left, services right."""
+    nodes = [
+        _node("u3", "class", _e(eids, "u3"), 30, 100, 200, 80),
+        _node("u1", "class", _e(eids, "u1"), 350, 30, 200, 80),
+        _node("u2", "class", _e(eids, "u2"), 350, 200, 200, 80),
+        _node("u4", "class", _e(eids, "u4"), 350, 370, 200, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "u3", "target": "u1", "type": "dependency",
-         "data": {"relationshipType": "dependency", "label": "Delegates", "relationshipId": _r(rids, 22)}},
-        {"id": "e1", "source": "u3", "target": "u2", "type": "dependency",
-         "data": {"relationshipType": "dependency", "label": "Delegates", "relationshipId": _r(rids, 23)}},
+        _edge("e0", "u3", "u1", "dependency", "Delegates", rel_id=_r(rids, 22),
+              source_handle="right", target_handle="left"),
+        _edge("e1", "u3", "u2", "dependency", "Delegates", rel_id=_r(rids, 23),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_uml_process(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML process: Edit workflow activity."""
-    nodes = _grid_nodes([
-        {"id": "act1", "type": "component", "data": {"label": "Open Diagram", "entityType": "component",
-         "description": "User opens an existing diagram for editing"}},
-        {"id": "act2", "type": "component", "data": {"label": "Edit Canvas", "entityType": "component",
-         "description": "User modifies nodes and edges on canvas"}},
-        {"id": "act3", "type": "component", "data": {"label": "Validate", "entityType": "component",
-         "description": "System validates diagram structure"}},
-        {"id": "act4", "type": "component", "data": {"label": "Save Version", "entityType": "component",
-         "description": "System persists new version to database"}},
-        {"id": "act5", "type": "component", "data": {"label": "Generate Thumbnail", "entityType": "component",
-         "description": "System regenerates SVG/PNG thumbnail"}},
-    ], cols=5, x_gap=240)
+    """UML process: Edit workflow activity — left-to-right pipeline."""
+    nodes = [
+        _node("act1", "component", {"label": "Open Diagram", "entityType": "component",
+              "description": "User opens an existing diagram for editing"}, 0, 60, 170, 70),
+        _node("act2", "component", {"label": "Edit Canvas", "entityType": "component",
+              "description": "User modifies nodes and edges on canvas"}, 240, 60, 170, 70),
+        _node("act3", "component", {"label": "Validate", "entityType": "component",
+              "description": "System validates diagram structure"}, 480, 60, 160, 70),
+        _node("act4", "component", {"label": "Save Version", "entityType": "component",
+              "description": "System persists new version to database"}, 710, 60, 170, 70),
+        _node("act5", "component", {"label": "Generate Thumbnail", "entityType": "component",
+              "description": "System regenerates SVG/PNG thumbnail"}, 950, 60, 190, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "act1", "target": "act2", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "→"}},
-        {"id": "e1", "source": "act2", "target": "act3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "→"}},
-        {"id": "e2", "source": "act3", "target": "act4", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "→"}},
-        {"id": "e3", "source": "act4", "target": "act5", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "→"}},
+        _edge("e0", "act1", "act2", "uses", "→",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "act2", "act3", "uses", "→",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "act3", "act4", "uses", "→",
+              source_handle="right", target_handle="left"),
+        _edge("e3", "act4", "act5", "uses", "→",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_uml_free_form(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML free_form: Mix of UML elements."""
-    nodes = _grid_nodes([
-        {"id": "u7", "type": "abstract_class", "data": _e(eids, "u7")},
-        {"id": "u1", "type": "class", "data": _e(eids, "u1")},
-        {"id": "u5", "type": "interface_uml", "data": _e(eids, "u5")},
-        {"id": "u8", "type": "enumeration", "data": _e(eids, "u8")},
-        {"id": "u9", "type": "use_case", "data": _e(eids, "u9")},
-    ])
+    """UML free_form: Mix of UML elements — structured with boundary."""
+    nodes = [
+        _boundary("b1", "Iris Core Domain", 10, 10, 580, 350),
+        _node("u7", "abstract_class", _e(eids, "u7"), 30, 50, 200, 80),
+        _node("u1", "class", _e(eids, "u1"), 30, 210, 200, 80),
+        _node("u5", "interface_uml", _e(eids, "u5"), 310, 50, 180, 70),
+        _node("u8", "enumeration", _e(eids, "u8"), 310, 210, 180, 80),
+        _node("u9", "use_case", _e(eids, "u9"), 200, 420, 200, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "u1", "target": "u7", "type": "generalization",
-         "data": {"relationshipType": "generalization", "label": "Extends", "relationshipId": _r(rids, 20)}},
-        {"id": "e1", "source": "u5", "target": "u1", "type": "realization",
-         "data": {"relationshipType": "realization", "label": "Renders", "relationshipId": _r(rids, 25)}},
-        {"id": "e2", "source": "u9", "target": "u1", "type": "association",
-         "data": {"relationshipType": "association", "label": "Invokes", "relationshipId": _r(rids, 28)}},
+        _edge("e0", "u1", "u7", "generalization", "Extends", rel_id=_r(rids, 20),
+              source_handle="top", target_handle="bottom"),
+        _edge("e1", "u5", "u1", "realization", "Renders", rel_id=_r(rids, 25),
+              source_handle="bottom", target_handle="right"),
+        _edge("e2", "u9", "u1", "association", "Invokes", rel_id=_r(rids, 28),
+              source_handle="top", target_handle="bottom"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_uml_use_case(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML use_case: Iris use cases."""
-    nodes = _grid_nodes([
-        {"id": "n10", "type": "actor", "data": _e(eids, "n10")},
-        {"id": "n11", "type": "actor", "data": _e(eids, "n11")},
-        {"id": "u9", "type": "use_case", "data": _e(eids, "u9")},
-        {"id": "u10", "type": "use_case", "data": _e(eids, "u10")},
-        {"id": "uc_export", "type": "use_case", "data": {"label": "Export Diagram", "entityType": "use_case",
-         "description": "User exports diagram to SVG/PNG/PDF"}},
-    ])
+    """UML use_case: Iris use cases — actors left, use cases right."""
+    nodes = [
+        _node("n10", "actor", _e(eids, "n10"), 30, 80, 120, 70),
+        _node("n11", "actor", _e(eids, "n11"), 30, 300, 120, 70),
+        _node("u9", "use_case", _e(eids, "u9"), 300, 40, 200, 70),
+        _node("u10", "use_case", _e(eids, "u10"), 300, 170, 200, 70),
+        _node("uc_export", "use_case", {"label": "Export Diagram", "entityType": "use_case",
+              "description": "User exports diagram to SVG/PNG/PDF"}, 300, 300, 200, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "n10", "target": "u9", "type": "association",
-         "data": {"relationshipType": "association", "label": "Performs"}},
-        {"id": "e1", "source": "n10", "target": "u10", "type": "association",
-         "data": {"relationshipType": "association", "label": "Performs"}},
-        {"id": "e2", "source": "n10", "target": "uc_export", "type": "association",
-         "data": {"relationshipType": "association", "label": "Performs"}},
-        {"id": "e3", "source": "n11", "target": "u9", "type": "association",
-         "data": {"relationshipType": "association", "label": "Performs"}},
+        _edge("e0", "n10", "u9", "association", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "n10", "u10", "association", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "n10", "uc_export", "association", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e3", "n11", "u9", "association", "Performs",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_uml_state_machine(eids: dict, rids: dict, **_kw: object) -> dict:
-    """UML state_machine: Element lifecycle."""
-    nodes = _grid_nodes([
-        {"id": "u11", "type": "state", "data": _e(eids, "u11")},
-        {"id": "u12", "type": "state", "data": _e(eids, "u12")},
-        {"id": "s_versioned", "type": "state", "data": {"label": "Versioned", "entityType": "state",
-         "description": "Element has multiple versions in history"}},
-        {"id": "s_deleted", "type": "state", "data": {"label": "Deleted", "entityType": "state",
-         "description": "Element is soft-deleted in recycle bin"}},
-    ], cols=4, x_gap=280)
+    """UML state_machine: Element lifecycle — diamond flow."""
+    nodes = [
+        _node("u11", "state", _e(eids, "u11"), 60, 30, 170, 70),
+        _node("u12", "state", _e(eids, "u12"), 370, 30, 170, 70),
+        _node("s_versioned", "state", {"label": "Versioned", "entityType": "state",
+              "description": "Element has multiple versions in history"}, 370, 210, 170, 70),
+        _node("s_deleted", "state", {"label": "Deleted", "entityType": "state",
+              "description": "Element is soft-deleted in recycle bin"}, 60, 210, 170, 70),
+    ]
     edges = [
-        {"id": "e0", "source": "u11", "target": "u12", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Publish"}},
-        {"id": "e1", "source": "u12", "target": "s_versioned", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Update"}},
-        {"id": "e2", "source": "s_versioned", "target": "u11", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Edit"}},
-        {"id": "e3", "source": "s_versioned", "target": "s_deleted", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Delete"}},
+        _edge("e0", "u11", "u12", "uses", "Publish",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "u12", "s_versioned", "uses", "Update",
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "s_versioned", "u11", "uses", "Edit",
+              source_handle="left", target_handle="bottom"),
+        _edge("e3", "s_versioned", "s_deleted", "uses", "Delete",
+              source_handle="left", target_handle="right"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -801,200 +874,178 @@ def _build_uml_state_machine(eids: dict, rids: dict, **_kw: object) -> dict:
 # ── ArchiMate Notation Diagrams (7, indices 18–24) ───────────────────────────
 
 def _build_archimate_component(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate component: Iris enterprise view (business+app+tech layers)."""
-    nodes = _grid_nodes([
-        {"id": "a1", "type": "business_actor",
-         "data": {**_e(eids, "a1"), "layer": "business", "archimateType": "Business Actor"}},
-        {"id": "a2", "type": "business_role",
-         "data": {**_e(eids, "a2"), "layer": "business", "archimateType": "Business Role"}},
-        {"id": "a3", "type": "business_process",
-         "data": {**_e(eids, "a3"), "layer": "business", "archimateType": "Business Process"}},
-        {"id": "a5", "type": "application_component",
-         "data": {**_e(eids, "a5"), "layer": "application", "archimateType": "Application Component"}},
-        {"id": "a6", "type": "application_service",
-         "data": {**_e(eids, "a6"), "layer": "application", "archimateType": "Application Service"}},
-        {"id": "a7", "type": "application_interface",
-         "data": {**_e(eids, "a7"), "layer": "application", "archimateType": "Application Interface"}},
-        {"id": "a9", "type": "technology_node",
-         "data": {**_e(eids, "a9"), "layer": "technology", "archimateType": "Technology Node"}},
-        {"id": "a10", "type": "technology_service",
-         "data": {**_e(eids, "a10"), "layer": "technology", "archimateType": "Technology Service"}},
-    ], cols=3)
+    """ArchiMate component: Iris enterprise view — layered top-down with boundaries."""
+    nodes = [
+        # Business layer
+        _boundary("bl", "Business Layer", 20, 10, 640, 160),
+        _node("a1", "business_actor", _ae(eids, "a1", "business", "Business Actor"), 40, 50, 180, 80),
+        _node("a2", "business_role", _ae(eids, "a2", "business", "Business Role"), 270, 50, 180, 80),
+        _node("a3", "business_process", _ae(eids, "a3", "business", "Business Process"), 500, 50, 180, 80),
+        # Application layer
+        _boundary("al", "Application Layer", 20, 210, 640, 160),
+        _node("a5", "application_component", _ae(eids, "a5", "application", "Application Component"), 40, 250, 200, 80),
+        _node("a6", "application_service", _ae(eids, "a6", "application", "Application Service"), 290, 250, 180, 80),
+        _node("a7", "application_interface", _ae(eids, "a7", "application", "Application Interface"), 520, 250, 180, 80),
+        # Technology layer
+        _boundary("tl", "Technology Layer", 20, 410, 640, 140),
+        _node("a9", "technology_node", _ae(eids, "a9", "technology", "Technology Node"), 40, 440, 180, 80),
+        _node("a10", "technology_service", _ae(eids, "a10", "technology", "Technology Service"), 290, 440, 200, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "a1", "target": "a2", "type": "assignment",
-         "data": {"relationshipType": "assignment", "label": "Fills", "relationshipId": _r(rids, 30)}},
-        {"id": "e1", "source": "a2", "target": "a3", "type": "assignment",
-         "data": {"relationshipType": "assignment", "label": "Performs", "relationshipId": _r(rids, 31)}},
-        {"id": "e2", "source": "a3", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Realizes", "relationshipId": _r(rids, 33)}},
-        {"id": "e3", "source": "a5", "target": "a6", "type": "archimate_composition",
-         "data": {"relationshipType": "archimate_composition", "label": "Contains", "relationshipId": _r(rids, 34)}},
-        {"id": "e4", "source": "a5", "target": "a7", "type": "archimate_composition",
-         "data": {"relationshipType": "archimate_composition", "label": "Exposes", "relationshipId": _r(rids, 35)}},
-        {"id": "e5", "source": "a9", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Hosts", "relationshipId": _r(rids, 37)}},
-        {"id": "e6", "source": "a9", "target": "a10", "type": "archimate_composition",
-         "data": {"relationshipType": "archimate_composition", "label": "Provides", "relationshipId": _r(rids, 38)}},
+        _edge("e0", "a1", "a2", "assignment", "Fills", rel_id=_r(rids, 30),
+              source_handle="right", target_handle="left"),
+        _edge("e1", "a2", "a3", "assignment", "Performs", rel_id=_r(rids, 31),
+              source_handle="right", target_handle="left"),
+        _edge("e2", "a3", "a5", "serving", "Realizes", rel_id=_r(rids, 33),
+              source_handle="bottom", target_handle="top"),
+        _edge("e3", "a5", "a6", "archimate_composition", "Contains", rel_id=_r(rids, 34),
+              source_handle="right", target_handle="left"),
+        _edge("e4", "a5", "a7", "archimate_composition", "Exposes", rel_id=_r(rids, 35),
+              source_handle="right", target_handle="left"),
+        _edge("e5", "a9", "a5", "serving", "Hosts", rel_id=_r(rids, 37),
+              source_handle="top", target_handle="bottom"),
+        _edge("e6", "a9", "a10", "archimate_composition", "Provides", rel_id=_r(rids, 38),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_archimate_deployment(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate deployment: Technology layer."""
-    nodes = _grid_nodes([
-        {"id": "a9", "type": "technology_node",
-         "data": {**_e(eids, "a9"), "layer": "technology", "archimateType": "Technology Node"}},
-        {"id": "a10", "type": "technology_service",
-         "data": {**_e(eids, "a10"), "layer": "technology", "archimateType": "Technology Service"}},
-        {"id": "a11", "type": "technology_artifact",
-         "data": {**_e(eids, "a11"), "layer": "technology", "archimateType": "Technology Artifact"}},
-        {"id": "a12", "type": "technology_device",
-         "data": {**_e(eids, "a12"), "layer": "technology", "archimateType": "Technology Device"}},
-        {"id": "a5", "type": "application_component",
-         "data": {**_e(eids, "a5"), "layer": "application", "archimateType": "Application Component"}},
-    ])
+    """ArchiMate deployment: Technology layer — layered."""
+    nodes = [
+        _node("a12", "technology_device", _ae(eids, "a12", "technology", "Technology Device"), 30, 30, 180, 80),
+        _node("a5", "application_component", _ae(eids, "a5", "application", "Application Component"), 300, 30, 200, 80),
+        _node("a9", "technology_node", _ae(eids, "a9", "technology", "Technology Node"), 30, 210, 180, 80),
+        _node("a10", "technology_service", _ae(eids, "a10", "technology", "Technology Service"), 300, 210, 200, 80),
+        _node("a11", "technology_artifact", _ae(eids, "a11", "technology", "Technology Artifact"), 580, 210, 180, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "a9", "target": "a10", "type": "archimate_composition",
-         "data": {"relationshipType": "archimate_composition", "label": "Provides", "relationshipId": _r(rids, 38)}},
-        {"id": "e1", "source": "a10", "target": "a11", "type": "access",
-         "data": {"relationshipType": "access", "label": "Stores in", "relationshipId": _r(rids, 39)}},
-        {"id": "e2", "source": "a12", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Renders", "relationshipId": _r(rids, 40)}},
-        {"id": "e3", "source": "a9", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Hosts", "relationshipId": _r(rids, 37)}},
+        _edge("e0", "a12", "a5", "serving", "Renders", rel_id=_r(rids, 40),
+              source_handle="right", target_handle="left"),
+        _edge("e1", "a9", "a5", "serving", "Hosts", rel_id=_r(rids, 37),
+              source_handle="top", target_handle="bottom"),
+        _edge("e2", "a9", "a10", "archimate_composition", "Provides", rel_id=_r(rids, 38),
+              source_handle="right", target_handle="left"),
+        _edge("e3", "a10", "a11", "access", "Stores in", rel_id=_r(rids, 39),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_archimate_process(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate process: Modeling business process."""
-    nodes = _grid_nodes([
-        {"id": "a1", "type": "business_actor",
-         "data": {**_e(eids, "a1"), "layer": "business", "archimateType": "Business Actor"}},
-        {"id": "a3", "type": "business_process",
-         "data": {**_e(eids, "a3"), "layer": "business", "archimateType": "Business Process"}},
-        {"id": "a4", "type": "business_service",
-         "data": {**_e(eids, "a4"), "layer": "business", "archimateType": "Business Service"}},
-        {"id": "a5", "type": "application_component",
-         "data": {**_e(eids, "a5"), "layer": "application", "archimateType": "Application Component"}},
-        {"id": "a6", "type": "application_service",
-         "data": {**_e(eids, "a6"), "layer": "application", "archimateType": "Application Service"}},
-    ])
+    """ArchiMate process: Modeling business process — left-to-right flow."""
+    nodes = [
+        _node("a1", "business_actor", _ae(eids, "a1", "business", "Business Actor"), 0, 100, 180, 80),
+        _node("a3", "business_process", _ae(eids, "a3", "business", "Business Process"), 260, 100, 200, 80),
+        _node("a4", "business_service", _ae(eids, "a4", "business", "Business Service"), 540, 100, 180, 80),
+        _node("a5", "application_component", _ae(eids, "a5", "application", "Application Component"), 400, 280, 200, 80),
+        _node("a6", "application_service", _ae(eids, "a6", "application", "Application Service"), 140, 280, 180, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "a1", "target": "a3", "type": "assignment",
-         "data": {"relationshipType": "assignment", "label": "Performs"}},
-        {"id": "e1", "source": "a3", "target": "a4", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Realizes", "relationshipId": _r(rids, 32)}},
-        {"id": "e2", "source": "a4", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Provided by", "relationshipId": _r(rids, 33)}},
-        {"id": "e3", "source": "a5", "target": "a6", "type": "archimate_composition",
-         "data": {"relationshipType": "archimate_composition", "label": "Contains", "relationshipId": _r(rids, 34)}},
+        _edge("e0", "a1", "a3", "assignment", "Performs",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "a3", "a4", "serving", "Realizes", rel_id=_r(rids, 32),
+              source_handle="right", target_handle="left"),
+        _edge("e2", "a4", "a5", "serving", "Provided by", rel_id=_r(rids, 33),
+              source_handle="bottom", target_handle="top"),
+        _edge("e3", "a5", "a6", "archimate_composition", "Contains", rel_id=_r(rids, 34),
+              source_handle="left", target_handle="right"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_archimate_roadmap(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate roadmap: Implementation phases."""
-    nodes = _grid_nodes([
-        {"id": "wp1", "type": "component", "data": {"label": "Foundation Phase", "entityType": "component",
-         "layer": "implementation_migration", "archimateType": "Work Package",
-         "description": "Core platform with auth, CRUD, canvas"}},
-        {"id": "wp2", "type": "component", "data": {"label": "Multi-Notation Phase", "entityType": "component",
-         "layer": "implementation_migration", "archimateType": "Work Package",
-         "description": "UML, ArchiMate, C4 support, imports"}},
-        {"id": "wp3", "type": "component", "data": {"label": "Enterprise Phase", "entityType": "component",
-         "layer": "implementation_migration", "archimateType": "Work Package",
-         "description": "Collaboration, locking, advanced views"}},
-        {"id": "wp4", "type": "component", "data": {"label": "Target Architecture", "entityType": "component",
-         "layer": "implementation_migration", "archimateType": "Plateau",
-         "description": "Fully featured architecture platform"}},
-    ], cols=4, x_gap=280)
+    """ArchiMate roadmap: Implementation phases — left-to-right timeline."""
+    nodes = [
+        _node("wp1", "component", {"label": "Foundation Phase", "entityType": "component",
+              "layer": "implementation_migration", "archimateType": "Work Package",
+              "description": "Core platform with auth, CRUD, canvas"}, 0, 60, 200, 80),
+        _node("wp2", "component", {"label": "Multi-Notation Phase", "entityType": "component",
+              "layer": "implementation_migration", "archimateType": "Work Package",
+              "description": "UML, ArchiMate, C4 support, imports"}, 280, 60, 220, 80),
+        _node("wp3", "component", {"label": "Enterprise Phase", "entityType": "component",
+              "layer": "implementation_migration", "archimateType": "Work Package",
+              "description": "Collaboration, locking, advanced views"}, 580, 60, 200, 80),
+        _node("wp4", "component", {"label": "Target Architecture", "entityType": "component",
+              "layer": "implementation_migration", "archimateType": "Plateau",
+              "description": "Fully featured architecture platform"}, 860, 60, 210, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "wp1", "target": "wp2", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Enables"}},
-        {"id": "e1", "source": "wp2", "target": "wp3", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Enables"}},
-        {"id": "e2", "source": "wp3", "target": "wp4", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Delivers"}},
+        _edge("e0", "wp1", "wp2", "uses", "Enables",
+              source_handle="right", target_handle="left"),
+        _edge("e1", "wp2", "wp3", "uses", "Enables",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "wp3", "wp4", "uses", "Delivers",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_archimate_free_form(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate free_form: Cross-layer overview."""
-    nodes = _grid_nodes([
-        {"id": "a1", "type": "business_actor",
-         "data": {**_e(eids, "a1"), "layer": "business", "archimateType": "Business Actor"}},
-        {"id": "a4", "type": "business_service",
-         "data": {**_e(eids, "a4"), "layer": "business", "archimateType": "Business Service"}},
-        {"id": "a5", "type": "application_component",
-         "data": {**_e(eids, "a5"), "layer": "application", "archimateType": "Application Component"}},
-        {"id": "a8", "type": "application_function",
-         "data": {**_e(eids, "a8"), "layer": "application", "archimateType": "Application Function"}},
-        {"id": "a9", "type": "technology_node",
-         "data": {**_e(eids, "a9"), "layer": "technology", "archimateType": "Technology Node"}},
-        {"id": "a11", "type": "technology_artifact",
-         "data": {**_e(eids, "a11"), "layer": "technology", "archimateType": "Technology Artifact"}},
-    ])
+    """ArchiMate free_form: Cross-layer overview with boundaries."""
+    nodes = [
+        _boundary("bl", "Business", 10, 10, 300, 140),
+        _node("a1", "business_actor", _ae(eids, "a1", "business", "Business Actor"), 30, 50, 180, 80),
+        _node("a4", "business_service", _ae(eids, "a4", "business", "Business Service"), 30, 200, 180, 80),
+        _boundary("al", "Application", 350, 10, 300, 320),
+        _node("a5", "application_component", _ae(eids, "a5", "application", "Application Component"), 370, 50, 200, 80),
+        _node("a8", "application_function", _ae(eids, "a8", "application", "Application Function"), 370, 200, 200, 80),
+        _boundary("tl", "Technology", 10, 380, 640, 140),
+        _node("a9", "technology_node", _ae(eids, "a9", "technology", "Technology Node"), 30, 420, 180, 80),
+        _node("a11", "technology_artifact", _ae(eids, "a11", "technology", "Technology Artifact"), 370, 420, 180, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "a1", "target": "a4", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Uses"}},
-        {"id": "e1", "source": "a5", "target": "a8", "type": "archimate_composition",
-         "data": {"relationshipType": "archimate_composition", "label": "Contains", "relationshipId": _r(rids, 36)}},
-        {"id": "e2", "source": "a9", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Hosts", "relationshipId": _r(rids, 37)}},
+        _edge("e0", "a1", "a4", "serving", "Uses",
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "a5", "a8", "archimate_composition", "Contains", rel_id=_r(rids, 36),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "a9", "a5", "serving", "Hosts", rel_id=_r(rids, 37),
+              source_handle="top", target_handle="bottom"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_archimate_motivation(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate motivation: Stakeholder goals and requirements."""
-    nodes = _grid_nodes([
-        {"id": "a13", "type": "stakeholder",
-         "data": {**_e(eids, "a13"), "layer": "motivation", "archimateType": "Stakeholder"}},
-        {"id": "a14", "type": "driver",
-         "data": {**_e(eids, "a14"), "layer": "motivation", "archimateType": "Driver"}},
-        {"id": "a15", "type": "goal",
-         "data": {**_e(eids, "a15"), "layer": "motivation", "archimateType": "Goal"}},
-        {"id": "a16", "type": "requirement_archimate",
-         "data": {**_e(eids, "a16"), "layer": "motivation", "archimateType": "Requirement"}},
-        {"id": "a5", "type": "application_component",
-         "data": {**_e(eids, "a5"), "layer": "application", "archimateType": "Application Component"}},
-    ])
+    """ArchiMate motivation: Stakeholder goals — top-down cascade."""
+    nodes = [
+        _node("a13", "stakeholder", _ae(eids, "a13", "motivation", "Stakeholder"), 200, 20, 200, 80),
+        _node("a14", "driver", _ae(eids, "a14", "motivation", "Driver"), 50, 170, 210, 80),
+        _node("a15", "goal", _ae(eids, "a15", "motivation", "Goal"), 350, 170, 200, 80),
+        _node("a16", "requirement_archimate", _ae(eids, "a16", "motivation", "Requirement"), 200, 330, 220, 80),
+        _node("a5", "application_component", _ae(eids, "a5", "application", "Application Component"), 200, 490, 200, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "a13", "target": "a14", "type": "association",
-         "data": {"relationshipType": "association", "label": "Motivates", "relationshipId": _r(rids, 41)}},
-        {"id": "e1", "source": "a14", "target": "a15", "type": "association",
-         "data": {"relationshipType": "association", "label": "Drives"}},
-        {"id": "e2", "source": "a15", "target": "a16", "type": "association",
-         "data": {"relationshipType": "association", "label": "Requires"}},
-        {"id": "e3", "source": "a16", "target": "a5", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Realized by"}},
+        _edge("e0", "a13", "a14", "association", "Motivates", rel_id=_r(rids, 41),
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "a13", "a15", "association", "Drives",
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "a15", "a16", "association", "Requires",
+              source_handle="bottom", target_handle="top"),
+        _edge("e3", "a16", "a5", "serving", "Realized by",
+              source_handle="bottom", target_handle="top"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_archimate_strategy(eids: dict, rids: dict, **_kw: object) -> dict:
-    """ArchiMate strategy: Capabilities and resources."""
-    nodes = _grid_nodes([
-        {"id": "a17", "type": "capability",
-         "data": {**_e(eids, "a17"), "layer": "strategy", "archimateType": "Capability"}},
-        {"id": "a18", "type": "resource",
-         "data": {**_e(eids, "a18"), "layer": "strategy", "archimateType": "Resource"}},
-        {"id": "coa", "type": "component", "data": {"label": "Adopt Multi-Notation", "entityType": "component",
-         "layer": "strategy", "archimateType": "Course of Action",
-         "description": "Strategic course of action to adopt multi-notation modelling"}},
-        {"id": "vs", "type": "component", "data": {"label": "Architecture Governance", "entityType": "component",
-         "layer": "strategy", "archimateType": "Value Stream",
-         "description": "Value stream for enterprise architecture governance"}},
-    ], cols=4, x_gap=280)
+    """ArchiMate strategy: Capabilities and resources — V layout."""
+    nodes = [
+        _node("vs", "component", {"label": "Architecture Governance", "entityType": "component",
+              "layer": "strategy", "archimateType": "Value Stream",
+              "description": "Value stream for enterprise architecture governance"}, 200, 20, 230, 80),
+        _node("coa", "component", {"label": "Adopt Multi-Notation", "entityType": "component",
+              "layer": "strategy", "archimateType": "Course of Action",
+              "description": "Strategic course of action to adopt multi-notation modelling"}, 30, 190, 220, 80),
+        _node("a17", "capability", _ae(eids, "a17", "strategy", "Capability"), 330, 190, 220, 80),
+        _node("a18", "resource", _ae(eids, "a18", "strategy", "Resource"), 180, 370, 220, 80),
+    ]
     edges = [
-        {"id": "e0", "source": "a17", "target": "a18", "type": "association",
-         "data": {"relationshipType": "association", "label": "Requires"}},
-        {"id": "e1", "source": "coa", "target": "a17", "type": "serving",
-         "data": {"relationshipType": "serving", "label": "Develops"}},
-        {"id": "e2", "source": "vs", "target": "coa", "type": "association",
-         "data": {"relationshipType": "association", "label": "Includes"}},
+        _edge("e0", "vs", "coa", "association", "Includes",
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "coa", "a17", "serving", "Develops",
+              source_handle="right", target_handle="left"),
+        _edge("e2", "a17", "a18", "association", "Requires",
+              source_handle="bottom", target_handle="top"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -1002,23 +1053,24 @@ def _build_archimate_strategy(eids: dict, rids: dict, **_kw: object) -> dict:
 # ── C4 Notation Diagrams (6, indices 25–30) ──────────────────────────────────
 
 def _build_c4_component(eids: dict, rids: dict, **_kw: object) -> dict:
-    """C4 component: Internal components of the backend."""
-    nodes = _grid_nodes([
-        {"id": "c7", "type": "container", "data": _e(eids, "c7")},
-        {"id": "c9", "type": "c4_component", "data": _e(eids, "c9")},
-        {"id": "c10", "type": "c4_component", "data": _e(eids, "c10")},
-        {"id": "c8", "type": "container", "data": _e(eids, "c8")},
-        {"id": "c6", "type": "container", "data": _e(eids, "c6")},
-    ])
+    """C4 component: Internal components of the backend — boundary grouping."""
+    nodes = [
+        _boundary("bb", "FastAPI Backend", 160, 10, 400, 340),
+        _node("c6", "container", _e(eids, "c6"), 0, 100, 140, 80, icon="monitor"),
+        _node("c7", "container", _e(eids, "c7"), 200, 50, 180, 80, icon="server"),
+        _node("c9", "c4_component", _e(eids, "c9"), 200, 200, 170, 80, icon="lock"),
+        _node("c10", "c4_component", _e(eids, "c10"), 410, 200, 170, 80, icon="pen-tool"),
+        _node("c8", "container", _e(eids, "c8"), 600, 100, 170, 80, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "c7", "target": "c9", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Contains", "relationshipId": _r(rids, 48)}},
-        {"id": "e1", "source": "c7", "target": "c10", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Contains", "relationshipId": _r(rids, 49)}},
-        {"id": "e2", "source": "c6", "target": "c7", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Calls API", "relationshipId": _r(rids, 46)}},
-        {"id": "e3", "source": "c7", "target": "c8", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Reads/writes", "relationshipId": _r(rids, 47)}},
+        _edge("e0", "c6", "c7", "c4_relationship", "Calls API", rel_id=_r(rids, 46),
+              source_handle="right", target_handle="left"),
+        _edge("e1", "c7", "c9", "c4_relationship", "Contains", rel_id=_r(rids, 48),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "c7", "c10", "c4_relationship", "Contains", rel_id=_r(rids, 49),
+              source_handle="bottom", target_handle="top"),
+        _edge("e3", "c7", "c8", "c4_relationship", "Reads/writes", rel_id=_r(rids, 47),
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
@@ -1049,140 +1101,165 @@ def _build_c4_sequence(eids: dict, rids: dict, **_kw: object) -> dict:
 
 
 def _build_c4_deployment(eids: dict, rids: dict, **_kw: object) -> dict:
-    """C4 deployment: Production deployment view."""
-    nodes = _grid_nodes([
-        {"id": "c3", "type": "software_system", "data": _e(eids, "c3")},
-        {"id": "c6", "type": "container", "data": _e(eids, "c6")},
-        {"id": "c7", "type": "container", "data": _e(eids, "c7")},
-        {"id": "c8", "type": "container", "data": _e(eids, "c8")},
-    ])
+    """C4 deployment: Production deployment — top-down 3-tier."""
+    nodes = [
+        _node("c3", "software_system", _e(eids, "c3"), 200, 20, 220, 90, icon="boxes"),
+        _node("c6", "container", _e(eids, "c6"), 50, 200, 190, 80, icon="monitor"),
+        _node("c7", "container", _e(eids, "c7"), 310, 200, 190, 80, icon="server"),
+        _node("c8", "container", _e(eids, "c8"), 310, 370, 190, 80, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "c6", "target": "c7", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Calls", "technology": "REST/HTTPS",
-                  "relationshipId": _r(rids, 46)}},
-        {"id": "e1", "source": "c7", "target": "c8", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Reads/writes", "technology": "SQLite WAL",
-                  "relationshipId": _r(rids, 47)}},
+        _edge("e0", "c6", "c7", "c4_relationship", "Calls", rel_id=_r(rids, 46),
+              source_handle="right", target_handle="left",
+              technology="REST/HTTPS"),
+        _edge("e1", "c7", "c8", "c4_relationship", "Reads/writes", rel_id=_r(rids, 47),
+              source_handle="bottom", target_handle="top",
+              technology="SQLite WAL"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_c4_free_form(eids: dict, rids: dict, **_kw: object) -> dict:
-    """C4 free_form: Mix of all C4 levels."""
-    nodes = _grid_nodes([
-        {"id": "c1", "type": "person", "data": _e(eids, "c1")},
-        {"id": "c2", "type": "person", "data": _e(eids, "c2")},
-        {"id": "c3", "type": "software_system", "data": _e(eids, "c3")},
-        {"id": "c6", "type": "container", "data": _e(eids, "c6")},
-        {"id": "c9", "type": "c4_component", "data": _e(eids, "c9")},
-        {"id": "c10", "type": "c4_component", "data": _e(eids, "c10")},
-    ])
+    """C4 free_form: Mix of all C4 levels — layered with persons on top."""
+    nodes = [
+        _node("c1", "person", _e(eids, "c1"), 50, 20, 150, 80, icon="user"),
+        _node("c2", "person", _e(eids, "c2"), 300, 20, 150, 80, icon="shield"),
+        _node("c3", "software_system", _e(eids, "c3"), 150, 180, 210, 90, icon="boxes"),
+        _node("c6", "container", _e(eids, "c6"), 50, 360, 170, 80, icon="monitor"),
+        _node("c9", "c4_component", _e(eids, "c9"), 300, 360, 170, 80, icon="lock"),
+        _node("c10", "c4_component", _e(eids, "c10"), 300, 500, 170, 80, icon="pen-tool"),
+    ]
     edges = [
-        {"id": "e0", "source": "c1", "target": "c3", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Uses", "relationshipId": _r(rids, 42)}},
-        {"id": "e1", "source": "c2", "target": "c3", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Administers", "relationshipId": _r(rids, 43)}},
-        {"id": "e2", "source": "c6", "target": "c9", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Uses"}},
+        _edge("e0", "c1", "c3", "c4_relationship", "Uses", rel_id=_r(rids, 42),
+              source_handle="bottom", target_handle="top"),
+        _edge("e1", "c2", "c3", "c4_relationship", "Administers", rel_id=_r(rids, 43),
+              source_handle="bottom", target_handle="top"),
+        _edge("e2", "c6", "c9", "c4_relationship", "Uses",
+              source_handle="right", target_handle="left"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_c4_system_context(eids: dict, rids: dict, **_kw: object) -> dict:
-    """C4 system_context: Iris in its environment."""
-    nodes = _grid_nodes([
-        {"id": "c1", "type": "person", "data": _e(eids, "c1")},
-        {"id": "c2", "type": "person", "data": _e(eids, "c2")},
-        {"id": "c3", "type": "software_system", "data": _e(eids, "c3")},
-        {"id": "c4_ext_browser", "type": "software_system_external",
-         "data": {**_e(eids, "c4_ext_browser"), "c4External": True}},
-        {"id": "c5", "type": "software_system_external",
-         "data": {**_e(eids, "c5"), "c4External": True}},
-    ])
+    """C4 system_context: Iris in its environment — centre-focused star."""
+    nodes = [
+        _node("c1", "person", _e(eids, "c1"), 30, 30, 150, 80, icon="user"),
+        _node("c2", "person", _e(eids, "c2"), 30, 280, 150, 80, icon="shield"),
+        _node("c3", "software_system", _e(eids, "c3"), 280, 140, 220, 100, icon="boxes"),
+        _node("c4_ext_browser", "software_system_external",
+              {**_e(eids, "c4_ext_browser"), "c4External": True}, 580, 30, 180, 80, icon="globe"),
+        _node("c5", "software_system_external",
+              {**_e(eids, "c5"), "c4External": True}, 580, 280, 180, 80, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "c1", "target": "c3", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Uses", "technology": "HTTPS/REST",
-                  "relationshipId": _r(rids, 42)}},
-        {"id": "e1", "source": "c2", "target": "c3", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Administers", "technology": "HTTPS/REST",
-                  "relationshipId": _r(rids, 43)}},
-        {"id": "e2", "source": "c3", "target": "c4_ext_browser", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Delivers to", "technology": "HTML/CSS/JS",
-                  "relationshipId": _r(rids, 44)}},
-        {"id": "e3", "source": "c3", "target": "c5", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Stores in", "technology": "SQLite WAL",
-                  "relationshipId": _r(rids, 45)}},
+        _edge("e0", "c1", "c3", "c4_relationship", "Uses", rel_id=_r(rids, 42),
+              source_handle="right", target_handle="left",
+              technology="HTTPS/REST"),
+        _edge("e1", "c2", "c3", "c4_relationship", "Administers", rel_id=_r(rids, 43),
+              source_handle="right", target_handle="left",
+              technology="HTTPS/REST"),
+        _edge("e2", "c3", "c4_ext_browser", "c4_relationship", "Delivers to", rel_id=_r(rids, 44),
+              source_handle="right", target_handle="left",
+              technology="HTML/CSS/JS"),
+        _edge("e3", "c3", "c5", "c4_relationship", "Stores in", rel_id=_r(rids, 45),
+              source_handle="right", target_handle="left",
+              technology="SQLite WAL"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
 def _build_c4_container(eids: dict, rids: dict, **_kw: object) -> dict:
-    """C4 container: Container-level decomposition."""
-    nodes = _grid_nodes([
-        {"id": "c1", "type": "person", "data": _e(eids, "c1")},
-        {"id": "c6", "type": "container", "data": _e(eids, "c6")},
-        {"id": "c7", "type": "container", "data": _e(eids, "c7")},
-        {"id": "c8", "type": "container", "data": _e(eids, "c8")},
-        {"id": "c5", "type": "software_system_external",
-         "data": {**_e(eids, "c5"), "c4External": True}},
-    ])
+    """C4 container: Container-level — person top, 3-tier below."""
+    nodes = [
+        _node("c1", "person", _e(eids, "c1"), 180, 20, 150, 80, icon="user"),
+        _node("c6", "container", _e(eids, "c6"), 60, 180, 190, 80, icon="monitor"),
+        _node("c7", "container", _e(eids, "c7"), 320, 180, 190, 80, icon="server"),
+        _node("c8", "container", _e(eids, "c8"), 320, 350, 190, 80, icon="database"),
+        _node("c5", "software_system_external",
+              {**_e(eids, "c5"), "c4External": True}, 60, 350, 190, 80, icon="database"),
+    ]
     edges = [
-        {"id": "e0", "source": "c1", "target": "c6", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Uses", "technology": "HTTPS"}},
-        {"id": "e1", "source": "c6", "target": "c7", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Calls API", "technology": "REST",
-                  "relationshipId": _r(rids, 46)}},
-        {"id": "e2", "source": "c7", "target": "c8", "type": "c4_relationship",
-         "data": {"relationshipType": "c4_relationship", "label": "Reads/writes", "technology": "SQLite",
-                  "relationshipId": _r(rids, 47)}},
+        _edge("e0", "c1", "c6", "c4_relationship", "Uses",
+              source_handle="bottom", target_handle="top",
+              technology="HTTPS"),
+        _edge("e1", "c6", "c7", "c4_relationship", "Calls API", rel_id=_r(rids, 46),
+              source_handle="right", target_handle="left",
+              technology="REST"),
+        _edge("e2", "c7", "c8", "c4_relationship", "Reads/writes", rel_id=_r(rids, 47),
+              source_handle="bottom", target_handle="top",
+              technology="SQLite"),
     ]
     return {"nodes": nodes, "edges": edges}
 
 
-# ── Overview Diagram (index 31, root package) ────────────────────────────────
+# ── Navigation Overview (index 31, root package) ─────────────────────────────
 
-def _build_system_overview(
+def _build_navigation_overview(
     eids: dict, rids: dict, mids: dict[int, str] | None = None,
 ) -> dict:
-    """Top-level overview with modelrefs to key diagrams per notation."""
+    """Root navigation diagram with navigation_cell tiles linking to each notation group."""
     mids = mids or {}
-    nodes = _grid_nodes([
-        {"id": "mr0", "type": "modelref", "data": {"label": "Iris Architecture (Simple)",
-         "entityType": "component", "description": "Core component overview",
-         "linkedModelId": mids.get(0, "")}},
-        {"id": "mr10", "type": "modelref", "data": {"label": "UML Components",
-         "entityType": "component", "description": "UML service modules",
-         "linkedModelId": mids.get(10, "")}},
-        {"id": "mr18", "type": "modelref", "data": {"label": "ArchiMate Enterprise",
-         "entityType": "component", "description": "Enterprise architecture view",
-         "linkedModelId": mids.get(18, "")}},
-        {"id": "mr29", "type": "modelref", "data": {"label": "C4 System Context",
-         "entityType": "component", "description": "C4 system context diagram",
-         "linkedModelId": mids.get(29, "")}},
-        {"id": "mr5", "type": "modelref", "data": {"label": "Database Schema",
-         "entityType": "database", "description": "Complete database schema",
-         "linkedModelId": mids.get(5, "")}},
-        {"id": "mr12", "type": "modelref", "data": {"label": "UML Domain Model",
-         "entityType": "component", "description": "Class diagram of Iris domain",
-         "linkedModelId": mids.get(12, "")}},
-        {"id": "n10", "type": "actor", "data": _e(eids, "n10")},
-        {"id": "n11", "type": "actor", "data": _e(eids, "n11")},
-    ])
-    edges = [
-        {"id": "eo1", "source": "n10", "target": "mr0", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Uses system"}},
-        {"id": "eo2", "source": "n10", "target": "mr29", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Context"}},
-        {"id": "eo3", "source": "n11", "target": "mr18", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Manages"}},
-        {"id": "eo4", "source": "mr0", "target": "mr5", "type": "depends_on",
-         "data": {"relationshipType": "depends_on", "label": "Persistence"}},
-        {"id": "eo5", "source": "mr18", "target": "mr0", "type": "uses",
-         "data": {"relationshipType": "uses", "label": "Includes"}},
-        {"id": "eo6", "source": "mr10", "target": "mr12", "type": "depends_on",
-         "data": {"relationshipType": "depends_on", "label": "Domain model"}},
+    # Navigation cells arranged in a 2×2 grid with a title note at top
+    nodes = [
+        _node("note1", "note", {
+            "label": "Iris Architecture Examples",
+            "entityType": "note",
+            "description": "Click any tile below to explore diagrams in that notation. "
+                           "Each group demonstrates Iris architecture using a different modelling standard.",
+        }, 120, 10, 400, 70),
+        # Row 1: Simple, UML
+        _node("nav_simple", "navigation_cell", {
+            "label": "Simple Notation",
+            "entityType": "navigation_cell",
+            "description": "10 diagrams using basic boxes-and-lines notation",
+            "linkedModelId": mids.get(0, ""),
+            "visual": {"width": 220, "height": 130,
+                       "icon": {"set": "lucide", "name": "layout-grid"}},
+        }, 50, 120, 220, 130),
+        _node("nav_uml", "navigation_cell", {
+            "label": "UML Notation",
+            "entityType": "navigation_cell",
+            "description": "8 diagrams using Unified Modeling Language",
+            "linkedModelId": mids.get(10, ""),
+            "visual": {"width": 220, "height": 130,
+                       "icon": {"set": "lucide", "name": "git-merge"}},
+        }, 370, 120, 220, 130),
+        # Row 2: ArchiMate, C4
+        _node("nav_archimate", "navigation_cell", {
+            "label": "ArchiMate Notation",
+            "entityType": "navigation_cell",
+            "description": "7 diagrams using ArchiMate enterprise architecture notation",
+            "linkedModelId": mids.get(18, ""),
+            "visual": {"width": 220, "height": 130,
+                       "icon": {"set": "lucide", "name": "building"}},
+        }, 50, 310, 220, 130),
+        _node("nav_c4", "navigation_cell", {
+            "label": "C4 Notation",
+            "entityType": "navigation_cell",
+            "description": "6 diagrams using the C4 model (Context, Container, Component)",
+            "linkedModelId": mids.get(29, ""),
+            "visual": {"width": 220, "height": 130,
+                       "icon": {"set": "lucide", "name": "layers"}},
+        }, 370, 310, 220, 130),
+        # Quick links to key diagrams
+        _node("nav_schema", "navigation_cell", {
+            "label": "Database Schema",
+            "entityType": "navigation_cell",
+            "description": "Complete database schema with all 20 tables",
+            "linkedModelId": mids.get(5, ""),
+            "visual": {"width": 200, "height": 100,
+                       "icon": {"set": "lucide", "name": "database"}},
+        }, 50, 500, 200, 100),
+        _node("nav_class", "navigation_cell", {
+            "label": "UML Domain Model",
+            "entityType": "navigation_cell",
+            "description": "Class diagram of Iris domain model",
+            "linkedModelId": mids.get(12, ""),
+            "visual": {"width": 200, "height": 100,
+                       "icon": {"set": "lucide", "name": "boxes"}},
+        }, 370, 500, 200, 100),
     ]
-    return {"nodes": nodes, "edges": edges}
+    return {"nodes": nodes, "edges": []}
 
 
 # ── Diagram definitions ───────────────────────────────────────────────────────
@@ -1320,11 +1397,11 @@ _DIAGRAMS = [
      "description": "C4 container diagram: SvelteKit Frontend, FastAPI Backend, SQLite Database.",
      "builder": _build_c4_container, "tags": _DIAGRAM_TAGS},
 
-    # ── Overview (pkg-0, index 31) ───────────────────────────────────────────
+    # ── Navigation Overview (pkg-0, index 31) ────────────────────────────────
     {"index": 31, "diagram_type": "component", "notation": "simple",
-     "name": "Iris System Overview", "parent_package_index": 0,
-     "description": "Top-level overview with modelrefs to key diagrams across all notations.",
-     "builder": _build_system_overview, "tags": _DIAGRAM_TAGS},
+     "name": "Iris Navigation", "parent_package_index": 0,
+     "description": "Root navigation diagram with click-through tiles to each notation group.",
+     "builder": _build_navigation_overview, "tags": _DIAGRAM_TAGS},
 ]
 
 
@@ -1341,11 +1418,10 @@ async def _ensure_system_user(db: aiosqlite.Connection) -> None:
 
 async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
     """Delete old seed data by deterministic IDs in dependency order."""
-    # Collect all possible deterministic IDs across v2 and v3
-    max_elements = max(len(_ENTITIES), 15)  # v2 had 15
-    max_rels = max(len(_RELATIONSHIPS), 20)  # v2 had 20
-    max_diagrams = max(len(_DIAGRAMS), 7)  # v2 had 7
-    max_packages = max(len(_PACKAGES), 4)  # v2 had 4
+    max_elements = max(len(_ENTITIES), 55)
+    max_rels = max(len(_RELATIONSHIPS), 50)
+    max_diagrams = max(len(_DIAGRAMS), 32)
+    max_packages = max(len(_PACKAGES), 5)
 
     element_ids = [_gen_id("element", i) for i in range(max_elements)]
     rel_ids = [_gen_id("rel", i) for i in range(max_rels)]
@@ -1363,6 +1439,7 @@ async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
             "UPDATE sets SET thumbnail_diagram_id = NULL "
             "WHERE thumbnail_diagram_id = ?", (did,),
         )
+        await db.execute("DELETE FROM diagram_links WHERE source_diagram_id = ? OR target_diagram_id = ?", (did, did))
         await db.execute("DELETE FROM diagrams WHERE id = ?", (did,))
         await db.execute("DELETE FROM diagrams_fts WHERE diagram_id = ?", (did,))
 
@@ -1384,14 +1461,15 @@ async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
+_V4_MARKER = "seed_v4"
+
+
 async def seed_example_models(db: aiosqlite.Connection) -> None:
     """Seed example elements, packages, and diagrams demonstrating Iris architecture.
 
     Idempotency:
-      - If pkg-4 (C4 Notation) exists → already v3, skip
-      - If pkg-0 exists but not pkg-4 → v2, clear + reseed v3
-      - If element_tags with tag='example' exist but no root package → v1, clear + reseed
-      - Otherwise → fresh seed
+      - If diagram-31 metadata contains 'seed_v4' → already v4, skip
+      - Otherwise → clear + reseed v4
     """
     # --- Skip if initial setup not yet completed ------------------------------
     cursor = await db.execute(
@@ -1401,16 +1479,23 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
     if not row or row[0] == 0:
         return
 
-    # --- v3 idempotency check: pkg-4 exists → already seeded v3 --------
-    v3_marker_id = _gen_id("pkg", 4)
+    # --- v4 idempotency check: diagram-31 has v4 marker in metadata ----
+    overview_id = _gen_id("diagram", 31)
     cursor = await db.execute(
-        "SELECT COUNT(*) FROM packages WHERE id = ?", (v3_marker_id,)
+        "SELECT metadata FROM diagram_versions WHERE diagram_id = ? ORDER BY version DESC LIMIT 1",
+        (overview_id,),
     )
     row = await cursor.fetchone()
-    if row and row[0] > 0:
-        return
+    if row and row[0]:
+        try:
+            meta = json.loads(row[0])
+            if meta.get("seed_version") == _V4_MARKER:
+                return
+        except (json.JSONDecodeError, TypeError):
+            pass
 
-    # --- v2→v3 migration: root package exists but no pkg-4 → clear + reseed ---
+    # --- Clear any existing seed data (v1/v2/v3/partial v4) ---------
+    # Check if any seed data exists
     root_pkg_id = _gen_id("pkg", 0)
     cursor = await db.execute(
         "SELECT COUNT(*) FROM packages WHERE id = ?", (root_pkg_id,)
@@ -1419,7 +1504,7 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
     if row and row[0] > 0:
         await _clear_old_seed_data(db)
 
-    # --- v1→v3 migration: old seed exists without packages → clear + reseed ---
+    # Also check for old v1 data
     cursor = await db.execute(
         "SELECT COUNT(*) FROM element_tags WHERE tag = 'example'"
     )
@@ -1511,6 +1596,11 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         diagram_data_json = json.dumps(diagram_data)
         parent_package_id = pkg_id_map[model_def["parent_package_index"]]
 
+        # v4 marker in metadata for overview diagram
+        metadata: dict[str, object] = {}
+        if model_def["index"] == 31:
+            metadata["seed_version"] = _V4_MARKER
+
         await db.execute(
             "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
             "created_at, created_by, updated_at, parent_package_id, notation) "
@@ -1518,12 +1608,13 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
             (diagram_id, model_def["diagram_type"], _DEFAULT_SET_ID, now,
              _SYSTEM_USER_ID, now, parent_package_id, model_def["notation"]),
         )
+        metadata_json = json.dumps(metadata) if metadata else None
         await db.execute(
             "INSERT INTO diagram_versions (diagram_id, version, name, description, "
-            "data, change_type, created_at, created_by) "
-            "VALUES (?, 1, ?, ?, ?, 'create', ?, ?)",
+            "data, metadata, change_type, created_at, created_by) "
+            "VALUES (?, 1, ?, ?, ?, ?, 'create', ?, ?)",
             (diagram_id, model_def["name"], model_def["description"],
-             diagram_data_json, now, _SYSTEM_USER_ID),
+             diagram_data_json, metadata_json, now, _SYSTEM_USER_ID),
         )
 
         for tag in model_def["tags"]:
@@ -1531,6 +1622,28 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
                 "INSERT INTO diagram_tags (diagram_id, tag, created_at, created_by) "
                 "VALUES (?, ?, ?, ?)",
                 (diagram_id, tag, now, _SYSTEM_USER_ID),
+            )
+
+    # --- Create diagram_links for navigation cells ----------------------------
+    # The overview diagram (index 31) links to primary diagrams in each notation
+    overview_diag_id = diagram_id_map[31]
+    nav_targets = [
+        (0, "Simple Notation"),
+        (10, "UML Notation"),
+        (18, "ArchiMate Notation"),
+        (29, "C4 Notation"),
+        (5, "Database Schema"),
+        (12, "UML Domain Model"),
+    ]
+    for target_idx, label in nav_targets:
+        target_id = diagram_id_map.get(target_idx)
+        if target_id:
+            link_id = _gen_id("diagram_link", target_idx)
+            await db.execute(
+                "INSERT OR IGNORE INTO diagram_links "
+                "(id, source_diagram_id, target_diagram_id, link_type, label, created_by) "
+                "VALUES (?, ?, ?, 'navigation', ?, ?)",
+                (link_id, overview_diag_id, target_id, label, _SYSTEM_USER_ID),
             )
 
     await db.commit()

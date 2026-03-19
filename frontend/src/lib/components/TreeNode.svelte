@@ -113,6 +113,7 @@
 			<a
 				href={nodeHref}
 				class="tree-node__link"
+				title={node.diagram_type ? node.diagram_type : isPackage ? 'package' : undefined}
 				onclick={() => { if (hasChildren && !expanded) { expanded = true; expandedIds.add(node.id); } }}
 				onkeydown={handleKeydown}
 			>
@@ -122,11 +123,6 @@
 					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--hollow" aria-hidden="true"></span>
 				{/if}
 				<span class="tree-node__name">{node.name}</span>
-				{#if node.diagram_type}
-					<span class="tree-node__type">{node.diagram_type}</span>
-				{:else if isPackage}
-					<span class="tree-node__type tree-node__type--package">pkg</span>
-				{/if}
 			</a>
 		</div>
 		{#if hasChildren && expanded}

@@ -36,7 +36,10 @@
 
 	const relType = $derived(String(edgeData?.relationshipType ?? ''));
 	const dashArray = $derived(DASH_PATTERNS[relType] ?? 'none');
-	const markerEnd = $derived(MARKER_END[relType] ?? (relType === 'association' && edgeData?.direction === 'Source -> Destination' ? 'url(#uml-arrow-open)' : undefined));
+	const markerEnd = $derived(
+		MARKER_END[relType] ??
+		(((relType === 'association' || relType === 'composition' || relType === 'aggregation') && edgeData?.direction === 'Source -> Destination') ? 'url(#uml-arrow-open)' : undefined)
+	);
 	const markerStart = $derived(MARKER_START[relType] ?? undefined);
 </script>
 

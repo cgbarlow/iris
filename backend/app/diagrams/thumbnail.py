@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from html import escape as html_escape
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ def generate_svg_from_diagram_data(
         gap = width / (len(participants) + 1)
         for i, p in enumerate(participants):
             x = gap * (i + 1) - 30
-            name = p.get("name", "?")[:8]
+            name = html_escape(p.get("name", "?")[:8])
             svg_parts.append(
                 f'<rect x="{x}" y="20" width="60" height="30" rx="4" '
                 f'fill="{colors["node_fill"]}" stroke="{colors["node_stroke"]}"/>'
@@ -80,7 +81,7 @@ def generate_svg_from_diagram_data(
             # Scale positions to fit thumbnail
             nx = min(max(20, (pos.get("x", i * 80) % 350) + 20), width - 80)
             ny = min(max(20, (pos.get("y", i * 60) % 200) + 20), height - 40)
-            label = node.get("data", {}).get("label", "?")[:10]
+            label = html_escape(node.get("data", {}).get("label", "?")[:10])
             svg_parts.append(
                 f'<rect x="{nx}" y="{ny}" width="70" height="30" rx="4" '
                 f'fill="{colors["node_fill"]}" stroke="{colors["node_stroke"]}"/>'

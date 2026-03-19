@@ -24,6 +24,7 @@ class CommentResponse(BaseModel):
     target_type: str
     target_id: str
     user_id: str
+    username: str = "Unknown"
     content: str
     created_at: str
     updated_at: str

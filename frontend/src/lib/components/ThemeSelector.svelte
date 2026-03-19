@@ -1,14 +1,14 @@
 <script lang="ts">
 	/**
-	 * ThemeSelector: Dropdown for switching the active theme for a given notation.
-	 * Placed in diagram toolbar — shows themes available for the current notation.
+	 * ThemeSelector: Dropdown for switching the active theme.
+	 * Shows all available themes grouped by notation, with the current
+	 * notation's themes listed first. Always visible in diagram toolbar.
 	 */
 	import {
-		getThemesForNotation,
-		getActiveThemeId,
-		setActiveTheme,
-		loadThemes,
 		getThemes,
+		getActiveThemeId,
+		getActiveTheme,
+		setActiveTheme,
 	} from '$lib/stores/themeStore.svelte';
 
 	interface Props {
@@ -17,18 +17,17 @@
 
 	let { notation }: Props = $props();
 
-	let loaded = $state(false);
-
-	$effect(() => {
-		if (!loaded && getThemes().length === 0) {
-			loadThemes().then(() => { loaded = true; });
-		} else {
-			loaded = true;
-		}
+	/** All themes, with current notation first, then others grouped by notation. */
+	const sortedThemes = $derived.by(() => {
+		const all = getThemes();
+		const forNotation = all.filter((t) => t.notation === notation);
+		const others = all.filter((t) => t.notation !== notation);
+		return { forNotation, others };
 	});
 
-	const themes = $derived(getThemesForNotation(notation));
-	const activeId = $derived(getActiveThemeId(notation));
+	/** Active theme ID — explicit selection or fallback default. */
+	const activeId = $derived(getActiveThemeId(notation) ?? getActiveTheme(notation)?.id ?? '');
+	const hasThemes = $derived(sortedThemes.forNotation.length > 0 || sortedThemes.others.length > 0);
 
 	function handleChange(event: Event) {
 		const target = event.target as HTMLSelectElement;
@@ -36,7 +35,7 @@
 	}
 </script>
 
-{#if themes.length > 0}
+{#if hasThemes}
 	<select
 		aria-label="Active theme"
 		class="rounded border px-2 py-1 text-xs"
@@ -44,8 +43,19 @@
 		value={activeId}
 		onchange={handleChange}
 	>
-		{#each themes as theme}
-			<option value={theme.id}>{theme.name}</option>
-		{/each}
+		{#if sortedThemes.forNotation.length > 0}
+			<optgroup label="{notation.toUpperCase()} themes">
+				{#each sortedThemes.forNotation as theme}
+					<option value={theme.id}>{theme.name}</option>
+				{/each}
+			</optgroup>
+		{/if}
+		{#if sortedThemes.others.length > 0}
+			<optgroup label="Other themes">
+				{#each sortedThemes.others as theme}
+					<option value={theme.id}>{theme.name} ({theme.notation})</option>
+				{/each}
+			</optgroup>
+		{/if}
 	</select>
 {/if}
