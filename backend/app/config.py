@@ -45,6 +45,18 @@ class AuthConfig:
 
 
 @dataclass(frozen=True)
+class AIConfig:
+    """AI provider configuration."""
+
+    default_max_context_tokens: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_AI_MAX_CONTEXT_TOKENS", "8000"))
+    )
+    default_timeout_ms: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_AI_TIMEOUT_MS", "30000"))
+    )
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Application configuration."""
 
@@ -58,6 +70,7 @@ class AppConfig:
     )
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
+    ai: AIConfig = field(default_factory=AIConfig)
     rate_limit_login: int = field(
         default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_LOGIN", "10"))
     )

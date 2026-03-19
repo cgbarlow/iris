@@ -1,21 +1,21 @@
 """Idempotent seed: example diagrams covering all diagram-type/notation permutations.
 
-Creates elements representing the Iris system and 32 diagrams organised
+Creates elements representing the Iris system and 34 diagrams organised
 into a 5-package hierarchy by notation:
 
   Iris (root package)
   ├── Iris Navigation (root — navigation_cell tiles → each notation)
-  ├── Simple Notation   — 10 diagrams
+  ├── Simple Notation   — 11 diagrams (incl. AI Module Architecture)
   ├── UML Notation      — 8 diagrams
   ├── ArchiMate Notation — 7 diagrams
   └── C4 Notation       — 6 diagrams
 
-v4 revision: intentional layouts, explicit edge routing via sourceHandle/
-targetHandle, navigation_cell overview with diagram_links, boundary nodes.
+v5 revision: adds AI module elements (AI Service, AI Client, Provider Registry,
+Context Builder), relationships, and AI Module Architecture diagram.
 
 Idempotency:
-  - If _gen_id("diagram", 31) has v4 marker in metadata → already v4, skip
-  - Otherwise → clear + reseed v4
+  - If _gen_id("diagram", 33) has v5 marker in metadata → already v5, skip
+  - Otherwise → clear + reseed v5
 """
 
 from __future__ import annotations
@@ -238,6 +238,16 @@ _ENTITIES: list[tuple[str, str, str, str, str]] = [
      "Authentication and authorization component", "c4"),
     ("c10", "c4_component", "CanvasModule",
      "Canvas rendering and editing component", "c4"),
+
+    # ── AI module elements (simple, indices 55–58) ────────────────────────────
+    ("ai1", "service", "AI Service",
+     "Orchestrates Q&A queries: resolves provider, builds context, calls LLM, stores conversations", "simple"),
+    ("ai2", "component", "AI Client",
+     "Provider-agnostic LLM client abstraction with OpenAI-compatible and Anthropic implementations", "simple"),
+    ("ai3", "component", "AI Provider Registry",
+     "Admin-managed database of LLM provider configurations with API keys, models, and parameters", "simple"),
+    ("ai4", "component", "Context Builder",
+     "Builds structured LLM prompts from Set elements, relationships, and diagrams with token-budget truncation", "simple"),
 ]
 
 _ELEMENT_DESCRIPTIONS = {nid: desc for nid, _, _, desc, _ in _ENTITIES}
@@ -353,6 +363,24 @@ _RELATIONSHIPS: list[tuple[int, str, str, str, str, str]] = [
      "FastAPIBackend contains AuthModule"),
     (49, "c7", "c10", "c4_relationship", "Contains",
      "FastAPIBackend contains CanvasModule"),
+
+    # ── AI module relationships (8, indices 50–57) ────────────────────────────
+    (50, "n2", "ai1", "uses", "Delegates Q&A",
+     "Backend delegates AI question-answering to AI Service"),
+    (51, "ai1", "ai2", "uses", "Sends prompts",
+     "AI Service sends chat messages through AI Client abstraction"),
+    (52, "ai1", "ai3", "uses", "Resolves provider",
+     "AI Service looks up provider configuration from Provider Registry"),
+    (53, "ai1", "ai4", "uses", "Builds context",
+     "AI Service uses Context Builder to create LLM prompts from Set data"),
+    (54, "ai4", "n3", "uses", "Queries set data",
+     "Context Builder reads elements, relationships, and diagrams from Database"),
+    (55, "ai3", "n3", "uses", "Stores providers",
+     "Provider Registry persists provider configs and API keys in Database"),
+    (56, "ai1", "n3", "uses", "Stores conversations",
+     "AI Service stores Q&A conversations and usage logs in Database"),
+    (57, "n1", "ai1", "uses", "Ask AI",
+     "Frontend sends user questions to AI Service via REST API"),
 ]
 
 # ── Package definitions ─────────────────────────────────────────────────────
@@ -1194,6 +1222,42 @@ def _build_c4_container(eids: dict, rids: dict, **_kw: object) -> dict:
 
 # ── Navigation Overview (index 31, root package) ─────────────────────────────
 
+def _build_ai_module(eids: dict, rids: dict, **_kw: object) -> dict:
+    """Simple component: AI Module Architecture — shows AI service, client, registry, context."""
+    nodes = [
+        # Row 1: Frontend (caller)
+        _node("n1", "component", _e(eids, "n1"), 220, 20, 200, 70, icon="monitor"),
+        # Row 2: Backend + AI Service
+        _node("n2", "component", _e(eids, "n2"), 30, 150, 180, 70, icon="server"),
+        _node("ai1", "service", _e(eids, "ai1"), 280, 150, 220, 70, icon="brain"),
+        # Row 3: AI internals
+        _node("ai3", "component", _e(eids, "ai3"), 60, 300, 220, 70, icon="list"),
+        _node("ai4", "component", _e(eids, "ai4"), 360, 300, 220, 70, icon="file-text"),
+        # Row 4: AI Client + Database
+        _node("ai2", "component", _e(eids, "ai2"), 210, 450, 220, 70, icon="zap"),
+        _node("n3", "database", _e(eids, "n3"), 60, 450, 180, 70, icon="database"),
+    ]
+    edges = [
+        _edge("e-ai-1", "n1", "ai1", "uses", "Ask AI",
+              rel_id=_r(rids, 57), source_handle="bottom", target_handle="top"),
+        _edge("e-ai-2", "n2", "ai1", "uses", "Delegates Q&A",
+              rel_id=_r(rids, 50), source_handle="right", target_handle="left"),
+        _edge("e-ai-3", "ai1", "ai2", "uses", "Sends prompts",
+              rel_id=_r(rids, 51), source_handle="bottom", target_handle="top"),
+        _edge("e-ai-4", "ai1", "ai3", "uses", "Resolves provider",
+              rel_id=_r(rids, 52), source_handle="bottom", target_handle="top"),
+        _edge("e-ai-5", "ai1", "ai4", "uses", "Builds context",
+              rel_id=_r(rids, 53), source_handle="bottom", target_handle="top"),
+        _edge("e-ai-6", "ai4", "n3", "uses", "Queries set data",
+              rel_id=_r(rids, 54), source_handle="bottom", target_handle="right"),
+        _edge("e-ai-7", "ai3", "n3", "uses", "Stores providers",
+              rel_id=_r(rids, 55), source_handle="bottom", target_handle="top"),
+        _edge("e-ai-8", "ai1", "n3", "uses", "Stores conversations",
+              rel_id=_r(rids, 56), source_handle="left", target_handle="right"),
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+
 def _build_navigation_overview(
     eids: dict, rids: dict, mids: dict[int, str] | None = None,
 ) -> dict:
@@ -1258,6 +1322,14 @@ def _build_navigation_overview(
             "visual": {"width": 200, "height": 100,
                        "icon": {"set": "lucide", "name": "boxes"}},
         }, 370, 500, 200, 100),
+        _node("nav_ai", "navigation_cell", {
+            "label": "AI Module",
+            "entityType": "navigation_cell",
+            "description": "AI Q&A service architecture with provider registry and context builder",
+            "linkedModelId": mids.get(32, ""),
+            "visual": {"width": 200, "height": 100,
+                       "icon": {"set": "lucide", "name": "brain"}},
+        }, 210, 640, 200, 100),
     ]
     return {"nodes": nodes, "edges": []}
 
@@ -1397,8 +1469,14 @@ _DIAGRAMS = [
      "description": "C4 container diagram: SvelteKit Frontend, FastAPI Backend, SQLite Database.",
      "builder": _build_c4_container, "tags": _DIAGRAM_TAGS},
 
-    # ── Navigation Overview (pkg-0, index 31) ────────────────────────────────
-    {"index": 31, "diagram_type": "component", "notation": "simple",
+    # ── AI Module (pkg-1, index 32) ─────────────────────────────────────────
+    {"index": 32, "diagram_type": "component", "notation": "simple",
+     "name": "AI Module Architecture", "parent_package_index": 1,
+     "description": "Component diagram showing AI Q&A service, client abstraction, provider registry, and context builder.",
+     "builder": _build_ai_module, "tags": _DIAGRAM_TAGS},
+
+    # ── Navigation Overview (pkg-0, index 33) ────────────────────────────────
+    {"index": 33, "diagram_type": "component", "notation": "simple",
      "name": "Iris Navigation", "parent_package_index": 0,
      "description": "Root navigation diagram with click-through tiles to each notation group.",
      "builder": _build_navigation_overview, "tags": _DIAGRAM_TAGS},
@@ -1418,9 +1496,9 @@ async def _ensure_system_user(db: aiosqlite.Connection) -> None:
 
 async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
     """Delete old seed data by deterministic IDs in dependency order."""
-    max_elements = max(len(_ENTITIES), 55)
-    max_rels = max(len(_RELATIONSHIPS), 50)
-    max_diagrams = max(len(_DIAGRAMS), 32)
+    max_elements = max(len(_ENTITIES), 59)
+    max_rels = max(len(_RELATIONSHIPS), 58)
+    max_diagrams = max(len(_DIAGRAMS), 34)
     max_packages = max(len(_PACKAGES), 5)
 
     element_ids = [_gen_id("element", i) for i in range(max_elements)]
@@ -1448,6 +1526,14 @@ async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
         await db.execute("DELETE FROM relationships WHERE id = ?", (rid,))
 
     for eid in element_ids:
+        # Delete any relationships (seed or not) that reference this element
+        cursor = await db.execute(
+            "SELECT id FROM relationships WHERE source_element_id = ? OR target_element_id = ?",
+            (eid, eid),
+        )
+        for (orphan_rid,) in await cursor.fetchall():
+            await db.execute("DELETE FROM relationship_versions WHERE relationship_id = ?", (orphan_rid,))
+            await db.execute("DELETE FROM relationships WHERE id = ?", (orphan_rid,))
         await db.execute("DELETE FROM element_tags WHERE element_id = ?", (eid,))
         await db.execute("DELETE FROM element_versions WHERE element_id = ?", (eid,))
         await db.execute("DELETE FROM elements_fts WHERE element_id = ?", (eid,))
@@ -1461,15 +1547,15 @@ async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
-_V4_MARKER = "seed_v4"
+_V5_MARKER = "seed_v5"
 
 
 async def seed_example_models(db: aiosqlite.Connection) -> None:
     """Seed example elements, packages, and diagrams demonstrating Iris architecture.
 
     Idempotency:
-      - If diagram-31 metadata contains 'seed_v4' → already v4, skip
-      - Otherwise → clear + reseed v4
+      - If diagram-33 metadata contains 'seed_v5' → already v5, skip
+      - Otherwise → clear + reseed v5
     """
     # --- Skip if initial setup not yet completed ------------------------------
     cursor = await db.execute(
@@ -1479,8 +1565,8 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
     if not row or row[0] == 0:
         return
 
-    # --- v4 idempotency check: diagram-31 has v4 marker in metadata ----
-    overview_id = _gen_id("diagram", 31)
+    # --- v5 idempotency check: diagram-33 (nav) has v5 marker in metadata ----
+    overview_id = _gen_id("diagram", 33)
     cursor = await db.execute(
         "SELECT metadata FROM diagram_versions WHERE diagram_id = ? ORDER BY version DESC LIMIT 1",
         (overview_id,),
@@ -1489,12 +1575,12 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
     if row and row[0]:
         try:
             meta = json.loads(row[0])
-            if meta.get("seed_version") == _V4_MARKER:
+            if meta.get("seed_version") == _V5_MARKER:
                 return
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # --- Clear any existing seed data (v1/v2/v3/partial v4) ---------
+    # --- Clear any existing seed data (v1/v2/v3/v4/partial v5) --------
     # Check if any seed data exists
     root_pkg_id = _gen_id("pkg", 0)
     cursor = await db.execute(
@@ -1596,10 +1682,10 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         diagram_data_json = json.dumps(diagram_data)
         parent_package_id = pkg_id_map[model_def["parent_package_index"]]
 
-        # v4 marker in metadata for overview diagram
+        # v5 marker in metadata for overview diagram
         metadata: dict[str, object] = {}
-        if model_def["index"] == 31:
-            metadata["seed_version"] = _V4_MARKER
+        if model_def["index"] == 33:
+            metadata["seed_version"] = _V5_MARKER
 
         await db.execute(
             "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
@@ -1625,8 +1711,8 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
             )
 
     # --- Create diagram_links for navigation cells ----------------------------
-    # The overview diagram (index 31) links to primary diagrams in each notation
-    overview_diag_id = diagram_id_map[31]
+    # The overview diagram (index 33) links to primary diagrams in each notation
+    overview_diag_id = diagram_id_map[33]
     nav_targets = [
         (0, "Simple Notation"),
         (10, "UML Notation"),
@@ -1634,6 +1720,7 @@ async def seed_example_models(db: aiosqlite.Connection) -> None:
         (29, "C4 Notation"),
         (5, "Database Schema"),
         (12, "UML Domain Model"),
+        (32, "AI Module"),
     ]
     for target_idx, label in nav_targets:
         target_id = diagram_id_map.get(target_idx)

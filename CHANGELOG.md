@@ -5,6 +5,40 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-19
+
+### Added
+- AI model management module (`backend/app/ai/`) — DB-backed provider registry, client abstraction, admin CRUD, Set-scoped Q&A (ADR-093)
+- `ai_providers`, `ai_conversations`, `ai_usage_log` tables (migration m026)
+- `AIClient` ABC with `OpenAICompatibleClient` (openai, ollama, lmstudio, openrouter, custom) and `AnthropicClient`
+- Retry logic: exponential backoff on network/5xx errors; no retry on timeouts or 4xx auth (translated from machine-dream_ag patterns)
+- `build_set_context()` — structured text context builder from Set elements, relationships, diagrams with token-budget truncation
+- Provider CRUD API (`GET/POST/PUT/DELETE /api/ai/providers`), test endpoint, set-default endpoint
+- Set Q&A endpoint (`POST /api/ai/sets/{set_id}/ask`) with SSE streaming support
+- Conversation history endpoint (`GET /api/ai/sets/{set_id}/conversations`)
+- Usage log endpoint (`GET /api/ai/usage`) for admin visibility
+- Admin AI Providers page (`/admin/ai`) — provider list, add/edit modal with password input for API keys, test connection, set default, delete
+- Brain icon for AI Providers in sidebar navigation (Phosphor Brain)
+- Dedicated **Ask AI** page (`/ask`) with Set selector — accessible from main navigation between Dashboard and Sets
+- Chat-style Q&A component with SSE streaming responses, animated thinking indicator, markdown rendering (`marked` + DOMPurify), copy-to-clipboard, and clear conversation
+- Inline error display on provider test results (no hover required)
+- AI module seed data: 4 new elements (AI Service, AI Client, Provider Registry, Context Builder), 8 relationships, and "AI Module Architecture" diagram under Simple Notation
+- AI Module navigation tile on Iris Navigation overview
+- `dev.sh` now sources `.env` file for API keys and env var overrides
+
+### Changed
+- API keys stored directly in DB (not env var names) — enterable via admin UI password field
+- Set detail page links to `/ask` instead of embedding inline Q&A panel
+- Seed data bumped to v5 with AI module additions (34 diagrams, 59 elements, 58 relationships)
+
+### Security
+- API keys stored in DB, never returned by API (`has_api_key: bool` in responses)
+- Admin-only provider CRUD via existing `_require_admin()` pattern
+- DOMPurify sanitization on all AI-generated content rendered via `{@html}` (Protocol 7)
+- Input length cap: 4000 chars on question field via Pydantic `max_length`
+- Context token budget (default 8000 tokens) prevents excessive LLM costs
+- All AI calls logged to `ai_usage_log` + `iris_audit.db`
+
 ## [2.4.2] - 2026-03-19
 
 ### Added
