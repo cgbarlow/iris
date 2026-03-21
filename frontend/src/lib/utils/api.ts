@@ -6,7 +6,7 @@ import {
 	updateTokens,
 	clearAuth,
 } from '$lib/stores/auth.svelte.js';
-import { DB_BACKEND } from '$lib/config.js';
+import { API_BASE_URL, DB_BACKEND } from '$lib/config.js';
 import { supabase } from '$lib/supabase.js';
 import type { AuthTokens } from '$lib/types/api.js';
 
@@ -45,7 +45,7 @@ export async function tryRefresh(): Promise<boolean> {
 	if (!token) return false;
 
 	try {
-		const response = await fetch('/api/auth/refresh', {
+		const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ refresh_token: token }),
@@ -79,7 +79,7 @@ export async function apiFetch<T>(
 		headers['Authorization'] = `Bearer ${token}`;
 	}
 
-	let response = await fetch(`${path}`, {
+	let response = await fetch(`${API_BASE_URL}${path}`, {
 		...options,
 		headers,
 	});
@@ -99,7 +99,7 @@ export async function apiFetch<T>(
 			if (newToken) {
 				headers['Authorization'] = `Bearer ${newToken}`;
 			}
-			response = await fetch(`${path}`, {
+			response = await fetch(`${API_BASE_URL}${path}`, {
 				...options,
 				headers,
 			});

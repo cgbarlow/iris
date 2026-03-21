@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
+	import { API_BASE_URL } from '$lib/config.js';
 	import type { AIConversation } from '$lib/types/api';
 	import PackagePicker from '$lib/components/PackagePicker.svelte';
 
@@ -213,7 +214,7 @@ function promptForLocation() {
 
 		try {
 			const token = getAccessToken();
-			const resp = await fetch(`/api/ai/sets/${setId}/ask?stream=true`, {
+			const resp = await fetch(`${API_BASE_URL}/api/ai/sets/${setId}/ask?stream=true`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

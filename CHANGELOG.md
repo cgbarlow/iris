@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Create Diagrams" action button appears when AI outputs a valid diagram JSON block
 - Admin Creation Prompts editor in `/admin/ai/` — table of layered prompts with full-text edit modal
 - Seeded default prompts: base output format, DoView methodology (guided 8-question conversation), outcomes_map layout rules, overview layout rules
-- **Optional Supabase/Netlify deployment** (ADR-094) — cloud deployment path alongside the default SQLite self-hosted mode
+- **Optional Supabase/Render deployment** (ADR-094, ADR-096) — cloud deployment path alongside the default SQLite self-hosted mode
 - `DatabasePort` protocol with `SqliteAdapter` (aiosqlite passthrough) and `SupabaseAdapter` (asyncpg with automatic `?` → `$N` placeholder conversion)
 - `IRIS_DB_BACKEND` env var (`sqlite` default, `supabase` for cloud mode)
 - PostgreSQL migrations (`backend/app/migrations/supabase/`) — 30 SQL files covering all schema including FTS via `tsvector`/GIN indexes and triggers
@@ -41,15 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Supabase Auth JWT validation (`app/auth/supabase_service.py`) — HS256, no aud verification
 - `GET /api/auth/me` endpoint (both modes) — returns authenticated user profile
 - Dual search: FTS5 for SQLite, `tsvector`/`to_tsquery` for PostgreSQL (`app/search/service.py`)
-- `netlify.toml` with build config, function directory, and `/api/*` → Netlify Function redirect
-- `netlify/functions/api.py` — Mangum ASGI handler wrapping FastAPI for serverless deployment
-- `frontend/src/lib/config.ts` — runtime config from `VITE_DB_BACKEND`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- `render.yaml` Blueprint with static site (frontend) and web service (backend) definitions
+- `VITE_API_BASE_URL` env var — configurable backend URL for cross-origin Render deployment (empty default preserves self-hosted mode)
+- `frontend/src/lib/config.ts` — runtime config from `VITE_DB_BACKEND`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`
 - `frontend/src/lib/supabase.ts` — conditional Supabase JS client (null when not configured)
 - Supabase mode frontend auth: `onAuthStateChange` token sync, `supabase.auth.signInWithPassword()` login, `supabase.auth.refreshSession()` token refresh
 - Login page: email field and Supabase sign-in in Supabase mode; setup/request-account/forgot-password views hidden (managed via Supabase Dashboard)
 - `.env.example` documenting all environment variables for both deployment modes
-- `docs/deployment-netlify-supabase.md` — step-by-step Netlify + Supabase deployment guide
-- Optional backend dependencies: `mangum==0.21.0`, `asyncpg==0.31.0` (install with `uv sync --extra supabase`)
+- `docs/deployment-render-supabase.md` — step-by-step Render + Supabase deployment guide
+- Optional backend dependency: `asyncpg==0.31.0` (install with `uv sync --extra supabase`)
 
 ### Security
 - **Row Level Security** enabled on all 34 Supabase tables with deny-all strategy (ADR-095) — blocks `anon` and `authenticated` roles from direct PostgREST table access while backend (`postgres` role) bypasses RLS as table owner

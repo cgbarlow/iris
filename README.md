@@ -13,7 +13,7 @@ iris/
   backend/       Python/FastAPI API server
   frontend/      SvelteKit/Svelte 5 single-page application
   docs/          ADRs, specs, protocols, and compliance documents
-  netlify/       Netlify Functions handler (optional cloud deployment)
+  render.yaml    Render Blueprint (optional cloud deployment)
 ```
 
 ### Deployment modes
@@ -21,9 +21,9 @@ iris/
 | Mode | Database | Auth | Hosting |
 |------|----------|------|---------|
 | **SQLite** (default) | SQLite (aiosqlite) | Iris JWT (Argon2id) | Self-hosted (any server) |
-| **Supabase** (optional) | PostgreSQL (asyncpg) | Supabase Auth (JWTs) | Netlify Functions + CDN |
+| **Supabase** (optional) | PostgreSQL (asyncpg) | Supabase Auth (JWTs) | Render (static site + web service) |
 
-The default self-hosted mode requires no external services. The optional Supabase/Netlify mode is a cloud-native deployment path. See [docs/deployment-netlify-supabase.md](docs/deployment-netlify-supabase.md) for setup instructions.
+The default self-hosted mode requires no external services. The optional Render + Supabase mode is a cloud-native deployment path. See [docs/deployment-render-supabase.md](docs/deployment-render-supabase.md) for setup instructions.
 
 ### Backend
 
@@ -257,7 +257,7 @@ npm run test:all-e2e
 | `docs/protocols.md` | 12 non-negotiable development protocols |
 | `docs/adrs/` | 85+ Architecture Decision Records |
 | `docs/adrs/specs/` | 97+ implementation specifications |
-| `docs/deployment-netlify-supabase.md` | Netlify + Supabase deployment guide |
+| `docs/deployment-render-supabase.md` | Render + Supabase deployment guide |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 

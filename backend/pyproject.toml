@@ -24,7 +24,6 @@ dev = [
     "mypy>=1.8.0",
 ]
 supabase = [
-    "mangum==0.21.0",
     "asyncpg==0.31.0",
 ]
 
@@ -53,7 +52,7 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["jose.*", "aiosqlite.*", "asyncpg.*", "mangum.*"]
+module = ["jose.*", "aiosqlite.*", "asyncpg.*"]
 ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]

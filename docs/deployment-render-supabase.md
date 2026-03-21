@@ -1,12 +1,12 @@
-# Deploying Iris to Netlify + Supabase
+# Deploying Iris to Render + Supabase
 
-This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** with a **FastAPI** backend served through Netlify Functions, backed by a **Supabase** PostgreSQL database and Supabase Auth.
+This guide covers deploying Iris as a static SvelteKit frontend and a FastAPI backend on **Render**, backed by a **Supabase** PostgreSQL database and Supabase Auth.
 
-> **Default deployment is SQLite (self-hosted).** Netlify + Supabase is an optional cloud deployment path. See the main README for standard self-hosted setup.
+> **Default deployment is SQLite (self-hosted).** Render + Supabase is an optional cloud deployment path. See the main README for standard self-hosted setup.
 
 ## Prerequisites
 
-- A [Netlify](https://netlify.com) account
+- A [Render](https://render.com) account (free tier works)
 - A [Supabase](https://supabase.com) account
 - The Iris repository cloned locally (or forked on GitHub)
 
@@ -104,57 +104,73 @@ To add more users after initial setup:
 
 ---
 
-## Step 4 — Create a Netlify site
+## Step 4 — Deploy to Render
 
-### Option A: Deploy from GitHub (recommended)
+### Option A: Blueprint (recommended)
 
 1. Push your Iris fork/repo to GitHub.
-2. Log in to Netlify, click **Add new site → Import an existing project**.
+2. Log in to [Render](https://render.com), click **New → Blueprint**.
 3. Connect to GitHub and select your Iris repository.
-4. Netlify will detect `netlify.toml` automatically. The build settings are pre-configured.
+4. Render will detect `render.yaml` and create two services:
+   - **iris-frontend** — Static Site serving the SvelteKit SPA
+   - **iris-api** — Web Service running FastAPI via uvicorn
 
-### Option B: Netlify CLI
+### Option B: Manual setup
 
-```sh
-npm install -g netlify-cli
-netlify login
-netlify init
-```
+Create two services manually in the Render Dashboard:
+
+**Static Site (frontend):**
+- Name: `iris-frontend`
+- Build command: `cd frontend && npm ci && npm run build`
+- Publish directory: `frontend/build`
+- Add rewrite rule: `/* → /index.html` (for SPA client-side routing)
+
+**Web Service (backend):**
+- Name: `iris-api`
+- Runtime: Python
+- Build command: `cd backend && pip install -e ".[supabase]"`
+- Start command: `cd backend && uvicorn app.main:create_app --host 0.0.0.0 --port $PORT --factory`
 
 ---
 
-## Step 5 — Set environment variables in Netlify
+## Step 5 — Set environment variables in Render
 
-In your Netlify site, go to **Site settings → Environment variables** and add:
+### Frontend (iris-frontend)
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `VITE_DB_BACKEND` | `supabase` | Enables Supabase deployment mode |
+| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key |
+| `VITE_API_BASE_URL` | `https://iris-api.onrender.com` | URL of the iris-api web service |
+
+> **Security note:** `VITE_*` variables are embedded in the frontend bundle at build time and visible to users. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. RLS (m030) prevents the publishable key from accessing any table data directly.
+
+### Backend (iris-api)
 
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `IRIS_DB_BACKEND` | `supabase` | Enables Supabase deployment mode |
-| `SUPABASE_URL` | `https://xxxx.supabase.co` | From Supabase Settings → API |
-| `SUPABASE_ANON_KEY` | `sb_publishable_...` | Publishable key (or legacy anon key) |
-| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Secret key (or legacy service_role key) |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Supabase secret key (backend only) |
 | `SUPABASE_DB_URL` | `postgresql://...` | Transaction pooler connection string |
-| `SUPABASE_JWT_SECRET` | `your-jwt-secret` | From Supabase Settings → API Keys → JWT Settings |
-| `VITE_DB_BACKEND` | `supabase` | Frontend deployment mode flag |
-| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Frontend Supabase URL |
-| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Frontend Supabase publishable key |
+| `SUPABASE_JWT_SECRET` | `your-jwt-secret` | JWT secret from Supabase settings |
+| `IRIS_CORS_ORIGINS` | `https://iris-frontend.onrender.com` | Frontend URL (for CORS) |
 
-> **Security note:** `VITE_*` variables are embedded in the frontend bundle at build time and visible to users. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. The `SUPABASE_SERVICE_ROLE_KEY` is only available to the Netlify Function (backend). RLS (m030) prevents the publishable key from accessing any table data directly.
+> Set `IRIS_CORS_ORIGINS` to your frontend's Render URL. Multiple origins can be comma-separated.
 
 ---
 
-## Step 6 — Deploy
+## Step 6 — Verify the deployment
 
-1. Trigger a deploy from Netlify (or push to your linked GitHub branch).
-2. Netlify runs: `cd frontend && npm ci && npm run build`
-3. The SvelteKit frontend is published to `frontend/build`.
-4. The FastAPI backend is served from `netlify/functions/api.py` via Mangum.
+1. Visit your frontend Render URL — you should see the Iris login page.
+2. Log in with the admin credentials created in Step 3.
+3. Create a model, add entities — verify CRUD operations work.
 
-### Verify the deployment
+### Verify CORS
 
-- Visit your Netlify URL — you should see the Iris login page.
-- Log in with the admin credentials created in Step 3.
-- API calls are routed through `/.netlify/functions/api` by the redirect rule in `netlify.toml`.
+If API calls fail with CORS errors, check that `IRIS_CORS_ORIGINS` on the backend service matches your frontend URL exactly (including `https://`).
 
 ---
 
@@ -163,11 +179,11 @@ In your Netlify site, go to **Site settings → Environment variables** and add:
 ```
 Browser
   ↓  HTTPS
-Netlify CDN (frontend/build — SvelteKit static)
-  ↓  /api/* redirect
-Netlify Function (netlify/functions/api.py — FastAPI via Mangum)
-  ↓  asyncpg
-Supabase PostgreSQL (Transaction Pooler)
+Render Static Site (frontend/build — SvelteKit SPA)
+  ↓  VITE_API_BASE_URL (cross-origin fetch)
+Render Web Service (backend — FastAPI via uvicorn)
+  ↓  asyncpg (statement_cache_size=0)
+Supabase PostgreSQL (Transaction Pooler, port 6543)
 
 Supabase Auth
   ↑  JWT (HS256, SUPABASE_JWT_SECRET)
@@ -183,25 +199,6 @@ Browser (Supabase JS SDK)
 4. Backend decodes the JWT using `SUPABASE_JWT_SECRET`, looks up the user's role in the `profiles` table, and returns the user profile.
 5. Subsequent API calls include the JWT; backend validates it on every request.
 6. Supabase SDK auto-refreshes tokens before expiry; `onAuthStateChange` keeps the frontend store in sync.
-
----
-
-## Limitations and differences from SQLite mode
-
-| Feature | SQLite (self-hosted) | Supabase (Netlify) |
-|---------|---------------------|-------------------|
-| User creation | Admin panel in app | Supabase Dashboard only |
-| Password reset | Admin panel in app | Supabase email flow |
-| Setup wizard | Shown on first login | Never shown (users pre-exist) |
-| Audit log | Separate `iris_audit.db` | `audit_log` table in Supabase DB |
-| Full-text search | FTS5 (SQLite virtual tables) | `tsvector` + GIN index + triggers |
-| Cold start | N/A | ~1–3s on first request (Netlify Function) |
-| Concurrency | SQLite WAL (single writer) | PostgreSQL (full concurrent writes) |
-| AI thumbnail generation | Supported | Not supported (no filesystem) |
-
-### Cold start note
-
-Netlify Functions are serverless and spin down after inactivity. The first request after a cold period may take 1–3 seconds while the FastAPI + asyncpg pool initialises. Subsequent requests are fast.
 
 ---
 
@@ -243,6 +240,25 @@ If you get data back instead of `[]`, RLS is not enabled — re-run `m030_rls_po
 
 ---
 
+## Limitations and differences from SQLite mode
+
+| Feature | SQLite (self-hosted) | Supabase (Render) |
+|---------|---------------------|-------------------|
+| User creation | Admin panel in app | Supabase Dashboard only |
+| Password reset | Admin panel in app | Supabase email flow |
+| Setup wizard | Shown on first login | Never shown (users pre-exist) |
+| Audit log | Separate `iris_audit.db` | `audit_log` table in Supabase DB |
+| Full-text search | FTS5 (SQLite virtual tables) | `tsvector` + GIN index + triggers |
+| Cold start | N/A | ~30–60s on first request (Render free tier spins down after inactivity) |
+| Concurrency | SQLite WAL (single writer) | PostgreSQL (full concurrent writes) |
+| AI thumbnail generation | Supported | Not supported (no filesystem) |
+
+### Cold start note
+
+Render free-tier web services spin down after 15 minutes of inactivity. The first request after a cold period may take 30–60 seconds while the Python process starts and the asyncpg pool initialises. Subsequent requests are fast. Upgrade to a paid plan to keep the service always running.
+
+---
+
 ## Troubleshooting
 
 **`User not found or inactive` on login**
@@ -260,14 +276,18 @@ INSERT INTO profiles (id, username, role)
 SELECT id, email, 'viewer' FROM auth.users WHERE email = 'user@example.com';
 ```
 
-**API 404 on `/api/*` routes**
+**CORS errors on API calls**
 
-Confirm `netlify.toml` is at the repository root and the `[[redirects]]` block is present. Check the Netlify deploy logs for function build errors.
+Ensure `IRIS_CORS_ORIGINS` on the backend service matches your frontend URL exactly (e.g. `https://iris-frontend.onrender.com`). Include the protocol (`https://`) and do not include a trailing slash.
+
+**API 502/503 errors**
+
+The backend may be cold-starting. Wait 30–60 seconds and retry. Check Render logs for startup errors. Ensure all `SUPABASE_*` environment variables are set correctly.
 
 **`Supabase not configured` error**
 
-One or more `SUPABASE_*` environment variables is missing. Check all variables in **Site settings → Environment variables**.
+One or more `SUPABASE_*` environment variables is missing. Check all variables in the Render Dashboard for both services.
 
-**Database connection errors in function logs**
+**Database connection errors**
 
-Ensure `SUPABASE_DB_URL` uses the **Transaction pooler** URL (port 6543), not the direct connection (port 5432). Serverless functions must use the pooler to avoid connection exhaustion.
+Ensure `SUPABASE_DB_URL` uses the **Transaction pooler** URL (port 6543), not the direct connection (port 5432). The pooler is required for connection management.

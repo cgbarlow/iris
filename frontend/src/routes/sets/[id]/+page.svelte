@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { apiFetch } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
+	import { API_BASE_URL } from '$lib/config.js';
 	import type { IrisSet, Diagram, PaginatedResponse } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import DOMPurify from 'dompurify';
@@ -77,7 +78,7 @@
 				formData.append('file', thumbnailFile);
 
 				const token = getAccessToken();
-				const resp = await fetch(`/api/sets/${setId}/thumbnail`, {
+				const resp = await fetch(`${API_BASE_URL}/api/sets/${setId}/thumbnail`, {
 					method: 'POST',
 					headers: token ? { Authorization: `Bearer ${token}` } : {},
 					body: formData,

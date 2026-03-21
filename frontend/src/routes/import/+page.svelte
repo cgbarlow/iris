@@ -2,6 +2,7 @@
 	/** SparxEA import page — upload .qea or .eap files to import diagrams, elements, and relationships. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
+	import { API_BASE_URL } from '$lib/config.js';
 	import { setActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import { apiFetch } from '$lib/utils/api';
 	import type { IrisSet } from '$lib/types/api';
@@ -90,7 +91,7 @@
 			progress = 20;
 
 			const token = getAccessToken();
-			const response = await fetch('/api/import/sparx', {
+			const response = await fetch(`${API_BASE_URL}/api/import/sparx`, {
 				method: 'POST',
 				headers: token ? { Authorization: `Bearer ${token}` } : {},
 				body: formData,

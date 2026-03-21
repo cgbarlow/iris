@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { setAuth } from '$lib/stores/auth.svelte.js';
-	import { DB_BACKEND } from '$lib/config.js';
+	import { API_BASE_URL, DB_BACKEND } from '$lib/config.js';
 	import { supabase } from '$lib/supabase.js';
 	import type { AuthTokens, User } from '$lib/types/api.js';
 
@@ -25,7 +25,7 @@
 
 	async function checkSetupNeeded() {
 		try {
-			const response = await fetch('/api/auth/setup/status');
+			const response = await fetch(`${API_BASE_URL}/api/auth/setup/status`);
 			if (response.ok) {
 				const data = await response.json();
 				needsSetup = data.needs_setup === true;
@@ -47,7 +47,7 @@
 
 		loading = true;
 		try {
-			const response = await fetch('/api/auth/setup', {
+			const response = await fetch(`${API_BASE_URL}/api/auth/setup`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ username, password }),
@@ -93,7 +93,7 @@
 			}
 
 			// Fetch full user profile (role etc.) from the backend
-			const meResponse = await fetch('/api/auth/me', {
+			const meResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
 				headers: { Authorization: `Bearer ${data.session.access_token}` },
 			});
 
@@ -126,7 +126,7 @@
 		loading = true;
 
 		try {
-			const response = await fetch('/api/auth/login', {
+			const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ username, password }),

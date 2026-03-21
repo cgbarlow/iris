@@ -1,0 +1,48 @@
+# Render Blueprint — Iris cloud deployment (ADR-096).
+# Deploy via Render Dashboard → New → Blueprint, point to this repo.
+# Secrets (sync: false) must be entered manually in the Render Dashboard.
+
+services:
+  # --- Frontend: SvelteKit SPA served as static files ---
+  - type: web
+    name: iris-frontend
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/build
+    envVars:
+      - key: VITE_DB_BACKEND
+        value: supabase
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # --- Backend: FastAPI via uvicorn ---
+  - type: web
+    name: iris-api
+    runtime: python
+    buildCommand: cd backend && pip install -e ".[supabase]"
+    startCommand: cd backend && uvicorn app.main:create_app --host 0.0.0.0 --port $PORT --factory
+    envVars:
+      - key: IRIS_DB_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: IRIS_CORS_ORIGINS
+        sync: false
+      - key: IRIS_DEBUG
+        value: "false"
