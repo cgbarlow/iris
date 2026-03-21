@@ -1,9 +1,11 @@
 import adapterAuto from '@sveltejs/adapter-auto';
-import adapterNetlify from '@sveltejs/adapter-netlify';
+import adapterStatic from '@sveltejs/adapter-static';
 
-// Use Netlify adapter when deployed to Netlify (NETLIFY env var is set automatically).
-// Fall back to adapter-auto for all other environments (local dev, self-hosted).
-const adapter = process.env.NETLIFY ? adapterNetlify() : adapterAuto();
+// Use static adapter on Netlify (SPA mode — all routing handled client-side).
+// Fall back to adapter-auto for local dev / self-hosted.
+const adapter = process.env.NETLIFY
+	? adapterStatic({ fallback: 'index.html' })
+	: adapterAuto();
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
