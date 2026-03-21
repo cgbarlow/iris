@@ -135,9 +135,14 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     # asyncpg cannot execute dollar-quoted SQL ($$) used in trigger/function definitions.
     # See docs/deployment-render-supabase.md Step 2.
 
-    # Seed roles, permissions, settings via DatabasePort (SupabaseAdapter)
-    port = db_manager.main_db
-    await seed_roles_and_permissions(port)
-    await seed_defaults(port)
+    # Seed roles, permissions, settings via DatabasePort (SupabaseAdapter).
+    # Acquire connection directly from pool (async) — the sync main_db property
+    # uses run_until_complete() which fails inside an already-running event loop.
+    from app.database import SupabaseAdapter  # noqa: PLC0415
+
+    async with db_manager.pool.acquire() as conn:
+        port = SupabaseAdapter(conn)
+        await seed_roles_and_permissions(port)
+        await seed_defaults(port)
     # Example models are not seeded in Supabase mode (production deployments should not
     # have demo data; use admin UI to create real content)
