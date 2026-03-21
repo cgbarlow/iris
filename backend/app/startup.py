@@ -131,9 +131,9 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     - FTS uses PostgreSQL tsvector triggers (auto-updated on INSERT/UPDATE)
     - cairosvg thumbnail generation may not be available in Netlify Function runtime
     """
-    from app.migrations.supabase.runner import run_supabase_migrations
-
-    await run_supabase_migrations(db_manager.pool)
+    # Migrations are run externally via psql (scripts/supabase-migrate.sh or SQL Editor).
+    # asyncpg cannot execute dollar-quoted SQL ($$) used in trigger/function definitions.
+    # See docs/deployment-render-supabase.md Step 2.
 
     # Seed roles, permissions, settings via DatabasePort (SupabaseAdapter)
     port = db_manager.main_db
