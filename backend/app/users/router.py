@@ -29,14 +29,21 @@ async def list_users(
     """List all users (admin only)."""
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
-    cursor = await db.execute(
-        "SELECT id, username, role, is_active, created_at, last_login_at "
-        "FROM users ORDER BY created_at"
-    )
+
+    if request.app.state.config.db_backend == "supabase":
+        cursor = await db.execute(
+            "SELECT id::text, username, role, is_active, created_at, NULL "
+            "FROM profiles ORDER BY created_at"
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT id, username, role, is_active, created_at, last_login_at "
+            "FROM users ORDER BY created_at"
+        )
     rows = await cursor.fetchall()
     return [
         UserResponse(
-            id=r[0], username=r[1], role=r[2],
+            id=str(r[0]), username=r[1], role=r[2],
             is_active=bool(r[3]), created_at=r[4], last_login_at=r[5],
         )
         for r in rows
@@ -49,17 +56,28 @@ async def create_user(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> UserResponse:
-    """Create a new user (admin only)."""
+    """Create a new user (admin only).
+
+    SQLite mode: creates user with hashed password in users table.
+    Supabase mode: not supported — users must be created in Supabase Dashboard.
+    """
     _require_admin(current_user)
+
+    if request.app.state.config.db_backend == "supabase":
+        raise HTTPException(
+            status_code=501,
+            detail="User creation via API is not supported in Supabase deployment mode. "
+                   "Create users in the Supabase Dashboard, then their profile is "
+                   "auto-created on first login.",
+        )
+
     config = request.app.state.config
     db = request.app.state.db_manager.main_db
 
-    # Validate password
     errors = validate_password(body.password, config.auth)
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
 
-    # Check username uniqueness
     cursor = await db.execute(
         "SELECT id FROM users WHERE username = ?", (body.username,),
     )
@@ -94,6 +112,31 @@ async def update_user(
     """Update a user's role or active status (admin only)."""
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
+
+    if request.app.state.config.db_backend == "supabase":
+        cursor = await db.execute(
+            "SELECT id::text, username, role, is_active, created_at, NULL "
+            "FROM profiles WHERE id::text = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        new_role = body.role if body.role is not None else row[2]
+        new_active = body.is_active if body.is_active is not None else bool(row[3])
+
+        await db.execute(
+            "UPDATE profiles SET role = ?, is_active = ?, updated_at = NOW() "
+            "WHERE id::text = ?",
+            (new_role, new_active, user_id),
+        )
+        await db.commit()
+
+        return UserResponse(
+            id=str(row[0]), username=row[1], role=new_role,
+            is_active=new_active, created_at=row[4], last_login_at=None,
+        )
 
     cursor = await db.execute(
         "SELECT id, username, role, is_active, created_at, last_login_at "

@@ -1,6 +1,12 @@
-/** Auth store using Svelte 5 runes — JWT persisted in sessionStorage to survive page reloads. */
+/** Auth store using Svelte 5 runes.
+ *
+ * SQLite mode: JWT persisted in sessionStorage to survive page reloads.
+ * Supabase mode: session managed by Supabase SDK; reactive via onAuthStateChange.
+ */
 
 import type { AuthTokens, User } from '$lib/types/api.js';
+import { DB_BACKEND } from '$lib/config.js';
+import { supabase } from '$lib/supabase.js';
 
 const STORAGE_KEY = 'iris_auth';
 
@@ -30,11 +36,31 @@ function saveToSession(data: StoredAuth | null): void {
 	}
 }
 
-const initial = loadFromSession();
+const initial = DB_BACKEND === 'supabase' ? null : loadFromSession();
 
 let accessToken = $state<string | null>(initial?.accessToken ?? null);
 let refreshToken = $state<string | null>(initial?.refreshToken ?? null);
 let currentUser = $state<User | null>(initial?.user ?? null);
+
+// Supabase mode: keep access token in sync with the Supabase session.
+// onAuthStateChange fires on SIGNED_IN, TOKEN_REFRESHED, and SIGNED_OUT.
+if (DB_BACKEND === 'supabase' && supabase) {
+	supabase.auth.getSession().then(({ data: { session } }) => {
+		if (session && !accessToken) {
+			accessToken = session.access_token;
+		}
+	});
+
+	supabase.auth.onAuthStateChange((_event, session) => {
+		if (session) {
+			accessToken = session.access_token;
+		} else {
+			accessToken = null;
+			refreshToken = null;
+			currentUser = null;
+		}
+	});
+}
 
 export function getAccessToken(): string | null {
 	return accessToken;
@@ -54,15 +80,17 @@ export function isAuthenticated(): boolean {
 
 export function setAuth(tokens: AuthTokens, user: User): void {
 	accessToken = tokens.access_token;
-	refreshToken = tokens.refresh_token;
+	refreshToken = tokens.refresh_token ?? null;
 	currentUser = user;
-	saveToSession({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token, user });
+	if (DB_BACKEND !== 'supabase') {
+		saveToSession({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token, user });
+	}
 }
 
 export function updateTokens(tokens: AuthTokens): void {
 	accessToken = tokens.access_token;
-	refreshToken = tokens.refresh_token;
-	if (currentUser) {
+	refreshToken = tokens.refresh_token ?? null;
+	if (DB_BACKEND !== 'supabase' && currentUser) {
 		saveToSession({ accessToken: tokens.access_token, refreshToken: tokens.refresh_token, user: currentUser });
 	}
 }
@@ -71,5 +99,10 @@ export function clearAuth(): void {
 	accessToken = null;
 	refreshToken = null;
 	currentUser = null;
-	saveToSession(null);
+	if (DB_BACKEND === 'supabase' && supabase) {
+		// Fire-and-forget: state is already cleared above; signOut revokes the server session.
+		supabase.auth.signOut().catch(() => undefined);
+	} else {
+		saveToSession(null);
+	}
 }

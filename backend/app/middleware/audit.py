@@ -21,16 +21,28 @@ _AUDITED_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
 
 
 def _decode_token(request: Request) -> dict[str, str] | None:
-    """Try to decode JWT claims from Authorization header."""
+    """Try to decode JWT claims from Authorization header.
+
+    SQLite mode: decodes with Iris JWT secret.
+    Supabase mode: decodes with Supabase JWT secret (no aud verification).
+    """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
     token = auth_header[len("Bearer "):]
+    config = request.app.state.config
     try:
+        if config.db_backend == "supabase" and config.supabase:
+            return jwt.decode(
+                token,
+                config.supabase.jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
         return jwt.decode(
             token,
-            request.app.state.config.auth.jwt_secret,
-            algorithms=[request.app.state.config.auth.jwt_algorithm],
+            config.auth.jwt_secret,
+            algorithms=[config.auth.jwt_algorithm],
         )
     except Exception:
         return None
@@ -44,14 +56,24 @@ def _get_client_ip(request: Request) -> str:
 
 
 async def _resolve_username(request: Request, user_id: str) -> str:
-    """Resolve user_id (GUID) to username via the users table."""
+    """Resolve user_id (GUID) to username.
+
+    SQLite mode: queries users table.
+    Supabase mode: queries profiles table (id is UUID, cast to text for comparison).
+    """
     if user_id == "anonymous":
         return "anonymous"
     try:
+        config = request.app.state.config
         main_db = request.app.state.db_manager.main_db
-        cursor = await main_db.execute(
-            "SELECT username FROM users WHERE id = ?", (user_id,),
-        )
+        if config.db_backend == "supabase":
+            cursor = await main_db.execute(
+                "SELECT username FROM profiles WHERE id::text = ?", (user_id,),
+            )
+        else:
+            cursor = await main_db.execute(
+                "SELECT username FROM users WHERE id = ?", (user_id,),
+            )
         row = await cursor.fetchone()
         return row[0] if row else user_id
     except Exception:

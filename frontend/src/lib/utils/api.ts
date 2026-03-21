@@ -6,6 +6,8 @@ import {
 	updateTokens,
 	clearAuth,
 } from '$lib/stores/auth.svelte.js';
+import { DB_BACKEND } from '$lib/config.js';
+import { supabase } from '$lib/supabase.js';
 import type { AuthTokens } from '$lib/types/api.js';
 
 export class ApiError extends Error {
@@ -21,6 +23,24 @@ export class ApiError extends Error {
 let refreshPromise: Promise<boolean> | null = null;
 
 export async function tryRefresh(): Promise<boolean> {
+	// Supabase mode: delegate token refresh to the Supabase SDK.
+	if (DB_BACKEND === 'supabase' && supabase) {
+		try {
+			const { data, error } = await supabase.auth.refreshSession();
+			if (error || !data.session) {
+				clearAuth();
+				return false;
+			}
+			// onAuthStateChange will update the store; updateTokens keeps it in sync now.
+			updateTokens({ access_token: data.session.access_token, refresh_token: '' });
+			return true;
+		} catch {
+			clearAuth();
+			return false;
+		}
+	}
+
+	// SQLite mode: use the Iris /api/auth/refresh endpoint.
 	const token = getRefreshToken();
 	if (!token) return false;
 

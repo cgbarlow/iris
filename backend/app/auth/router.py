@@ -31,6 +31,15 @@ from app.settings.service import get_setting
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+@router.get("/me")
+async def get_me(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, Any]:
+    """Return the authenticated user's profile (both deployment modes)."""
+    return {**current_user, "is_active": True}
+
+
 async def _get_session_timeout(db: object) -> int | None:
     """Fetch session_timeout_minutes from settings, return None on failure."""
     try:
@@ -42,9 +51,20 @@ async def _get_session_timeout(db: object) -> int | None:
     return None
 
 
+def _require_sqlite_mode(request: Request) -> None:
+    """Raise 404 if called in Supabase mode (auth is handled by Supabase)."""
+    if request.app.state.config.db_backend == "supabase":
+        raise HTTPException(
+            status_code=404,
+            detail="This endpoint is not available in Supabase deployment mode. "
+                   "Use Supabase Auth for authentication.",
+        )
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, request: Request) -> TokenResponse:
     """Authenticate user and issue tokens per SPEC-005-B login flow."""
+    _require_sqlite_mode(request)
     config = request.app.state.config
     db = request.app.state.db_manager.main_db
     hasher = create_password_hasher(config.auth)
@@ -125,6 +145,7 @@ async def login(body: LoginRequest, request: Request) -> TokenResponse:
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshRequest, request: Request) -> TokenResponse:
     """Rotate refresh token and issue new access token."""
+    _require_sqlite_mode(request)
     config = request.app.state.config
     db = request.app.state.db_manager.main_db
 
@@ -176,6 +197,7 @@ async def change_password(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
     """Change password per SPEC-005-B change-password flow."""
+    _require_sqlite_mode(request)
     config = request.app.state.config
     db = request.app.state.db_manager.main_db
     hasher = create_password_hasher(config.auth)
@@ -236,7 +258,10 @@ async def change_password(
 
 @router.get("/setup/status")
 async def setup_status(request: Request) -> dict[str, bool]:
-    """Check whether first-run setup is needed."""
+    """Check whether first-run setup is needed (SQLite mode only)."""
+    if request.app.state.config.db_backend == "supabase":
+        # Supabase mode: users are managed in Supabase Dashboard — setup never needed
+        return {"needs_setup": False}
     db = request.app.state.db_manager.main_db
     cursor = await db.execute("SELECT COUNT(*) FROM users")
     row = await cursor.fetchone()
@@ -245,7 +270,8 @@ async def setup_status(request: Request) -> dict[str, bool]:
 
 @router.post("/setup")
 async def setup(body: SetupRequest, request: Request) -> dict[str, str]:
-    """First-run admin setup — creates initial admin user."""
+    """First-run admin setup — creates initial admin user (SQLite mode only)."""
+    _require_sqlite_mode(request)
     config = request.app.state.config
     db = request.app.state.db_manager.main_db
 

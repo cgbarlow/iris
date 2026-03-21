@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { setAuth } from '$lib/stores/auth.svelte.js';
+	import { DB_BACKEND } from '$lib/config.js';
+	import { supabase } from '$lib/supabase.js';
 	import type { AuthTokens, User } from '$lib/types/api.js';
+
+	const isSupabase = DB_BACKEND === 'supabase';
 
 	let username = $state('');
 	let password = $state('');
@@ -67,7 +71,56 @@
 		}
 	}
 
+	async function handleLoginSupabase(event: Event) {
+		event.preventDefault();
+		if (!supabase) {
+			error = 'Supabase is not configured';
+			return;
+		}
+		error = '';
+		loading = true;
+
+		try {
+			// username field is used as email in Supabase mode
+			const { data, error: authError } = await supabase.auth.signInWithPassword({
+				email: username,
+				password,
+			});
+
+			if (authError || !data.session) {
+				error = authError?.message ?? 'Login failed';
+				return;
+			}
+
+			// Fetch full user profile (role etc.) from the backend
+			const meResponse = await fetch('/api/auth/me', {
+				headers: { Authorization: `Bearer ${data.session.access_token}` },
+			});
+
+			if (!meResponse.ok) {
+				error = 'Login succeeded but profile not found. Contact your administrator.';
+				await supabase.auth.signOut();
+				return;
+			}
+
+			const me: User = await meResponse.json();
+			setAuth(
+				{ access_token: data.session.access_token, refresh_token: data.session.refresh_token },
+				me,
+			);
+			await goto('/');
+		} catch {
+			error = 'Unable to connect to server';
+		} finally {
+			loading = false;
+		}
+	}
+
 	async function handleLogin(event: Event) {
+		if (isSupabase) {
+			return handleLoginSupabase(event);
+		}
+
 		event.preventDefault();
 		error = '';
 		loading = true;
@@ -98,7 +151,7 @@
 
 			setAuth(tokens, user);
 			await goto('/');
-		} catch (e) {
+		} catch {
 			error = 'Unable to connect to server';
 		} finally {
 			loading = false;
@@ -114,7 +167,7 @@
 	{#if checkingSetup}
 		<p style="color: var(--color-muted)">Loading...</p>
 
-	{:else if needsSetup || view === 'setup'}
+	{:else if !isSupabase && (needsSetup || view === 'setup')}
 		<form
 			onsubmit={handleSetup}
 			class="w-full max-w-sm rounded-lg p-6"
@@ -193,7 +246,7 @@
 			</button>
 		</form>
 
-	{:else if view === 'request-account'}
+	{:else if !isSupabase && view === 'request-account'}
 		<div
 			class="w-full max-w-sm rounded-lg p-6"
 			style="background-color: var(--color-surface); border: 1px solid var(--color-border)"
@@ -224,7 +277,7 @@
 			</button>
 		</div>
 
-	{:else if view === 'forgot-password'}
+	{:else if !isSupabase && view === 'forgot-password'}
 		<div
 			class="w-full max-w-sm rounded-lg p-6"
 			style="background-color: var(--color-surface); border: 1px solid var(--color-border)"
@@ -288,19 +341,19 @@
 
 			<div class="mb-4">
 				<label for="username" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">
-					Username
+					{isSupabase ? 'Email' : 'Username'}
 				</label>
 				<input
 					id="username"
-					type="text"
+					type={isSupabase ? 'email' : 'text'}
 					bind:value={username}
-					autocomplete="username"
+					autocomplete={isSupabase ? 'email' : 'username'}
 					required
 					class="w-full rounded border px-3 py-2"
 					style="background-color: var(--color-bg); border-color: var(--color-border); color: var(--color-fg)"
 					aria-describedby="username-help"
 				/>
-				<span id="username-help" class="sr-only">Enter your username</span>
+				<span id="username-help" class="sr-only">Enter your {isSupabase ? 'email' : 'username'}</span>
 			</div>
 
 			<div class="mb-4">
@@ -329,6 +382,7 @@
 				{loading ? 'Signing in...' : 'Sign in'}
 			</button>
 
+			{#if !isSupabase}
 			<div class="mt-4 flex justify-between text-sm">
 				<button
 					type="button"
@@ -347,6 +401,7 @@
 					Forgot password?
 				</button>
 			</div>
+			{/if}
 		</form>
 	{/if}
 </main>
