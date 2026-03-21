@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_view(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     name: str,
     description: str | None = None,
@@ -42,7 +43,7 @@ async def create_view(
 
 
 async def list_views(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
 ) -> list[dict[str, object]]:
     """List all views."""
     cursor = await db.execute(
@@ -66,7 +67,7 @@ async def list_views(
 
 
 async def get_view(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     view_id: str,
 ) -> dict[str, object] | None:
     """Get a single view by ID."""
@@ -91,7 +92,7 @@ async def get_view(
 
 
 async def update_view(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     view_id: str,
     *,
     name: str,
@@ -111,7 +112,7 @@ async def update_view(
 
 
 async def delete_view(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     view_id: str,
 ) -> bool:
     """Delete a view. Returns False if not found or is default."""
@@ -128,7 +129,7 @@ async def delete_view(
     return True
 
 
-async def seed_default_views(db: aiosqlite.Connection) -> None:
+async def seed_default_views(db: DatabasePort) -> None:
     """Seed default views if none exist."""
     cursor = await db.execute("SELECT COUNT(*) FROM views")
     count = (await cursor.fetchone())[0]

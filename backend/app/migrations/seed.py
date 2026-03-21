@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 ROLES = [
     ("admin", "Admin", "System administration, user management, all operations"),
@@ -64,7 +65,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
 }
 
 
-async def seed_roles_and_permissions(db: aiosqlite.Connection) -> None:
+async def seed_roles_and_permissions(db: DatabasePort) -> None:
     """Idempotently seed all 4 roles and their permission mappings."""
     for role_id, name, description in ROLES:
         await db.execute(

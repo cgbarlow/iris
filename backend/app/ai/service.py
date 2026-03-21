@@ -21,6 +21,7 @@ build_context = build_set_context
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 def _row_to_provider(row: tuple[object, ...]) -> dict[str, object]:
@@ -63,7 +64,7 @@ _SELECT = (
 
 
 async def create_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     name: str,
     provider_type: str,
@@ -104,7 +105,7 @@ async def create_provider(
 
 
 async def get_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     provider_id: str,
 ) -> dict[str, object] | None:
     """Get a single provider by ID."""
@@ -113,7 +114,7 @@ async def get_provider(
 
 
 async def list_providers(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     active_only: bool = False,
 ) -> list[dict[str, object]]:
@@ -131,7 +132,7 @@ async def list_providers(
 
 
 async def update_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     provider_id: str,
     *,
     name: str,
@@ -188,7 +189,7 @@ async def update_provider(
 
 
 async def delete_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     provider_id: str,
 ) -> bool:
     """Delete a provider. Returns False if not found or is_default."""
@@ -203,7 +204,7 @@ async def delete_provider(
 
 
 async def set_default_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     provider_id: str,
 ) -> dict[str, object] | None:
     """Set a provider as the default. Returns None if not found."""
@@ -224,7 +225,7 @@ async def set_default_provider(
 
 
 async def get_default_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
 ) -> dict[str, object] | None:
     """Get the default provider, or None if none set."""
     row = await (await db.execute(
@@ -234,7 +235,7 @@ async def get_default_provider(
 
 
 async def _get_provider_with_key(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     provider_id: str,
 ) -> dict[str, object] | None:
     """Fetch provider including api_key — for internal client creation only."""
@@ -243,7 +244,7 @@ async def _get_provider_with_key(
 
 
 async def _get_default_provider_with_key(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
 ) -> dict[str, object] | None:
     """Fetch default provider including api_key — for internal client creation only."""
     row = await (await db.execute(
@@ -253,7 +254,7 @@ async def _get_default_provider_with_key(
 
 
 async def test_provider(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     provider_id: str,
 ) -> ProviderTestResult:
     """Test a provider's connection. Returns ProviderTestResult."""
@@ -265,7 +266,7 @@ async def test_provider(
 
 
 async def ask_question(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     set_id: str,
     question: str,
@@ -355,7 +356,7 @@ async def ask_question(
 
 
 async def get_conversations(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     set_id: str,
     limit: int = 50,
@@ -389,7 +390,7 @@ async def get_conversations(
 
 
 async def log_usage(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     provider_id: str,
     user_id: str,

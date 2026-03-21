@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 LOCK_DURATION_MINUTES = 15
 
 
-async def cleanup_expired_locks(db: aiosqlite.Connection) -> int:
+async def cleanup_expired_locks(db: DatabasePort) -> int:
     """Remove expired locks. Returns count deleted."""
     now = datetime.now(tz=UTC).isoformat()
     cursor = await db.execute(
@@ -23,7 +24,7 @@ async def cleanup_expired_locks(db: aiosqlite.Connection) -> int:
 
 
 async def acquire_lock(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     target_type: str,
     target_id: str,
@@ -104,7 +105,7 @@ async def acquire_lock(
 
 
 async def check_lock(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     target_type: str,
     target_id: str,
@@ -141,7 +142,7 @@ async def check_lock(
 
 
 async def heartbeat_lock(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     lock_id: str,
     user_id: str,
 ) -> dict | None:
@@ -178,7 +179,7 @@ async def heartbeat_lock(
 
 
 async def release_lock(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     lock_id: str,
     user_id: str,
 ) -> bool:
@@ -198,7 +199,7 @@ async def release_lock(
 
 
 async def force_release_lock(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     lock_id: str,
 ) -> bool:
     """Force-release a lock (admin). Returns True if released."""
@@ -213,7 +214,7 @@ async def force_release_lock(
     return True
 
 
-async def list_active_locks(db: aiosqlite.Connection) -> list[dict]:
+async def list_active_locks(db: DatabasePort) -> list[dict]:
     """List all non-expired locks."""
     await cleanup_expired_locks(db)
 

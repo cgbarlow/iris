@@ -10,6 +10,7 @@ from app.migrations.m012_sets import DEFAULT_SET_ID
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, object]:
@@ -36,7 +37,7 @@ _SET_COLUMNS = (
 
 
 async def create_set(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     name: str,
     description: str | None,
@@ -70,7 +71,7 @@ async def create_set(
 
 
 async def get_set(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
 ) -> dict[str, object] | None:
     """Get a set by ID with diagram/element counts."""
@@ -103,7 +104,7 @@ async def get_set(
 
 
 async def list_sets(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
 ) -> list[dict[str, object]]:
     """List all sets with diagram/element counts."""
     cursor = await db.execute(
@@ -154,7 +155,7 @@ async def list_sets(
 
 
 async def update_set(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
     *,
     name: str,
@@ -206,7 +207,7 @@ async def update_set(
 
 
 async def soft_delete_set(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
 ) -> dict[str, object] | None:
     """Soft-delete a set. Returns error info or None on success.
@@ -252,7 +253,7 @@ async def soft_delete_set(
 
 
 async def force_delete_set(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
     deleted_by: str,
 ) -> dict[str, int] | dict[str, str]:
@@ -352,7 +353,7 @@ async def force_delete_set(
 
 
 async def store_set_thumbnail_image(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
     image_bytes: bytes,
 ) -> dict[str, object] | None:
@@ -379,7 +380,7 @@ async def store_set_thumbnail_image(
 
 
 async def get_set_thumbnail(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
     *,
     theme: str = "dark",
@@ -450,7 +451,7 @@ async def get_set_thumbnail(
 
 
 async def get_set_tags(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
 ) -> list[str]:
     """Get all unique tags within a set (from both diagrams and elements)."""

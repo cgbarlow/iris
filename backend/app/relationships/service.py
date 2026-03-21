@@ -12,10 +12,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_relationship(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     source_element_id: str,
     target_element_id: str,
@@ -64,7 +65,7 @@ async def create_relationship(
 
 
 async def get_relationship(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     rel_id: str,
 ) -> dict[str, object] | None:
     """Get a relationship with its current version data."""
@@ -111,7 +112,7 @@ async def get_relationship(
 
 
 async def list_relationships(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     element_id: str | None = None,
     page: int = 1,
@@ -183,7 +184,7 @@ async def list_relationships(
 
 
 async def update_relationship(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     rel_id: str,
     *,
     label: str | None,
@@ -225,7 +226,7 @@ async def update_relationship(
 
 
 async def soft_delete_relationship(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     rel_id: str,
     *,
     deleted_by: str,

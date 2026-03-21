@@ -11,10 +11,11 @@ from app.migrations.m012_sets import DEFAULT_SET_ID
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_package(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     name: str,
     description: str | None,
@@ -60,7 +61,7 @@ async def create_package(
 
 
 async def get_package(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
 ) -> dict[str, object] | None:
     """Get a package with its current version data."""
@@ -99,7 +100,7 @@ async def get_package(
 
 
 async def list_packages(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     set_id: str | None = None,
     page: int = 1,
@@ -159,7 +160,7 @@ async def list_packages(
 
 
 async def update_package(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
     *,
     name: str,
@@ -199,7 +200,7 @@ async def update_package(
 
 
 async def soft_delete_package(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
     *,
     deleted_by: str,
@@ -240,7 +241,7 @@ async def soft_delete_package(
 
 
 async def validate_no_cycle(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
     proposed_parent_id: str,
 ) -> bool:
@@ -272,7 +273,7 @@ async def validate_no_cycle(
 
 
 async def set_package_parent(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
     parent_package_id: str | None,
     updated_by: str,
@@ -308,7 +309,7 @@ async def set_package_parent(
 
 
 async def get_package_ancestors(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
 ) -> list[dict[str, object]]:
     """Get ancestor chain from package to root (breadcrumb order: root first)."""
@@ -353,7 +354,7 @@ async def get_package_ancestors(
 
 
 async def get_package_children(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
 ) -> list[dict[str, object]]:
     """Get direct children of a package."""
@@ -378,7 +379,7 @@ async def get_package_children(
 
 
 async def get_package_hierarchy(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     root_id: str | None = None,
     set_id: str | None = None,
 ) -> list[dict[str, object]]:
@@ -434,7 +435,7 @@ async def get_package_hierarchy(
 
 
 async def count_package_descendants(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
 ) -> dict[str, int]:
     """Count all descendant packages and diagrams under a package (non-deleted only)."""
@@ -466,7 +467,7 @@ async def count_package_descendants(
 
 
 async def cascade_delete_package(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
     *,
     deleted_by: str,
@@ -576,7 +577,7 @@ async def cascade_delete_package(
 
 
 async def restore_package(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
     *,
     restored_by: str,
@@ -616,7 +617,7 @@ async def restore_package(
 
 
 async def get_package_versions(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
 ) -> list[dict[str, object]]:
     """Get all versions of a package."""

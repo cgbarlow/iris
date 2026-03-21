@@ -17,6 +17,7 @@ from jose import jwt
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
     from app.config import AuthConfig
 
@@ -119,7 +120,7 @@ def decode_access_token(
 
 
 async def create_refresh_token(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     user_id: str,
     config: AuthConfig,
     family_id: str | None = None,
@@ -142,7 +143,7 @@ async def create_refresh_token(
 
 
 async def rotate_refresh_token(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     old_token_id: str,
     config: AuthConfig,
 ) -> tuple[str, str] | None:
@@ -196,7 +197,7 @@ async def rotate_refresh_token(
 
 
 async def revoke_user_tokens(
-    db: aiosqlite.Connection, user_id: str
+    db: DatabasePort, user_id: str
 ) -> None:
     """Revoke all refresh tokens for a user."""
     await db.execute(
@@ -207,7 +208,7 @@ async def revoke_user_tokens(
 
 
 async def check_password_history(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     user_id: str,
     new_password: str,
     hasher: PasswordHasher,

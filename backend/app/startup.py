@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from app.audit.service import verify_audit_chain
@@ -43,75 +42,98 @@ if TYPE_CHECKING:
 
 
 async def initialize_databases(db_manager: DatabaseManager) -> None:
-    """Initialize both databases: create dirs, run migrations, seed, verify.
+    """Initialize the database(s): connect, run migrations, seed, and verify.
 
-    Called during application startup (lifespan).
+    Called during application startup (lifespan). Branches on db_backend:
+    - sqlite (default): runs SQLite migrations, FTS rebuild, thumbnail regeneration
+    - supabase: runs PostgreSQL migrations, skips FTS/thumbnails (handled differently)
     """
-    # 1. Ensure data directory exists
-    data_dir = os.path.dirname(db_manager.config.main_db_path)
-    os.makedirs(data_dir, exist_ok=True)
-
-    # 2. Connect to both databases
+    # Connect to database(s) — DatabaseManager handles dir creation in SQLite mode.
     await db_manager.connect()
 
-    # 3. Run main database migrations
-    await m001_up(db_manager.main_db)
-    await m002_up(db_manager.main_db)
-    await m004_up(db_manager.main_db)
-    await m005_up(db_manager.main_db)
-    await m006_up(db_manager.main_db)
-    await m007_up(db_manager.main_db)
-    await m008_up(db_manager.main_db)
-    await m009_up(db_manager.main_db)
-    await m010_up(db_manager.main_db)
-    await m011_up(db_manager.main_db)
-    await m012_up(db_manager.main_db)
-    await m013_up(db_manager.main_db)
-    await m014_up(db_manager.main_db)
-    await m015_up(db_manager.main_db)
-    await m016_up(db_manager.main_db)
-    await m017_up(db_manager.main_db)
-    await m018_up(db_manager.main_db)
-    await m019_up(db_manager.main_db)
-    await m020_up(db_manager.main_db)
-    await m021_up(db_manager.main_db)
-    await m022_up(db_manager.main_db)
-    await m023_up(db_manager.main_db)
-    await m024_up(db_manager.main_db)
-    await m025_up(db_manager.main_db)
-    await m026_up(db_manager.main_db)
+    if db_manager.is_supabase:
+        await _initialize_supabase(db_manager)
+    else:
+        await _initialize_sqlite(db_manager)
 
-    # Seed default views
+
+async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
+    """Run SQLite initialization: migrations, seeds, FTS rebuild, audit verify."""
+    # Migrations expect raw aiosqlite.Connection (executescript / SQLite-specific DDL).
+    main = db_manager.raw_main_db
+    audit = db_manager.raw_audit_db
+
+    # Main database migrations
+    await m001_up(main)
+    await m002_up(main)
+    await m004_up(main)
+    await m005_up(main)
+    await m006_up(main)
+    await m007_up(main)
+    await m008_up(main)
+    await m009_up(main)
+    await m010_up(main)
+    await m011_up(main)
+    await m012_up(main)
+    await m013_up(main)
+    await m014_up(main)
+    await m015_up(main)
+    await m016_up(main)
+    await m017_up(main)
+    await m018_up(main)
+    await m019_up(main)
+    await m020_up(main)
+    await m021_up(main)
+    await m022_up(main)
+    await m023_up(main)
+    await m024_up(main)
+    await m025_up(main)
+    await m026_up(main)
+
+    # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
+    port = db_manager.main_db
     from app.views.service import seed_default_views
-    await seed_default_views(db_manager.main_db)
-
-    # Seed default themes
+    await seed_default_views(port)
     from app.themes.service import seed_default_themes
-    await seed_default_themes(db_manager.main_db)
+    await seed_default_themes(port)
 
-    # 3b. Rebuild FTS search index from existing data
-    await rebuild_search_index(db_manager.main_db)
+    # Rebuild FTS search index from existing data
+    await rebuild_search_index(port)
 
-    # 3c. Regenerate PNG thumbnails for all models
-    await regenerate_all_thumbnails(db_manager.main_db)
+    # Regenerate PNG thumbnails for all models
+    await regenerate_all_thumbnails(port)
 
-    # 4. Seed roles and permissions
-    await seed_roles_and_permissions(db_manager.main_db)
+    # Seed roles, permissions, settings, example models
+    await seed_roles_and_permissions(port)
+    await seed_defaults(port)
+    await seed_example_models(port)
 
-    # 4b. Seed default settings
-    await seed_defaults(db_manager.main_db)
-
-    # 4c. Seed example models (Iris architecture demo)
-    await seed_example_models(db_manager.main_db)
-
-    # 5. Run audit database migration
-    await m003_up(db_manager.audit_db)
-
-    # 6. Verify audit chain integrity
-    is_valid, entries_checked = await verify_audit_chain(db_manager.audit_db)
+    # Audit database migration and chain verification
+    await m003_up(audit)
+    audit_port = db_manager.audit_db
+    is_valid, entries_checked = await verify_audit_chain(audit_port)
     if not is_valid:
         msg = (
             f"Audit chain verification failed at entry {entries_checked}. "
             "Database integrity may be compromised."
         )
         raise RuntimeError(msg)
+
+
+async def _initialize_supabase(db_manager: DatabaseManager) -> None:
+    """Run Supabase/PostgreSQL initialization: run idempotent migrations, seed core data.
+
+    FTS rebuild and thumbnail generation are skipped:
+    - FTS uses PostgreSQL tsvector triggers (auto-updated on INSERT/UPDATE)
+    - cairosvg thumbnail generation may not be available in Netlify Function runtime
+    """
+    from app.migrations.supabase.runner import run_supabase_migrations
+
+    await run_supabase_migrations(db_manager.pool)
+
+    # Seed roles, permissions, settings via DatabasePort (SupabaseAdapter)
+    port = db_manager.main_db
+    await seed_roles_and_permissions(port)
+    await seed_defaults(port)
+    # Example models are not seeded in Supabase mode (production deployments should not
+    # have demo data; use admin UI to create real content)

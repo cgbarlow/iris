@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 THEME_COLORS: dict[str, dict[str, str]] = {
     "light": {
@@ -120,7 +121,7 @@ def generate_svg_from_diagram_data(
 
 
 async def generate_and_store_thumbnail(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     data: dict,
     diagram_type: str,
@@ -152,7 +153,7 @@ async def generate_and_store_thumbnail(
 
 
 async def get_thumbnail(
-    db: aiosqlite.Connection, diagram_id: str, theme: str = "dark",
+    db: DatabasePort, diagram_id: str, theme: str = "dark",
 ) -> bytes | None:
     """Get stored thumbnail for a diagram."""
     cursor = await db.execute(
@@ -164,7 +165,7 @@ async def get_thumbnail(
     return row[0] if row else None
 
 
-async def regenerate_all_thumbnails(db: aiosqlite.Connection) -> int:
+async def regenerate_all_thumbnails(db: DatabasePort) -> int:
     """Regenerate PNG thumbnails for all non-deleted diagrams in all themes.
 
     Called during startup to ensure all diagrams have up-to-date PNG thumbnails,

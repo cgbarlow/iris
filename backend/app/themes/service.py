@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_theme(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     name: str,
     description: str | None = None,
@@ -44,7 +45,7 @@ async def create_theme(
 
 
 async def list_themes(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     notation: str | None = None,
 ) -> list[dict[str, object]]:
     """List all themes, optionally filtered by notation."""
@@ -77,7 +78,7 @@ async def list_themes(
 
 
 async def get_theme(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     theme_id: str,
 ) -> dict[str, object] | None:
     """Get a single theme by ID."""
@@ -103,7 +104,7 @@ async def get_theme(
 
 
 async def update_theme(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     theme_id: str,
     *,
     name: str,
@@ -124,7 +125,7 @@ async def update_theme(
 
 
 async def delete_theme(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     theme_id: str,
 ) -> bool:
     """Delete a theme. Returns False if not found or is default."""
@@ -140,7 +141,7 @@ async def delete_theme(
     return True
 
 
-async def seed_default_themes(db: aiosqlite.Connection) -> None:
+async def seed_default_themes(db: DatabasePort) -> None:
     """Seed default themes if none exist, or update existing seed themes with latest config."""
     cursor = await db.execute("SELECT COUNT(*) FROM themes")
     count = (await cursor.fetchone())[0]

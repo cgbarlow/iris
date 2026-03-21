@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: initialize databases on startup, close on shutdown."""
     config: AppConfig = app.state.config
-    db_manager = DatabaseManager(config.database)
+    db_manager = DatabaseManager(config)
     await initialize_databases(db_manager)
     app.state.db_manager = db_manager
     yield

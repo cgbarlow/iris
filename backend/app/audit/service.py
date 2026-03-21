@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 GENESIS_HASH = hashlib.sha256(b"IRIS_AUDIT_GENESIS").hexdigest()
 
@@ -32,7 +33,7 @@ def compute_entry_hash(entry: dict[str, object], previous_hash: str) -> str:
 
 
 async def write_audit_entry(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     user_id: str,
     username: str,
@@ -95,7 +96,7 @@ async def write_audit_entry(
 
 
 async def verify_audit_chain(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
 ) -> tuple[bool, int]:
     """Verify the audit log hash chain. Returns (is_valid, entries_checked)."""
     cursor = await db.execute(

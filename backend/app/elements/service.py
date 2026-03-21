@@ -13,10 +13,11 @@ from app.search.service import remove_element_index as _remove_element_index
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     element_type: str,
     name: str,
@@ -71,7 +72,7 @@ async def create_element(
 
 
 async def get_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
 ) -> dict[str, object] | None:
     """Get an element with its current version data."""
@@ -122,7 +123,7 @@ async def get_element(
 
 
 async def list_elements(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     element_type: str | None = None,
     set_id: str | None = None,
@@ -223,7 +224,7 @@ async def list_elements(
 
 
 async def update_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
     *,
     name: str,
@@ -289,7 +290,7 @@ async def update_element(
 
 
 async def rollback_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
     *,
     target_version: int,
@@ -359,7 +360,7 @@ async def rollback_element(
 
 
 async def soft_delete_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
     *,
     deleted_by: str,
@@ -408,7 +409,7 @@ async def soft_delete_element(
 
 
 async def restore_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
     *,
     restored_by: str,
@@ -459,7 +460,7 @@ async def restore_element(
 
 
 async def cascade_delete_element(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
     *,
     deleted_by: str,
@@ -563,7 +564,7 @@ async def cascade_delete_element(
 
 
 async def get_element_versions(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
 ) -> list[dict[str, object]]:
     """Get all versions of an element."""
@@ -599,7 +600,7 @@ async def get_element_versions(
 
 
 async def get_element_version(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     element_id: str,
     version: int,
 ) -> dict[str, object] | None:

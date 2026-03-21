@@ -32,6 +32,7 @@ from app.relationships.service import create_relationship
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 @dataclass
@@ -216,7 +217,7 @@ async def _build_guid_index(
 
 
 async def import_sparx_file(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     qea_path: str,
     imported_by: str,
     set_id: str | None = None,

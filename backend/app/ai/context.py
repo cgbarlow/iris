@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 # Rough heuristic: 4 chars ≈ 1 token
 _CHARS_PER_TOKEN = 4
@@ -23,7 +24,7 @@ def _truncate_to_budget(text: str, max_chars: int) -> str:
 
 
 async def build_set_context(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     set_id: str,
     *,
     max_tokens: int = 8000,

@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_package_relationship(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     source_package_id: str,
     target_package_id: str,
@@ -47,7 +48,7 @@ async def create_package_relationship(
 
 
 async def list_package_relationships(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     package_id: str,
 ) -> list[dict[str, object]]:
     """List all relationships where package_id is source or target."""
@@ -84,7 +85,7 @@ async def list_package_relationships(
 
 
 async def list_element_relationships_for_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
 ) -> list[dict[str, object]]:
     """List element-to-element relationships for elements on a diagram's canvas."""
@@ -158,7 +159,7 @@ async def list_element_relationships_for_diagram(
 
 
 async def list_all_relationships_for_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
 ) -> dict[str, list[dict[str, object]]]:
     """Return both package-to-package and element-to-element relationships for a diagram."""
@@ -181,7 +182,7 @@ async def list_all_relationships_for_diagram(
 
 
 async def delete_package_relationship(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     relationship_id: str,
 ) -> bool:
     """Delete a package relationship. Returns False if not found."""

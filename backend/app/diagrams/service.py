@@ -18,10 +18,11 @@ from app.search.service import remove_diagram_index as _remove_diagram_index
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def create_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     diagram_type: str,
     name: str,
@@ -118,7 +119,7 @@ async def create_diagram(
 
 
 async def get_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
 ) -> dict[str, object] | None:
     """Get a diagram with its current version data."""
@@ -178,7 +179,7 @@ async def get_diagram(
 
 
 async def list_diagrams(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     diagram_type: str | None = None,
     notation: str | None = None,
@@ -272,7 +273,7 @@ async def list_diagrams(
 
 
 async def update_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     *,
     name: str,
@@ -443,7 +444,7 @@ async def update_diagram(
 
 
 async def soft_delete_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     *,
     deleted_by: str,
@@ -487,7 +488,7 @@ async def soft_delete_diagram(
 
 
 async def restore_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     *,
     restored_by: str,
@@ -538,7 +539,7 @@ async def restore_diagram(
 
 
 async def validate_no_cycle(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     proposed_parent_id: str,
 ) -> bool:
@@ -579,7 +580,7 @@ async def validate_no_cycle(
 
 
 async def set_diagram_parent(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     parent_package_id: str | None,
     updated_by: str,
@@ -615,7 +616,7 @@ async def set_diagram_parent(
 
 
 async def get_diagram_ancestors(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
 ) -> list[dict[str, object]]:
     """Get ancestor chain from diagram to root (breadcrumb order: root first).
@@ -666,7 +667,7 @@ async def get_diagram_ancestors(
 
 
 async def get_diagram_children(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
 ) -> list[dict[str, object]]:
     """Get direct child diagrams of a diagram/package."""
@@ -692,7 +693,7 @@ async def get_diagram_children(
 
 
 async def get_diagram_hierarchy(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     root_id: str | None = None,
     set_id: str | None = None,
 ) -> list[dict[str, object]]:
@@ -785,7 +786,7 @@ async def get_diagram_hierarchy(
 
 
 async def get_diagram_versions(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
 ) -> list[dict[str, object]]:
     """Get all versions of a diagram."""
@@ -821,7 +822,7 @@ async def get_diagram_versions(
 
 
 async def rollback_diagram(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     diagram_id: str,
     *,
     target_version: int,

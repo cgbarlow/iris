@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 # Default settings values
 DEFAULTS = {
@@ -15,7 +16,7 @@ DEFAULTS = {
 }
 
 
-async def seed_defaults(db: aiosqlite.Connection) -> None:
+async def seed_defaults(db: DatabasePort) -> None:
     """Seed default settings if they don't exist."""
     for key, value in DEFAULTS.items():
         await db.execute(
@@ -25,7 +26,7 @@ async def seed_defaults(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
-async def get_all_settings(db: aiosqlite.Connection) -> list[dict[str, object]]:
+async def get_all_settings(db: DatabasePort) -> list[dict[str, object]]:
     """Get all settings."""
     cursor = await db.execute(
         "SELECT key, value, updated_at, updated_by FROM settings ORDER BY key"
@@ -37,7 +38,7 @@ async def get_all_settings(db: aiosqlite.Connection) -> list[dict[str, object]]:
     ]
 
 
-async def get_setting(db: aiosqlite.Connection, key: str) -> dict[str, object] | None:
+async def get_setting(db: DatabasePort, key: str) -> dict[str, object] | None:
     """Get a single setting by key."""
     cursor = await db.execute(
         "SELECT key, value, updated_at, updated_by FROM settings WHERE key = ?",
@@ -50,7 +51,7 @@ async def get_setting(db: aiosqlite.Connection, key: str) -> dict[str, object] |
 
 
 async def update_setting(
-    db: aiosqlite.Connection, key: str, value: str, updated_by: str
+    db: DatabasePort, key: str, value: str, updated_by: str
 ) -> dict[str, object] | None:
     """Update a setting. Returns None if key doesn't exist."""
     cursor = await db.execute("SELECT key FROM settings WHERE key = ?", (key,))

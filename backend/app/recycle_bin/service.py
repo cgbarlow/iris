@@ -10,10 +10,11 @@ from app.packages.service import restore_package
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def list_deleted_items(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     *,
     page: int = 1,
     page_size: int = 50,
@@ -96,7 +97,7 @@ async def list_deleted_items(
 
 
 async def cascade_restore_by_group(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     group_id: str,
     *,
     restored_by: str,
@@ -137,7 +138,7 @@ async def cascade_restore_by_group(
     return count
 
 
-async def empty_recycle_bin(db: aiosqlite.Connection) -> int:
+async def empty_recycle_bin(db: DatabasePort) -> int:
     """Permanently delete all soft-deleted items. Returns total count removed."""
     count = 0
 
@@ -173,7 +174,7 @@ async def empty_recycle_bin(db: aiosqlite.Connection) -> int:
 
 
 async def _hard_delete_single(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     item_type: str,
     item_id: str,
 ) -> None:
@@ -224,7 +225,7 @@ async def _hard_delete_single(
 
 
 async def hard_delete_item(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     item_type: str,
     item_id: str,
 ) -> bool:

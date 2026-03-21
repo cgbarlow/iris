@@ -14,10 +14,11 @@ from app.search.service import remove_diagram_index as _remove_diagram_index
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
 async def batch_delete_diagrams(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     deleted_by: str,
 ) -> dict[str, object]:
@@ -75,7 +76,7 @@ async def batch_delete_diagrams(
 
 
 async def batch_clone_diagrams(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     cloned_by: str,
 ) -> dict[str, object]:
@@ -146,7 +147,7 @@ async def batch_clone_diagrams(
 
 
 async def batch_set_diagrams(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     set_id: str,
 ) -> dict[str, object]:
@@ -188,7 +189,7 @@ async def batch_set_diagrams(
 
 
 async def batch_tags_diagrams(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     add_tags: list[str],
     remove_tags: list[str],
@@ -234,7 +235,7 @@ async def batch_tags_diagrams(
 
 
 async def batch_delete_elements(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     deleted_by: str,
 ) -> dict[str, object]:
@@ -292,7 +293,7 @@ async def batch_delete_elements(
 
 
 async def batch_clone_elements(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     cloned_by: str,
 ) -> dict[str, object]:
@@ -364,7 +365,7 @@ async def batch_clone_elements(
 
 
 async def batch_set_elements(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     set_id: str,
 ) -> dict[str, object]:
@@ -406,7 +407,7 @@ async def batch_set_elements(
 
 
 async def batch_tags_elements(
-    db: aiosqlite.Connection,
+    db: DatabasePort,
     ids: list[str],
     add_tags: list[str],
     remove_tags: list[str],

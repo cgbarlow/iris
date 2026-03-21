@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 
-async def list_diagram_types(db: aiosqlite.Connection) -> list[dict]:
+async def list_diagram_types(db: DatabasePort) -> list[dict]:
     """Return all active diagram types with their notation mappings."""
     cursor = await db.execute(
         "SELECT id, name, description, display_order, is_active "
@@ -48,7 +49,7 @@ async def list_diagram_types(db: aiosqlite.Connection) -> list[dict]:
     return result
 
 
-async def list_notations(db: aiosqlite.Connection) -> list[dict]:
+async def list_notations(db: DatabasePort) -> list[dict]:
     """Return all active notations."""
     cursor = await db.execute(
         "SELECT id, name, description, display_order, is_active "
@@ -69,7 +70,7 @@ async def list_notations(db: aiosqlite.Connection) -> list[dict]:
 
 
 async def get_default_notation(
-    db: aiosqlite.Connection, diagram_type_id: str
+    db: DatabasePort, diagram_type_id: str
 ) -> str | None:
     """Return the default notation ID for a diagram type, or None."""
     cursor = await db.execute(
@@ -82,7 +83,7 @@ async def get_default_notation(
 
 
 async def validate_type_notation(
-    db: aiosqlite.Connection, diagram_type_id: str, notation_id: str
+    db: DatabasePort, diagram_type_id: str, notation_id: str
 ) -> bool:
     """Check that a (type, notation) pair exists in the mapping table."""
     cursor = await db.execute(
@@ -94,7 +95,7 @@ async def validate_type_notation(
 
 
 async def update_diagram_notation(
-    db: aiosqlite.Connection, diagram_id: str, notation: str
+    db: DatabasePort, diagram_id: str, notation: str
 ) -> dict | None:
     """Change a diagram's notation. Returns updated fields or None if not found."""
     # Verify diagram exists

@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+    from app.db.adapter import DatabasePort
 
 _SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000"
 _DEFAULT_SET_ID = "00000000-0000-0000-0000-000000000001"
@@ -1485,7 +1486,7 @@ _DIAGRAMS = [
 
 # ── Seed logic ───────────────────────────────────────────────────────────────
 
-async def _ensure_system_user(db: aiosqlite.Connection) -> None:
+async def _ensure_system_user(db: DatabasePort) -> None:
     """Create a deactivated system user for seed data ownership."""
     await db.execute(
         "INSERT OR IGNORE INTO users (id, username, password_hash, role, is_active) "
@@ -1494,7 +1495,7 @@ async def _ensure_system_user(db: aiosqlite.Connection) -> None:
     )
 
 
-async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
+async def _clear_old_seed_data(db: DatabasePort) -> None:
     """Delete old seed data by deterministic IDs in dependency order."""
     max_elements = max(len(_ENTITIES), 59)
     max_rels = max(len(_RELATIONSHIPS), 58)
@@ -1550,7 +1551,7 @@ async def _clear_old_seed_data(db: aiosqlite.Connection) -> None:
 _V5_MARKER = "seed_v5"
 
 
-async def seed_example_models(db: aiosqlite.Connection) -> None:
+async def seed_example_models(db: DatabasePort) -> None:
     """Seed example elements, packages, and diagrams demonstrating Iris architecture.
 
     Idempotency:
