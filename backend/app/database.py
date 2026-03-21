@@ -111,6 +111,7 @@ class DatabaseManager:
             min_size=1,
             max_size=10,
             command_timeout=30,
+            statement_cache_size=0,  # Transaction pooler does not support PREPARE
         )
 
     async def close(self) -> None:
