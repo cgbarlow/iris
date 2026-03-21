@@ -26,7 +26,7 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         await initialize_databases(manager)
         assert data_dir.exists()
         await manager.close()
@@ -39,7 +39,7 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         await initialize_databases(manager)
         cursor = await manager.main_db.execute("SELECT COUNT(*) FROM roles")
         row = await cursor.fetchone()
@@ -56,7 +56,7 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         await initialize_databases(manager)
         cursor = await manager.main_db.execute(
             "SELECT name FROM sqlite_master "
@@ -75,7 +75,7 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         await initialize_databases(manager)
         cursor = await manager.audit_db.execute(
             "SELECT name FROM sqlite_master "
@@ -94,7 +94,7 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         # First init succeeds (empty chain is valid)
         await initialize_databases(manager)
         await manager.close()
@@ -109,7 +109,7 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         await initialize_databases(manager)
 
         # Write an audit entry then tamper with it
@@ -127,7 +127,7 @@ class TestInitializeDatabases:
         await manager.close()
 
         # Re-initialize should detect tampering
-        manager2 = DatabaseManager(config.database)
+        manager2 = DatabaseManager(config)
         with pytest.raises(RuntimeError, match="Audit chain verification failed"):
             await initialize_databases(manager2)
         await manager2.close()
@@ -140,12 +140,12 @@ class TestInitializeDatabases:
                 jwt_secret="test-key-at-least-32-bytes-long-for-testing",
             ),
         )
-        manager = DatabaseManager(config.database)
+        manager = DatabaseManager(config)
         await initialize_databases(manager)
         await manager.close()
 
         # Run again
-        manager2 = DatabaseManager(config.database)
+        manager2 = DatabaseManager(config)
         await initialize_databases(manager2)
         cursor = await manager2.main_db.execute("SELECT COUNT(*) FROM roles")
         row = await cursor.fetchone()

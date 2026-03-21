@@ -74,7 +74,7 @@ async def client(
     app_config: AppConfig,
 ) -> AsyncIterator[httpx.AsyncClient]:
     application = create_app(app_config)
-    db_manager = DatabaseManager(app_config.database)
+    db_manager = DatabaseManager(app_config)
     await initialize_databases(db_manager)
     application.state.db_manager = db_manager
     transport = httpx.ASGITransport(app=application)
@@ -221,7 +221,7 @@ class TestRegenerateAllThumbnails:
         self, app_config: AppConfig,
     ) -> None:
         """Diagrams without thumbnails get PNG after regeneration."""
-        db_manager = DatabaseManager(app_config.database)
+        db_manager = DatabaseManager(app_config)
         await initialize_databases(db_manager)
         db = db_manager.main_db
 
@@ -260,7 +260,7 @@ class TestRegenerateAllThumbnails:
         self, app_config: AppConfig,
     ) -> None:
         """SVG-byte thumbnails are replaced with PNG."""
-        db_manager = DatabaseManager(app_config.database)
+        db_manager = DatabaseManager(app_config)
         await initialize_databases(db_manager)
         db = db_manager.main_db
 
@@ -298,7 +298,7 @@ class TestRegenerateAllThumbnails:
         self, app_config: AppConfig,
     ) -> None:
         """Deleted diagrams should not get thumbnails."""
-        db_manager = DatabaseManager(app_config.database)
+        db_manager = DatabaseManager(app_config)
         await initialize_databases(db_manager)
         db = db_manager.main_db
 
@@ -331,7 +331,7 @@ class TestStartupThumbnailRegeneration:
         self, app_config: AppConfig,
     ) -> None:
         """After restart, all diagrams have PNG thumbnails."""
-        db_manager = DatabaseManager(app_config.database)
+        db_manager = DatabaseManager(app_config)
         await initialize_databases(db_manager)
         db = db_manager.main_db
 
@@ -350,7 +350,7 @@ class TestStartupThumbnailRegeneration:
         await db_manager.close()
 
         # Re-initialize (simulates restart)
-        db_manager2 = DatabaseManager(app_config.database)
+        db_manager2 = DatabaseManager(app_config)
         await initialize_databases(db_manager2)
 
         thumb = await get_thumbnail(db_manager2.main_db, diagram_id)
@@ -413,7 +413,7 @@ class TestThemeThumbnails:
         self, app_config: AppConfig,
     ) -> None:
         """After regeneration each diagram has dark, light, and high-contrast thumbnails."""
-        db_manager = DatabaseManager(app_config.database)
+        db_manager = DatabaseManager(app_config)
         await initialize_databases(db_manager)
         db = db_manager.main_db
 

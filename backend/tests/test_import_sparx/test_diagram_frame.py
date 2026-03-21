@@ -209,7 +209,7 @@ def app_config(tmp_path: Path) -> AppConfig:
 @pytest.fixture
 async def client(app_config: AppConfig) -> AsyncIterator[httpx.AsyncClient]:
     application = create_app(app_config)
-    db_manager = DatabaseManager(app_config.database)
+    db_manager = DatabaseManager(app_config)
     await initialize_databases(db_manager)
     application.state.db_manager = db_manager
     transport = httpx.ASGITransport(app=application)
