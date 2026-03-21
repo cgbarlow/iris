@@ -17,16 +17,16 @@ This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** w
 1. Log in to [app.supabase.com](https://app.supabase.com) and click **New project**.
 2. Choose an organisation, project name, database password, and region. Save the database password securely.
    > **Do not** check "Enable automatic RLS". Iris manages RLS explicitly via migration `m030_rls_policies.sql` — an automatic trigger could interfere with migration ordering.
-3. After the project provisions, go to **Settings → API Keys** and note:
-   - **Project URL** (`SUPABASE_URL`)
+3. After the project provisions, go to **Settings → General** and note the **Project ID** (e.g. `onaojeffmvyzajrnuzqj`). The project URL is `https://<project-id>.supabase.co` (`SUPABASE_URL`).
+4. Go to **Settings → API Keys** and note:
    - **Publishable key** (default) → use as `SUPABASE_ANON_KEY` / `VITE_SUPABASE_ANON_KEY`
    - **Secret key** (default) → use as `SUPABASE_SERVICE_ROLE_KEY`
 
    > Supabase now uses **Publishable keys** (`sb_publishable_*`) and **Secret keys** (`sb_secret_*`). These replace the legacy `anon` and `service_role` JWT keys. Both formats work with the Supabase JS SDK. If you see a "Legacy anon, service_role API keys" tab, use the new keys instead.
 
-4. Go to **Settings → API Keys → JWT Settings** (or **Settings → Data API**) and note:
+5. Go to **Settings → API Keys → JWT Settings** (or **Settings → Data API**) and note:
    - **JWT Secret** (`SUPABASE_JWT_SECRET`)
-5. Go to **Settings → Database** and note the **Connection string (URI)** — use the *Transaction pooler* URL for serverless functions (`SUPABASE_DB_URL`). Replace `[YOUR-PASSWORD]` with your database password.
+6. Go to **Settings → Database** and note the **Connection string (URI)** — use the *Transaction pooler* URL for serverless functions (`SUPABASE_DB_URL`). Replace `[YOUR-PASSWORD]` with your database password.
 
 ---
 
