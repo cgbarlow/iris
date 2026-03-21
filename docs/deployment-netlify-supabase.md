@@ -16,6 +16,7 @@ This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** w
 
 1. Log in to [app.supabase.com](https://app.supabase.com) and click **New project**.
 2. Choose an organisation, project name, database password, and region. Save the database password securely.
+   > **Do not** check "Enable automatic RLS". Iris manages RLS explicitly via migration `m030_rls_policies.sql` — an automatic trigger could interfere with migration ordering.
 3. After the project provisions, go to **Settings → API** and note:
    - **Project URL** (`SUPABASE_URL`)
    - **anon / public key** (`SUPABASE_ANON_KEY`)
