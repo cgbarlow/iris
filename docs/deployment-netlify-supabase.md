@@ -33,48 +33,35 @@ This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** w
 
 ## Step 2 — Run the PostgreSQL migrations
 
-1. In your Supabase project, go to **SQL Editor** and open a new query.
-2. Run each migration file in order from `backend/app/migrations/supabase/`:
+All 30 migration files are in `backend/app/migrations/supabase/` (m001–m030). They are idempotent and safe to re-run.
 
-   ```
-   m001_roles_users.sql
-   m002_elements_relationships_diagrams.sql
-   m003_audit_log.sql
-   m004_comments_bookmarks.sql
-   m005_search.sql
-   m006_settings.sql
-   m007_thumbnails.sql
-   m008_element_tags.sql
-   m009_diagram_tags.sql
-   m010_thumbnail_themes.sql
-   m011_model_hierarchy.sql
-   m012_sets.sql
-   m013_set_thumbnails.sql
-   m014_sets_partial_unique.sql
-   m015_package_relationships.sql
-   m016_naming_rename.sql
-   m017_views.sql
-   m018_package_bookmarks.sql
-   m019_recycle_bin.sql
-   m020_diagram_type_notation_registry.sql
-   m021_edit_locks.sql
-   m022_element_notation.sql
-   m023_new_diagram_types.sql
-   m024_themes.sql
-   m025_diagram_links.sql
-   m026_ai_providers.sql
-   m027_profiles.sql
-   m028_doview_notation.sql
-   m029_ai_creation_prompts.sql
-   m030_rls_policies.sql
+### Option A: Script (recommended)
+
+If you have `psql` installed locally, run all migrations in one command using the **Direct connection** URI (port 5432, not the Transaction pooler):
+
+```sh
+./scripts/supabase-migrate.sh "postgresql://postgres:YOUR-PASSWORD@db.xxxx.supabase.co:5432/postgres"
+```
+
+### Option B: Supabase SQL Editor
+
+1. Open the **SQL Editor** in your Supabase project.
+2. Concatenate all migration files and paste into a single query:
+
+   ```sh
+   cat backend/app/migrations/supabase/m*.sql | pbcopy   # macOS
+   cat backend/app/migrations/supabase/m*.sql | xclip    # Linux
    ```
 
-   Run each file in the SQL Editor, in order.
+3. Paste into the SQL Editor and click **Run**.
 
-3. `m027_profiles.sql` creates the `profiles` table and a trigger that auto-creates a profile row whenever Supabase Auth creates a new user. You do **not** need to insert profile rows manually.
-4. `m028_doview_notation.sql` seeds DoView notation data (notation, diagram types, mappings, theme).
-5. `m029_ai_creation_prompts.sql` creates the `ai_creation_prompts` table and seeds 4 layered prompts for AI diagram creation.
-6. `m030_rls_policies.sql` enables Row Level Security on all 34 tables (see [Verifying Row Level Security](#verifying-row-level-security) below).
+### What the migrations do
+
+- **m001–m026**: Core schema (tables, indexes, FTS triggers, seed data)
+- **m027**: `profiles` table + trigger that auto-creates a profile row when Supabase Auth creates a user (no manual inserts needed)
+- **m028**: DoView notation, diagram types, mappings, and theme (seed data)
+- **m029**: `ai_creation_prompts` table + 4 seeded layered prompts
+- **m030**: Row Level Security on all 34 tables (see [Verifying Row Level Security](#verifying-row-level-security))
 
 ---
 
