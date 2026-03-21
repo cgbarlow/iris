@@ -41,6 +41,8 @@ const ALL_NODE_TYPE_KEYS = [
 	'person', 'software_system', 'software_system_external', 'container',
 	'c4_component', 'code_element', 'deployment_node', 'infrastructure_node',
 	'container_instance',
+	// DoView
+	'outcome_box', 'final_outcome', 'overview_tile', 'source_reference',
 ] as const;
 
 /** All edge type keys across all notations. */
@@ -57,6 +59,8 @@ const ALL_EDGE_TYPE_KEYS = [
 	'specialization', 'assignment', 'association_archimate',
 	// C4
 	'c4_relationship',
+	// DoView
+	'causal_link',
 ] as const;
 
 /** Unified node type registry — ALL types map to DynamicNode. */

@@ -328,6 +328,7 @@
 			<option value="uml">UML</option>
 			<option value="archimate">ArchiMate</option>
 			<option value="c4">C4</option>
+			<option value="doview">DoView</option>
 		</select>
 	</div>
 	<div>

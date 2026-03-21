@@ -45,6 +45,10 @@ SIMPLE_TYPES: frozenset[str] = frozenset({
     "component", "service", "interface", "actor", "database",
 })
 
+DOVIEW_TYPES: frozenset[str] = frozenset({
+    "outcome_box", "final_outcome", "overview_tile", "source_reference",
+})
+
 UNIVERSAL_TYPES: frozenset[str] = frozenset({
     "note", "boundary", "modelref",
 })
@@ -74,5 +78,7 @@ def detect_notations(data: dict) -> list[str]:
             notations.add("archimate")
         elif entity_type in SIMPLE_TYPES:
             notations.add("simple")
+        elif entity_type in DOVIEW_TYPES:
+            notations.add("doview")
 
     return sorted(notations)

@@ -5,6 +5,37 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-03-21
+
+### Added
+- **DoView notation** — fifth notation in Iris for outcomes-based theory of change diagrams (ADR-094)
+- DoView entity types: `outcome_box`, `final_outcome`, `overview_tile`, `source_reference`
+- DoView relationship type: `causal_link` (grey arrow, 2px)
+- DoView diagram types: `outcomes_map` (left-to-right causal flow) and `overview` (navigation tiles)
+- `doview` notation added to registry with `free_form` cross-notation mapping
+- DoView default theme (`doview-default`) with 10-color palette (yellow, pink, blue, green, beige, lavender, peach, cyan, grey, white)
+- `DoviewRenderer.svelte` — node renderer for all DoView entity types with color overrides
+- `DoviewEdgeRenderer.svelte` — causal link edge renderer with grey arrow styling
+- Dynamic dispatch: `DynamicNode`/`DynamicEdge` route `doview` notation and DoView entity types
+- DoView notation detection in `notation_detection.py`
+- Entity dialog and diagram creation dialog support for DoView
+- Seed example DoView diagrams: DoView Overview (navigation tiles) and Outcomes Map (4-column causal flow)
+- Migration m027 for notation, diagram types, mappings, and DoView theme
+- **AI Diagram Creation system** — layered system prompt composition for AI-guided diagram creation (ADR-094-B)
+- `ai_creation_prompts` table with layered prompt architecture: base / notation / diagram_type / override (migration m028)
+- `build_creation_system_prompt()` — composes layered prompts; override layer replaces all others
+- `create_diagrams_from_ai()` — materialises AI-generated JSON into Iris canvas diagrams with `linkedDiagramIndex` resolution
+- Admin creation prompts endpoint: `GET /api/ai/creation-prompts`, `PUT /api/ai/creation-prompts/{id}`
+- Apply creation endpoint: `POST /api/ai/sets/{set_id}/create-diagram/apply`
+- Creation mode toggle in Ask AI chat — switches to DoView creation mode with notation selector
+- "Create Diagrams" action button appears when AI outputs a valid diagram JSON block
+- Admin Creation Prompts editor in `/admin/ai/` — table of layered prompts with full-text edit modal
+- Seeded default prompts: base output format, DoView methodology (guided 8-question conversation), outcomes_map layout rules, overview layout rules
+
+### Changed
+- Seed data bumped to v6 with DoView examples (35 diagrams, 66 elements, 63 relationships)
+- `build_edge_visual()` returns `None` (not `{}`) when no visual overrides are present — consistent with `build_node_visual()`
+
 ## [2.5.0] - 2026-03-19
 
 ### Added

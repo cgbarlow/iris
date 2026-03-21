@@ -7,14 +7,15 @@ import {
 } from '$lib/types/canvas';
 
 describe('Canvas types', () => {
-	it('defines all 7 Simple View entity types (5 domain + 2 universal)', () => {
-		expect(SIMPLE_ENTITY_TYPES).toHaveLength(7);
+	it('defines all 8 Simple View entity types (6 domain + 2 universal)', () => {
+		expect(SIMPLE_ENTITY_TYPES).toHaveLength(8);
 		const keys = SIMPLE_ENTITY_TYPES.map((t) => t.key);
 		expect(keys).toContain('component');
 		expect(keys).toContain('service');
 		expect(keys).toContain('interface');
 		expect(keys).toContain('actor');
 		expect(keys).toContain('database');
+		expect(keys).toContain('navigation_cell');
 		expect(keys).toContain('note');
 		expect(keys).toContain('boundary');
 	});
@@ -48,10 +49,9 @@ describe('Canvas types', () => {
 			'component',
 			'service',
 			'interface',
-			'package',
 			'actor',
 			'database',
-			'queue',
+			'navigation_cell',
 			'note',
 			'boundary',
 		];

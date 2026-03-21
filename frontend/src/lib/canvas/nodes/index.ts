@@ -10,6 +10,7 @@ import QueueNode from './QueueNode.svelte';
 import ModelRefNode from './ModelRefNode.svelte';
 import NoteNode from './NoteNode.svelte';
 import BoundaryNode from './BoundaryNode.svelte';
+import NavigationCellNode from './NavigationCellNode.svelte';
 
 export const simpleViewNodeTypes = {
 	component: ComponentNode,
@@ -22,4 +23,5 @@ export const simpleViewNodeTypes = {
 	modelref: ModelRefNode,
 	note: NoteNode,
 	boundary: BoundaryNode,
+	navigation_cell: NavigationCellNode,
 } as const;

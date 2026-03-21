@@ -13,6 +13,8 @@ export interface ThemeRenderingConfig {
 	attrFontColor?: string;
 	hideTypeStereotypes?: boolean;
 	abstractBoldOverride?: boolean;
+	wrapLabels?: boolean;
+	textAlign?: 'left' | 'center' | 'right';
 }
 
 export interface ThemeConfig {
