@@ -5,6 +5,39 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-03-21
+
+### Added
+
+- **Optional Supabase/Netlify deployment** (ADR-094) — cloud deployment path alongside the default SQLite self-hosted mode
+- `DatabasePort` protocol with `SqliteAdapter` (aiosqlite passthrough) and `SupabaseAdapter` (asyncpg with automatic `?` → `$N` placeholder conversion)
+- `IRIS_DB_BACKEND` env var (`sqlite` default, `supabase` for cloud mode)
+- PostgreSQL migrations (`backend/app/migrations/supabase/`) — 27 SQL files covering all schema including FTS via `tsvector`/GIN indexes and triggers
+- `profiles` table in Supabase mode: maps `auth.users` UUIDs to Iris roles; auto-created by trigger on user creation
+- Supabase Auth JWT validation (`app/auth/supabase_service.py`) — HS256, no aud verification
+- `GET /api/auth/me` endpoint (both modes) — returns authenticated user profile
+- Dual search: FTS5 for SQLite, `tsvector`/`to_tsquery` for PostgreSQL (`app/search/service.py`)
+- `netlify.toml` with build config, function directory, and `/api/*` → Netlify Function redirect
+- `netlify/functions/api.py` — Mangum ASGI handler wrapping FastAPI for serverless deployment
+- `frontend/src/lib/config.ts` — runtime config from `VITE_DB_BACKEND`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- `frontend/src/lib/supabase.ts` — conditional Supabase JS client (null when not configured)
+- Supabase mode frontend auth: `onAuthStateChange` token sync, `supabase.auth.signInWithPassword()` login, `supabase.auth.refreshSession()` token refresh
+- Login page: email field and Supabase sign-in in Supabase mode; setup/request-account/forgot-password views hidden (managed via Supabase Dashboard)
+- `.env.example` documenting all environment variables for both deployment modes
+- `docs/deployment-netlify-supabase.md` — step-by-step Netlify + Supabase deployment guide
+- Optional backend dependencies: `mangum==0.21.0`, `asyncpg==0.31.0` (install with `uv sync --extra supabase`)
+
+### Changed
+
+- `DatabaseManager` now accepts `AppConfig` (preferred) or `DatabaseConfig` (backward-compatible)
+- All service functions: `db` parameter type updated from `aiosqlite.Connection` to `DatabasePort` (no runtime change in SQLite mode)
+- `app/auth/dependencies.py`: `get_current_user` branches on `db_backend` — SQLite checks `users` table, Supabase checks `profiles` table
+- `app/auth/router.py`: login/refresh/setup/change-password return 404 in Supabase mode; setup/status always returns `needs_setup: false` in Supabase mode
+- `app/users/router.py`: list/update users reads from `profiles` table in Supabase mode; create user returns 501 (use Supabase Dashboard)
+- `app/middleware/audit.py`: JWT decoded with correct secret per mode; username resolved from `profiles` (Supabase) or `users` (SQLite)
+- `frontend/src/lib/utils/api.ts`: `tryRefresh()` delegates to Supabase SDK in Supabase mode
+- `frontend/src/lib/stores/auth.svelte.ts`: `clearAuth()` calls `supabase.auth.signOut()` in Supabase mode
+
 ## [2.5.0] - 2026-03-19
 
 ### Added

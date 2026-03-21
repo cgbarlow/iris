@@ -10,20 +10,30 @@ Iris follows a **repository-first architecture** (ADR-003): entities are first-c
 
 ```
 iris/
-  backend/       Python/FastAPI API server with SQLite
+  backend/       Python/FastAPI API server
   frontend/      SvelteKit/Svelte 5 single-page application
   docs/          ADRs, specs, protocols, and compliance documents
+  netlify/       Netlify Functions handler (optional cloud deployment)
 ```
+
+### Deployment modes
+
+| Mode | Database | Auth | Hosting |
+|------|----------|------|---------|
+| **SQLite** (default) | SQLite (aiosqlite) | Iris JWT (Argon2id) | Self-hosted (any server) |
+| **Supabase** (optional) | PostgreSQL (asyncpg) | Supabase Auth (JWTs) | Netlify Functions + CDN |
+
+The default self-hosted mode requires no external services. The optional Supabase/Netlify mode is a cloud-native deployment path. See [docs/deployment-netlify-supabase.md](docs/deployment-netlify-supabase.md) for setup instructions.
 
 ### Backend
 
-- **Framework:** FastAPI with async SQLite (aiosqlite)
-- **Database:** SQLite with WAL mode, foreign keys, and 7 PRAGMAs per SPEC-004-A
-- **Auth:** Argon2id password hashing, JWT access tokens (15min), refresh token rotation
+- **Framework:** FastAPI with async database access (aiosqlite / asyncpg)
+- **Database:** SQLite with WAL mode (default) or PostgreSQL via Supabase (optional)
+- **Auth:** Argon2id password hashing + Iris JWT (SQLite) or Supabase Auth JWT (Supabase)
 - **RBAC:** 4 roles (Admin, Architect, Reviewer, Viewer) with 26 permission mappings
-- **Audit:** Separate audit database with SHA-256 hash-chained immutable log
+- **Audit:** SHA-256 hash-chained immutable audit log (separate DB in SQLite; table in Supabase)
 - **Versioning:** Immutable append-only entity versions with revert-as-new-version rollback
-- **Search:** Full-text search with SQLite FTS5 (semantic search planned — see docs/ROADMAP.md)
+- **Search:** Full-text search with SQLite FTS5 (default) or PostgreSQL tsvector/GIN (Supabase)
 
 ### Frontend
 
@@ -244,8 +254,9 @@ npm run test:all-e2e
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 85 Architecture Decision Records |
-| `docs/adrs/specs/` | 97 implementation specifications |
+| `docs/adrs/` | 85+ Architecture Decision Records |
+| `docs/adrs/specs/` | 97+ implementation specifications |
+| `docs/deployment-netlify-supabase.md` | Netlify + Supabase deployment guide |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
 
