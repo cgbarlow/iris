@@ -236,25 +236,10 @@
 	}
 </script>
 
-<svelte:head>
-	<title>AI Providers — Iris Admin</title>
-</svelte:head>
-
-<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-	<ol class="flex gap-1">
-		<li><a href="/admin" style="color: var(--color-primary)">Admin</a></li>
-		<li aria-hidden="true">/</li>
-		<li aria-current="page">AI Providers</li>
-	</ol>
-</nav>
-
 <div class="mb-4 flex items-center justify-between">
-	<div>
-		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">AI Providers</h1>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">
-			Configure LLM providers for Set Q&amp;A. API keys are stored securely and never returned by the API.
-		</p>
-	</div>
+	<p style="color: var(--color-muted)">
+		Configure LLM providers and AI settings. API keys are stored securely and never returned by the API.
+	</p>
 	<button
 		onclick={openCreate}
 		class="rounded px-4 py-2 text-sm text-white"

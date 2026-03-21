@@ -451,6 +451,7 @@
 		if (n === 'uml') return 'uml';
 		if (n === 'archimate') return 'archimate';
 		if (n === 'c4') return 'c4';
+		if (n === 'doview') return 'doview';
 		return 'simple';
 	});
 
@@ -1104,6 +1105,7 @@
 		const edge = canvasEdges.find((e) => e.id === selectedEdgeId);
 		return edge?.data ?? null;
 	});
+	const selectedEdgeRoutingType = $derived(selectedEdgeData?.routingType ?? 'default');
 
 	/** Derived visual overrides for the currently selected node in edit mode. */
 	const selectedNodeVisual = $derived.by(() => {

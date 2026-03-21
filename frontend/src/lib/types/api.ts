@@ -326,6 +326,9 @@ export interface AIConversation {
 	tokens_out: number | null;
 	duration_ms: number | null;
 	created_at: string;
+	mode: string | null;
+	set_name: string | null;
+	thread_id: string | null;
 }
 
 /** @deprecated Use Element instead */

@@ -21,6 +21,7 @@ import type { EdgeRoutingType } from '$lib/types/canvas';
 const FRONTEND_SRC = resolve(import.meta.dirname, '../../src/lib/canvas');
 const TYPES_FILE = resolve(import.meta.dirname, '../../src/lib/types/canvas.ts');
 const PAGE_FILE = resolve(import.meta.dirname, '../../src/routes/diagrams/[id]/+page.svelte');
+const EDGE_STYLE_PANEL = resolve(import.meta.dirname, '../../src/lib/canvas/controls/EdgeStylePanel.svelte');
 
 const simpleEdgeFiles = [
 	'edges/UsesEdge.svelte',
@@ -256,13 +257,13 @@ describe('Routing type undo/redo integration', () => {
 });
 
 describe('Diagram detail page routing type UI', () => {
-	it('page contains routing type select dropdown', () => {
-		const content = readFileSync(PAGE_FILE, 'utf-8');
-		expect(content).toContain('aria-label="Edge routing type"');
+	it('EdgeStylePanel contains routing type select dropdown', () => {
+		const content = readFileSync(EDGE_STYLE_PANEL, 'utf-8');
+		expect(content).toContain('routingType');
 	});
 
-	it('page dropdown has all five routing options', () => {
-		const content = readFileSync(PAGE_FILE, 'utf-8');
+	it('EdgeStylePanel dropdown has all five routing options', () => {
+		const content = readFileSync(EDGE_STYLE_PANEL, 'utf-8');
 		expect(content).toContain('>Default<');
 		expect(content).toContain('>Straight<');
 		expect(content).toContain('>Step<');
@@ -275,9 +276,9 @@ describe('Diagram detail page routing type UI', () => {
 		expect(content).toContain('EdgeRoutingType');
 	});
 
-	it('page has handleRoutingTypeChange function', () => {
+	it('page has selectedEdgeData derived value for edge state', () => {
 		const content = readFileSync(PAGE_FILE, 'utf-8');
-		expect(content).toContain('handleRoutingTypeChange');
+		expect(content).toContain('selectedEdgeData');
 	});
 
 	it('page has selectedEdgeRoutingType derived value', () => {

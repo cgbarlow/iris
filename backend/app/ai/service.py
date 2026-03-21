@@ -363,10 +363,11 @@ async def get_conversations(
 ) -> list[dict[str, object]]:
     """Get conversation history for a Set, newest first."""
     cursor = await db.execute(
-        "SELECT id, set_id, user_id, question, answer, model_used, provider_id, "
-        "tokens_in, tokens_out, duration_ms, created_at "
-        "FROM ai_conversations WHERE set_id = ? "
-        "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        "SELECT c.id, c.set_id, c.user_id, c.question, c.answer, c.model_used, c.provider_id, "
+        "c.tokens_in, c.tokens_out, c.duration_ms, c.created_at, c.mode, s.name, c.thread_id "
+        "FROM ai_conversations c LEFT JOIN sets s ON c.set_id = s.id "
+        "WHERE c.set_id = ? "
+        "ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
         (set_id, limit, offset),
     )
     rows = await cursor.fetchall()
@@ -383,6 +384,9 @@ async def get_conversations(
             "tokens_out": r[8],
             "duration_ms": r[9],
             "created_at": r[10],
+            "mode": r[11] or "discuss",
+            "set_name": r[12],
+            "thread_id": r[13],
         }
         for r in rows
     ]

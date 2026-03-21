@@ -11,6 +11,7 @@
     { key: 'uml', label: 'UML' },
     { key: 'archimate', label: 'ArchiMate' },
     { key: 'c4', label: 'C4' },
+    { key: 'doview', label: 'DoView' },
   ];
 </script>
 

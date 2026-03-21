@@ -44,8 +44,6 @@
 
 	const adminItems = [
 		{ href: '/admin/users', label: 'Users', shortcut: 'U', icon: 'users' },
-		{ href: '/admin/themes', label: 'Themes', shortcut: 'T', icon: 'palette' },
-		{ href: '/admin/ai', label: 'AI Providers', shortcut: 'I', icon: 'ai' },
 		{ href: '/admin/audit', label: 'Audit Log', shortcut: 'A', icon: 'audit' },
 		{ href: '/admin/locks', label: 'Locks', shortcut: 'L', icon: 'lock' },
 		{ href: '/admin/settings', label: 'Settings', shortcut: 'S', icon: 'admin-settings' },
@@ -178,8 +176,8 @@
 									<a
 										href={item.href}
 										class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
-										style="color: var(--color-fg){page.url.pathname === item.href ? '; background-color: var(--color-bg)' : ''}"
-										aria-current={page.url.pathname === item.href ? 'page' : undefined}
+										style="color: var(--color-fg){page.url.pathname.startsWith(item.href) ? '; background-color: var(--color-bg)' : ''}"
+										aria-current={page.url.pathname.startsWith(item.href) ? 'page' : undefined}
 										title="{item.label} ({item.shortcut})"
 									>
 										{@render navIcon(item.icon)}

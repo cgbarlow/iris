@@ -77,8 +77,8 @@ class TestNewDiagramTypes:
         headers = await _auth_headers(client)
         resp = await client.get("/api/registry/diagram-types", headers=headers)
         types = resp.json()
-        # 7 original + 6 new = 13
-        assert len(types) == 13
+        # 7 original + 6 new + 2 DoView = 15
+        assert len(types) == 15
 
 
 class TestNewNotationMappings:

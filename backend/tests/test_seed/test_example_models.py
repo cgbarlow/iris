@@ -51,7 +51,13 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     from app.migrations.m018_package_bookmarks import up as m018
     from app.migrations.m019_recycle_bin import up as m019
     from app.migrations.m020_diagram_type_notation_registry import up as m020
+    from app.migrations.m021_edit_locks import up as m021
     from app.migrations.m022_element_notation import up as m022
+    from app.migrations.m023_new_diagram_types import up as m023
+    from app.migrations.m024_themes import up as m024
+    from app.migrations.m025_diagram_links import up as m025
+    from app.migrations.m026_ai_providers import up as m026
+    from app.migrations.m027_doview_notation import up as m027
     from app.migrations.seed import seed_roles_and_permissions
 
     await m001(db)
@@ -73,7 +79,13 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await m018(db)
     await m019(db)
     await m020(db)
+    await m021(db)
     await m022(db)
+    await m023(db)
+    await m024(db)
+    await m025(db)
+    await m026(db)
+    await m027(db)
     await seed_roles_and_permissions(db)
 
 
@@ -131,6 +143,9 @@ _ALL_VALID_PAIRS = [
     ("free_form", "c4"),
     ("system_context", "c4"),
     ("container", "c4"),
+    # DoView pairs
+    ("overview", "doview"),
+    ("outcomes_map", "doview"),
 ]
 
 
@@ -138,14 +153,14 @@ _ALL_VALID_PAIRS = [
 
 
 @pytest.mark.asyncio
-async def test_seed_creates_five_packages(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 5 packages in Default set."""
+async def test_seed_creates_six_packages(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 6 packages in Default set (5 notation groups + root)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
     row = await cursor.fetchone()
-    assert row[0] == 5
+    assert row[0] == 6
 
 
 @pytest.mark.asyncio
@@ -175,15 +190,15 @@ async def test_root_package_named_iris(seeded_db: aiosqlite.Connection) -> None:
 
 
 @pytest.mark.asyncio
-async def test_four_children_reference_root(seeded_db: aiosqlite.Connection) -> None:
-    """4 child packages reference the root 'Iris' package as parent."""
+async def test_five_children_reference_root(seeded_db: aiosqlite.Connection) -> None:
+    """5 child packages reference the root 'Iris' package as parent."""
     root_id = _gen_id("pkg", 0)
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM packages WHERE parent_package_id = ? AND is_deleted = 0",
         (root_id,),
     )
     row = await cursor.fetchone()
-    assert row[0] == 4
+    assert row[0] == 5
 
 
 @pytest.mark.asyncio
@@ -194,6 +209,7 @@ async def test_notation_package_names(seeded_db: aiosqlite.Connection) -> None:
         2: "UML Notation",
         3: "ArchiMate Notation",
         4: "C4 Notation",
+        5: "DoView Notation",
     }
     for idx, expected_name in expected.items():
         pkg_id = _gen_id("pkg", idx)
@@ -210,26 +226,26 @@ async def test_notation_package_names(seeded_db: aiosqlite.Connection) -> None:
 
 
 @pytest.mark.asyncio
-async def test_thirty_two_diagrams_total(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 32 diagrams (31 permutations + 1 overview)."""
+async def test_thirty_five_diagrams_total(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 35 diagrams (33 notation permutations + 1 AI module + 1 overview)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
     row = await cursor.fetchone()
-    assert row[0] == 32
+    assert row[0] == 35
 
 
 @pytest.mark.asyncio
 async def test_all_diagrams_have_parent_package(seeded_db: aiosqlite.Connection) -> None:
-    """All 32 diagrams have parent_package_id set (not NULL)."""
+    """All diagrams have parent_package_id set (not NULL)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM diagrams "
         "WHERE set_id = ? AND is_deleted = 0 AND parent_package_id IS NOT NULL",
         (_DEFAULT_SET_ID,),
     )
     row = await cursor.fetchone()
-    assert row[0] == 32
+    assert row[0] == 35
 
 
 @pytest.mark.asyncio
@@ -265,42 +281,42 @@ async def test_all_diagrams_have_example_tag(seeded_db: aiosqlite.Connection) ->
 
 
 @pytest.mark.asyncio
-async def test_overview_diagram_has_modelrefs(seeded_db: aiosqlite.Connection) -> None:
-    """System Overview diagram includes modelref nodes."""
-    overview_id = _gen_id("diagram", 31)
+async def test_navigation_diagram_has_navigation_cells(seeded_db: aiosqlite.Connection) -> None:
+    """Navigation overview diagram (index 33) includes navigation_cell tiles."""
+    nav_id = _gen_id("diagram", 33)
     cursor = await seeded_db.execute(
         "SELECT dv.data FROM diagrams d "
         "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
         "WHERE d.id = ?",
-        (overview_id,),
+        (nav_id,),
     )
     row = await cursor.fetchone()
     assert row is not None
     data = json.loads(row[0])
-    modelref_nodes = [n for n in data["nodes"] if n["type"] == "modelref"]
-    assert len(modelref_nodes) >= 4
+    nav_nodes = [n for n in data["nodes"] if n["type"] == "navigation_cell"]
+    assert len(nav_nodes) >= 5
 
 
 # ── Element and relationship tests ───────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_fifty_five_elements(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 55 elements."""
+async def test_sixty_six_elements(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 66 elements (59 system + 7 DoView)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 55
+    assert (await cursor.fetchone())[0] == 66
 
 
 @pytest.mark.asyncio
-async def test_fifty_relationships(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 50 relationships."""
+async def test_sixty_three_relationships(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 63 relationships (58 system + 5 DoView causal links)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM relationships WHERE is_deleted = 0",
     )
-    assert (await cursor.fetchone())[0] == 50
+    assert (await cursor.fetchone())[0] == 63
 
 
 @pytest.mark.asyncio
@@ -331,10 +347,11 @@ async def test_elements_have_correct_notations(seeded_db: aiosqlite.Connection) 
     )
     rows = await cursor.fetchall()
     notation_counts = {r[0]: r[1] for r in rows}
-    assert notation_counts.get("simple", 0) == 15
+    assert notation_counts.get("simple", 0) == 19  # 15 system + 4 AI module
     assert notation_counts.get("uml", 0) == 12
     assert notation_counts.get("archimate", 0) == 18
     assert notation_counts.get("c4", 0) == 10
+    assert notation_counts.get("doview", 0) == 7
 
 
 # ── Idempotency and migration tests ─────────────────────────────────────────
@@ -352,13 +369,13 @@ async def test_idempotent_no_duplicates(main_db: aiosqlite.Connection) -> None:
         "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 5
+    assert (await cursor.fetchone())[0] == 6
 
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 32
+    assert (await cursor.fetchone())[0] == 35
 
 
 @pytest.mark.asyncio
@@ -396,19 +413,19 @@ async def test_v1_seed_cleared_on_reseed(main_db: aiosqlite.Connection) -> None:
     # Now run seed — should detect v1 format, clear, and reseed v3
     await seed_example_models(main_db)
 
-    # Should now have v3 packages
+    # Should now have v6 packages
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 5
+    assert (await cursor.fetchone())[0] == 6
 
-    # Should have 55 elements (not 56 — the old one was cleared)
+    # Should have 66 elements (not 67 — the old one was cleared)
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 55
+    assert (await cursor.fetchone())[0] == 66
 
 
 @pytest.mark.asyncio
@@ -440,19 +457,19 @@ async def test_v2_seed_upgraded_to_v3(main_db: aiosqlite.Connection) -> None:
     )
     await main_db.commit()
 
-    # Run seed — should detect v2 (root exists, no pkg-4) and upgrade to v3
+    # Run seed — should detect v2 (root exists, no pkg-4) and upgrade to v6
     await seed_example_models(main_db)
 
-    # Should now have 5 packages
+    # Should now have 6 packages
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 5
+    assert (await cursor.fetchone())[0] == 6
 
-    # Should have 32 diagrams
+    # Should have 35 diagrams
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 32
+    assert (await cursor.fetchone())[0] == 35

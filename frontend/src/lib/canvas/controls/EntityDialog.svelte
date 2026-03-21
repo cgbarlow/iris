@@ -6,10 +6,12 @@
 		UML_ENTITY_TYPES,
 		ARCHIMATE_ENTITY_TYPES,
 		C4_ENTITY_TYPES,
+		DOVIEW_ENTITY_TYPES,
 		SIMPLE_DIAGRAM_TYPE_FILTER,
 		UML_DIAGRAM_TYPE_FILTER,
 		ARCHIMATE_DIAGRAM_TYPE_LAYERS,
 		C4_DIAGRAM_TYPE_LEVELS,
+		DOVIEW_DIAGRAM_TYPE_FILTER,
 		type SimpleEntityType,
 		type NotationType,
 	} from '$lib/types/canvas';
@@ -132,6 +134,15 @@
 					filtered = filtered.filter((t) => C4_LEVEL_TO_SCOPE[t.level] === selectedLayer);
 				}
 				types = filtered.map((t) => ({ key: t.key as string, label: t.label, icon: t.icon }));
+				break;
+			}
+			case 'doview': {
+				let filteredDoview = DOVIEW_ENTITY_TYPES;
+				if (!showAllTypes && diagramType && DOVIEW_DIAGRAM_TYPE_FILTER[diagramType] !== undefined && DOVIEW_DIAGRAM_TYPE_FILTER[diagramType] !== null) {
+					const allowed = DOVIEW_DIAGRAM_TYPE_FILTER[diagramType]!;
+					filteredDoview = filteredDoview.filter((t) => allowed.includes(t.key));
+				}
+				types = filteredDoview.map((t) => ({ key: t.key as string, label: t.label, icon: t.icon }));
 				break;
 			}
 			default: {

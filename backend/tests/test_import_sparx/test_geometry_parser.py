@@ -93,14 +93,14 @@ class TestParseDiagramLinkPath:
 class TestBuildNodeVisualDefaults:
     """Verify build_node_visual emits EA default colors when all values are -1 (ADR-090)."""
 
-    def test_all_defaults_returns_empty(self) -> None:
-        """EA default -1 for all colors should return empty dict (themes handle defaults)."""
+    def test_all_defaults_returns_none(self) -> None:
+        """EA default -1 for all colors should return None (themes handle defaults)."""
         result = build_node_visual(None, -1, -1, -1, None)
-        assert result == {}
+        assert result is None
 
-    def test_none_backcolor_returns_empty(self) -> None:
+    def test_none_backcolor_returns_none(self) -> None:
         result = build_node_visual(None, None, None, None, None)
-        assert result == {}
+        assert result is None
 
     def test_explicit_color_overrides_default(self) -> None:
         """When EA has an explicit color, use it instead of default."""
@@ -116,19 +116,19 @@ class TestBuildNodeVisualDefaults:
     def test_default_does_not_set_fontcolor(self) -> None:
         """Font color default (-1) should NOT be emitted — CSS handles it."""
         result = build_node_visual(None, None, -1, None, None)
-        assert "fontColor" not in result
+        assert result is None  # No fields set, so None returned
 
 
 class TestBuildEdgeVisualDefaults:
     """Verify build_edge_visual emits EA default black when lineColor is -1 (ADR-090)."""
 
-    def test_none_linecolor_returns_empty(self) -> None:
+    def test_none_linecolor_returns_none(self) -> None:
         result = build_edge_visual(None, None, None)
-        assert result == {}
+        assert result is None
 
-    def test_default_linecolor_returns_empty(self) -> None:
+    def test_default_linecolor_returns_none(self) -> None:
         result = build_edge_visual(-1, None, None)
-        assert result == {}
+        assert result is None
 
     def test_explicit_linecolor_preserved(self) -> None:
         result = build_edge_visual(255, None, None)  # red in BGR

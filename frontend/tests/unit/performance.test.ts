@@ -6,6 +6,8 @@ import {
 	UML_RELATIONSHIP_TYPES,
 	ARCHIMATE_ENTITY_TYPES,
 	ARCHIMATE_RELATIONSHIP_TYPES,
+	DOVIEW_ENTITY_TYPES,
+	DOVIEW_RELATIONSHIP_TYPES,
 } from '$lib/types/canvas';
 import { createCanvasNode, createCanvasEdge, nodesToPlacements } from '$lib/canvas/canvasService';
 
@@ -126,8 +128,8 @@ describe('Client-side filtering performance', () => {
 });
 
 describe('Type registry completeness', () => {
-	it('Simple View has 7 entity types and 4 relationship types', () => {
-		expect(SIMPLE_ENTITY_TYPES).toHaveLength(7);
+	it('Simple View has 8 entity types and 4 relationship types', () => {
+		expect(SIMPLE_ENTITY_TYPES).toHaveLength(8);
 		expect(SIMPLE_RELATIONSHIP_TYPES).toHaveLength(4);
 	});
 
@@ -141,15 +143,24 @@ describe('Type registry completeness', () => {
 		expect(ARCHIMATE_RELATIONSHIP_TYPES).toHaveLength(11);
 	});
 
-	it('total type count: 63 entity types + 22 relationship types', () => {
+	it('DoView has 4 entity types and 1 relationship type', () => {
+		expect(DOVIEW_ENTITY_TYPES).toHaveLength(4);
+		expect(DOVIEW_RELATIONSHIP_TYPES).toHaveLength(1);
+	});
+
+	it('total type count: 68 entity types + 23 relationship types', () => {
 		const totalEntityTypes =
-			SIMPLE_ENTITY_TYPES.length + UML_ENTITY_TYPES.length + ARCHIMATE_ENTITY_TYPES.length;
+			SIMPLE_ENTITY_TYPES.length +
+			UML_ENTITY_TYPES.length +
+			ARCHIMATE_ENTITY_TYPES.length +
+			DOVIEW_ENTITY_TYPES.length;
 		const totalRelTypes =
 			SIMPLE_RELATIONSHIP_TYPES.length +
 			UML_RELATIONSHIP_TYPES.length +
-			ARCHIMATE_RELATIONSHIP_TYPES.length;
+			ARCHIMATE_RELATIONSHIP_TYPES.length +
+			DOVIEW_RELATIONSHIP_TYPES.length;
 
-		expect(totalEntityTypes).toBe(63);
-		expect(totalRelTypes).toBe(22);
+		expect(totalEntityTypes).toBe(68);
+		expect(totalRelTypes).toBe(23);
 	});
 });

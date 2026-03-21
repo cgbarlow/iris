@@ -1,7 +1,10 @@
 <script lang="ts">
 	/**
 	 * Session timeout warning per WCAG 2.2.1 (Timing Adjustable).
-	 * Shows a dialog 60s before JWT expiry, allowing the user to extend their session.
+	 *
+	 * If the user is active (mouse/keyboard/touch in the last 2 minutes),
+	 * silently auto-refreshes the token before the warning would appear.
+	 * Only shows the dialog if the user has been truly idle.
 	 *
 	 * ADR-031: The $effect reads getAccessToken() FIRST (before any early returns)
 	 * to ensure Svelte 5 tracks the $state dependency. This guarantees the effect
@@ -17,10 +20,24 @@
 	let timeoutId: ReturnType<typeof setTimeout> | undefined;
 	let dialogEl: HTMLDialogElement | undefined = $state();
 
+	// Track user activity — any interaction resets the timestamp
+	let lastActivity = Date.now();
+	const IDLE_THRESHOLD = 2 * 60 * 1000; // 2 minutes
+
+	function onUserActivity() {
+		lastActivity = Date.now();
+	}
+
+	$effect(() => {
+		const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'] as const;
+		for (const e of events) window.addEventListener(e, onUserActivity, { passive: true });
+		return () => {
+			for (const e of events) window.removeEventListener(e, onUserActivity);
+		};
+	});
+
 	$effect(() => {
 		// ADR-031: Read token FIRST to ensure Svelte tracks the $state dependency.
-		// This must happen before any early returns so the effect re-runs whenever
-		// updateTokens() or setAuth() writes a new token value (e.g. auto-refresh).
 		const token = getAccessToken();
 
 		if (!isAuthenticated()) return;
@@ -29,20 +46,33 @@
 		const expiresAt = parseTokenExpiry(token);
 		if (!expiresAt) return;
 
-		const warningTime = expiresAt - 60_000;
+		// Schedule check 90s before expiry — enough time to auto-refresh silently
+		const checkTime = expiresAt - 90_000;
 		const now = Date.now();
 
-		if (warningTime > now) {
-			timeoutId = setTimeout(() => {
-				showWarning = true;
-				secondsRemaining = 60;
-				intervalId = setInterval(() => {
-					secondsRemaining--;
-					if (secondsRemaining <= 0) {
-						clearInterval(intervalId);
+		if (checkTime > now) {
+			timeoutId = setTimeout(async () => {
+				const isActive = (Date.now() - lastActivity) < IDLE_THRESHOLD;
+
+				if (isActive) {
+					// User is active — silently refresh, no dialog needed
+					const success = await tryRefresh();
+					if (!success) {
+						clearAuth();
 					}
-				}, 1000);
-			}, warningTime - now);
+					// $effect will re-run with the new token and re-schedule
+				} else {
+					// User is idle — show the warning dialog
+					showWarning = true;
+					secondsRemaining = Math.round((expiresAt - Date.now()) / 1000);
+					intervalId = setInterval(() => {
+						secondsRemaining--;
+						if (secondsRemaining <= 0) {
+							clearInterval(intervalId);
+						}
+					}, 1000);
+				}
+			}, checkTime - now);
 		}
 
 		return () => {
@@ -62,11 +92,9 @@
 	async function extendSession() {
 		const success = await tryRefresh();
 		if (success) {
-			// Re-schedule warning timer with new token's expiry
 			if (timeoutId) clearTimeout(timeoutId);
 			if (intervalId) clearInterval(intervalId);
 			showWarning = false;
-			// The $effect watching isAuthenticated/getAccessToken will re-schedule
 		} else {
 			clearAuth();
 			showWarning = false;
