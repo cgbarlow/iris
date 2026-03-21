@@ -26,7 +26,8 @@ This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** w
 
 5. Go to **Settings → API Keys → JWT Settings** (or **Settings → Data API**) and note:
    - **JWT Secret** (`SUPABASE_JWT_SECRET`)
-6. Click the **Connect** button (top bar, next to the branch name) to find connection strings. Use the **Transaction pooler** URI for serverless functions (`SUPABASE_DB_URL`). Replace `[YOUR-PASSWORD]` with your database password.
+6. Click the **Connect** button (top bar, next to the branch name) to find connection strings. Set **Method** to **Transaction pooler** (port 6543, IPv4 compatible). Copy the URI and replace `[YOUR-PASSWORD]` with your database password — this is your `SUPABASE_DB_URL`.
+   > The Transaction pooler does not support PREPARE statements. The Iris backend handles this automatically (`statement_cache_size=0` on the asyncpg pool).
 
 ---
 
