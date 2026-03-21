@@ -16,8 +16,6 @@ async def run_supabase_migrations(pool: asyncpg.Pool) -> None:
         for sql_file in sql_files:
             sql_path = os.path.join(migrations_dir, sql_file)
             with open(sql_path) as f:
-                sql = f.read()
-            # Execute each statement separately (split on ;)
-            statements = [s.strip() for s in sql.split(';') if s.strip()]
-            for stmt in statements:
-                await conn.execute(stmt)
+                sql = f.read().strip()
+            if sql:
+                await conn.execute(sql)
