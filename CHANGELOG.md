@@ -34,7 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Optional Supabase/Netlify deployment** (ADR-094) — cloud deployment path alongside the default SQLite self-hosted mode
 - `DatabasePort` protocol with `SqliteAdapter` (aiosqlite passthrough) and `SupabaseAdapter` (asyncpg with automatic `?` → `$N` placeholder conversion)
 - `IRIS_DB_BACKEND` env var (`sqlite` default, `supabase` for cloud mode)
-- PostgreSQL migrations (`backend/app/migrations/supabase/`) — 27 SQL files covering all schema including FTS via `tsvector`/GIN indexes and triggers
+- PostgreSQL migrations (`backend/app/migrations/supabase/`) — 30 SQL files covering all schema including FTS via `tsvector`/GIN indexes and triggers
+- Supabase migration m028: DoView notation, diagram types, notation-type mappings, and DoView default theme (Supabase equivalent of SQLite m027)
+- Supabase migration m029: `ai_creation_prompts` table and 4 seeded layered prompts (Supabase equivalent of SQLite m028)
 - `profiles` table in Supabase mode: maps `auth.users` UUIDs to Iris roles; auto-created by trigger on user creation
 - Supabase Auth JWT validation (`app/auth/supabase_service.py`) — HS256, no aud verification
 - `GET /api/auth/me` endpoint (both modes) — returns authenticated user profile
@@ -48,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.env.example` documenting all environment variables for both deployment modes
 - `docs/deployment-netlify-supabase.md` — step-by-step Netlify + Supabase deployment guide
 - Optional backend dependencies: `mangum==0.21.0`, `asyncpg==0.31.0` (install with `uv sync --extra supabase`)
+
+### Security
+- **Row Level Security** enabled on all 34 Supabase tables with deny-all strategy (ADR-095) — blocks `anon` and `authenticated` roles from direct PostgREST table access while backend (`postgres` role) bypasses RLS as table owner
 
 ### Changed
 - Seed data bumped to v6 with DoView examples (35 diagrams, 66 elements, 63 relationships)

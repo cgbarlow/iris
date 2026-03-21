@@ -247,6 +247,7 @@ npm run test:all-e2e
 - Rate limiting (10/min login, 30/min refresh, 100/min general)
 - DOMPurify XSS prevention, CSP headers, parameterised queries
 - RBAC with least privilege (4 roles, 26 permission mappings)
+- Row Level Security on all Supabase tables (deny-all, no direct REST API access)
 
 ## Documentation
 

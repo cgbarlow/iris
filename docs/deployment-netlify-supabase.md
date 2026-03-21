@@ -59,11 +59,17 @@ This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** w
    m025_diagram_links.sql
    m026_ai_providers.sql
    m027_profiles.sql
+   m028_doview_notation.sql
+   m029_ai_creation_prompts.sql
+   m030_rls_policies.sql
    ```
 
    Run each file in the SQL Editor, in order.
 
 3. `m027_profiles.sql` creates the `profiles` table and a trigger that auto-creates a profile row whenever Supabase Auth creates a new user. You do **not** need to insert profile rows manually.
+4. `m028_doview_notation.sql` seeds DoView notation data (notation, diagram types, mappings, theme).
+5. `m029_ai_creation_prompts.sql` creates the `ai_creation_prompts` table and seeds 4 layered prompts for AI diagram creation.
+6. `m030_rls_policies.sql` enables Row Level Security on all 34 tables (see [Verifying Row Level Security](#verifying-row-level-security) below).
 
 ---
 
@@ -204,6 +210,44 @@ Browser (Supabase JS SDK)
 ### Cold start note
 
 Netlify Functions are serverless and spin down after inactivity. The first request after a cold period may take 1–3 seconds while the FastAPI + asyncpg pool initialises. Subsequent requests are fast.
+
+---
+
+## Verifying Row Level Security
+
+Migration `m030_rls_policies.sql` enables Row Level Security (RLS) on all 34 tables using a **deny-all** strategy — no policies are created. This means:
+
+- The `anon` key (embedded in the frontend) **cannot** query tables via the Supabase REST API
+- The `authenticated` role (logged-in Supabase JS users) **cannot** query tables directly
+- The `postgres` role (FastAPI backend via asyncpg) **bypasses** RLS as table owner
+- The `service_role` key (server-only) **bypasses** RLS
+
+### Quick verification
+
+After running all migrations, test that RLS is active:
+
+```sql
+-- In Supabase SQL Editor: check RLS is enabled on all tables
+SELECT tablename, rowsecurity
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY tablename;
+```
+
+Every table should show `rowsecurity = true`.
+
+### REST API verification
+
+```bash
+# This should return an empty array [] — RLS blocks anon access
+curl "https://<project>.supabase.co/rest/v1/users?select=*" \
+  -H "apikey: <your-anon-key>" \
+  -H "Authorization: Bearer <your-anon-key>"
+```
+
+If you get data back instead of `[]`, RLS is not enabled — re-run `m030_rls_policies.sql`.
+
+> **See also:** [ADR-095](adrs/ADR-095-Row-Level-Security.md) for the full security rationale.
 
 ---
 
