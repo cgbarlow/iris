@@ -17,11 +17,14 @@ This guide covers deploying Iris as a static SvelteKit frontend on **Netlify** w
 1. Log in to [app.supabase.com](https://app.supabase.com) and click **New project**.
 2. Choose an organisation, project name, database password, and region. Save the database password securely.
    > **Do not** check "Enable automatic RLS". Iris manages RLS explicitly via migration `m030_rls_policies.sql` — an automatic trigger could interfere with migration ordering.
-3. After the project provisions, go to **Settings → API** and note:
+3. After the project provisions, go to **Settings → API Keys** and note:
    - **Project URL** (`SUPABASE_URL`)
-   - **anon / public key** (`SUPABASE_ANON_KEY`)
-   - **service_role / secret key** (`SUPABASE_SERVICE_ROLE_KEY`)
-4. Go to **Settings → API → JWT Settings** and note:
+   - **Publishable key** (default) → use as `SUPABASE_ANON_KEY` / `VITE_SUPABASE_ANON_KEY`
+   - **Secret key** (default) → use as `SUPABASE_SERVICE_ROLE_KEY`
+
+   > Supabase now uses **Publishable keys** (`sb_publishable_*`) and **Secret keys** (`sb_secret_*`). These replace the legacy `anon` and `service_role` JWT keys. Both formats work with the Supabase JS SDK. If you see a "Legacy anon, service_role API keys" tab, use the new keys instead.
+
+4. Go to **Settings → API Keys → JWT Settings** (or **Settings → Data API**) and note:
    - **JWT Secret** (`SUPABASE_JWT_SECRET`)
 5. Go to **Settings → Database** and note the **Connection string (URI)** — use the *Transaction pooler* URL for serverless functions (`SUPABASE_DB_URL`). Replace `[YOUR-PASSWORD]` with your database password.
 
@@ -140,15 +143,15 @@ In your Netlify site, go to **Site settings → Environment variables** and add:
 |----------|-------|-------------|
 | `IRIS_DB_BACKEND` | `supabase` | Enables Supabase deployment mode |
 | `SUPABASE_URL` | `https://xxxx.supabase.co` | From Supabase Settings → API |
-| `SUPABASE_ANON_KEY` | `eyJ...` | Supabase anon/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Supabase service_role key |
+| `SUPABASE_ANON_KEY` | `sb_publishable_...` | Publishable key (or legacy anon key) |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Secret key (or legacy service_role key) |
 | `SUPABASE_DB_URL` | `postgresql://...` | Transaction pooler connection string |
-| `SUPABASE_JWT_SECRET` | `your-jwt-secret` | From Supabase Settings → API → JWT Settings |
+| `SUPABASE_JWT_SECRET` | `your-jwt-secret` | From Supabase Settings → API Keys → JWT Settings |
 | `VITE_DB_BACKEND` | `supabase` | Frontend deployment mode flag |
 | `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Frontend Supabase URL |
-| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Frontend Supabase anon key |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Frontend Supabase publishable key |
 
-> **Security note:** `VITE_*` variables are embedded in the frontend bundle at build time and visible to users. Use the **anon** key (not service_role) for `VITE_SUPABASE_ANON_KEY`. The `SUPABASE_SERVICE_ROLE_KEY` is only available to the Netlify Function (backend).
+> **Security note:** `VITE_*` variables are embedded in the frontend bundle at build time and visible to users. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. The `SUPABASE_SERVICE_ROLE_KEY` is only available to the Netlify Function (backend). RLS (m030) prevents the publishable key from accessing any table data directly.
 
 ---
 
