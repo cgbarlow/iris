@@ -1,0 +1,30 @@
+# Netlify configuration for optional Supabase/Netlify deployment (ADR-094).
+# The default deployment target is SQLite (local/self-hosted).
+# See docs/deployment-netlify-supabase.md for setup instructions.
+
+[build]
+  # Build the SvelteKit frontend. adapter-netlify is activated by the NETLIFY env var.
+  command = "cd frontend && npm ci && npm run build"
+  publish = "frontend/build"
+  functions = "netlify/functions"
+
+[functions]
+  # Bundle the backend Python package with the API function.
+  included_files = ["backend/**"]
+
+# Route all API calls to the Netlify Function (FastAPI via Mangum).
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api"
+  status = 200
+
+# SvelteKit SPA fallback — must be last.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

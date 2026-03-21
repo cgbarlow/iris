@@ -22,6 +22,17 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True)
+class SupabaseConfig:
+    """Supabase/PostgreSQL deployment configuration (used when IRIS_DB_BACKEND=supabase)."""
+
+    url: str
+    anon_key: str
+    service_role_key: str
+    db_url: str
+    jwt_secret: str
+
+
+@dataclass(frozen=True)
 class AuthConfig:
     """Authentication configuration."""
 
@@ -80,8 +91,23 @@ class AppConfig:
     rate_limit_general: int = field(
         default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_GENERAL", "1000"))
     )
+    # Deployment mode: "sqlite" (default, self-hosted) or "supabase" (Netlify/Supabase cloud)
+    db_backend: str = field(
+        default_factory=lambda: os.environ.get("IRIS_DB_BACKEND", "sqlite")
+    )
+    supabase: SupabaseConfig | None = field(default=None)
 
 
 def get_config() -> AppConfig:
-    """Get application configuration."""
-    return AppConfig()
+    """Get application configuration from environment variables."""
+    db_backend = os.environ.get("IRIS_DB_BACKEND", "sqlite")
+    supabase: SupabaseConfig | None = None
+    if db_backend == "supabase":
+        supabase = SupabaseConfig(
+            url=os.environ.get("SUPABASE_URL", ""),
+            anon_key=os.environ.get("SUPABASE_ANON_KEY", ""),
+            service_role_key=os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
+            db_url=os.environ.get("SUPABASE_DB_URL", ""),
+            jwt_secret=os.environ.get("SUPABASE_JWT_SECRET", ""),
+        )
+    return AppConfig(supabase=supabase)
