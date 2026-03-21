@@ -27,6 +27,7 @@ services:
   - type: web
     name: iris-api
     runtime: python
+    plan: free
     buildCommand: cd backend && pip install -e ".[supabase]"
     startCommand: cd backend && uvicorn app.main:create_app --host 0.0.0.0 --port $PORT --factory
     envVars:
