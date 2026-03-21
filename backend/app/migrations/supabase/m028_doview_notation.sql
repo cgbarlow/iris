@@ -17,15 +17,15 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 3. Notation–diagram-type mappings
 INSERT INTO diagram_type_notations (diagram_type_id, notation_id, is_default)
-VALUES ('outcomes_map', 'doview', 1)
+VALUES ('outcomes_map', 'doview', TRUE)
 ON CONFLICT (diagram_type_id, notation_id) DO NOTHING;
 
 INSERT INTO diagram_type_notations (diagram_type_id, notation_id, is_default)
-VALUES ('overview', 'doview', 1)
+VALUES ('overview', 'doview', TRUE)
 ON CONFLICT (diagram_type_id, notation_id) DO NOTHING;
 
 INSERT INTO diagram_type_notations (diagram_type_id, notation_id, is_default)
-VALUES ('free_form', 'doview', 0)
+VALUES ('free_form', 'doview', FALSE)
 ON CONFLICT (diagram_type_id, notation_id) DO NOTHING;
 
 -- 4. DoView default theme (upsert)
