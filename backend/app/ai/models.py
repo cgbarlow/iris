@@ -80,6 +80,10 @@ class QARequest(BaseModel):
 
     question: str = Field(min_length=1, max_length=4000)
     provider_id: str | None = None
+    mode: str | None = None        # 'creation' for diagram creation mode
+    notation: str | None = None    # notation to use in creation mode (e.g. 'doview')
+    history: list[dict[str, str]] | None = None  # prior conversation turns for multi-turn creation
+    thread_id: str | None = None   # groups messages in a conversation thread
 
 
 class QAResponse(BaseModel):
@@ -107,3 +111,44 @@ class ConversationResponse(BaseModel):
     tokens_out: int | None = None
     duration_ms: int | None = None
     created_at: str
+    mode: str | None = "discuss"
+    set_name: str | None = None
+    thread_id: str | None = None
+
+
+class CreationPromptResponse(BaseModel):
+    """Response for a single AI creation prompt."""
+
+    id: str
+    name: str
+    description: str | None = None
+    layer: str
+    notation: str | None = None
+    diagram_type: str | None = None
+    prompt_text: str
+    display_order: int
+    is_active: bool
+    created_by: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class CreationPromptUpdate(BaseModel):
+    """Request body for updating an AI creation prompt."""
+
+    prompt_text: str | None = None
+    is_active: bool | None = None
+
+
+class ApplyCreationRequest(BaseModel):
+    """Request body for applying AI-generated diagram JSON."""
+
+    diagrams_json: str  # JSON string produced by the AI
+    package_id: str | None = None  # optional parent package for created diagrams
+
+
+class ApplyCreationResponse(BaseModel):
+    """Response after applying AI-generated diagrams."""
+
+    diagram_ids: list[str]
+    primary_diagram_id: str | None = None

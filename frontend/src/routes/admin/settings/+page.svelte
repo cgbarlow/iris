@@ -21,6 +21,7 @@
 	// Form values
 	let sessionTimeout = $state(15);
 	let thumbnailMode = $state('svg');
+	let debugAi = $state(false);
 
 	$effect(() => {
 		loadSettings();
@@ -33,6 +34,7 @@
 			for (const s of settings) {
 				if (s.key === 'session_timeout_minutes') sessionTimeout = Number(s.value) || 15;
 				if (s.key === 'gallery_thumbnail_mode') thumbnailMode = s.value;
+				if (s.key === 'debug_ai') debugAi = s.value === '1';
 			}
 		} catch {
 			error = 'Failed to load settings';
@@ -72,6 +74,7 @@
 			const timeout = Math.max(5, Math.min(480, sessionTimeout));
 			await saveSetting('session_timeout_minutes', String(timeout));
 			await saveSetting('gallery_thumbnail_mode', thumbnailMode);
+			await saveSetting('debug_ai', debugAi ? '1' : '0');
 			success = 'Settings saved successfully';
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to save settings';
@@ -80,20 +83,7 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Admin Settings — Iris</title>
-</svelte:head>
-
-<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-	<ol class="flex gap-1">
-		<li><a href="/admin" style="color: var(--color-primary)">Admin</a></li>
-		<li aria-hidden="true">/</li>
-		<li aria-current="page">Settings</li>
-	</ol>
-</nav>
-
-<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Settings</h1>
-<p class="mt-2" style="color: var(--color-muted)">Configure system-wide settings.</p>
+<p class="mb-4" style="color: var(--color-muted)">Configure session timeout and system preferences.</p>
 
 {#if loading}
 	<p class="mt-4" style="color: var(--color-muted)">Loading settings...</p>
@@ -157,6 +147,20 @@
 					</label>
 				</div>
 			</fieldset>
+		</div>
+
+		<div class="rounded border p-4" style="border-color: var(--color-border)">
+			<h2 class="text-lg font-medium" style="color: var(--color-fg)">Debug Logging</h2>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">
+				Enable verbose server-side logging for troubleshooting. Logs are written to the backend console.
+			</p>
+			<div class="mt-3 flex flex-col gap-2">
+				<label class="flex items-center gap-2 text-sm" style="color: var(--color-fg)">
+					<input type="checkbox" bind:checked={debugAi} class="h-4 w-4" />
+					AI debug logging
+					<span class="text-xs" style="color: var(--color-muted)">(prompts, messages, streaming, diagram creation)</span>
+				</label>
+			</div>
 		</div>
 
 		<div class="rounded border p-4" style="border-color: var(--color-border)">

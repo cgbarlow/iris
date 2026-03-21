@@ -20,6 +20,7 @@
 	import UmlRenderer from './renderers/UmlRenderer.svelte';
 	import ArchimateRenderer from './renderers/ArchimateRenderer.svelte';
 	import C4Renderer from './renderers/C4Renderer.svelte';
+	import DoviewRenderer from './renderers/DoviewRenderer.svelte';
 	import BaseNode from './BaseNode.svelte';
 
 	interface Props {
@@ -70,6 +71,11 @@
 		'container_instance',
 	]);
 
+	/** DoView type keys that should use DoviewRenderer. */
+	const DOVIEW_TYPES = new Set([
+		'outcome_box', 'final_outcome', 'overview_tile', 'source_reference',
+	]);
+
 	/** ArchiMate type keys that should use ArchimateRenderer. */
 	const ARCHIMATE_TYPES = new Set([
 		'business_actor', 'business_role', 'business_process', 'business_service',
@@ -105,6 +111,8 @@
 	<BoundaryNode data={effectiveData} {selected} />
 {:else if effectiveData.entityType === 'modelref'}
 	<ModelRefNode data={effectiveData} {selected} />
+{:else if notation === 'doview' || DOVIEW_TYPES.has(effectiveData.entityType)}
+	<DoviewRenderer data={effectiveData} {selected} />
 {:else if !isUniversal && ARCHIMATE_TYPES.has(effectiveData.entityType)}
 	<ArchimateRenderer data={effectiveData} {selected} />
 {:else if notation === 'uml' || (!isUniversal && UML_TYPES.has(effectiveData.entityType))}

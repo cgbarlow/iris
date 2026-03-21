@@ -31,6 +31,8 @@ from app.migrations.m023_new_diagram_types import up as m023_up
 from app.migrations.m024_themes import up as m024_up
 from app.migrations.m025_diagram_links import up as m025_up
 from app.migrations.m026_ai_providers import up as m026_up
+from app.migrations.m027_doview_notation import up as m027_up
+from app.migrations.m028_ai_creation_prompts import up as m028_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
@@ -89,6 +91,8 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m024_up(main)
     await m025_up(main)
     await m026_up(main)
+    await m027_up(main)
+    await m028_up(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

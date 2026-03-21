@@ -13,6 +13,8 @@ class ThemeRenderingConfig(BaseModel):
     attrFontColor: str | None = None
     hideTypeStereotypes: bool | None = None
     abstractBoldOverride: bool | None = None
+    wrapLabels: bool | None = None
+    textAlign: str | None = None  # 'left', 'center', 'right'
 
 
 class ThemeConfig(BaseModel):

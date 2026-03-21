@@ -346,4 +346,46 @@ async def seed_default_themes(db: DatabasePort) -> None:
          json.dumps(archimate_config), 1, "system", now, now),
     )
 
+    # DoView Default — official DoView 10-color palette (DoViewPlanning.org)
+    doview_config = {
+        "element_defaults": {
+            "outcome_box":      {"bgColor": "#FFF2CC", "borderColor": "#D6B656", "fontColor": "#333333", "borderWidth": 2},
+            "final_outcome":    {"bgColor": "#FFFFFF", "borderColor": "#CCCCCC", "fontColor": "#333333", "borderWidth": 2},
+            "overview_tile":    {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF", "fontColor": "#333333", "borderWidth": 2},
+            "source_reference": {"bgColor": "#F5F5F5", "borderColor": "#666666", "fontColor": "#333333", "borderWidth": 1},
+        },
+        "stereotype_overrides": {
+            "page_yellow":   {"bgColor": "#FFF2CC", "borderColor": "#D6B656"},
+            "page_pink":     {"bgColor": "#F8CECC", "borderColor": "#B85450"},
+            "page_blue":     {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF"},
+            "page_green":    {"bgColor": "#D5E8D4", "borderColor": "#82B366"},
+            "page_beige":    {"bgColor": "#FFF4E6", "borderColor": "#D4A574"},
+            "page_lavender": {"bgColor": "#E1D5E7", "borderColor": "#9673A6"},
+            "page_peach":    {"bgColor": "#FFE6CC", "borderColor": "#D79B00"},
+            "page_cyan":     {"bgColor": "#D4E1F5", "borderColor": "#7EA6E0"},
+            "page_grey":     {"bgColor": "#F5F5F5", "borderColor": "#666666"},
+            "page_white":    {"bgColor": "#FFFFFF", "borderColor": "#CCCCCC"},
+        },
+        "edge_defaults": {
+            "causal_link": {"lineColor": "#C8C8C8", "lineWidth": 2},
+        },
+        "global": {
+            "defaultBgColor": "#FFF2CC",
+            "defaultBorderColor": "#D6B656",
+            "defaultFontColor": "#333333",
+        },
+        "rendering": {
+            "hideIcons": False,
+            "borderRadius": 4,
+            "wrapLabels": True,
+            "textAlign": "center",
+        },
+    }
+    await db.execute(
+        "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("doview-default", "DoView Default", "Official DoView 10-color palette — DoViewPlanning.org", "doview",
+         json.dumps(doview_config), 1, "system", now, now),
+    )
+
     await db.commit()

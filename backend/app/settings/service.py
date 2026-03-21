@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 DEFAULTS = {
     "session_timeout_minutes": "15",
     "gallery_thumbnail_mode": "svg",
+    "debug_ai": "0",
 }
 
 

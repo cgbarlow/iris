@@ -1,9 +1,11 @@
 <script lang="ts">
 	import DOMPurify from 'dompurify';
 	import { marked } from 'marked';
+	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import type { AIConversation } from '$lib/types/api';
+	import PackagePicker from '$lib/components/PackagePicker.svelte';
 
 	interface Props {
 		setId: string;
@@ -20,7 +22,16 @@
 		tokens_out: number | null;
 		duration_ms: number | null;
 		created_at: string;
+		isCreation?: boolean;
 	};
+
+	// Creation mode state
+	let creationMode = $state(false);
+	let selectedNotation = $state('doview');
+	let pendingDiagrams = $state<object | null>(null);
+	let applyingDiagrams = $state(false);
+	// Multi-turn creation conversation history
+	let creationHistory = $state<{ role: string; content: string }[]>([]);
 
 	let conversations = $state<ConvEntry[]>([]);
 	let question = $state('');
@@ -30,7 +41,22 @@
 	let streamingQuestion = $state('');
 	let historyLoaded = $state(false);
 	let chatContainer: HTMLDivElement | undefined = $state();
+	let qaInput: HTMLTextAreaElement | undefined = $state();
 	let copiedId = $state<string | null>(null);
+	let abortController: AbortController | null = null;
+	let creationJsonBuffer = $state('');  // accumulates raw JSON in creation mode (hidden from UI)
+	let generatingDiagrams = $state(false);  // true when AI is outputting JSON
+	let diagramsGenerated = $state(0);  // count of diagrams seen so far in the JSON stream
+	let expectedDiagramCount = $state(0);  // estimated total from conversation
+	let currentDiagramName = $state('');  // name of the diagram currently being generated
+	let showLocationPicker = $state(false);  // show package picker before creating/generating diagrams
+	let selectedPackageId = $state<string | null>(null);
+	let locationChosen = $state(false);  // true once user has picked a location
+	let pendingSendMessage = $state('');  // message waiting to be sent after location is chosen
+	let showHistorySidebar = $state(false);
+	let allHistory = $state<AIConversation[]>([]);
+	let historyLoading = $state(false);
+	let currentThreadId = $state(crypto.randomUUID());
 
 	function isClearedSession(): boolean {
 		return sessionStorage.getItem(`qa-cleared-${setId}`) === '1';
@@ -67,15 +93,121 @@
 		}
 	}
 
+function promptForLocation() {
+		showLocationPicker = true;
+	}
+
+	async function applyCreationDiagrams(packageId: string | null = null) {
+		if (!pendingDiagrams || applyingDiagrams) return;
+		showLocationPicker = false;
+		applyingDiagrams = true;
+		error = null;
+		try {
+			const body: Record<string, unknown> = { diagrams_json: JSON.stringify(pendingDiagrams) };
+			if (packageId) body.package_id = packageId;
+			const result = await apiFetch<{ diagram_ids: string[]; primary_diagram_id: string | null }>(
+				`/api/ai/sets/${setId}/create-diagram/apply`,
+				{
+					method: 'POST',
+					body: JSON.stringify(body),
+				}
+			);
+			pendingDiagrams = null;
+			if (result.primary_diagram_id) {
+				goto(`/diagrams/${result.primary_diagram_id}`);
+			}
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create diagrams';
+		}
+		applyingDiagrams = false;
+	}
+
+	function estimateExpectedDiagrams(): number {
+		// Find the Stage 1 subpage structure proposal — a SHORT message with just page titles.
+		// This is the message where the AI lists subpage names and asks for confirmation,
+		// NOT the detailed Stage 2 content (which has many more numbered items).
+		// Stage 1 messages are typically short (<1000 chars) with a numbered list.
+		for (let i = creationHistory.length - 1; i >= 0; i--) {
+			const msg = creationHistory[i];
+			if (msg.role !== 'assistant') continue;
+			const content = msg.content;
+			// Skip long messages — Stage 2 detailed content is much longer
+			if (content.length > 1500) continue;
+			// Must look like a structure proposal (asks for confirmation)
+			if (!(/happy|fewer.*more.*pages|rename|structure/i.test(content))) continue;
+			// Count numbered items
+			const numberedItems = content.match(/^\s*\d+\.\s+\S/gm);
+			if (numberedItems && numberedItems.length >= 2) {
+				let total = numberedItems.length + 2; // + Overview + Final Outcomes
+				if (/source/i.test(content)) total += 1;
+				return total;
+			}
+			// Try bullet lists
+			const bulletItems = content.match(/^\s*[-*]\s+\S/gm);
+			if (bulletItems && bulletItems.length >= 2) {
+				let total = bulletItems.length + 2;
+				if (/source/i.test(content)) total += 1;
+				return total;
+			}
+		}
+		return 0;
+	}
+
+	function tryExtractDiagrams(text: string): object | null {
+		// Try fenced code block first (```json ... ``` or ``` ... ```)
+		const fenced = text.match(/```(?:json)?\s*(\{[\s\S]*?"diagrams"[\s\S]*?\})\s*```/);
+		const candidates = fenced ? [fenced[1]] : [];
+		// Also try bare JSON object
+		const bare = text.match(/\{[\s\S]*?"diagrams"[\s\S]*\}/);
+		if (bare) candidates.push(bare[0]);
+
+		for (const candidate of candidates) {
+			try {
+				const parsed = JSON.parse(candidate);
+				if (parsed && Array.isArray(parsed.diagrams) && parsed.diagrams.length > 0) return parsed;
+			} catch {
+				// keep trying
+			}
+		}
+		return null;
+	}
+
+	function isAwaitingGenerationConfirm(): boolean {
+		// Check if the last AI message is asking the user to confirm before generating
+		if (creationHistory.length === 0) return false;
+		const lastAssistant = [...creationHistory].reverse().find(m => m.role === 'assistant');
+		if (!lastAssistant) return false;
+		const text = lastAssistant.content.toLowerCase();
+		return text.includes("generate the diagram") || text.includes("i'll generate") || text.includes("generate the json");
+	}
+
+	function stopStreaming() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+	}
+
 	async function ask() {
 		const q = question.trim();
 		if (!q || asking) return;
+
+		// In creation mode, if the AI is ready to generate and user hasn't picked a location yet,
+		// show the location picker first before sending the confirmation.
+		if (creationMode && !locationChosen && isAwaitingGenerationConfirm()) {
+			pendingSendMessage = q;
+			question = '';
+			showLocationPicker = true;
+			return;
+		}
 
 		streamingQuestion = q;
 		question = '';
 		error = null;
 		asking = true;
 		streamingAnswer = '';
+		pendingDiagrams = null;
+		abortController = new AbortController();
 
 		setTimeout(scrollToBottom, 50);
 
@@ -87,7 +219,11 @@
 					'Content-Type': 'application/json',
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
-				body: JSON.stringify({ question: q }),
+				body: JSON.stringify(creationMode
+					? { question: q, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
+					: { question: q, thread_id: currentThreadId }
+				),
+				signal: abortController.signal,
 			});
 
 			if (!resp.ok) {
@@ -114,25 +250,82 @@
 					try {
 						const payload = JSON.parse(line.slice(6));
 						if (payload.chunk) {
-							streamingAnswer += payload.chunk;
+							if (creationMode && generatingDiagrams) {
+								// Already in JSON generation — accumulate silently
+								creationJsonBuffer += payload.chunk;
+								// Track diagram progress by counting "diagram_type" occurrences
+								const count = (creationJsonBuffer.match(/"diagram_type"/g) || []).length;
+								if (count > diagramsGenerated) {
+									diagramsGenerated = count;
+									// Extract the latest diagram name
+									const nameMatches = [...creationJsonBuffer.matchAll(/"name"\s*:\s*"([^"]+)"/g)];
+									if (nameMatches.length > 0) {
+										currentDiagramName = nameMatches[nameMatches.length - 1][1];
+									}
+								}
+							} else if (creationMode && !generatingDiagrams) {
+								// Check if JSON output is starting
+								const combined = streamingAnswer + payload.chunk;
+								const trimmed = combined.trimStart();
+								if (trimmed.startsWith('{') || trimmed.startsWith('```')) {
+									// JSON generation has begun — switch to silent mode
+									generatingDiagrams = true;
+									creationJsonBuffer = combined;
+									diagramsGenerated = 0;
+									expectedDiagramCount = estimateExpectedDiagrams();
+									currentDiagramName = '';
+									streamingAnswer = '';
+								} else {
+									streamingAnswer += payload.chunk;
+								}
+							} else {
+								streamingAnswer += payload.chunk;
+							}
 							scrollToBottom();
 						} else if (payload.done) {
+							// In creation mode, auto-apply the generated diagrams
+							let displayAnswer = streamingAnswer;
+							if (creationMode) {
+								const fullAnswer = generatingDiagrams ? creationJsonBuffer : streamingAnswer;
+								creationHistory = [
+									...creationHistory,
+									{ role: 'user', content: q },
+									{ role: 'assistant', content: fullAnswer },
+								];
+								const extracted = tryExtractDiagrams(fullAnswer);
+								if (extracted) {
+									pendingDiagrams = extracted;
+									displayAnswer = 'Diagrams generated — creating…';
+								} else if (generatingDiagrams) {
+									// JSON generation happened but extraction failed
+									displayAnswer = 'Generation complete but could not parse diagram data.';
+									error = 'Failed to parse AI diagram output. Try again.';
+								}
+								generatingDiagrams = false;
+								creationJsonBuffer = '';
+							}
 							conversations = [
 								...conversations,
 								{
 									id: payload.conversation_id,
 									question: q,
-									answer: streamingAnswer,
+									answer: displayAnswer,
 									model_used: payload.model_used,
 									tokens_in: null,
 									tokens_out: null,
 									duration_ms: payload.duration_ms,
 									created_at: new Date().toISOString(),
+									isCreation: creationMode,
 								},
 							];
 							streamingAnswer = '';
 							streamingQuestion = '';
 							scrollToBottom();
+
+							// Auto-apply diagrams after UI is updated
+							if (pendingDiagrams) {
+								await applyCreationDiagrams(selectedPackageId);
+							}
 						} else if (payload.error) {
 							throw new Error(payload.error);
 						}
@@ -143,12 +336,36 @@
 				}
 			}
 		} catch (e) {
-			error = e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Failed to get answer';
-			question = q;
-			streamingAnswer = '';
-			streamingQuestion = '';
+			if (e instanceof DOMException && e.name === 'AbortError') {
+				// User stopped the stream — keep partial answer
+				if (streamingAnswer) {
+					conversations = [
+						...conversations,
+						{
+							id: crypto.randomUUID(),
+							question: q,
+							answer: streamingAnswer + '\n\n*(stopped)*',
+							model_used: '',
+							tokens_in: null,
+							tokens_out: null,
+							duration_ms: null,
+							created_at: new Date().toISOString(),
+							isCreation: creationMode,
+						},
+					];
+				}
+				streamingAnswer = '';
+				streamingQuestion = '';
+			} else {
+				error = e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Failed to get answer';
+				question = q;
+				streamingAnswer = '';
+				streamingQuestion = '';
+			}
 		}
+		abortController = null;
 		asking = false;
+		setTimeout(() => qaInput?.focus(), 50);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -158,12 +375,117 @@
 		}
 	}
 
+	type HistoryThread = {
+		thread_id: string;
+		mode: string;
+		set_name: string | null;
+		first_question: string;
+		message_count: number;
+		created_at: string;
+		messages: AIConversation[];
+	};
+
+	let groupedHistory = $state<HistoryThread[]>([]);
+
+	async function loadFullHistory() {
+		historyLoading = true;
+		try {
+			allHistory = await apiFetch<AIConversation[]>(`/api/ai/sets/${setId}/conversations?limit=200`);
+			// Group by thread_id
+			const threadMap = new Map<string, AIConversation[]>();
+			for (const conv of allHistory) {
+				const tid = conv.thread_id || conv.id;
+				if (!threadMap.has(tid)) threadMap.set(tid, []);
+				threadMap.get(tid)!.push(conv);
+			}
+			groupedHistory = [...threadMap.entries()].map(([tid, msgs]) => {
+				// Messages are newest-first from API, reverse for chronological
+				const sorted = [...msgs].sort((a, b) => a.created_at.localeCompare(b.created_at));
+				return {
+					thread_id: tid,
+					mode: sorted[0].mode || 'discuss',
+					set_name: sorted[0].set_name,
+					first_question: sorted[0].question,
+					message_count: sorted.length,
+					created_at: sorted[0].created_at,
+					messages: sorted,
+				};
+			}).sort((a, b) => b.created_at.localeCompare(a.created_at)); // newest threads first
+		} catch {
+			allHistory = [];
+			groupedHistory = [];
+		}
+		historyLoading = false;
+	}
+
+	function toggleHistorySidebar() {
+		showHistorySidebar = !showHistorySidebar;
+		if (showHistorySidebar) loadFullHistory();
+	}
+
+	function loadFromHistory(thread: HistoryThread) {
+		const isCreation = thread.mode === 'creation';
+		creationMode = isCreation;
+		pendingDiagrams = null;
+		locationChosen = false;
+		selectedPackageId = null;
+		currentThreadId = thread.thread_id;
+
+		// Populate all messages from the thread into the chat
+		conversations = thread.messages.map(conv => ({
+			id: conv.id,
+			question: conv.question,
+			answer: conv.answer,
+			model_used: conv.model_used,
+			tokens_in: conv.tokens_in,
+			tokens_out: conv.tokens_out,
+			duration_ms: conv.duration_ms,
+			created_at: conv.created_at,
+			isCreation: isCreation,
+		}));
+
+		// Seed creation history with all messages so AI has full context
+		creationHistory = isCreation
+			? thread.messages.flatMap(c => [
+				{ role: 'user', content: c.question },
+				{ role: 'assistant', content: c.answer },
+			])
+			: [];
+
+		sessionStorage.removeItem(`qa-cleared-${setId}`);
+		showHistorySidebar = false;
+		setTimeout(scrollToBottom, 50);
+	}
+
+	function formatHistoryDate(iso: string): string {
+		const d = new Date(iso);
+		if (isNaN(d.getTime())) return iso;
+		const now = new Date();
+		const diffMs = now.getTime() - d.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		if (diffMins < 1) return 'just now';
+		if (diffMins < 60) return `${diffMins}m ago`;
+		const diffHours = Math.floor(diffMins / 60);
+		if (diffHours < 24) return `${diffHours}h ago`;
+		const diffDays = Math.floor(diffHours / 24);
+		if (diffDays < 7) return `${diffDays}d ago`;
+		return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+	}
+
 	function clearConversation() {
 		conversations = [];
+		creationHistory = [];
 		streamingAnswer = '';
 		streamingQuestion = '';
 		question = '';
 		error = null;
+		pendingDiagrams = null;
+		generatingDiagrams = false;
+		creationJsonBuffer = '';
+		locationChosen = false;
+		selectedPackageId = null;
+		pendingSendMessage = '';
+		currentThreadId = crypto.randomUUID();
 		sessionStorage.setItem(`qa-cleared-${setId}`, '1');
 	}
 
@@ -193,18 +515,63 @@
 </script>
 
 <div class="flex flex-col" style="height: 100%">
-	<!-- Header with clear button -->
-	<div class="mb-3 flex items-center justify-between">
-		<p class="text-xs" style="color: var(--color-muted)">Press Enter to send, Shift+Enter for newline</p>
-		{#if conversations.length > 0}
+	<!-- Header with mode toggle, clear, and history buttons -->
+	<div class="mb-3 flex items-center justify-between gap-2 flex-wrap">
+		<div class="flex items-center gap-2">
 			<button
-				onclick={clearConversation}
-				class="rounded px-3 py-1 text-xs"
-				style="border: 1px solid var(--color-border); color: var(--color-muted)"
+				onclick={() => { creationMode = false; pendingDiagrams = null; creationHistory = []; locationChosen = false; selectedPackageId = null; }}
+				class="rounded px-3 py-1.5 text-sm"
+				style={!creationMode
+					? 'background: var(--color-primary); color: white; border: 1px solid var(--color-primary)'
+					: 'border: 1px solid var(--color-border); color: var(--color-fg)'}
 			>
-				Clear conversation
+				Discuss
 			</button>
-		{/if}
+			<button
+				onclick={() => {
+					creationMode = true;
+					pendingDiagrams = null;
+					locationChosen = false;
+					selectedPackageId = null;
+					creationHistory = conversations.flatMap(c => [
+						{ role: 'user' as const, content: c.question },
+						{ role: 'assistant' as const, content: c.answer },
+					]);
+				}}
+				class="rounded px-3 py-1.5 text-sm"
+				style={creationMode
+					? 'background: var(--color-primary); color: white; border: 1px solid var(--color-primary)'
+					: 'border: 1px solid var(--color-border); color: var(--color-fg)'}
+			>
+				Create Diagram
+			</button>
+			{#if creationMode}
+				<select
+					bind:value={selectedNotation}
+					class="rounded border px-2 py-1.5 text-sm"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+				>
+					<option value="doview">DoView</option>
+				</select>
+			{/if}
+			{#if conversations.length > 0}
+				<button
+					onclick={clearConversation}
+					class="rounded px-3 py-1.5 text-sm"
+					style="border: 1px solid var(--color-border); color: var(--color-muted)"
+				>
+					Clear
+				</button>
+			{/if}
+		</div>
+		<button
+			onclick={toggleHistorySidebar}
+			class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
+			style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			aria-pressed={showHistorySidebar}
+		>
+			History
+		</button>
 	</div>
 
 	<!-- Chat messages area -->
@@ -266,7 +633,43 @@
 				<div class="flex justify-start">
 					<div class="max-w-[85%] rounded-lg px-4 py-3 text-sm"
 						style="background: var(--color-surface, #f5f5f5); color: var(--color-fg)">
-						{#if streamingAnswer}
+						{#if generatingDiagrams}
+							<div class="flex flex-col gap-2 min-w-[220px]">
+								<div class="flex items-center gap-2">
+									<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation: spin 2s linear infinite; flex-shrink: 0">
+										<circle cx="8" cy="8" r="6" stroke="var(--color-primary)" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/>
+									</svg>
+									<span class="text-sm font-medium" style="color: var(--color-fg)">
+										{#if diagramsGenerated > 0}
+											Building page {diagramsGenerated}{expectedDiagramCount > 0 ? ` of ${expectedDiagramCount}` : ''}…
+										{:else}
+											Starting generation…
+										{/if}
+									</span>
+								</div>
+								{#if currentDiagramName}
+									<span class="text-xs" style="color: var(--color-muted)">{currentDiagramName}</span>
+								{/if}
+								{#if diagramsGenerated > 0}
+									{@const total = expectedDiagramCount || diagramsGenerated + 1}
+									<div class="flex gap-1">
+										{#each Array(total) as _, i}
+											{#if i < diagramsGenerated}
+												<div class="rounded-sm" style="width: 24px; height: 6px; background: var(--color-primary)"></div>
+											{:else if i === diagramsGenerated}
+												<div class="rounded-sm generating-next" style="width: 24px; height: 6px; background: var(--color-primary); opacity: 0.3"></div>
+											{:else}
+												<div class="rounded-sm" style="width: 24px; height: 6px; background: var(--color-border)"></div>
+											{/if}
+										{/each}
+									</div>
+								{:else}
+									<div class="overflow-hidden rounded-full" style="height: 4px; background: var(--color-border)">
+										<div class="generating-bar rounded-full" style="height: 100%; background: var(--color-primary)"></div>
+									</div>
+								{/if}
+							</div>
+						{:else if streamingAnswer}
 							<div class="prose prose-sm max-w-none">
 								{@html renderMarkdown(streamingAnswer)}
 							</div>
@@ -284,6 +687,62 @@
 		</div>
 	</div>
 
+	{#if pendingDiagrams}
+		<div class="mt-2 flex items-center gap-3 rounded border p-3"
+			style="border-color: var(--color-primary); background: var(--color-surface, #f5f5f5)">
+			<p class="flex-1 text-sm" style="color: var(--color-fg)">
+				{applyingDiagrams ? 'Creating diagrams…' : 'Diagrams ready. Where should they be created?'}
+			</p>
+			{#if !applyingDiagrams}
+				<button
+					onclick={() => applyCreationDiagrams(null)}
+					class="rounded px-3 py-1.5 text-sm"
+					style="border: 1px solid var(--color-border); color: var(--color-fg)"
+				>
+					Set Root
+				</button>
+				<button
+					onclick={promptForLocation}
+					class="rounded px-3 py-1.5 text-sm text-white"
+					style="background-color: var(--color-primary)"
+				>
+					Choose Package
+				</button>
+			{/if}
+		</div>
+	{/if}
+
+	<PackagePicker
+		open={showLocationPicker}
+		title="Select location for diagrams"
+		subtitle="Click a package to select it, then click OK. Or create a new package."
+		setId={setId}
+		onselect={(pkg) => {
+			selectedPackageId = pkg.id;
+			locationChosen = true;
+			showLocationPicker = false;
+			if (pendingSendMessage) {
+				// Resume sending the confirmation message now that location is chosen
+				question = pendingSendMessage;
+				pendingSendMessage = '';
+				ask();
+			} else if (pendingDiagrams) {
+				applyCreationDiagrams(pkg.id);
+			}
+		}}
+		oncancel={() => {
+			selectedPackageId = null;
+			locationChosen = true;
+			showLocationPicker = false;
+			if (pendingSendMessage) {
+				// User chose set root (cancelled picker) — resume sending
+				question = pendingSendMessage;
+				pendingSendMessage = '';
+				ask();
+			}
+		}}
+	/>
+
 	{#if error}
 		<div role="alert" class="mt-2 rounded border p-3 text-sm"
 			style="border-color: var(--color-danger); color: var(--color-danger)">{error}</div>
@@ -293,29 +752,86 @@
 	<div class="mt-3 flex gap-2">
 		<textarea
 			id="qa-input"
+			bind:this={qaInput}
 			bind:value={question}
 			onkeydown={handleKeydown}
-			placeholder="Ask a question about this Set..."
+			placeholder={creationMode ? `Describe what you'd like a ${selectedNotation === 'doview' ? 'DoView' : selectedNotation} diagram of...` : 'Ask a question about this Set...'}
 			rows="2"
 			maxlength="4000"
 			disabled={asking}
 			class="flex-1 rounded border px-3 py-2 text-sm disabled:opacity-50"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); resize: none"
 		></textarea>
-		<button
-			onclick={ask}
-			disabled={asking || !question.trim()}
-			class="self-end rounded px-4 py-2 text-sm text-white disabled:opacity-50"
-			style="background-color: var(--color-primary)"
-		>
-			{#if asking}
-				<span class="inline-block animate-spin">↻</span>
-			{:else}
+		{#if asking}
+			<button
+				onclick={stopStreaming}
+				class="self-end rounded px-4 py-2 text-sm text-white"
+				style="background-color: var(--color-danger)"
+				title="Stop generating"
+			>
+				Stop
+			</button>
+		{:else}
+			<button
+				onclick={ask}
+				disabled={!question.trim()}
+				class="self-end rounded px-4 py-2 text-sm text-white disabled:opacity-50"
+				style="background-color: var(--color-primary)"
+			>
 				Send
-			{/if}
-		</button>
+			</button>
+		{/if}
 	</div>
 </div>
+
+<!-- History sidebar (reuses right-sidebar pattern from diagram comments panel) -->
+{#if showHistorySidebar}
+	<div
+		style="position: fixed; top: 0; right: 0; bottom: 0; width: 316px; z-index: 40; overflow-y: auto; background: var(--color-bg); border-left: 1px solid var(--color-border);"
+	>
+		<div class="p-4">
+			<div class="flex items-center justify-between mb-3">
+				<h3 class="text-sm font-semibold" style="color: var(--color-fg)">Conversation History</h3>
+				<button
+					onclick={() => { showHistorySidebar = false; }}
+					class="rounded p-1 text-xs"
+					style="color: var(--color-muted)"
+					aria-label="Close history"
+				>✕</button>
+			</div>
+			{#if historyLoading}
+				<p class="text-sm" style="color: var(--color-muted)">Loading…</p>
+			{:else if groupedHistory.length === 0}
+				<p class="text-sm" style="color: var(--color-muted)">No conversation history.</p>
+			{:else}
+				<div class="flex flex-col gap-2">
+					{#each groupedHistory as thread (thread.thread_id)}
+						<button
+							onclick={() => loadFromHistory(thread)}
+							class="w-full rounded border p-3 text-left transition-colors"
+							style="border-color: {currentThreadId === thread.thread_id ? 'var(--color-primary)' : 'var(--color-border)'}; background: transparent"
+							title="Click to load this conversation ({thread.message_count} messages)"
+						>
+							<div class="flex items-center gap-2 mb-1">
+								<span class="rounded-full px-2 py-0.5 text-xs font-medium"
+									style={thread.mode === 'creation'
+										? 'background: var(--color-primary); color: white'
+										: 'background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)'}
+								>{thread.mode === 'creation' ? 'Create' : 'Discuss'}</span>
+								<span class="text-xs" style="color: var(--color-muted)">{formatHistoryDate(thread.created_at)}</span>
+								<span class="text-xs" style="color: var(--color-muted)">{thread.message_count} msg{thread.message_count !== 1 ? 's' : ''}</span>
+							</div>
+							{#if thread.set_name}
+								<p class="text-xs mb-1" style="color: var(--color-muted)">{thread.set_name}</p>
+							{/if}
+							<p class="text-xs font-medium" style="color: var(--color-fg)">{thread.first_question}</p>
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</div>
+{/if}
 
 <style>
 	.thinking-dots .dot {
@@ -329,6 +845,30 @@
 	@keyframes blink {
 		0%, 80%, 100% { opacity: 0; }
 		40% { opacity: 1; }
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+
+	.generating-bar {
+		animation: indeterminate 1.5s ease-in-out infinite;
+		width: 40%;
+	}
+
+	@keyframes indeterminate {
+		0% { transform: translateX(-100%); }
+		100% { transform: translateX(350%); }
+	}
+
+	.generating-next {
+		animation: pulse-next 1s ease-in-out infinite;
+	}
+
+	@keyframes pulse-next {
+		0%, 100% { opacity: 0.15; }
+		50% { opacity: 0.4; }
 	}
 
 	/* Markdown styling inside chat bubbles */

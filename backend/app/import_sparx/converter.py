@@ -107,7 +107,7 @@ def build_edge_visual(
         if da:
             visual["dashArray"] = da
 
-    return visual
+    return visual or None
 
 
 def parse_nid(style_ex: str | None) -> str | None:

@@ -26,8 +26,8 @@ describe('Legacy node type registry alignment', () => {
 		}
 	});
 
-	it('simpleViewNodeTypes has exactly 10 entries', () => {
-		expect(Object.keys(simpleViewNodeTypes)).toHaveLength(10);
+	it('simpleViewNodeTypes has exactly 11 entries', () => {
+		expect(Object.keys(simpleViewNodeTypes)).toHaveLength(11);
 	});
 
 	it('simpleViewEdgeTypes has exactly 7 entries', () => {

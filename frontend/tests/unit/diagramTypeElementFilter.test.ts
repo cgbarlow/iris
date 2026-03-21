@@ -204,7 +204,7 @@ describe('Override toggle behaviour (ADR-082)', () => {
 			(t) => allowed.includes(t.key) || t.key === 'note' || t.key === 'boundary'
 		);
 		expect(filtered.length).toBe(4);
-		// With override (null bypass): all 7 types available
-		expect(SIMPLE_ENTITY_TYPES.length).toBe(7);
+		// With override (null bypass): all 8 types available
+		expect(SIMPLE_ENTITY_TYPES.length).toBe(8);
 	});
 });

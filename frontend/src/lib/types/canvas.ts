@@ -3,7 +3,7 @@
 import type { Node, Edge } from '@xyflow/svelte';
 
 /** Diagram notation type — determines how elements render on canvas. */
-export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4';
+export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4' | 'doview';
 
 /** Simple View entity types (6 domain + 2 universal = 8 total). */
 export type SimpleEntityType =
@@ -449,3 +449,43 @@ export const ARCHIMATE_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
 	{ key: 'assignment', label: 'Assignment', description: 'Source assigned to target' },
 	{ key: 'association_archimate', label: 'Association', description: 'Unspecified relationship' },
 ];
+
+// ── DoView notation types (ADR-094) ──────────────────────────────────────────
+
+/** DoView entity types — outcomes-based theory of change notation. */
+export type DoviewEntityType =
+	| 'outcome_box'
+	| 'final_outcome'
+	| 'overview_tile'
+	| 'source_reference';
+
+/** DoView relationship type. */
+export type DoviewRelationshipType = 'causal_link';
+
+/** DoView entity type display metadata. */
+export interface DoviewEntityTypeInfo {
+	key: DoviewEntityType;
+	label: string;
+	icon: string;
+	description: string;
+}
+
+/** All DoView entity types with display metadata. */
+export const DOVIEW_ENTITY_TYPES: DoviewEntityTypeInfo[] = [
+	{ key: 'outcome_box',      label: 'Outcome Box',      icon: '▭', description: 'A single achieved outcome in the causal flow' },
+	{ key: 'final_outcome',    label: 'Final Outcome',    icon: '★', description: 'Ultimate impact — white box with grey top rule' },
+	{ key: 'overview_tile',    label: 'Overview Tile',    icon: '⬡', description: 'Navigation card linking to a subpage diagram' },
+	{ key: 'source_reference', label: 'Source Reference', icon: '◧', description: 'Citation or source URL' },
+];
+
+/** All DoView relationship types with display metadata. */
+export const DOVIEW_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
+	{ key: 'causal_link' as DoviewRelationshipType, label: 'Causal Link', description: 'A causes/leads to B — left-to-right causal flow' },
+];
+
+/** DoView diagram-type → allowed element type keys (ADR-082). null = no filtering. */
+export const DOVIEW_DIAGRAM_TYPE_FILTER: Record<string, string[] | null> = {
+	outcomes_map: ['outcome_box', 'final_outcome', 'source_reference'],
+	overview:     ['final_outcome', 'overview_tile'],
+	free_form:    null,
+};

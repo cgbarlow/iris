@@ -28,22 +28,6 @@
 		style="border-color: var(--color-border); color: var(--color-fg)"
 	>
 		<div class="text-lg font-semibold" style="color: var(--color-primary)">Settings</div>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure session timeout and system preferences.</p>
-	</a>
-	<a
-		href="/admin/themes"
-		class="rounded border p-6 text-center"
-		style="border-color: var(--color-border); color: var(--color-fg)"
-	>
-		<div class="text-lg font-semibold" style="color: var(--color-primary)">Themes</div>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Manage visual themes for diagram notations.</p>
-	</a>
-	<a
-		href="/admin/ai"
-		class="rounded border p-6 text-center"
-		style="border-color: var(--color-border); color: var(--color-fg)"
-	>
-		<div class="text-lg font-semibold" style="color: var(--color-primary)">AI Providers</div>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure LLM providers for AI-powered Q&amp;A.</p>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure session timeout, themes, and AI providers.</p>
 	</a>
 </div>

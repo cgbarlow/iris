@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import time
 import uuid
 from collections.abc import AsyncGenerator
@@ -12,9 +14,31 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+log = logging.getLogger("app.ai")
+# Fallback: env var IRIS_AI_DEBUG=1 (overridden by DB setting debug_ai)
+_AI_DEBUG_ENV = os.environ.get("IRIS_AI_DEBUG", "0") == "1"
+
+
+async def _is_ai_debug(db: object) -> bool:
+    """Check if AI debug logging is enabled (DB setting or env var)."""
+    if _AI_DEBUG_ENV:
+        return True
+    try:
+        cursor = await db.execute(  # type: ignore[union-attr]
+            "SELECT value FROM settings WHERE key = 'debug_ai'",
+        )
+        row = await cursor.fetchone()
+        return row is not None and row[0] == "1"
+    except Exception:  # noqa: BLE001
+        return False
+
 from app.auth.dependencies import get_current_user
 from app.ai.models import (
+    ApplyCreationRequest,
+    ApplyCreationResponse,
     ConversationResponse,
+    CreationPromptResponse,
+    CreationPromptUpdate,
     ProviderCreate,
     ProviderResponse,
     ProviderTestResult,
@@ -23,6 +47,7 @@ from app.ai.models import (
     QAResponse,
 )
 from app.ai import service
+from app.ai.creation import create_diagrams_from_ai
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -256,6 +281,8 @@ async def _ask_streaming(
 
     async def _generate() -> AsyncGenerator[str, None]:
         try:
+            ai_debug = await _is_ai_debug(db)
+
             # Resolve provider
             if body.provider_id:
                 provider = await service._get_provider_with_key(db, body.provider_id)
@@ -267,19 +294,50 @@ async def _ask_streaming(
                 return
 
             context = await service.build_context(db, set_id)
-            system_prompt = str(provider.get("system_prompt") or "")
-            if system_prompt:
-                system_content = f"{system_prompt}\n\nContext:\n{context}"
-            else:
-                system_content = (
-                    "You are an AI assistant helping users understand their architecture models. "
-                    "Answer questions based on the provided Set context.\n\nContext:\n" + context
-                )
 
-            messages = [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": body.question},
-            ]
+            if body.mode == "creation":
+                from app.ai.creation import build_creation_system_prompt
+                creation_prompt = await build_creation_system_prompt(
+                    db,
+                    notation=body.notation or "doview",
+                    diagram_type=None,
+                )
+                system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content in the user's Set. This is BACKGROUND REFERENCE ONLY. The user decides what the DoView is about — do NOT assume the DoView topic matches the Set content. If the user says they want a DoView about X, make it about X regardless of what is in the Set.\n\n{context}"
+            else:
+                system_prompt = str(provider.get("system_prompt") or "")
+                if system_prompt:
+                    system_content = f"{system_prompt}\n\nContext:\n{context}"
+                else:
+                    system_content = (
+                        "You are an AI assistant helping users understand their architecture models. "
+                        "Answer questions based on the provided Set context.\n\nContext:\n" + context
+                    )
+
+            if body.mode == "creation":
+                messages: list[dict[str, str]] = [
+                    {"role": "system", "content": system_content},
+                    {"role": "assistant", "content": "Describe in a couple of lines or less what you want a DoView of."},
+                ]
+                if body.history:
+                    messages.extend(body.history)
+                messages.append({"role": "user", "content": body.question})
+            else:
+                messages = [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": body.question},
+                ]
+
+            if ai_debug:
+                log.info("[AI_DEBUG] mode=%s notation=%s set_id=%s", body.mode, body.notation, set_id)
+                log.info("[AI_DEBUG] provider=%s model=%s", provider["name"], provider["model"])
+                log.info("[AI_DEBUG] system_prompt length=%d chars", len(system_content))
+                log.info("[AI_DEBUG] history turns=%d", len(body.history) if body.history else 0)
+                log.info("[AI_DEBUG] messages count=%d", len(messages))
+                for i, m in enumerate(messages):
+                    role = m["role"]
+                    content_preview = m["content"][:200].replace("\n", "\\n")
+                    log.info("[AI_DEBUG] msg[%d] role=%s len=%d preview=%s", i, role, len(m["content"]), content_preview)
+                log.info("[AI_DEBUG] --- streaming start ---")
 
             from app.ai.client import create_ai_client
             client = create_ai_client(provider)
@@ -292,6 +350,11 @@ async def _ask_streaming(
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             answer = "".join(full_answer)
+
+            if ai_debug:
+                log.info("[AI_DEBUG] --- streaming complete ---")
+                log.info("[AI_DEBUG] duration=%dms answer_length=%d chars", duration_ms, len(answer))
+                log.info("[AI_DEBUG] answer_preview=%s", answer[:500].replace("\n", "\\n"))
             conv_id = str(uuid.uuid4())
             now = datetime.now(tz=UTC).isoformat()
             model_used = str(provider["model"])
@@ -300,10 +363,11 @@ async def _ask_streaming(
             await db.execute(
                 "INSERT INTO ai_conversations "
                 "(id, set_id, user_id, question, answer, context_summary, model_used, "
-                "provider_id, duration_ms, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "provider_id, duration_ms, created_at, mode, thread_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (conv_id, set_id, user_id, body.question, answer, context_summary,
-                 model_used, str(provider["id"]), duration_ms, now),
+                 model_used, str(provider["id"]), duration_ms, now,
+                 body.mode or "discuss", body.thread_id),
             )
             await db.execute(
                 "INSERT INTO ai_usage_log "
@@ -327,6 +391,160 @@ async def _ask_streaming(
         _generate(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin: Creation Prompt CRUD
+# ---------------------------------------------------------------------------
+
+
+@router.get("/creation-prompts", response_model=list[CreationPromptResponse])
+async def list_creation_prompts(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[CreationPromptResponse]:
+    """List all AI diagram creation prompts. Admin only."""
+    _require_admin(current_user)
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "SELECT id, name, description, layer, notation, diagram_type, "
+        "prompt_text, display_order, is_active, created_by, created_at, updated_at "
+        "FROM ai_creation_prompts ORDER BY layer, display_order"
+    )
+    rows = await cursor.fetchall()
+    return [
+        CreationPromptResponse(
+            id=r[0],
+            name=r[1],
+            description=r[2],
+            layer=r[3],
+            notation=r[4],
+            diagram_type=r[5],
+            prompt_text=r[6],
+            display_order=r[7],
+            is_active=bool(r[8]),
+            created_by=r[9],
+            created_at=r[10],
+            updated_at=r[11],
+        )
+        for r in rows
+    ]
+
+
+@router.put("/creation-prompts/{prompt_id}", response_model=CreationPromptResponse)
+async def update_creation_prompt(
+    prompt_id: str,
+    body: CreationPromptUpdate,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> CreationPromptResponse:
+    """Update an AI creation prompt. Admin only."""
+    _require_admin(current_user)
+    db = request.app.state.db_manager.main_db
+
+    cursor = await db.execute(
+        "SELECT id FROM ai_creation_prompts WHERE id = ?", (prompt_id,)
+    )
+    if await cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Creation prompt not found")
+
+    updates: list[str] = []
+    params: list[Any] = []
+    if body.prompt_text is not None:
+        updates.append("prompt_text = ?")
+        params.append(body.prompt_text)
+    if body.is_active is not None:
+        updates.append("is_active = ?")
+        params.append(1 if body.is_active else 0)
+    updates.append("updated_at = datetime('now')")
+
+    if len(updates) > 1:  # at least one real field besides updated_at
+        await db.execute(
+            f"UPDATE ai_creation_prompts SET {', '.join(updates)} WHERE id = ?",  # noqa: S608
+            (*params, prompt_id),
+        )
+        await db.commit()
+
+    cursor = await db.execute(
+        "SELECT id, name, description, layer, notation, diagram_type, "
+        "prompt_text, display_order, is_active, created_by, created_at, updated_at "
+        "FROM ai_creation_prompts WHERE id = ?",
+        (prompt_id,),
+    )
+    row = await cursor.fetchone()
+    return CreationPromptResponse(
+        id=row[0],
+        name=row[1],
+        description=row[2],
+        layer=row[3],
+        notation=row[4],
+        diagram_type=row[5],
+        prompt_text=row[6],
+        display_order=row[7],
+        is_active=bool(row[8]),
+        created_by=row[9],
+        created_at=row[10],
+        updated_at=row[11],
+    )
+
+
+# ---------------------------------------------------------------------------
+# User: AI Diagram Creation Apply
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/sets/{set_id}/create-diagram/apply",
+    response_model=ApplyCreationResponse,
+    status_code=201,
+)
+async def apply_diagram_creation(
+    set_id: str,
+    body: ApplyCreationRequest,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> ApplyCreationResponse:
+    """Apply AI-generated diagram JSON to create diagrams in a Set."""
+    db = request.app.state.db_manager.main_db
+
+    # Verify set exists
+    cursor = await db.execute("SELECT 1 FROM sets WHERE id = ?", (set_id,))
+    if await cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    ai_debug = await _is_ai_debug(db)
+
+    # Parse the AI JSON string
+    try:
+        ai_json = json.loads(body.diagrams_json)
+    except (json.JSONDecodeError, ValueError) as exc:
+        if ai_debug:
+            log.error("[AI_DEBUG] apply: invalid JSON: %s", str(exc)[:200])
+        raise HTTPException(status_code=422, detail=f"Invalid JSON: {exc}") from exc
+
+    if ai_debug:
+        diagram_count = len(ai_json.get("diagrams", []))
+        log.info("[AI_DEBUG] apply: set_id=%s package_id=%s diagrams=%d json_len=%d",
+                 set_id, body.package_id, diagram_count, len(body.diagrams_json))
+
+    # Create diagrams
+    try:
+        diagram_ids = await create_diagrams_from_ai(
+            db, set_id, ai_json, current_user["id"],
+            package_id=body.package_id,
+        )
+    except (KeyError, ValueError) as exc:
+        if ai_debug:
+            log.error("[AI_DEBUG] apply: creation failed: %s", str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if ai_debug:
+        log.info("[AI_DEBUG] apply: created %d diagrams, ids=%s", len(diagram_ids), diagram_ids)
+
+    return ApplyCreationResponse(
+        diagram_ids=diagram_ids,
+        primary_diagram_id=diagram_ids[0] if diagram_ids else None,
     )
 
 

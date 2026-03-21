@@ -16,6 +16,7 @@
 	import UmlEdgeRenderer from './renderers/UmlEdgeRenderer.svelte';
 	import ArchimateEdgeRenderer from './renderers/ArchimateEdgeRenderer.svelte';
 	import C4EdgeRenderer from './renderers/C4EdgeRenderer.svelte';
+	import DoviewEdgeRenderer from './renderers/DoviewEdgeRenderer.svelte';
 	import IrisBaseEdge from './BaseEdge.svelte';
 
 	let props: EdgeProps = $props();
@@ -35,6 +36,9 @@
 	/** C4 edge relationship types. */
 	const C4_TYPES = new Set(['c4_relationship']);
 
+	/** DoView edge relationship types. */
+	const DOVIEW_TYPES = new Set(['causal_link']);
+
 	/** ArchiMate edge relationship types. */
 	const ARCHIMATE_TYPES = new Set([
 		'serving', 'flow', 'triggering', 'access', 'influence',
@@ -47,6 +51,8 @@
 	<SelfLoopEdge {...props} />
 {:else if isNoteLink}
 	<NoteLinkEdge {...props} />
+{:else if notation === 'doview' || DOVIEW_TYPES.has(edgeType)}
+	<DoviewEdgeRenderer {...props} />
 {:else if notation === 'uml' || UML_TYPES.has(edgeType)}
 	<UmlEdgeRenderer {...props} />
 {:else if notation === 'c4' || C4_TYPES.has(edgeType)}

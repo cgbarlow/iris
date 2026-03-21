@@ -12,11 +12,10 @@ import { resolve, join } from 'node:path';
 
 const ROOT = resolve(__dirname, '../../src/lib/canvas');
 
+// NodeResizer is centralized in DynamicNode.svelte (ADR-091-A refactor).
+// Individual node files delegate resize handling to the parent DynamicNode.
 const RESIZABLE_NODES = [
-	'nodes/NavigationCellNode.svelte',
-	'nodes/NoteNode.svelte',
-	'nodes/BoundaryNode.svelte',
-	'BaseNode.svelte',
+	'DynamicNode.svelte',
 ];
 
 describe('Node resize support (ADR-091-A)', () => {

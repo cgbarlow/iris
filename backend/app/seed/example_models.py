@@ -249,6 +249,22 @@ _ENTITIES: list[tuple[str, str, str, str, str]] = [
      "Admin-managed database of LLM provider configurations with API keys, models, and parameters", "simple"),
     ("ai4", "component", "Context Builder",
      "Builds structured LLM prompts from Set elements, relationships, and diagrams with token-budget truncation", "simple"),
+
+    # ── DoView notation (7 elements, indices 59–65) ────────────────────────────
+    ("dv1", "outcome_box", "Employers engaged and on-board",
+     "Local employers understand and support the Youth Employment Program", "doview"),
+    ("dv2", "outcome_box", "Youth develop job-ready skills",
+     "Youth complete skills training in CV writing, interview preparation, and workplace readiness", "doview"),
+    ("dv3", "outcome_box", "Youth access employment opportunities",
+     "Youth are matched with suitable job vacancies and employer networks", "doview"),
+    ("dv4", "outcome_box", "Youth gain sustained work experience",
+     "Youth complete work placements, traineeships, or internships over 3+ months", "doview"),
+    ("dv5", "outcome_box", "Youth secure meaningful employment",
+     "Youth obtain paid employment aligned with their skills and career goals", "doview"),
+    ("dv6", "final_outcome", "Youth are economically independent",
+     "Young people have stable income, financial literacy, and long-term career prospects", "doview"),
+    ("dv7", "source_reference", "Youth Employment Research",
+     "Smith J. (2023). Youth Unemployment Interventions: A Systematic Review. Journal of Policy Studies.", "doview"),
 ]
 
 _ELEMENT_DESCRIPTIONS = {nid: desc for nid, _, _, desc, _ in _ENTITIES}
@@ -382,6 +398,18 @@ _RELATIONSHIPS: list[tuple[int, str, str, str, str, str]] = [
      "AI Service stores Q&A conversations and usage logs in Database"),
     (57, "n1", "ai1", "uses", "Ask AI",
      "Frontend sends user questions to AI Service via REST API"),
+
+    # ── DoView causal links (5, indices 58–62) ────────────────────────────────
+    (58, "dv1", "dv3", "causal_link", "",
+     "Employer engagement enables youth to access job opportunities"),
+    (59, "dv2", "dv3", "causal_link", "",
+     "Job-ready skills enable access to employment opportunities"),
+    (60, "dv3", "dv4", "causal_link", "",
+     "Accessing opportunities leads to gaining work experience"),
+    (61, "dv4", "dv5", "causal_link", "",
+     "Work experience leads to securing meaningful employment"),
+    (62, "dv5", "dv6", "causal_link", "",
+     "Meaningful employment contributes to economic independence"),
 ]
 
 # ── Package definitions ─────────────────────────────────────────────────────
@@ -392,6 +420,7 @@ _PACKAGES = [
     (2, "UML Notation", "Diagrams using UML notation elements", 0),
     (3, "ArchiMate Notation", "Diagrams using ArchiMate notation elements", 0),
     (4, "C4 Notation", "Diagrams using C4 notation elements", 0),
+    (5, "DoView Notation", "Diagrams using DoView outcomes-based notation", 0),
 ]
 
 
@@ -1331,8 +1360,102 @@ def _build_navigation_overview(
             "visual": {"width": 200, "height": 100,
                        "icon": {"set": "lucide", "name": "brain"}},
         }, 210, 640, 200, 100),
+        _node("nav_doview", "navigation_cell", {
+            "label": "DoView Notation",
+            "entityType": "navigation_cell",
+            "description": "2 diagrams using DoView outcomes-based theory of change notation",
+            "linkedModelId": mids.get(34, ""),
+            "visual": {"width": 220, "height": 130,
+                       "icon": {"set": "lucide", "name": "arrow-right"}},
+        }, 690, 120, 220, 130),
     ]
     return {"nodes": nodes, "edges": []}
+
+
+def _build_doview_overview(
+    eids: dict, rids: dict, mids: dict[int, str] | None = None,
+) -> dict:
+    """DoView overview diagram: final outcomes raised box + subpage navigation tiles."""
+    mids = mids or {}
+    nodes = [
+        # Final Outcomes raised box (white with grey top rule)
+        _node("dv_final_box", "final_outcome", {
+            "label": "Youth Employment Program — Final Outcomes",
+            "entityType": "final_outcome",
+            "description": "Youth are economically independent",
+            "entityId": eids.get("dv6", ""),
+        }, 200, 40, 400, 80),
+        # Navigation tile for the outcomes map subpage
+        _node("dv_tile_map", "overview_tile", {
+            "label": "Employment Outcomes Map",
+            "entityType": "overview_tile",
+            "description": "Causal chain from employer engagement to economic independence",
+            "linkedModelId": mids.get(35, ""),
+            "visual": {"width": 220, "height": 120, "bgColor": "#FFF2CC", "borderColor": "#D6B656"},
+        }, 100, 200, 220, 120),
+        # Source reference
+        _node("dv_source", "source_reference", {
+            "label": "Youth Employment Research",
+            "entityType": "source_reference",
+            "description": "Smith J. (2023). Youth Unemployment Interventions: A Systematic Review.",
+            "entityId": eids.get("dv7", ""),
+        }, 400, 200, 260, 80),
+    ]
+    return {"nodes": nodes, "edges": []}
+
+
+def _build_doview_outcomes_map(eids: dict, rids: dict, **_kw: object) -> dict:
+    """DoView outcomes map: left-to-right causal chain with 4 columns."""
+
+    def _dv_node(nid: str, entity_nid: str, x: int, y: int, color: str, border: str) -> dict:
+        """Build a DoView outcome_box node."""
+        _, etype, name, desc, _ = next(e for e in _ENTITIES if e[0] == entity_nid)
+        return _node(nid, etype, {
+            "label": name,
+            "entityType": etype,
+            "description": desc,
+            "entityId": eids.get(entity_nid, ""),
+            "visual": {"bgColor": color, "borderColor": border},
+        }, x, y, 200, 90)
+
+    # Four columns: col1=activities, col2=short-term, col3=medium-term, col4=final
+    nodes = [
+        # Column 1: Enabling outcomes
+        _dv_node("dv_n1", "dv1", 50, 80, "#FFF2CC", "#D6B656"),   # Employers engaged
+        _dv_node("dv_n2", "dv2", 50, 220, "#DAE8FC", "#6C8EBF"),  # Job-ready skills
+        # Column 2: Access outcome
+        _dv_node("dv_n3", "dv3", 320, 150, "#D5E8D4", "#82B366"),  # Access opportunities
+        # Column 3: Experience outcome
+        _dv_node("dv_n4", "dv4", 590, 150, "#FFE6CC", "#D79B00"),  # Gain experience
+        # Column 4: Final outcome (distinct styling)
+        _node("dv_n5", "outcome_box", {
+            "label": "Youth secure meaningful employment",
+            "entityType": "outcome_box",
+            "description": "Youth obtain paid employment aligned with their skills and career goals",
+            "entityId": eids.get("dv5", ""),
+            "visual": {"bgColor": "#E1D5E7", "borderColor": "#9673A6"},
+        }, 860, 150, 200, 90),
+        # Final outcome box with grey top rule
+        _node("dv_n6", "final_outcome", {
+            "label": "Youth are economically independent",
+            "entityType": "final_outcome",
+            "description": "Young people have stable income, financial literacy, and long-term career prospects",
+            "entityId": eids.get("dv6", ""),
+        }, 1130, 100, 220, 90),
+    ]
+    edges = [
+        _edge("dv_e1", "dv_n1", "dv_n3", "causal_link", "",
+              rel_id=_r(rids, 58), source_handle="right", target_handle="left"),
+        _edge("dv_e2", "dv_n2", "dv_n3", "causal_link", "",
+              rel_id=_r(rids, 59), source_handle="right", target_handle="left"),
+        _edge("dv_e3", "dv_n3", "dv_n4", "causal_link", "",
+              rel_id=_r(rids, 60), source_handle="right", target_handle="left"),
+        _edge("dv_e4", "dv_n4", "dv_n5", "causal_link", "",
+              rel_id=_r(rids, 61), source_handle="right", target_handle="left"),
+        _edge("dv_e5", "dv_n5", "dv_n6", "causal_link", "",
+              rel_id=_r(rids, 62), source_handle="right", target_handle="left"),
+    ]
+    return {"nodes": nodes, "edges": edges}
 
 
 # ── Diagram definitions ───────────────────────────────────────────────────────
@@ -1481,6 +1604,16 @@ _DIAGRAMS = [
      "name": "Iris Navigation", "parent_package_index": 0,
      "description": "Root navigation diagram with click-through tiles to each notation group.",
      "builder": _build_navigation_overview, "tags": _DIAGRAM_TAGS},
+
+    # ── DoView Notation (pkg-5, indices 34–35) ────────────────────────────────
+    {"index": 34, "diagram_type": "overview", "notation": "doview",
+     "name": "Youth Employment Program — Overview", "parent_package_index": 5,
+     "description": "DoView overview with final outcomes and navigation tiles to outcomes map subpages.",
+     "builder": _build_doview_overview, "tags": _DIAGRAM_TAGS},
+    {"index": 35, "diagram_type": "outcomes_map", "notation": "doview",
+     "name": "Employment Outcomes Map", "parent_package_index": 5,
+     "description": "Left-to-right causal chain: employer engagement → job-ready skills → access → experience → employment → independence.",
+     "builder": _build_doview_outcomes_map, "tags": _DIAGRAM_TAGS},
 ]
 
 
@@ -1549,14 +1682,15 @@ async def _clear_old_seed_data(db: DatabasePort) -> None:
 
 
 _V5_MARKER = "seed_v5"
+_V6_MARKER = "seed_v6"
 
 
 async def seed_example_models(db: DatabasePort) -> None:
     """Seed example elements, packages, and diagrams demonstrating Iris architecture.
 
     Idempotency:
-      - If diagram-33 metadata contains 'seed_v5' → already v5, skip
-      - Otherwise → clear + reseed v5
+      - If diagram-33 metadata contains 'seed_v6' → already v6, skip
+      - Otherwise → clear + reseed v6
     """
     # --- Skip if initial setup not yet completed ------------------------------
     cursor = await db.execute(
@@ -1566,7 +1700,7 @@ async def seed_example_models(db: DatabasePort) -> None:
     if not row or row[0] == 0:
         return
 
-    # --- v5 idempotency check: diagram-33 (nav) has v5 marker in metadata ----
+    # --- v6 idempotency check: diagram-33 (nav) has v6 marker in metadata ----
     overview_id = _gen_id("diagram", 33)
     cursor = await db.execute(
         "SELECT metadata FROM diagram_versions WHERE diagram_id = ? ORDER BY version DESC LIMIT 1",
@@ -1576,7 +1710,7 @@ async def seed_example_models(db: DatabasePort) -> None:
     if row and row[0]:
         try:
             meta = json.loads(row[0])
-            if meta.get("seed_version") == _V5_MARKER:
+            if meta.get("seed_version") == _V6_MARKER:
                 return
         except (json.JSONDecodeError, TypeError):
             pass
@@ -1683,10 +1817,10 @@ async def seed_example_models(db: DatabasePort) -> None:
         diagram_data_json = json.dumps(diagram_data)
         parent_package_id = pkg_id_map[model_def["parent_package_index"]]
 
-        # v5 marker in metadata for overview diagram
+        # v6 marker in metadata for overview diagram
         metadata: dict[str, object] = {}
         if model_def["index"] == 33:
-            metadata["seed_version"] = _V5_MARKER
+            metadata["seed_version"] = _V6_MARKER
 
         await db.execute(
             "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
@@ -1719,6 +1853,7 @@ async def seed_example_models(db: DatabasePort) -> None:
         (10, "UML Notation"),
         (18, "ArchiMate Notation"),
         (29, "C4 Notation"),
+        (34, "DoView Notation"),
         (5, "Database Schema"),
         (12, "UML Domain Model"),
         (32, "AI Module"),

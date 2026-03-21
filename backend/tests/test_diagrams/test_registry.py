@@ -66,7 +66,7 @@ class TestListDiagramTypes:
         resp = await client.get("/api/registry/diagram-types", headers=headers)
         assert resp.status_code == 200
         types = resp.json()
-        assert len(types) == 13  # 7 original + 6 new (ADR-082)
+        assert len(types) == 15  # 7 original + 6 new (ADR-082) + 2 DoView (ADR-094)
         type_ids = [t["id"] for t in types]
         assert "component" in type_ids
         assert "sequence" in type_ids
@@ -105,12 +105,13 @@ class TestListNotations:
         resp = await client.get("/api/registry/notations", headers=headers)
         assert resp.status_code == 200
         notations = resp.json()
-        assert len(notations) == 4
+        assert len(notations) == 5
         ids = [n["id"] for n in notations]
         assert "simple" in ids
         assert "uml" in ids
         assert "archimate" in ids
         assert "c4" in ids
+        assert "doview" in ids
 
 
 class TestCreateDiagramWithNotation:
