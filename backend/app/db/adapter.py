@@ -122,7 +122,15 @@ _SELECT_PREFIXES = ("SELECT", "WITH")
 
 
 def _convert_placeholders(query: str) -> str:
-    """Replace SQLite ? placeholders with PostgreSQL $1, $2, ... equivalents."""
+    """Replace SQLite ? placeholders with PostgreSQL $1, $2, ... equivalents.
+
+    Also converts ``INSERT OR IGNORE`` (SQLite) to
+    ``INSERT ... ON CONFLICT DO NOTHING`` (PostgreSQL).
+    """
+    # SQLite: INSERT OR IGNORE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT DO NOTHING
+    converted = re.sub(r"(?i)\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", query)
+    needs_on_conflict = converted is not query
+
     counter = 0
 
     def _replacer(_match: re.Match[str]) -> str:
@@ -130,7 +138,12 @@ def _convert_placeholders(query: str) -> str:
         counter += 1
         return f"${counter}"
 
-    return _PLACEHOLDER_RE.sub(_replacer, query)
+    pg_query = _PLACEHOLDER_RE.sub(_replacer, converted)
+
+    if needs_on_conflict:
+        pg_query = pg_query.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+
+    return pg_query
 
 
 def _is_select(query: str) -> bool:
