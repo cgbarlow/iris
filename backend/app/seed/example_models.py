@@ -1624,7 +1624,7 @@ async def _ensure_system_user(db: DatabasePort) -> None:
     await db.execute(
         "INSERT OR IGNORE INTO users (id, username, password_hash, role, is_active) "
         "VALUES (?, ?, ?, ?, ?)",
-        (_SYSTEM_USER_ID, "system", "!no-login-seed-user", "viewer", 0),
+        (_SYSTEM_USER_ID, "system", "!no-login-seed-user", "viewer", False),
     )
 
 

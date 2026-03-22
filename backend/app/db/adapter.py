@@ -322,6 +322,21 @@ class SupabaseAdapter:
     async def _execute_on(
         self, conn: asyncpg.Connection, pg_query: str, params: tuple[Any, ...]  # type: ignore[name-defined]
     ) -> _AsyncpgCursor:
+        try:
+            return await self._execute_on_inner(conn, pg_query, params)
+        except Exception as exc:
+            # Retry with int→bool conversion if asyncpg complains about boolean type
+            if "boolean is required" in str(exc):
+                bool_params = tuple(
+                    bool(v) if isinstance(v, int) and not isinstance(v, bool) and v in (0, 1) else v
+                    for v in params
+                )
+                return await self._execute_on_inner(conn, pg_query, bool_params)
+            raise
+
+    async def _execute_on_inner(
+        self, conn: asyncpg.Connection, pg_query: str, params: tuple[Any, ...]  # type: ignore[name-defined]
+    ) -> _AsyncpgCursor:
         upper = pg_query.strip().upper()
         if _is_select(pg_query):
             rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
