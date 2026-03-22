@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Row Level Security** enabled on all 34 Supabase tables with deny-all strategy (ADR-095) — blocks `anon` and `authenticated` roles from direct PostgREST table access while backend (`postgres` role) bypasses RLS as table owner
 
 ### Changed
-- Seed data bumped to v6 with DoView examples (35 diagrams, 66 elements, 63 relationships)
+- Seed data bumped to v7 with Iris System DoView (39 diagrams, 66 elements, 63 relationships)
 - `build_edge_visual()` returns `None` (not `{}`) when no visual overrides are present — consistent with `build_node_visual()`
 - `DatabaseManager` now accepts `AppConfig` (preferred) or `DatabaseConfig` (backward-compatible)
 - All service functions: `db` parameter type updated from `aiosqlite.Connection` to `DatabasePort` (no runtime change in SQLite mode)

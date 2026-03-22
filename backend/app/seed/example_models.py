@@ -1363,7 +1363,7 @@ def _build_navigation_overview(
         _node("nav_doview", "navigation_cell", {
             "label": "DoView Notation",
             "entityType": "navigation_cell",
-            "description": "2 diagrams using DoView outcomes-based theory of change notation",
+            "description": "6 diagrams using DoView outcomes-based theory of change notation",
             "linkedModelId": mids.get(34, ""),
             "visual": {"width": 220, "height": 130,
                        "icon": {"set": "lucide", "name": "arrow-right"}},
@@ -1373,89 +1373,149 @@ def _build_navigation_overview(
 
 
 def _build_doview_overview(
-    eids: dict, rids: dict, mids: dict[int, str] | None = None,
+    mids: dict[int, str] | None = None, **_kw: object,
 ) -> dict:
-    """DoView overview diagram: final outcomes raised box + subpage navigation tiles."""
+    """DoView overview: Iris System DoView with navigation tiles to subpages."""
     mids = mids or {}
-    nodes = [
-        # Final Outcomes raised box (white with grey top rule)
-        _node("dv_final_box", "final_outcome", {
-            "label": "Youth Employment Program — Final Outcomes",
-            "entityType": "final_outcome",
-            "description": "Youth are economically independent",
-            "entityId": eids.get("dv6", ""),
-        }, 200, 40, 400, 80),
-        # Navigation tile for the outcomes map subpage
-        _node("dv_tile_map", "overview_tile", {
-            "label": "Employment Outcomes Map",
-            "entityType": "overview_tile",
-            "description": "Causal chain from employer engagement to economic independence",
-            "linkedModelId": mids.get(35, ""),
-            "visual": {"width": 220, "height": 120, "bgColor": "#FFF2CC", "borderColor": "#D6B656"},
-        }, 100, 200, 220, 120),
-        # Source reference
-        _node("dv_source", "source_reference", {
-            "label": "Youth Employment Research",
-            "entityType": "source_reference",
-            "description": "Smith J. (2023). Youth Unemployment Interventions: A Systematic Review.",
-            "entityId": eids.get("dv7", ""),
-        }, 400, 200, 260, 80),
-    ]
-    return {"nodes": nodes, "edges": []}
+    return {"nodes": [
+        {"id": "tile_final_outcomes", "type": "overview_tile", "position": {"x": 60, "y": 30},
+         "data": {"label": "Final Outcomes", "entityType": "overview_tile",
+                  "visual": {"bgColor": "#FFFFFF", "borderColor": "#CCCCCC"},
+                  "linkedModelId": mids.get(35, "")}, "width": 200, "height": 86},
+        {"id": "tile_strategy", "type": "overview_tile", "position": {"x": 60, "y": 160},
+         "data": {"label": "Strategic Vision & Goals", "entityType": "overview_tile",
+                  "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"},
+                  "linkedModelId": mids.get(36, "")}, "width": 200, "height": 86},
+        {"id": "tile_delivery", "type": "overview_tile", "position": {"x": 300, "y": 160},
+         "data": {"label": "Platform Delivery & Operations", "entityType": "overview_tile",
+                  "visual": {"bgColor": "#F8CECC", "borderColor": "#B85450"},
+                  "linkedModelId": mids.get(37, "")}, "width": 200, "height": 86},
+        {"id": "tile_enablement", "type": "overview_tile", "position": {"x": 540, "y": 160},
+         "data": {"label": "User Enablement & Adoption", "entityType": "overview_tile",
+                  "visual": {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF"},
+                  "linkedModelId": mids.get(38, "")}, "width": 200, "height": 86},
+        {"id": "tile_sources", "type": "overview_tile", "position": {"x": 780, "y": 160},
+         "data": {"label": "Sources", "entityType": "overview_tile",
+                  "visual": {"bgColor": "#F5F5F5", "borderColor": "#666666"},
+                  "linkedModelId": mids.get(39, "")}, "width": 200, "height": 86},
+    ], "edges": []}
 
 
-def _build_doview_outcomes_map(eids: dict, rids: dict, **_kw: object) -> dict:
-    """DoView outcomes map: left-to-right causal chain with 4 columns."""
+def _build_doview_final_outcomes(**_kw: object) -> dict:
+    """DoView final outcomes page: stacked list of ultimate goals."""
+    return {"nodes": [
+        {"id": "fo1", "type": "final_outcome", "position": {"x": 400, "y": 60},
+         "data": {"label": "Decision-making improves through reliable architectural insight",
+                  "entityType": "final_outcome", "visual": {"bgColor": "#FFFFFF", "borderColor": "#CCCCCC"}},
+         "width": 200, "height": 86},
+        {"id": "fo2", "type": "final_outcome", "position": {"x": 400, "y": 166},
+         "data": {"label": "Digital transformation initiatives succeed with clear technical direction",
+                  "entityType": "final_outcome", "visual": {"bgColor": "#FFFFFF", "borderColor": "#CCCCCC"}},
+         "width": 200, "height": 86},
+        {"id": "fo3", "type": "final_outcome", "position": {"x": 400, "y": 272},
+         "data": {"label": "Organisational knowledge remains stable despite staff turnover",
+                  "entityType": "final_outcome", "visual": {"bgColor": "#FFFFFF", "borderColor": "#CCCCCC"}},
+         "width": 200, "height": 86},
+    ], "edges": []}
 
-    def _dv_node(nid: str, entity_nid: str, x: int, y: int, color: str, border: str) -> dict:
-        """Build a DoView outcome_box node."""
-        _, etype, name, desc, _ = next(e for e in _ENTITIES if e[0] == entity_nid)
-        return _node(nid, etype, {
-            "label": name,
-            "entityType": etype,
-            "description": desc,
-            "entityId": eids.get(entity_nid, ""),
-            "visual": {"bgColor": color, "borderColor": border},
-        }, x, y, 200, 90)
 
-    # Four columns: col1=activities, col2=short-term, col3=medium-term, col4=final
-    nodes = [
-        # Column 1: Enabling outcomes
-        _dv_node("dv_n1", "dv1", 50, 80, "#FFF2CC", "#D6B656"),   # Employers engaged
-        _dv_node("dv_n2", "dv2", 50, 220, "#DAE8FC", "#6C8EBF"),  # Job-ready skills
-        # Column 2: Access outcome
-        _dv_node("dv_n3", "dv3", 320, 150, "#D5E8D4", "#82B366"),  # Access opportunities
-        # Column 3: Experience outcome
-        _dv_node("dv_n4", "dv4", 590, 150, "#FFE6CC", "#D79B00"),  # Gain experience
-        # Column 4: Final outcome (distinct styling)
-        _node("dv_n5", "outcome_box", {
-            "label": "Youth secure meaningful employment",
-            "entityType": "outcome_box",
-            "description": "Youth obtain paid employment aligned with their skills and career goals",
-            "entityId": eids.get("dv5", ""),
-            "visual": {"bgColor": "#E1D5E7", "borderColor": "#9673A6"},
-        }, 860, 150, 200, 90),
-        # Final outcome box with grey top rule
-        _node("dv_n6", "final_outcome", {
-            "label": "Youth are economically independent",
-            "entityType": "final_outcome",
-            "description": "Young people have stable income, financial literacy, and long-term career prospects",
-            "entityId": eids.get("dv6", ""),
-        }, 1130, 100, 220, 90),
-    ]
-    edges = [
-        _edge("dv_e1", "dv_n1", "dv_n3", "causal_link", "",
-              rel_id=_r(rids, 58), source_handle="right", target_handle="left"),
-        _edge("dv_e2", "dv_n2", "dv_n3", "causal_link", "",
-              rel_id=_r(rids, 59), source_handle="right", target_handle="left"),
-        _edge("dv_e3", "dv_n3", "dv_n4", "causal_link", "",
-              rel_id=_r(rids, 60), source_handle="right", target_handle="left"),
-        _edge("dv_e4", "dv_n4", "dv_n5", "causal_link", "",
-              rel_id=_r(rids, 61), source_handle="right", target_handle="left"),
-        _edge("dv_e5", "dv_n5", "dv_n6", "causal_link", "",
-              rel_id=_r(rids, 62), source_handle="right", target_handle="left"),
-    ]
-    return {"nodes": nodes, "edges": edges}
+def _build_doview_strategic_vision(**_kw: object) -> dict:
+    """DoView outcomes map: Strategic Vision & Goals."""
+    return {"nodes": [
+        {"id": "s1_1", "type": "outcome_box", "position": {"x": 60, "y": 60},
+         "data": {"label": "High-quality architecture models are created and maintained",
+                  "entityType": "outcome_box", "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"}}, "width": 200, "height": 86},
+        {"id": "s1_2", "type": "outcome_box", "position": {"x": 60, "y": 166},
+         "data": {"label": "Enterprise architects are empowered to govern systems effectively",
+                  "entityType": "outcome_box", "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"}}, "width": 200, "height": 86},
+        {"id": "s2_1", "type": "outcome_box", "position": {"x": 340, "y": 60},
+         "data": {"label": "Decision-making improves through reliable architectural insight",
+                  "entityType": "outcome_box", "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"}}, "width": 200, "height": 86},
+        {"id": "s2_2", "type": "outcome_box", "position": {"x": 340, "y": 166},
+         "data": {"label": "Digital transformation initiatives succeed with clear technical direction",
+                  "entityType": "outcome_box", "visual": {"bgColor": "#F8CECC", "borderColor": "#B85450"}}, "width": 200, "height": 86},
+        {"id": "s2_3", "type": "outcome_box", "position": {"x": 340, "y": 272},
+         "data": {"label": "Organisational knowledge remains stable despite staff turnover",
+                  "entityType": "outcome_box", "visual": {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF"}}, "width": 200, "height": 86},
+    ], "edges": [
+        {"id": "e_s1_1_s2_1", "type": "causal_link", "source": "s1_1", "target": "s2_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_s1_2_s2_1", "type": "causal_link", "source": "s1_2", "target": "s2_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_s2_1_s2_2", "type": "causal_link", "source": "s2_1", "target": "s2_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_s2_1_s2_3", "type": "causal_link", "source": "s2_1", "target": "s2_3", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+    ]}
+
+
+def _build_doview_platform_delivery(**_kw: object) -> dict:
+    """DoView outcomes map: Platform Delivery & Operations."""
+    return {"nodes": [
+        {"id": "d1_1", "type": "outcome_box", "position": {"x": 60, "y": 60},
+         "data": {"label": "User accounts and permissions are managed securely", "entityType": "outcome_box", "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"}}, "width": 200, "height": 86},
+        {"id": "d1_2", "type": "outcome_box", "position": {"x": 60, "y": 166},
+         "data": {"label": "Diagrams are versioned with full history & rollback", "entityType": "outcome_box", "visual": {"bgColor": "#F8CECC", "borderColor": "#B85450"}}, "width": 200, "height": 86},
+        {"id": "d2_1", "type": "outcome_box", "position": {"x": 340, "y": 60},
+         "data": {"label": "Interactive canvas editing supports multiple notations", "entityType": "outcome_box", "visual": {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF"}}, "width": 200, "height": 86},
+        {"id": "d2_2", "type": "outcome_box", "position": {"x": 340, "y": 166},
+         "data": {"label": "Full-text search across diagrams and elements works instantly", "entityType": "outcome_box", "visual": {"bgColor": "#D5E8D4", "borderColor": "#82B366"}}, "width": 200, "height": 86},
+        {"id": "d2_3", "type": "outcome_box", "position": {"x": 340, "y": 272},
+         "data": {"label": "Diagrams export reliably to SVG, PNG, and PDF", "entityType": "outcome_box", "visual": {"bgColor": "#FFF4E6", "borderColor": "#D4A574"}}, "width": 200, "height": 86},
+        {"id": "d3_1", "type": "outcome_box", "position": {"x": 620, "y": 60},
+         "data": {"label": "Context-aware LLM responses guide users with accurate, bounded answers", "entityType": "outcome_box", "visual": {"bgColor": "#E1D5E7", "borderColor": "#9673A6"}}, "width": 200, "height": 86},
+        {"id": "d3_2", "type": "outcome_box", "position": {"x": 620, "y": 166},
+         "data": {"label": "Diagram thumbnails auto-generate for quick preview", "entityType": "outcome_box", "visual": {"bgColor": "#D4E1F5", "borderColor": "#7EA6E0"}}, "width": 200, "height": 86},
+        {"id": "d3_3", "type": "outcome_box", "position": {"x": 620, "y": 272},
+         "data": {"label": "Audit logs capture all state-changing actions", "entityType": "outcome_box", "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"}}, "width": 200, "height": 86},
+        {"id": "d4_1", "type": "outcome_box", "position": {"x": 900, "y": 60},
+         "data": {"label": "Diagrams load smoothly across devices and browsers", "entityType": "outcome_box", "visual": {"bgColor": "#F8CECC", "borderColor": "#B85450"}}, "width": 200, "height": 86},
+        {"id": "d4_2", "type": "outcome_box", "position": {"x": 900, "y": 166},
+         "data": {"label": "Data integrity is preserved with optimistic concurrency (ETag)", "entityType": "outcome_box", "visual": {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF"}}, "width": 200, "height": 86},
+    ], "edges": [
+        {"id": "e_d1_1_d2_1", "type": "causal_link", "source": "d1_1", "target": "d2_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d1_2_d2_3", "type": "causal_link", "source": "d1_2", "target": "d2_3", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d2_1_d2_2", "type": "causal_link", "source": "d2_1", "target": "d2_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d2_2_d3_1", "type": "causal_link", "source": "d2_2", "target": "d3_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d2_3_d3_2", "type": "causal_link", "source": "d2_3", "target": "d3_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d3_1_d3_3", "type": "causal_link", "source": "d3_1", "target": "d3_3", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d3_2_d4_1", "type": "causal_link", "source": "d3_2", "target": "d4_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d3_3_d4_2", "type": "causal_link", "source": "d3_3", "target": "d4_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_d4_1_d4_2", "type": "causal_link", "source": "d4_1", "target": "d4_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+    ]}
+
+
+def _build_doview_user_enablement(**_kw: object) -> dict:
+    """DoView outcomes map: User Enablement & Adoption."""
+    return {"nodes": [
+        {"id": "u1_1", "type": "outcome_box", "position": {"x": 60, "y": 60},
+         "data": {"label": "New users understand Iris\u2019s purpose and value quickly", "entityType": "outcome_box", "visual": {"bgColor": "#FFF2CC", "borderColor": "#D6B656"}}, "width": 200, "height": 86},
+        {"id": "u1_2", "type": "outcome_box", "position": {"x": 60, "y": 166},
+         "data": {"label": "Initial setup (account, team, models) completes in <10 minutes", "entityType": "outcome_box", "visual": {"bgColor": "#F8CECC", "borderColor": "#B85450"}}, "width": 200, "height": 86},
+        {"id": "u2_1", "type": "outcome_box", "position": {"x": 340, "y": 60},
+         "data": {"label": "Users confidently create and edit diagrams without training", "entityType": "outcome_box", "visual": {"bgColor": "#DAE8FC", "borderColor": "#6C8EBF"}}, "width": 200, "height": 86},
+        {"id": "u2_2", "type": "outcome_box", "position": {"x": 340, "y": 166},
+         "data": {"label": "Users apply appropriate notation for their domain", "entityType": "outcome_box", "visual": {"bgColor": "#D5E8D4", "borderColor": "#82B366"}}, "width": 200, "height": 86},
+        {"id": "u2_3", "type": "outcome_box", "position": {"x": 340, "y": 272},
+         "data": {"label": "Users contribute feedback that improves the product", "entityType": "outcome_box", "visual": {"bgColor": "#FFF4E6", "borderColor": "#D4A574"}}, "width": 200, "height": 86},
+        {"id": "u3_1", "type": "outcome_box", "position": {"x": 620, "y": 60},
+         "data": {"label": "Teams sustain shared models over time with clear ownership", "entityType": "outcome_box", "visual": {"bgColor": "#E1D5E7", "borderColor": "#9673A6"}}, "width": 200, "height": 86},
+        {"id": "u3_2", "type": "outcome_box", "position": {"x": 620, "y": 166},
+         "data": {"label": "User community grows through peer learning and sharing", "entityType": "outcome_box", "visual": {"bgColor": "#D4E1F5", "borderColor": "#7EA6E0"}}, "width": 200, "height": 86},
+    ], "edges": [
+        {"id": "e_u1_1_u2_1", "type": "causal_link", "source": "u1_1", "target": "u2_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_u1_2_u2_1", "type": "causal_link", "source": "u1_2", "target": "u2_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_u2_1_u2_2", "type": "causal_link", "source": "u2_1", "target": "u2_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_u2_2_u2_3", "type": "causal_link", "source": "u2_2", "target": "u2_3", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_u2_3_u3_1", "type": "causal_link", "source": "u2_3", "target": "u3_1", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+        {"id": "e_u3_1_u3_2", "type": "causal_link", "source": "u3_1", "target": "u3_2", "sourceHandle": "center", "targetHandle": "center", "data": {"relationshipType": "causal_link"}},
+    ]}
+
+
+def _build_doview_sources(**_kw: object) -> dict:
+    """DoView sources page."""
+    return {"nodes": [
+        {"id": "src1", "type": "source_reference", "position": {"x": 100, "y": 100},
+         "data": {"label": "Smith J. (2023). Youth Unemployment Interventions: A Systematic Review. Journal of Policy Studies",
+                  "entityType": "source_reference", "visual": {"bgColor": "#F5F5F5", "borderColor": "#666666"}},
+         "width": 600, "height": 50},
+    ], "edges": []}
 
 
 # ── Diagram definitions ───────────────────────────────────────────────────────
@@ -1605,15 +1665,31 @@ _DIAGRAMS = [
      "description": "Root navigation diagram with click-through tiles to each notation group.",
      "builder": _build_navigation_overview, "tags": _DIAGRAM_TAGS},
 
-    # ── DoView Notation (pkg-5, indices 34–35) ────────────────────────────────
+    # ── DoView Notation (pkg-5, indices 34–39) ────────────────────────────────
     {"index": 34, "diagram_type": "overview", "notation": "doview",
-     "name": "Youth Employment Program — Overview", "parent_package_index": 5,
-     "description": "DoView overview with final outcomes and navigation tiles to outcomes map subpages.",
+     "name": "Iris System DoView", "parent_package_index": 5,
+     "description": "DoView overview with navigation tiles to Final Outcomes, Strategic Vision, Platform Delivery, User Enablement, and Sources.",
      "builder": _build_doview_overview, "tags": _DIAGRAM_TAGS},
-    {"index": 35, "diagram_type": "outcomes_map", "notation": "doview",
-     "name": "Employment Outcomes Map", "parent_package_index": 5,
-     "description": "Left-to-right causal chain: employer engagement → job-ready skills → access → experience → employment → independence.",
-     "builder": _build_doview_outcomes_map, "tags": _DIAGRAM_TAGS},
+    {"index": 35, "diagram_type": "final_outcomes", "notation": "doview",
+     "name": "Final Outcomes", "parent_package_index": 5,
+     "description": "Three ultimate goals: reliable architectural insight, successful digital transformation, stable organisational knowledge.",
+     "builder": _build_doview_final_outcomes, "tags": _DIAGRAM_TAGS},
+    {"index": 36, "diagram_type": "outcomes_map", "notation": "doview",
+     "name": "Strategic Vision & Goals", "parent_package_index": 5,
+     "description": "Outcomes map: high-quality models and empowered architects lead to improved decisions, transformation success, and knowledge stability.",
+     "builder": _build_doview_strategic_vision, "tags": _DIAGRAM_TAGS},
+    {"index": 37, "diagram_type": "outcomes_map", "notation": "doview",
+     "name": "Platform Delivery & Operations", "parent_package_index": 5,
+     "description": "Outcomes map: security, versioning, canvas, search, export, AI, thumbnails, audit leading to cross-device performance and data integrity.",
+     "builder": _build_doview_platform_delivery, "tags": _DIAGRAM_TAGS},
+    {"index": 38, "diagram_type": "outcomes_map", "notation": "doview",
+     "name": "User Enablement & Adoption", "parent_package_index": 5,
+     "description": "Outcomes map: user understanding, quick setup, confident editing, notation application, feedback, team sustainability, and community growth.",
+     "builder": _build_doview_user_enablement, "tags": _DIAGRAM_TAGS},
+    {"index": 39, "diagram_type": "sources", "notation": "doview",
+     "name": "Sources", "parent_package_index": 5,
+     "description": "Reference sources for the Iris System DoView.",
+     "builder": _build_doview_sources, "tags": _DIAGRAM_TAGS},
 ]
 
 
@@ -1630,9 +1706,9 @@ async def _ensure_system_user(db: DatabasePort) -> None:
 
 async def _clear_old_seed_data(db: DatabasePort) -> None:
     """Delete old seed data by deterministic IDs in dependency order."""
-    max_elements = max(len(_ENTITIES), 59)
-    max_rels = max(len(_RELATIONSHIPS), 58)
-    max_diagrams = max(len(_DIAGRAMS), 34)
+    max_elements = max(len(_ENTITIES), 66)
+    max_rels = max(len(_RELATIONSHIPS), 63)
+    max_diagrams = max(len(_DIAGRAMS), 40)
     max_packages = max(len(_PACKAGES), 5)
 
     element_ids = [_gen_id("element", i) for i in range(max_elements)]
@@ -1683,13 +1759,14 @@ async def _clear_old_seed_data(db: DatabasePort) -> None:
 
 _V5_MARKER = "seed_v5"
 _V6_MARKER = "seed_v6"
+_V7_MARKER = "seed_v7"
 
 
 async def seed_example_models(db: DatabasePort) -> None:
     """Seed example elements, packages, and diagrams demonstrating Iris architecture.
 
     Idempotency:
-      - If diagram-33 metadata contains 'seed_v6' → already v6, skip
+      - If diagram-33 metadata contains 'seed_v7' → already v7, skip
       - Otherwise → clear + reseed v6
     """
     # --- Skip if initial setup not yet completed ------------------------------
@@ -1717,7 +1794,7 @@ async def seed_example_models(db: DatabasePort) -> None:
     if row and row[0]:
         try:
             meta = json.loads(row[0])
-            if meta.get("seed_version") == _V6_MARKER:
+            if meta.get("seed_version") == _V7_MARKER:
                 return
         except (json.JSONDecodeError, TypeError):
             pass
@@ -1827,7 +1904,7 @@ async def seed_example_models(db: DatabasePort) -> None:
         # v6 marker in metadata for overview diagram
         metadata: dict[str, object] = {}
         if model_def["index"] == 33:
-            metadata["seed_version"] = _V6_MARKER
+            metadata["seed_version"] = _V7_MARKER
 
         await db.execute(
             "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
