@@ -157,6 +157,15 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     )
     await port.commit()
 
+    # m032: add sequence_order column to diagrams and packages if missing.
+    await port.execute(
+        "ALTER TABLE diagrams ADD COLUMN IF NOT EXISTS sequence_order INTEGER NOT NULL DEFAULT 0"
+    )
+    await port.execute(
+        "ALTER TABLE packages ADD COLUMN IF NOT EXISTS sequence_order INTEGER NOT NULL DEFAULT 0"
+    )
+    await port.commit()
+
     # Sync profiles → users table so FK constraints (elements.created_by, etc.) are satisfied.
     # The `users` table is the SQLite-era user store; in Supabase mode it's empty but still
     # referenced by FKs. Mirror each profile into `users` so CRUD operations succeed.
