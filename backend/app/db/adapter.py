@@ -208,52 +208,38 @@ class SupabaseAdapter:
     Handles:
     - Automatic ? → $N placeholder conversion
     - Result wrapping to match the aiosqlite cursor interface
-    - Transaction management via an explicit connection context
 
-    Transactions:
-        Each SupabaseAdapter instance holds a single asyncpg connection acquired
-        from the pool. Multiple execute() calls within the same adapter share a
-        transaction that is committed by commit() or rolled back on close().
+    Each execute() acquires a connection from the pool and releases it after.
+    For DML, each statement auto-commits (no explicit transaction needed).
+    commit() is a no-op for compatibility with the DatabasePort interface.
     """
 
-    def __init__(self, conn: asyncpg.Connection) -> None:
-        self._conn = conn
-        self._transaction: asyncpg.transaction.Transaction | None = None
-
-    async def _ensure_transaction(self) -> None:
-        if self._transaction is None:
-            self._transaction = self._conn.transaction()
-            await self._transaction.start()
+    def __init__(self, pool: asyncpg.Pool) -> None:  # type: ignore[name-defined]
+        self._pool = pool
 
     async def execute(self, query: str, params: tuple[Any, ...] = ()) -> _AsyncpgCursor:
-        await self._ensure_transaction()
         pg_query = _convert_placeholders(query)
 
-        if _is_select(pg_query):
-            # SELECT: fetch all rows, rowcount = number of rows returned
-            rows: list[asyncpg.Record] = await self._conn.fetch(pg_query, *params)
-            return _AsyncpgCursor(rows, rowcount=len(rows))
-        else:
-            # DML (INSERT/UPDATE/DELETE): execute for status, no rows returned
-            # unless RETURNING is used
-            upper = pg_query.strip().upper()
-            if "RETURNING" in upper:
-                rows = await self._conn.fetch(pg_query, *params)
+        async with self._pool.acquire() as conn:
+            if _is_select(pg_query):
+                rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
                 return _AsyncpgCursor(rows, rowcount=len(rows))
             else:
-                status: str = await self._conn.execute(pg_query, *params)
-                return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
+                upper = pg_query.strip().upper()
+                if "RETURNING" in upper:
+                    rows = await conn.fetch(pg_query, *params)
+                    return _AsyncpgCursor(rows, rowcount=len(rows))
+                else:
+                    status: str = await conn.execute(pg_query, *params)
+                    return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
 
     async def commit(self) -> None:
-        if self._transaction is not None:
-            await self._transaction.commit()
-            self._transaction = None
+        # Each execute() auto-commits via the pool; no-op for interface compat.
+        pass
 
     async def rollback(self) -> None:
-        if self._transaction is not None:
-            await self._transaction.rollback()
-            self._transaction = None
+        pass
 
     @property
-    def raw(self) -> asyncpg.Connection:
-        return self._conn
+    def raw(self) -> asyncpg.Pool:  # type: ignore[name-defined]
+        return self._pool

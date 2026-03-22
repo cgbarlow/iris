@@ -78,7 +78,6 @@ class DatabaseManager:
         self._audit_db: aiosqlite.Connection | None = None
         # Supabase state
         self._pool: asyncpg.Pool | None = None  # type: ignore[name-defined]
-        self._supabase_conn: asyncpg.Connection | None = None  # type: ignore[name-defined]
 
     @property
     def is_supabase(self) -> bool:
@@ -114,10 +113,6 @@ class DatabaseManager:
             command_timeout=30,
             statement_cache_size=0,  # Transaction pooler does not support PREPARE
         )
-        # Acquire a persistent connection for request-time use.
-        # run_until_complete() cannot be used inside uvicorn's running event loop,
-        # so we acquire once here (async context) and reuse.
-        self._supabase_conn = await self._pool.acquire()
 
     async def close(self) -> None:
         """Close all database connections."""
@@ -127,9 +122,6 @@ class DatabaseManager:
         if self._audit_db is not None:
             await self._audit_db.close()
             self._audit_db = None
-        if self._supabase_conn is not None and self._pool is not None:
-            await self._pool.release(self._supabase_conn)
-            self._supabase_conn = None
         if self._pool is not None:
             await self._pool.close()
             self._pool = None
@@ -163,11 +155,11 @@ class DatabaseManager:
         return SqliteAdapter(self._audit_db)
 
     def _acquire_supabase(self) -> SupabaseAdapter:
-        """Return SupabaseAdapter wrapping the persistent connection."""
-        if self._supabase_conn is None:
+        """Return SupabaseAdapter wrapping the connection pool."""
+        if self._pool is None:
             msg = "Database not connected. Call connect() first."
             raise RuntimeError(msg)
-        return SupabaseAdapter(self._supabase_conn)
+        return SupabaseAdapter(self._pool)
 
     # ------------------------------------------------------------------
     # Raw SQLite connection (for migrations and startup only)
