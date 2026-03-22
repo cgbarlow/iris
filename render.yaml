@@ -28,6 +28,7 @@ services:
     name: iris-api
     runtime: docker
     plan: free
+    region: singapore
     dockerfilePath: backend/Dockerfile
     dockerContext: .
     envVars:
