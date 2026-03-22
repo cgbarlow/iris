@@ -78,6 +78,7 @@ class DatabaseManager:
         self._audit_db: aiosqlite.Connection | None = None
         # Supabase state
         self._pool: asyncpg.Pool | None = None  # type: ignore[name-defined]
+        self._supabase_conn: asyncpg.Connection | None = None  # type: ignore[name-defined]
 
     @property
     def is_supabase(self) -> bool:
@@ -113,6 +114,10 @@ class DatabaseManager:
             command_timeout=30,
             statement_cache_size=0,  # Transaction pooler does not support PREPARE
         )
+        # Acquire a persistent connection for request-time use.
+        # run_until_complete() cannot be used inside uvicorn's running event loop,
+        # so we acquire once here (async context) and reuse.
+        self._supabase_conn = await self._pool.acquire()
 
     async def close(self) -> None:
         """Close all database connections."""
@@ -122,6 +127,9 @@ class DatabaseManager:
         if self._audit_db is not None:
             await self._audit_db.close()
             self._audit_db = None
+        if self._supabase_conn is not None and self._pool is not None:
+            await self._pool.release(self._supabase_conn)
+            self._supabase_conn = None
         if self._pool is not None:
             await self._pool.close()
             self._pool = None
@@ -155,17 +163,11 @@ class DatabaseManager:
         return SqliteAdapter(self._audit_db)
 
     def _acquire_supabase(self) -> SupabaseAdapter:
-        """Acquire a connection from the asyncpg pool and wrap in SupabaseAdapter."""
-        if self._pool is None:
+        """Return SupabaseAdapter wrapping the persistent connection."""
+        if self._supabase_conn is None:
             msg = "Database not connected. Call connect() first."
             raise RuntimeError(msg)
-        # Synchronously acquire from the pool — each property access gets a fresh connection.
-        # For production use, prefer injecting a per-request connection via dependency injection.
-        import asyncio  # noqa: PLC0415
-
-        loop = asyncio.get_event_loop()
-        conn = loop.run_until_complete(self._pool.acquire())
-        return SupabaseAdapter(conn)
+        return SupabaseAdapter(self._supabase_conn)
 
     # ------------------------------------------------------------------
     # Raw SQLite connection (for migrations and startup only)
