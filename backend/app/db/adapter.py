@@ -298,12 +298,6 @@ class SupabaseAdapter:
 
     def __init__(self, pool: asyncpg.Pool) -> None:  # type: ignore[name-defined]
         self._pool = pool
-        self._conn: asyncpg.Connection | None = None  # type: ignore[name-defined]
-
-    async def _get_conn(self) -> asyncpg.Connection:  # type: ignore[name-defined]
-        if self._conn is None:
-            self._conn = await self._pool.acquire()
-        return self._conn
 
     # SQLite FTS virtual tables that don't exist in PostgreSQL (uses tsvector instead)
     _FTS_TABLES = {"elements_fts", "diagrams_fts"}
@@ -318,32 +312,24 @@ class SupabaseAdapter:
             if fts.upper() in upper_stripped:
                 return _AsyncpgCursor([], rowcount=0)
 
-        conn = await self._get_conn()
-
-        if _is_select(pg_query):
-            rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
-            return _AsyncpgCursor(rows, rowcount=len(rows))
-        else:
-            upper = upper_stripped
-            if "RETURNING" in upper:
-                rows = await conn.fetch(pg_query, *params)
+        async with self._pool.acquire() as conn:
+            if _is_select(pg_query):
+                rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
                 return _AsyncpgCursor(rows, rowcount=len(rows))
             else:
-                status: str = await conn.execute(pg_query, *params)
-                return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
+                upper = upper_stripped
+                if "RETURNING" in upper:
+                    rows = await conn.fetch(pg_query, *params)
+                    return _AsyncpgCursor(rows, rowcount=len(rows))
+                else:
+                    status: str = await conn.execute(pg_query, *params)
+                    return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
 
     async def commit(self) -> None:
-        # Auto-commit per statement in PostgreSQL; no-op for interface compat.
         pass
 
     async def rollback(self) -> None:
         pass
-
-    async def release(self) -> None:
-        """Return the held connection to the pool."""
-        if self._conn is not None:
-            await self._pool.release(self._conn)
-            self._conn = None
 
     @property
     def raw(self) -> asyncpg.Pool:  # type: ignore[name-defined]
