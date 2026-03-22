@@ -291,37 +291,49 @@ class SupabaseAdapter:
     - ISO datetime string → datetime object conversion for parameters
     - Result wrapping to match the aiosqlite cursor interface
 
-    Each execute() acquires a connection from the pool and releases it after.
-    For DML, each statement auto-commits (no explicit transaction needed).
-    commit() is a no-op for compatibility with the DatabasePort interface.
+    Lazily acquires a connection from the pool on first execute() and holds it
+    for the adapter's lifetime. Call release() to return the connection to the
+    pool. This avoids per-statement pool acquire/release overhead.
     """
 
     def __init__(self, pool: asyncpg.Pool) -> None:  # type: ignore[name-defined]
         self._pool = pool
+        self._conn: asyncpg.Connection | None = None  # type: ignore[name-defined]
+
+    async def _get_conn(self) -> asyncpg.Connection:  # type: ignore[name-defined]
+        if self._conn is None:
+            self._conn = await self._pool.acquire()
+        return self._conn
 
     async def execute(self, query: str, params: tuple[Any, ...] = ()) -> _AsyncpgCursor:
         pg_query = _convert_placeholders(query)
         params = _convert_params(params)
+        conn = await self._get_conn()
 
-        async with self._pool.acquire() as conn:
-            if _is_select(pg_query):
-                rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
+        if _is_select(pg_query):
+            rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
+            return _AsyncpgCursor(rows, rowcount=len(rows))
+        else:
+            upper = pg_query.strip().upper()
+            if "RETURNING" in upper:
+                rows = await conn.fetch(pg_query, *params)
                 return _AsyncpgCursor(rows, rowcount=len(rows))
             else:
-                upper = pg_query.strip().upper()
-                if "RETURNING" in upper:
-                    rows = await conn.fetch(pg_query, *params)
-                    return _AsyncpgCursor(rows, rowcount=len(rows))
-                else:
-                    status: str = await conn.execute(pg_query, *params)
-                    return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
+                status: str = await conn.execute(pg_query, *params)
+                return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
 
     async def commit(self) -> None:
-        # Each execute() auto-commits via the pool; no-op for interface compat.
+        # Auto-commit per statement in PostgreSQL; no-op for interface compat.
         pass
 
     async def rollback(self) -> None:
         pass
+
+    async def release(self) -> None:
+        """Return the held connection to the pool."""
+        if self._conn is not None:
+            await self._pool.release(self._conn)
+            self._conn = None
 
     @property
     def raw(self) -> asyncpg.Pool:  # type: ignore[name-defined]
