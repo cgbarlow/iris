@@ -161,9 +161,10 @@ def _convert_placeholders(query: str) -> str:
         needs_on_conflict = True
         query = converted
 
-    # SQLite uses 0/1 for booleans; PostgreSQL requires TRUE/FALSE
-    query = re.sub(r"(?<==\s)0(?=\s|$|,|\))", "FALSE", query)
-    query = re.sub(r"(?<==\s)1(?=\s|$|,|\))", "TRUE", query)
+    # Boolean conversion for known boolean columns only (not version/count integers).
+    # Match patterns like "is_deleted = 0", "is_active = 1", "is_default = 0"
+    query = re.sub(r"(?i)\b(is_\w+)\s*=\s*0\b", r"\1 = FALSE", query)
+    query = re.sub(r"(?i)\b(is_\w+)\s*=\s*1\b", r"\1 = TRUE", query)
 
     counter = 0
 
