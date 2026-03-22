@@ -77,7 +77,7 @@ async def build_creation_system_prompt(
             parts.append(row[0])
 
     result = "\n\n".join(parts)
-    logger.info("[AI_CREATION] Built system prompt: %d layers, %d chars", len(parts), len(result))
+    print(f"[AI_CREATION] Built system prompt: {len(parts)} layers, {len(result)} chars", flush=True)
     return result
 
 
