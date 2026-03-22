@@ -128,15 +128,32 @@ def _convert_placeholders(query: str) -> str:
 
     Also converts:
     - ``INSERT OR IGNORE`` (SQLite) to ``INSERT ... ON CONFLICT DO NOTHING`` (PostgreSQL)
+    - ``INSERT OR REPLACE`` (SQLite) to ``INSERT ... ON CONFLICT (id) DO UPDATE SET ...`` (PostgreSQL)
     - ``= 0`` / ``= 1`` to ``= FALSE`` / ``= TRUE`` for boolean column compatibility
     """
+    needs_on_conflict = False
+    needs_upsert = False
+    upsert_columns: list[str] = []
+
+    # SQLite: INSERT OR REPLACE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT (id) DO UPDATE
+    or_replace_match = re.match(
+        r"(?i)INSERT\s+OR\s+REPLACE\s+INTO\s+\w+\s*\(([^)]+)\)", query
+    )
+    if or_replace_match:
+        query = re.sub(r"(?i)\bINSERT\s+OR\s+REPLACE\s+INTO\b", "INSERT INTO", query)
+        cols = [c.strip() for c in or_replace_match.group(1).split(",")]
+        upsert_columns = [c for c in cols if c.lower() != "id"]
+        needs_upsert = True
+
     # SQLite: INSERT OR IGNORE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT DO NOTHING
     converted = re.sub(r"(?i)\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", query)
-    needs_on_conflict = converted is not query
+    if converted != query:
+        needs_on_conflict = True
+        query = converted
 
     # SQLite uses 0/1 for booleans; PostgreSQL requires TRUE/FALSE
-    converted = re.sub(r"(?<==\s)0(?=\s|$|,|\))", "FALSE", converted)
-    converted = re.sub(r"(?<==\s)1(?=\s|$|,|\))", "TRUE", converted)
+    query = re.sub(r"(?<==\s)0(?=\s|$|,|\))", "FALSE", query)
+    query = re.sub(r"(?<==\s)1(?=\s|$|,|\))", "TRUE", query)
 
     counter = 0
 
@@ -145,10 +162,13 @@ def _convert_placeholders(query: str) -> str:
         counter += 1
         return f"${counter}"
 
-    pg_query = _PLACEHOLDER_RE.sub(_replacer, converted)
+    pg_query = _PLACEHOLDER_RE.sub(_replacer, query)
 
     if needs_on_conflict:
         pg_query = pg_query.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+    elif needs_upsert and upsert_columns:
+        updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in upsert_columns)
+        pg_query = pg_query.rstrip().rstrip(";") + f" ON CONFLICT (id) DO UPDATE SET {updates}"
 
     return pg_query
 
