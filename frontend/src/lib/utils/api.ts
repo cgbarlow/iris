@@ -32,7 +32,7 @@ export async function tryRefresh(): Promise<boolean> {
 				return false;
 			}
 			// onAuthStateChange will update the store; updateTokens keeps it in sync now.
-			updateTokens({ access_token: data.session.access_token, refresh_token: '' });
+			updateTokens({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
 			return true;
 		} catch {
 			clearAuth();
@@ -84,8 +84,8 @@ export async function apiFetch<T>(
 		headers,
 	});
 
-	// Auto-refresh on 401
-	if (response.status === 401 && getRefreshToken()) {
+	// Auto-refresh on 401 (Supabase SDK manages its own refresh tokens internally)
+	if (response.status === 401 && (getRefreshToken() || DB_BACKEND === 'supabase')) {
 		// Deduplicate concurrent refresh attempts
 		if (!refreshPromise) {
 			refreshPromise = tryRefresh().finally(() => {

@@ -61,6 +61,7 @@ if (DB_BACKEND === 'supabase' && supabase) {
 	supabase.auth.getSession().then(({ data: { session } }) => {
 		if (session) {
 			accessToken = session.access_token;
+			refreshToken = session.refresh_token;
 			if (!currentUser) {
 				_fetchProfile(session.access_token);
 			}
@@ -70,6 +71,7 @@ if (DB_BACKEND === 'supabase' && supabase) {
 	supabase.auth.onAuthStateChange((_event, session) => {
 		if (session) {
 			accessToken = session.access_token;
+			refreshToken = session.refresh_token;
 			if (!currentUser) {
 				_fetchProfile(session.access_token);
 			}
