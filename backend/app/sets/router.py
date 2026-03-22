@@ -48,9 +48,11 @@ async def create(
             description=body.description,
             created_by=current_user["id"],
         )
-    except Exception:
+    except Exception as exc:
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).exception("Failed to create set: %s", exc)
         raise HTTPException(  # noqa: B904
-            status_code=409, detail="A set with this name already exists"
+            status_code=409, detail=f"A set with this name already exists ({type(exc).__name__}: {exc})"
         )
     return SetResponse(**result)
 
