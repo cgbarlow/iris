@@ -1,7 +1,9 @@
 FROM python:3.11-slim
 
-# Install system dependencies (mdbtools for .eap import)
-RUN apt-get update && apt-get install -y --no-install-recommends mdbtools && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+#   mdbtools: .eap file import (MS Access to SQLite conversion)
+#   libcairo2: SVG thumbnail generation via cairosvg
+RUN apt-get update && apt-get install -y --no-install-recommends mdbtools libcairo2 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/render/project/src
 
