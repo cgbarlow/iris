@@ -214,6 +214,15 @@ class _AsyncpgCursor:
         self._pos = len(self._rows)
         return remaining
 
+    def __aiter__(self) -> _AsyncpgCursor:
+        return self
+
+    async def __anext__(self) -> tuple[Any, ...]:
+        row = await self.fetchone()
+        if row is None:
+            raise StopAsyncIteration
+        return row
+
     @property
     def lastrowid(self) -> int | None:
         return self._lastrowid
