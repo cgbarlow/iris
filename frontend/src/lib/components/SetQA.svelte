@@ -124,34 +124,29 @@ function promptForLocation() {
 	}
 
 	function estimateExpectedDiagrams(): number {
-		// Find the Stage 1 subpage structure proposal — a SHORT message with just page titles.
-		// This is the message where the AI lists subpage names and asks for confirmation,
-		// NOT the detailed Stage 2 content (which has many more numbered items).
-		// Stage 1 messages are typically short (<1000 chars) with a numbered list.
+		// Find the Stage 1 subpage structure proposal in conversation history.
+		// Look for the SHORTEST assistant message that contains a numbered/bullet list
+		// and asks for confirmation — this is the structure, not the detailed content.
+		let bestCount = 0;
+		let bestLength = Infinity;
 		for (let i = creationHistory.length - 1; i >= 0; i--) {
 			const msg = creationHistory[i];
 			if (msg.role !== 'assistant') continue;
 			const content = msg.content;
-			// Skip long messages — Stage 2 detailed content is much longer
-			if (content.length > 1500) continue;
 			// Must look like a structure proposal (asks for confirmation)
-			if (!(/happy|fewer.*more.*pages|rename|structure/i.test(content))) continue;
-			// Count numbered items
-			const numberedItems = content.match(/^\s*\d+\.\s+\S/gm);
-			if (numberedItems && numberedItems.length >= 2) {
-				let total = numberedItems.length + 2; // + Overview + Final Outcomes
-				if (/source/i.test(content)) total += 1;
-				return total;
-			}
-			// Try bullet lists
-			const bulletItems = content.match(/^\s*[-*]\s+\S/gm);
-			if (bulletItems && bulletItems.length >= 2) {
-				let total = bulletItems.length + 2;
-				if (/source/i.test(content)) total += 1;
-				return total;
+			if (!(/happy|fewer.*more|rename|structure|confirm/i.test(content))) continue;
+			// Count numbered items (e.g. "1. Page Name")
+			const numberedItems = content.match(/^\s*\d+\.\s+\*{0,2}[A-Z]/gm);
+			const bulletItems = content.match(/^\s*[-*]\s+\*{0,2}[A-Z]/gm);
+			const items = numberedItems || bulletItems;
+			if (items && items.length >= 2 && content.length < bestLength) {
+				bestLength = content.length;
+				// The listed items are subpages; add 2 for Overview + Final Outcomes
+				bestCount = items.length + 2;
+				if (/source/i.test(content)) bestCount += 1;
 			}
 		}
-		return 0;
+		return bestCount;
 	}
 
 	function tryExtractDiagrams(text: string): object | null {
