@@ -1825,16 +1825,19 @@ async def seed_example_models(db: DatabasePort) -> None:
 
     # --- Create packages ------------------------------------------------------
     pkg_id_map: dict[int, str] = {}
+    pkg_seq_counters: dict[int | None, int] = {}  # parent_idx → next sequence_order
     for pkg_idx, pkg_name, pkg_desc, parent_idx in _PACKAGES:
         pkg_id = _gen_id("pkg", pkg_idx)
         pkg_id_map[pkg_idx] = pkg_id
         parent_pkg_id = pkg_id_map[parent_idx] if parent_idx is not None else None
+        seq = pkg_seq_counters.get(parent_idx, 0)
+        pkg_seq_counters[parent_idx] = seq + 1
 
         await db.execute(
             "INSERT INTO packages (id, current_version, "
-            "created_at, created_by, updated_at, parent_package_id, set_id) "
-            "VALUES (?, 1, ?, ?, ?, ?, ?)",
-            (pkg_id, now, _SYSTEM_USER_ID, now, parent_pkg_id, _DEFAULT_SET_ID),
+            "created_at, created_by, updated_at, parent_package_id, set_id, sequence_order) "
+            "VALUES (?, 1, ?, ?, ?, ?, ?, ?)",
+            (pkg_id, now, _SYSTEM_USER_ID, now, parent_pkg_id, _DEFAULT_SET_ID, seq),
         )
         await db.execute(
             "INSERT INTO package_versions (package_id, version, name, description, "
@@ -1896,11 +1899,15 @@ async def seed_example_models(db: DatabasePort) -> None:
     for model_def in _DIAGRAMS:
         diagram_id_map[model_def["index"]] = _gen_id("diagram", model_def["index"])
 
+    diag_seq_counters: dict[int, int] = {}  # parent_package_index → next sequence_order
     for model_def in _DIAGRAMS:
         diagram_id = diagram_id_map[model_def["index"]]
         diagram_data = model_def["builder"](element_ids, rel_ids, mids=diagram_id_map)
         diagram_data_json = json.dumps(diagram_data)
         parent_package_id = pkg_id_map[model_def["parent_package_index"]]
+        ppi = model_def["parent_package_index"]
+        seq = diag_seq_counters.get(ppi, 0)
+        diag_seq_counters[ppi] = seq + 1
 
         # v6 marker in metadata for overview diagram
         metadata: dict[str, object] = {}
@@ -1909,10 +1916,10 @@ async def seed_example_models(db: DatabasePort) -> None:
 
         await db.execute(
             "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
-            "created_at, created_by, updated_at, parent_package_id, notation) "
-            "VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)",
+            "created_at, created_by, updated_at, parent_package_id, notation, sequence_order) "
+            "VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
             (diagram_id, model_def["diagram_type"], _DEFAULT_SET_ID, now,
-             _SYSTEM_USER_ID, now, parent_package_id, model_def["notation"]),
+             _SYSTEM_USER_ID, now, parent_package_id, model_def["notation"], seq),
         )
         metadata_json = json.dumps(metadata) if metadata else None
         await db.execute(
