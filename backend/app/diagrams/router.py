@@ -17,6 +17,7 @@ from app.diagrams.models import (
     DiagramRollback,
     DiagramUpdate,
     DiagramVersionResponse,
+    ReorderRequest,
 )
 from app.diagrams.service import (
     create_diagram,
@@ -26,6 +27,7 @@ from app.diagrams.service import (
     get_diagram_hierarchy,
     get_diagram_versions,
     list_diagrams,
+    reorder_siblings,
     rollback_diagram,
     set_diagram_parent,
     soft_delete_diagram,
@@ -89,6 +91,22 @@ async def hierarchy(
     db = request.app.state.db_manager.main_db
     tree = await get_diagram_hierarchy(db, root_id=root_id, set_id=set_id)
     return [DiagramHierarchyNode(**node) for node in tree]
+
+
+@router.put("/reorder")
+async def reorder(
+    body: ReorderRequest,
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Reorder diagrams and packages within a parent group."""
+    db = request.app.state.db_manager.main_db
+    await reorder_siblings(
+        db,
+        parent_package_id=body.parent_package_id,
+        ordered_ids=body.ordered_ids,
+    )
+    return {"status": "ok"}
 
 
 @router.get("", response_model=DiagramListResponse)

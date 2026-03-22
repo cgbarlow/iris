@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Diagram sequence order** — user-controllable ordering of diagrams and packages in the navigation hierarchy tree (ADR-098, Issue #7)
+- `PUT /api/diagrams/reorder` endpoint for reordering diagrams/packages within a parent group
+- Drag-and-drop reordering in the dashboard hierarchy tree with visual drop indicators
+- `sequence_order` field on diagrams and packages tables (migration m029/m032)
+
 ### Fixed
 - Entity-to-entity relationships not displayed in diagram Relationships tab — field name mismatch `elementId` → `entityId` in relationship query (ADR-097, Issue #4)
 - Diagram relationships endpoint crash on SQLite — replaced unsupported `async for` cursor iteration with `fetchall()`

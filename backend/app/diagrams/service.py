@@ -75,13 +75,23 @@ async def create_diagram(
     detected = _detect_notations(data) if isinstance(data, dict) else []
     detected_json = json.dumps(detected)
 
+    # Compute next sequence_order within the parent group
+    seq_cursor = await db.execute(
+        "SELECT COALESCE(MAX(sequence_order), 0) + 1 FROM diagrams "
+        "WHERE parent_package_id IS ? AND is_deleted = 0",
+        (parent_package_id,),
+    )
+    seq_row = await seq_cursor.fetchone()
+    next_seq = seq_row[0] if seq_row else 1
+
     await db.execute(
         "INSERT INTO diagrams (id, diagram_type, current_version, "
         "created_at, created_by, updated_at, parent_package_id, set_id, "
-        "notation, detected_notations) "
-        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)",
+        "notation, detected_notations, sequence_order) "
+        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
         (diagram_id, diagram_type, now, created_by, now,
-         parent_package_id, effective_set_id, effective_notation, detected_json),
+         parent_package_id, effective_set_id, effective_notation, detected_json,
+         next_seq),
     )
     await db.execute(
         "INSERT INTO diagram_versions (diagram_id, version, name, description, "
@@ -719,23 +729,25 @@ async def get_diagram_hierarchy(
     # Fetch packages and diagrams in a single UNION query so we can
     # build the full hierarchy in one pass.
     query = (
-        "SELECT t.id, t.name, t.node_type, t.parent_package_id, t.diagram_type, t.data, t.notation "
+        "SELECT t.id, t.name, t.node_type, t.parent_package_id, t.diagram_type, "
+        "t.data, t.notation, t.sequence_order "
         "FROM ("
         "  SELECT p.id, pv.name, 'package' AS node_type, p.parent_package_id, "
-        "         NULL AS diagram_type, NULL AS data, NULL AS notation "
+        "         NULL AS diagram_type, NULL AS data, NULL AS notation, "
+        "         p.sequence_order "
         "  FROM packages p "
         "  JOIN package_versions pv ON p.id = pv.package_id "
         "       AND p.current_version = pv.version "
         f"  WHERE p.is_deleted = 0 {pkg_set_filter}"
         "  UNION ALL "
         "  SELECT d.id, dv.name, 'diagram' AS node_type, d.parent_package_id, "
-        "         d.diagram_type, dv.data, d.notation "
+        "         d.diagram_type, dv.data, d.notation, d.sequence_order "
         "  FROM diagrams d "
         "  JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "       AND d.current_version = dv.version "
         f"  WHERE d.is_deleted = 0 {diag_set_filter}"
         ") t "
-        "ORDER BY t.node_type, t.name"
+        "ORDER BY t.node_type, t.sequence_order, t.name"
     )
     cursor = await db.execute(query, params)
     rows = await cursor.fetchall()
@@ -762,6 +774,7 @@ async def get_diagram_hierarchy(
             "notation": r[6],
             "parent_package_id": r[3],
             "has_content": has_content,
+            "sequence_order": r[7] if r[7] is not None else 0,
             "children": [],
         }
 
@@ -783,6 +796,31 @@ async def get_diagram_hierarchy(
         return []
 
     return roots
+
+
+async def reorder_siblings(
+    db: DatabasePort,
+    *,
+    parent_package_id: str | None,
+    ordered_ids: list[str],
+) -> None:
+    """Update sequence_order for diagrams and packages within a parent group.
+
+    Each ID in ordered_ids gets sequence_order = its index position (0-based).
+    Items may be diagrams or packages — both tables are updated.
+    """
+    for idx, item_id in enumerate(ordered_ids):
+        # Try diagrams first, then packages
+        cursor = await db.execute(
+            "UPDATE diagrams SET sequence_order = ? WHERE id = ? AND parent_package_id IS ?",
+            (idx, item_id, parent_package_id),
+        )
+        if cursor.rowcount == 0:
+            await db.execute(
+                "UPDATE packages SET sequence_order = ? WHERE id = ? AND parent_package_id IS ?",
+                (idx, item_id, parent_package_id),
+            )
+    await db.commit()
 
 
 async def get_diagram_versions(

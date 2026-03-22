@@ -79,6 +79,7 @@ export interface DiagramHierarchyNode {
 	notation: string | null;
 	parent_package_id: string | null;
 	has_content: boolean;
+	sequence_order: number;
 	children: DiagramHierarchyNode[];
 }
 

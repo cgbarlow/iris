@@ -9,6 +9,8 @@
 		searchQuery?: string;
 		showDiagramsOnly?: boolean;
 		expandedIds?: Set<string>;
+		siblings?: DiagramHierarchyNode[];
+		onreorder?: (parentId: string | null, orderedIds: string[]) => void;
 	}
 
 	let {
@@ -18,9 +20,12 @@
 		searchQuery = '',
 		showDiagramsOnly = false,
 		expandedIds = new Set<string>(),
+		siblings = [],
+		onreorder,
 	}: Props = $props();
 
 	let expanded = $state(expandedIds.has(node.id) || depth < 2);
+	let dropPosition = $state<'before' | 'after' | null>(null);
 
 	const hasChildren = $derived(node.children && node.children.length > 0);
 	const isCurrent = $derived(currentDiagramId === node.id);
@@ -43,12 +48,6 @@
 		);
 	}
 
-	/**
-	 * Indicator type:
-	 * - 'solid': node has canvas content (elements/participants on its canvas)
-	 * - 'hollow': node has no content itself but a descendant does (organizational container)
-	 * - 'none': no content anywhere in this subtree
-	 */
 	const isPackage = $derived(node.node_type === 'package');
 	const indicatorType = $derived<'solid' | 'hollow' | 'none'>(
 		node.has_content
@@ -84,6 +83,60 @@
 			expandedIds.delete(node.id);
 		}
 	}
+
+	// Drag-and-drop reordering
+	function handleDragStart(e: DragEvent) {
+		if (!e.dataTransfer || !onreorder) return;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', JSON.stringify({
+			id: node.id,
+			parentId: node.parent_package_id,
+		}));
+	}
+
+	function handleDragOver(e: DragEvent) {
+		if (!e.dataTransfer || !onreorder) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'move';
+
+		const target = e.currentTarget as HTMLElement;
+		const rect = target.getBoundingClientRect();
+		const midY = rect.top + rect.height / 2;
+		dropPosition = e.clientY < midY ? 'before' : 'after';
+	}
+
+	function handleDragLeave() {
+		dropPosition = null;
+	}
+
+	function handleDrop(e: DragEvent) {
+		if (!e.dataTransfer || !onreorder) return;
+		e.preventDefault();
+
+		let dragData: { id: string; parentId: string | null };
+		try {
+			dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+		} catch {
+			dropPosition = null;
+			return;
+		}
+
+		// Only allow reordering within the same parent
+		if (dragData.parentId !== node.parent_package_id || dragData.id === node.id) {
+			dropPosition = null;
+			return;
+		}
+
+		// Compute new order
+		const currentOrder = siblings.map((s) => s.id);
+		const filtered = currentOrder.filter((id) => id !== dragData.id);
+		const targetIndex = filtered.indexOf(node.id);
+		const insertIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
+		filtered.splice(insertIndex, 0, dragData.id);
+
+		onreorder(node.parent_package_id, filtered);
+		dropPosition = null;
+	}
 </script>
 
 {#if visible}
@@ -93,11 +146,22 @@
 		aria-current={isCurrent ? 'page' : undefined}
 		class="tree-node"
 	>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="tree-node__row"
 			class:tree-node__row--current={isCurrent}
+			class:tree-node__row--drop-before={dropPosition === 'before'}
+			class:tree-node__row--drop-after={dropPosition === 'after'}
 			style="padding-left: {depth * 20 + 8}px"
+			draggable={onreorder ? 'true' : undefined}
+			ondragstart={handleDragStart}
+			ondragover={handleDragOver}
+			ondragleave={handleDragLeave}
+			ondrop={handleDrop}
 		>
+			{#if onreorder}
+				<span class="tree-node__grip" aria-hidden="true">⠿</span>
+			{/if}
 			{#if hasChildren}
 				<button
 					onclick={toggleExpand}
@@ -135,6 +199,8 @@
 						{searchQuery}
 						{showDiagramsOnly}
 						{expandedIds}
+						siblings={node.children}
+						{onreorder}
 					/>
 				{/each}
 			</ul>
@@ -149,6 +215,7 @@
 		gap: 4px;
 		padding: 2px 8px;
 		border-radius: 4px;
+		position: relative;
 	}
 	.tree-node__row:hover {
 		background-color: var(--color-bg);
@@ -156,6 +223,32 @@
 	.tree-node__row--current {
 		background-color: var(--color-bg);
 		font-weight: 600;
+	}
+	.tree-node__row--drop-before {
+		border-top: 2px solid var(--color-primary);
+	}
+	.tree-node__row--drop-after {
+		border-bottom: 2px solid var(--color-primary);
+	}
+	.tree-node__row[draggable='true'] {
+		cursor: grab;
+	}
+	.tree-node__row[draggable='true']:active {
+		cursor: grabbing;
+	}
+	.tree-node__grip {
+		display: none;
+		width: 14px;
+		font-size: 10px;
+		color: var(--color-muted);
+		flex-shrink: 0;
+		cursor: grab;
+		user-select: none;
+	}
+	.tree-node__row:hover .tree-node__grip {
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 	.tree-node__toggle {
 		display: flex;

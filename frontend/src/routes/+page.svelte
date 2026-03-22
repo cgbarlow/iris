@@ -93,6 +93,22 @@
 		hierarchyLoading = false;
 	}
 
+	async function handleReorder(parentId: string | null, orderedIds: string[]) {
+		try {
+			await apiFetch('/api/diagrams/reorder', {
+				method: 'PUT',
+				body: JSON.stringify({
+					parent_package_id: parentId,
+					ordered_ids: orderedIds,
+				}),
+			});
+			await loadHierarchy();
+		} catch {
+			// Reload to reset to server state
+			await loadHierarchy();
+		}
+	}
+
 	async function handleSearch() {
 		const q = searchQuery.trim();
 		if (!q) {
@@ -193,7 +209,7 @@
 			{:else}
 				<ul role="tree" class="mt-4" style="list-style: none; padding: 0; margin: 0">
 					{#each hierarchyTree as node (node.id)}
-						<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} />
+						<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={handleReorder} />
 					{/each}
 				</ul>
 			{/if}

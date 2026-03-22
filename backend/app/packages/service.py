@@ -31,11 +31,20 @@ async def create_package(
     metadata_json = json.dumps(metadata) if metadata else None
     effective_set_id = set_id or DEFAULT_SET_ID
 
+    # Compute next sequence_order within the parent group
+    seq_cursor = await db.execute(
+        "SELECT COALESCE(MAX(sequence_order), 0) + 1 FROM packages "
+        "WHERE parent_package_id IS ? AND is_deleted = 0",
+        (parent_package_id,),
+    )
+    seq_row = await seq_cursor.fetchone()
+    next_seq = seq_row[0] if seq_row else 1
+
     await db.execute(
         "INSERT INTO packages (id, current_version, "
-        "created_at, created_by, updated_at, parent_package_id, set_id) "
-        "VALUES (?, 1, ?, ?, ?, ?, ?)",
-        (package_id, now, created_by, now, parent_package_id, effective_set_id),
+        "created_at, created_by, updated_at, parent_package_id, set_id, sequence_order) "
+        "VALUES (?, 1, ?, ?, ?, ?, ?, ?)",
+        (package_id, now, created_by, now, parent_package_id, effective_set_id, next_seq),
     )
     await db.execute(
         "INSERT INTO package_versions (package_id, version, name, description, "

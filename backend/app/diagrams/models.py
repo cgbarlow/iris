@@ -67,7 +67,15 @@ class DiagramHierarchyNode(BaseModel):
     notation: str | None = None
     parent_package_id: str | None = None
     has_content: bool = False
+    sequence_order: int = 0
     children: list[DiagramHierarchyNode] = Field(default_factory=list)
+
+
+class ReorderRequest(BaseModel):
+    """Request body for reordering diagrams/packages within a parent."""
+
+    parent_package_id: str | None = None
+    ordered_ids: list[str] = Field(min_length=1)
 
 
 class DiagramVersionResponse(BaseModel):
