@@ -223,11 +223,34 @@ class _AsyncpgCursor:
         return self._rowcount
 
 
+_ISO_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
+)
+
+
+def _convert_params(params: tuple[Any, ...]) -> tuple[Any, ...]:
+    """Convert SQLite-style parameters to asyncpg-compatible types.
+
+    - ISO datetime strings → datetime objects (asyncpg requires native types)
+    """
+    converted: list[Any] = []
+    for val in params:
+        if isinstance(val, str) and _ISO_RE.match(val):
+            try:
+                converted.append(datetime.fromisoformat(val))
+            except ValueError:
+                converted.append(val)
+        else:
+            converted.append(val)
+    return tuple(converted)
+
+
 class SupabaseAdapter:
     """DatabasePort adapter backed by an asyncpg connection pool.
 
     Handles:
     - Automatic ? → $N placeholder conversion
+    - ISO datetime string → datetime object conversion for parameters
     - Result wrapping to match the aiosqlite cursor interface
 
     Each execute() acquires a connection from the pool and releases it after.
@@ -240,6 +263,7 @@ class SupabaseAdapter:
 
     async def execute(self, query: str, params: tuple[Any, ...] = ()) -> _AsyncpgCursor:
         pg_query = _convert_placeholders(query)
+        params = _convert_params(params)
 
         async with self._pool.acquire() as conn:
             if _is_select(pg_query):
