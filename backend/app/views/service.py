@@ -27,7 +27,7 @@ async def create_view(
     await db.execute(
         "INSERT INTO views (id, name, description, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (view_id, name, description, json.dumps(config or {}), int(is_default), created_by, now, now),
+        (view_id, name, description, json.dumps(config or {}), is_default, created_by, now, now),
     )
     await db.commit()
     return {

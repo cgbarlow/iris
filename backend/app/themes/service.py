@@ -28,7 +28,7 @@ async def create_theme(
     await db.execute(
         "INSERT INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (theme_id, name, description, notation, json.dumps(config or {}), int(is_default), created_by, now, now),
+        (theme_id, name, description, notation, json.dumps(config or {}), is_default, created_by, now, now),
     )
     await db.commit()
     return {

@@ -305,16 +305,26 @@ class SupabaseAdapter:
             self._conn = await self._pool.acquire()
         return self._conn
 
+    # SQLite FTS virtual tables that don't exist in PostgreSQL (uses tsvector instead)
+    _FTS_TABLES = {"elements_fts", "diagrams_fts"}
+
     async def execute(self, query: str, params: tuple[Any, ...] = ()) -> _AsyncpgCursor:
         pg_query = _convert_placeholders(query)
         params = _convert_params(params)
+
+        # Skip operations on SQLite FTS virtual tables (not present in PostgreSQL)
+        upper_stripped = pg_query.strip().upper()
+        for fts in self._FTS_TABLES:
+            if fts.upper() in upper_stripped:
+                return _AsyncpgCursor([], rowcount=0)
+
         conn = await self._get_conn()
 
         if _is_select(pg_query):
             rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
             return _AsyncpgCursor(rows, rowcount=len(rows))
         else:
-            upper = pg_query.strip().upper()
+            upper = upper_stripped
             if "RETURNING" in upper:
                 rows = await conn.fetch(pg_query, *params)
                 return _AsyncpgCursor(rows, rowcount=len(rows))

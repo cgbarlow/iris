@@ -96,7 +96,7 @@ async def create_provider(
         (
             provider_id, name, provider_type, base_url, api_key or None, model,
             json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
-            int(is_default), int(is_active), created_by, now, now,
+            is_default, is_active, created_by, now, now,
         ),
     )
     await db.commit()
@@ -168,7 +168,7 @@ async def update_provider(
             (
                 name, provider_type, base_url, model,
                 json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
-                int(is_default), int(is_active), now, provider_id,
+                is_default, is_active, now, provider_id,
             ),
         )
     else:
@@ -179,7 +179,7 @@ async def update_provider(
             (
                 name, provider_type, base_url, api_key or None, model,
                 json.dumps(parameters or {}), system_prompt, timeout_ms, retries,
-                int(is_default), int(is_active), now, provider_id,
+                is_default, is_active, now, provider_id,
             ),
         )
     if cursor.rowcount == 0:
