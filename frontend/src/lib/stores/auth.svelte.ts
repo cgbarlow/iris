@@ -5,7 +5,7 @@
  */
 
 import type { AuthTokens, User } from '$lib/types/api.js';
-import { DB_BACKEND } from '$lib/config.js';
+import { API_BASE_URL, DB_BACKEND } from '$lib/config.js';
 import { supabase } from '$lib/supabase.js';
 
 const STORAGE_KEY = 'iris_auth';
@@ -44,16 +44,35 @@ let currentUser = $state<User | null>(initial?.user ?? null);
 
 // Supabase mode: keep access token in sync with the Supabase session.
 // onAuthStateChange fires on SIGNED_IN, TOKEN_REFRESHED, and SIGNED_OUT.
+async function _fetchProfile(token: string): Promise<void> {
+	try {
+		const resp = await fetch(`${API_BASE_URL}/api/auth/me`, {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		if (resp.ok) {
+			currentUser = await resp.json();
+		}
+	} catch {
+		// Profile fetch failed — user will see partial auth state
+	}
+}
+
 if (DB_BACKEND === 'supabase' && supabase) {
 	supabase.auth.getSession().then(({ data: { session } }) => {
-		if (session && !accessToken) {
+		if (session) {
 			accessToken = session.access_token;
+			if (!currentUser) {
+				_fetchProfile(session.access_token);
+			}
 		}
 	});
 
 	supabase.auth.onAuthStateChange((_event, session) => {
 		if (session) {
 			accessToken = session.access_token;
+			if (!currentUser) {
+				_fetchProfile(session.access_token);
+			}
 		} else {
 			accessToken = null;
 			refreshToken = null;
