@@ -124,12 +124,17 @@ _SELECT_PREFIXES = ("SELECT", "WITH")
 def _convert_placeholders(query: str) -> str:
     """Replace SQLite ? placeholders with PostgreSQL $1, $2, ... equivalents.
 
-    Also converts ``INSERT OR IGNORE`` (SQLite) to
-    ``INSERT ... ON CONFLICT DO NOTHING`` (PostgreSQL).
+    Also converts:
+    - ``INSERT OR IGNORE`` (SQLite) to ``INSERT ... ON CONFLICT DO NOTHING`` (PostgreSQL)
+    - ``= 0`` / ``= 1`` to ``= FALSE`` / ``= TRUE`` for boolean column compatibility
     """
     # SQLite: INSERT OR IGNORE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT DO NOTHING
     converted = re.sub(r"(?i)\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", query)
     needs_on_conflict = converted is not query
+
+    # SQLite uses 0/1 for booleans; PostgreSQL requires TRUE/FALSE
+    converted = re.sub(r"(?<==\s)0(?=\s|$|,|\))", "FALSE", converted)
+    converted = re.sub(r"(?<==\s)1(?=\s|$|,|\))", "TRUE", converted)
 
     counter = 0
 
