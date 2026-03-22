@@ -121,13 +121,13 @@
 			return;
 		}
 
-		// Only allow reordering within the same parent
-		if (dragData.parentId !== node.parent_package_id || dragData.id === node.id) {
+		// Can't drop on itself
+		if (dragData.id === node.id) {
 			dropPosition = null;
 			return;
 		}
 
-		// Compute new order
+		// Compute new order — insert dragged item among target's siblings
 		const currentOrder = siblings.map((s) => s.id);
 		const filtered = currentOrder.filter((id) => id !== dragData.id);
 		const targetIndex = filtered.indexOf(node.id);

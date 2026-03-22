@@ -28,6 +28,7 @@
 	let hierarchyLoading = $state(false);
 	let treeSearchQuery = $state('');
 	let treeExpandedIds = $state(new Set<string>());
+	let reorderMode = $state(false);
 
 	let setId = $derived(page.url.searchParams.get('set_id') || getActiveSetId() || '');
 
@@ -193,7 +194,17 @@
 	<!-- Diagram Hierarchy (when set selected) -->
 	{#if activeSet}
 		<div class="mt-6" style="max-width: 500px">
-			<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Diagram Hierarchy</h2>
+			<div class="flex items-center justify-between">
+				<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Diagram Hierarchy</h2>
+				<button
+					onclick={() => { reorderMode = !reorderMode; }}
+					class="rounded px-2 py-1 text-xs"
+					style="border: 1px solid {reorderMode ? 'var(--color-primary)' : 'var(--color-border)'}; background: {reorderMode ? 'var(--color-primary)' : 'transparent'}; color: {reorderMode ? 'white' : 'var(--color-muted)'}"
+					title={reorderMode ? 'Exit reorder mode' : 'Reorder diagrams'}
+				>
+					{reorderMode ? 'Done' : 'Reorder'}
+				</button>
+			</div>
 			<input
 				id="tree-search"
 				bind:value={treeSearchQuery}
@@ -209,7 +220,7 @@
 			{:else}
 				<ul role="tree" class="mt-4" style="list-style: none; padding: 0; margin: 0">
 					{#each hierarchyTree as node (node.id)}
-						<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={handleReorder} />
+						<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} />
 					{/each}
 				</ul>
 			{/if}

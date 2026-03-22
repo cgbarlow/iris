@@ -804,21 +804,22 @@ async def reorder_siblings(
     parent_package_id: str | None,
     ordered_ids: list[str],
 ) -> None:
-    """Update sequence_order for diagrams and packages within a parent group.
+    """Update sequence_order and parent_package_id for items within a parent group.
 
     Each ID in ordered_ids gets sequence_order = its index position (0-based).
+    Items are also reparented to parent_package_id if they aren't already there.
     Items may be diagrams or packages — both tables are updated.
     """
     for idx, item_id in enumerate(ordered_ids):
-        # Try diagrams first, then packages
+        # Try diagrams first, then packages — update both parent and order
         cursor = await db.execute(
-            "UPDATE diagrams SET sequence_order = ? WHERE id = ? AND parent_package_id IS ?",
-            (idx, item_id, parent_package_id),
+            "UPDATE diagrams SET sequence_order = ?, parent_package_id = ? WHERE id = ?",
+            (idx, parent_package_id, item_id),
         )
         if cursor.rowcount == 0:
             await db.execute(
-                "UPDATE packages SET sequence_order = ? WHERE id = ? AND parent_package_id IS ?",
-                (idx, item_id, parent_package_id),
+                "UPDATE packages SET sequence_order = ?, parent_package_id = ? WHERE id = ?",
+                (idx, parent_package_id, item_id),
             )
     await db.commit()
 
