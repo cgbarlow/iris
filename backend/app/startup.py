@@ -139,5 +139,14 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     port = db_manager.main_db
     await seed_roles_and_permissions(port)
     await seed_defaults(port)
-    # Example models are not seeded in Supabase mode (production deployments should not
-    # have demo data; use admin UI to create real content)
+
+    # Sync profiles → users table so FK constraints (elements.created_by, etc.) are satisfied.
+    # The `users` table is the SQLite-era user store; in Supabase mode it's empty but still
+    # referenced by FKs. Mirror each profile into `users` so CRUD operations succeed.
+    await port.execute(
+        "INSERT INTO users (id, username, password_hash, role, is_active) "
+        "SELECT id::text, username, 'supabase-managed', role, is_active "
+        "FROM profiles "
+        "WHERE id::text NOT IN (SELECT id FROM users)"
+    )
+    await port.commit()
