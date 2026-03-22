@@ -69,14 +69,15 @@ async def _get_current_user_supabase(
     token: str,
 ) -> dict[str, Any]:
     """Validate Supabase JWT and check profiles table (Supabase mode)."""
-    from app.auth.supabase_service import decode_supabase_jwt, get_profile  # noqa: PLC0415
+    from app.auth.supabase_service import decode_supabase_jwt, fetch_jwks, get_profile  # noqa: PLC0415
 
     config = request.app.state.config
     if config.supabase is None:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        payload = decode_supabase_jwt(token, config.supabase.jwt_secret)
+        jwks = await fetch_jwks(config.supabase.url)
+        payload = decode_supabase_jwt(token, config.supabase.jwt_secret, jwks)
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")  # noqa: B904
 
