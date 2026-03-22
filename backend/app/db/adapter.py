@@ -11,7 +11,9 @@ Supabase mode:          SupabaseAdapter wraps asyncpg pool â€” auto-converts ? â
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from uuid import UUID
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -167,6 +169,25 @@ def _parse_rowcount(status: str) -> int:
     return 0
 
 
+def _normalize_row(record: asyncpg.Record) -> tuple[Any, ...]:
+    """Convert asyncpg Record to a tuple, converting PG types to SQLite-compatible types.
+
+    PostgreSQL returns native datetime/UUID objects; SQLite returns strings.
+    Convert so Pydantic models (expecting str) work unchanged.
+    """
+    values: list[Any] = []
+    for val in record.values():
+        if isinstance(val, datetime):
+            values.append(val.isoformat())
+        elif isinstance(val, date):
+            values.append(val.isoformat())
+        elif isinstance(val, UUID):
+            values.append(str(val))
+        else:
+            values.append(val)
+    return tuple(values)
+
+
 class _AsyncpgCursor:
     """Wraps asyncpg query results to satisfy AsyncCursor."""
 
@@ -176,19 +197,19 @@ class _AsyncpgCursor:
         rowcount: int = 0,
         lastrowid: int | None = None,
     ) -> None:
-        self._rows = rows
+        self._rows = [_normalize_row(r) for r in rows] if rows else []
         self._pos = 0
         self._rowcount = rowcount
         self._lastrowid = lastrowid
 
-    async def fetchone(self) -> asyncpg.Record | None:
+    async def fetchone(self) -> tuple[Any, ...] | None:
         if self._pos >= len(self._rows):
             return None
         row = self._rows[self._pos]
         self._pos += 1
         return row
 
-    async def fetchall(self) -> list[asyncpg.Record]:
+    async def fetchall(self) -> list[tuple[Any, ...]]:
         remaining = self._rows[self._pos:]
         self._pos = len(self._rows)
         return remaining
