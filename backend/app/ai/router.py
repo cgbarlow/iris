@@ -281,7 +281,7 @@ async def _ask_streaming(
 
     async def _generate() -> AsyncGenerator[str, None]:
         try:
-            log.info("[AI_ASK] mode=%s notation=%s question=%s", body.mode, body.notation, body.question[:100])
+            print(f"[AI_ASK] mode={body.mode} notation={body.notation} question={body.question[:100]}", flush=True)
             ai_debug = await _is_ai_debug(db)
 
             # Resolve provider
