@@ -141,7 +141,11 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     port = db_manager.main_db
     await seed_roles_and_permissions(port)
     await seed_defaults(port)
-    await seed_creation_prompts(port)
+    try:
+        await seed_creation_prompts(port)
+    except Exception:  # noqa: BLE001
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).warning("Failed to update creation prompts on startup (non-fatal)")
 
     # Run lightweight schema patches that don't require dollar-quoting (safe for asyncpg).
     # m031: add mode and thread_id columns to ai_conversations if missing.
