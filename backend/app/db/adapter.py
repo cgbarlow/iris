@@ -135,14 +135,22 @@ def _convert_placeholders(query: str) -> str:
     needs_upsert = False
     upsert_columns: list[str] = []
 
-    # SQLite: INSERT OR REPLACE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT (id) DO UPDATE
+    # SQLite: INSERT OR REPLACE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT (...) DO UPDATE
     or_replace_match = re.match(
         r"(?i)INSERT\s+OR\s+REPLACE\s+INTO\s+\w+\s*\(([^)]+)\)", query
     )
     if or_replace_match:
         query = re.sub(r"(?i)\bINSERT\s+OR\s+REPLACE\s+INTO\b", "INSERT INTO", query)
         cols = [c.strip() for c in or_replace_match.group(1).split(",")]
-        upsert_columns = [c for c in cols if c.lower() != "id"]
+        # Determine conflict target: use 'id' if present, otherwise first two columns
+        # (handles composite PKs like (diagram_id, theme))
+        if "id" in [c.lower() for c in cols]:
+            upsert_pk = ["id"]
+        else:
+            # For tables without 'id', assume first two columns form the PK
+            upsert_pk = cols[:2]
+        pk_set = {c.lower() for c in upsert_pk}
+        upsert_columns = [c for c in cols if c.lower() not in pk_set]
         needs_upsert = True
 
     # SQLite: INSERT OR IGNORE INTO ... → PostgreSQL: INSERT INTO ... ON CONFLICT DO NOTHING
@@ -167,8 +175,9 @@ def _convert_placeholders(query: str) -> str:
     if needs_on_conflict:
         pg_query = pg_query.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
     elif needs_upsert and upsert_columns:
+        pk_cols = ", ".join(upsert_pk)
         updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in upsert_columns)
-        pg_query = pg_query.rstrip().rstrip(";") + f" ON CONFLICT (id) DO UPDATE SET {updates}"
+        pg_query = pg_query.rstrip().rstrip(";") + f" ON CONFLICT ({pk_cols}) DO UPDATE SET {updates}"
 
     return pg_query
 
