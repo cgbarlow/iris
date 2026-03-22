@@ -135,10 +135,15 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     # asyncpg cannot execute dollar-quoted SQL ($$) used in trigger/function definitions.
     # See docs/deployment-render-supabase.md Step 2.
 
-    # Seed roles, permissions, settings via DatabasePort (SupabaseAdapter).
+    # Seed roles, permissions, settings, themes, views via DatabasePort (SupabaseAdapter).
+    from app.themes.service import seed_default_themes  # noqa: PLC0415
+    from app.views.service import seed_default_views  # noqa: PLC0415
+
     port = db_manager.main_db
     await seed_roles_and_permissions(port)
     await seed_defaults(port)
+    await seed_default_themes(port)
+    await seed_default_views(port)
 
     # Run lightweight schema patches that don't require dollar-quoting (safe for asyncpg).
     # m031: add mode and thread_id columns to ai_conversations if missing.
