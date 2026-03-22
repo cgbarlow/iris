@@ -7,12 +7,15 @@ into Iris canvas diagrams in the database.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import aiosqlite
+
+logger = logging.getLogger(__name__)
 
 
 async def build_creation_system_prompt(
@@ -73,7 +76,9 @@ async def build_creation_system_prompt(
         for row in await cursor.fetchall():
             parts.append(row[0])
 
-    return "\n\n".join(parts)
+    result = "\n\n".join(parts)
+    logger.info("[AI_CREATION] Built system prompt: %d layers, %d chars", len(parts), len(result))
+    return result
 
 
 async def create_diagrams_from_ai(
