@@ -57,6 +57,8 @@ _DOVIEW_THEME_CONFIG = {
     "rendering": {
         "hideIcons": False,
         "borderRadius": 4,
+        "wrapLabels": True,
+        "textAlign": "center",
     },
 }
 
