@@ -392,9 +392,9 @@ async def get_diagram_relationships(
         """,
         (diagram_id, diagram_id),
     )
-    diagram_links = []
-    async for row in cursor:
-        diagram_links.append({
+    rows = await cursor.fetchall()
+    diagram_links = [
+        {
             "id": row[0],
             "source_package_id": row[1],  # Frontend expects this field name
             "target_package_id": row[2],
@@ -405,7 +405,9 @@ async def get_diagram_relationships(
             "created_at": row[6],
             "source_name": row[7] or row[1],
             "target_name": row[8] or row[2],
-        })
+        }
+        for row in rows
+    ]
 
     return {
         "diagram_relationships": diagram_links,

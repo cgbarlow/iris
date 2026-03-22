@@ -110,7 +110,7 @@ async def list_element_relationships_for_diagram(
     for node in nodes:
         node_data = node.get("data", {})
         if isinstance(node_data, dict):
-            eid = node_data.get("elementId")
+            eid = node_data.get("entityId")
             if eid:
                 element_ids.add(eid)
 
