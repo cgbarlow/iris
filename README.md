@@ -280,6 +280,10 @@ npm run test:all-e2e
 | Linting | Ruff | 0.9.x |
 | Type Checking | mypy (strict) | 1.x |
 
+## Contributing
+
+Bugs and feature requests are tracked via [GitHub Issues](https://github.com/cgbarlow/iris/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 ## License
 
-All rights reserved.
+Licensed under the [Apache License 2.0](LICENSE).
