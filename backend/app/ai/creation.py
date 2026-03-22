@@ -130,6 +130,7 @@ async def create_diagrams_from_ai(
         canvas_data = {"nodes": canvas_nodes, "edges": canvas_edges}
         canvas_data_list.append(canvas_data)
 
+        print(f"[AI_APPLY] Creating diagram '{name}' type={diagram_type} package_id={package_id}", flush=True)
         await db.execute(
             "INSERT INTO diagrams "
             "(id, set_id, diagram_type, notation, parent_package_id, "

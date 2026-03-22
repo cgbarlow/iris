@@ -44,6 +44,7 @@ Stage 3 — GENERATE JSON: Only after the user confirms the detailed content, ou
 ## JSON output format (Stage 3 only)
 
 {
+  "total_pages": <integer — total number of diagrams in the array>,
   "diagrams": [
     {
       "name": "<diagram name>",
@@ -73,6 +74,7 @@ Stage 3 — GENERATE JSON: Only after the user confirms the detailed content, ou
 }
 
 Rules:
+- "total_pages" MUST appear BEFORE the "diagrams" array and equal its length.
 - All diagrams in one JSON response. Multiple pages = multiple entries in the diagrams array.
 - linkedDiagramIndex is a 0-based index for navigation tile links.
 - Positions: x increases right, y increases down.

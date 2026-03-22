@@ -124,30 +124,10 @@ function promptForLocation() {
 		applyingDiagrams = false;
 	}
 
-	function estimateExpectedDiagrams(): number {
-		// Find the Stage 1 subpage structure proposal in conversation history.
-		// Look for the SHORTEST assistant message that contains a numbered/bullet list
-		// and asks for confirmation — this is the structure, not the detailed content.
-		let bestCount = 0;
-		let bestLength = Infinity;
-		for (let i = creationHistory.length - 1; i >= 0; i--) {
-			const msg = creationHistory[i];
-			if (msg.role !== 'assistant') continue;
-			const content = msg.content;
-			// Must look like a structure proposal (asks for confirmation)
-			if (!(/happy|fewer.*more|rename|structure|confirm/i.test(content))) continue;
-			// Count numbered items (e.g. "1. Page Name")
-			const numberedItems = content.match(/^\s*\d+\.\s+\*{0,2}[A-Z]/gm);
-			const bulletItems = content.match(/^\s*[-*]\s+\*{0,2}[A-Z]/gm);
-			const items = numberedItems || bulletItems;
-			if (items && items.length >= 2 && content.length < bestLength) {
-				bestLength = content.length;
-				// The listed items are subpages; add 2 for Overview + Final Outcomes
-				bestCount = items.length + 2;
-				if (/source/i.test(content)) bestCount += 1;
-			}
-		}
-		return bestCount;
+	function parseTotalPagesFromStream(): number {
+		// Parse "total_pages": N from the JSON stream (appears before the diagrams array)
+		const match = creationJsonBuffer.match(/"total_pages"\s*:\s*(\d+)/);
+		return match ? parseInt(match[1], 10) : 0;
 	}
 
 	function tryExtractDiagrams(text: string): object | null {
@@ -250,6 +230,10 @@ function promptForLocation() {
 							if (creationMode && generatingDiagrams) {
 								// Already in JSON generation — accumulate silently
 								creationJsonBuffer += payload.chunk;
+								// Parse total_pages from stream (appears before diagrams array)
+								if (expectedDiagramCount === 0) {
+									expectedDiagramCount = parseTotalPagesFromStream();
+								}
 								// Track diagram progress by counting "diagram_type" occurrences
 								const count = (creationJsonBuffer.match(/"diagram_type"/g) || []).length;
 								if (count > diagramsGenerated) {
@@ -269,7 +253,7 @@ function promptForLocation() {
 									generatingDiagrams = true;
 									creationJsonBuffer = combined;
 									diagramsGenerated = 0;
-									expectedDiagramCount = estimateExpectedDiagrams();
+									expectedDiagramCount = 0; // will be parsed from stream
 									currentDiagramName = '';
 									streamingAnswer = '';
 								} else {
