@@ -23,13 +23,13 @@ services:
         source: /*
         destination: /index.html
 
-  # --- Backend: FastAPI via uvicorn ---
+  # --- Backend: FastAPI via uvicorn (Docker for mdbtools/.eap import) ---
   - type: web
     name: iris-api
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: cd backend && pip install -e ".[supabase]"
-    startCommand: cd backend && uvicorn app.main:create_app --host 0.0.0.0 --port $PORT --factory
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
     envVars:
       - key: IRIS_DB_BACKEND
         value: supabase
