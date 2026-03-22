@@ -457,8 +457,9 @@ async def update_creation_prompt(
         params.append(body.prompt_text)
     if body.is_active is not None:
         updates.append("is_active = ?")
-        params.append(1 if body.is_active else 0)
-    updates.append("updated_at = datetime('now')")
+        params.append(body.is_active)
+    updates.append("updated_at = ?")
+    params.append(datetime.now(tz=UTC).isoformat())
 
     if len(updates) > 1:  # at least one real field besides updated_at
         await db.execute(
