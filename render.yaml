@@ -7,7 +7,6 @@ services:
   - type: web
     name: iris-frontend
     runtime: static
-    region: singapore
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/build
     envVars:
