@@ -5,7 +5,7 @@ All notable changes to Iris are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.7.1] - 2026-03-22
 
 ### Added
 - **Diagram sequence order** — user-controllable ordering of diagrams and packages in the navigation hierarchy tree (ADR-098, Issue #7)
@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Entity-to-entity relationships not displayed in diagram Relationships tab — field name mismatch `elementId` → `entityId` in relationship query (ADR-097, Issue #4)
 - Diagram relationships endpoint crash on SQLite — replaced unsupported `async for` cursor iteration with `fetchall()`
+- DoView seed builder functions missing positional arguments — startup crash on fresh database
 
 ## [2.6.0] - 2026-03-21
 

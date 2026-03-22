@@ -1373,7 +1373,8 @@ def _build_navigation_overview(
 
 
 def _build_doview_overview(
-    mids: dict[int, str] | None = None, **_kw: object,
+    _eids: dict | None = None, _rids: dict | None = None,
+    *, mids: dict[int, str] | None = None, **_kw: object,
 ) -> dict:
     """DoView overview: Iris System DoView with navigation tiles to subpages."""
     mids = mids or {}
@@ -1401,7 +1402,7 @@ def _build_doview_overview(
     ], "edges": []}
 
 
-def _build_doview_final_outcomes(**_kw: object) -> dict:
+def _build_doview_final_outcomes(_eids: dict | None = None, _rids: dict | None = None, **_kw: object) -> dict:
     """DoView final outcomes page: stacked list of ultimate goals."""
     return {"nodes": [
         {"id": "fo1", "type": "final_outcome", "position": {"x": 400, "y": 60},
@@ -1419,7 +1420,7 @@ def _build_doview_final_outcomes(**_kw: object) -> dict:
     ], "edges": []}
 
 
-def _build_doview_strategic_vision(**_kw: object) -> dict:
+def _build_doview_strategic_vision(_eids: dict | None = None, _rids: dict | None = None, **_kw: object) -> dict:
     """DoView outcomes map: Strategic Vision & Goals."""
     return {"nodes": [
         {"id": "s1_1", "type": "outcome_box", "position": {"x": 60, "y": 60},
@@ -1445,7 +1446,7 @@ def _build_doview_strategic_vision(**_kw: object) -> dict:
     ]}
 
 
-def _build_doview_platform_delivery(**_kw: object) -> dict:
+def _build_doview_platform_delivery(_eids: dict | None = None, _rids: dict | None = None, **_kw: object) -> dict:
     """DoView outcomes map: Platform Delivery & Operations."""
     return {"nodes": [
         {"id": "d1_1", "type": "outcome_box", "position": {"x": 60, "y": 60},
@@ -1481,7 +1482,7 @@ def _build_doview_platform_delivery(**_kw: object) -> dict:
     ]}
 
 
-def _build_doview_user_enablement(**_kw: object) -> dict:
+def _build_doview_user_enablement(_eids: dict | None = None, _rids: dict | None = None, **_kw: object) -> dict:
     """DoView outcomes map: User Enablement & Adoption."""
     return {"nodes": [
         {"id": "u1_1", "type": "outcome_box", "position": {"x": 60, "y": 60},
@@ -1508,7 +1509,7 @@ def _build_doview_user_enablement(**_kw: object) -> dict:
     ]}
 
 
-def _build_doview_sources(**_kw: object) -> dict:
+def _build_doview_sources(_eids: dict | None = None, _rids: dict | None = None, **_kw: object) -> dict:
     """DoView sources page."""
     return {"nodes": [
         {"id": "src1", "type": "source_reference", "position": {"x": 100, "y": 100},
