@@ -632,7 +632,7 @@ function promptForLocation() {
 						{#if generatingDiagrams}
 							<div class="flex flex-col gap-2 min-w-[220px]">
 								<div class="flex items-center gap-2">
-									<svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation: spin 2s linear infinite; flex-shrink: 0">
+									<svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="spinner-icon">
 										<circle cx="8" cy="8" r="6" stroke="var(--color-primary)" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="8" stroke-linecap="round"/>
 									</svg>
 									<span class="text-sm font-medium" style="color: var(--color-fg)">
@@ -841,6 +841,11 @@ function promptForLocation() {
 	@keyframes blink {
 		0%, 80%, 100% { opacity: 0; }
 		40% { opacity: 1; }
+	}
+
+	.spinner-icon {
+		animation: spin 2s linear infinite;
+		flex-shrink: 0;
 	}
 
 	@keyframes spin {

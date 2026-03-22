@@ -134,7 +134,7 @@ async def create_diagrams_from_ai(
             "INSERT INTO diagrams "
             "(id, set_id, diagram_type, notation, parent_package_id, "
             "current_version, created_at, created_by, updated_at, is_deleted) "
-            "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, 0)",
+            "VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, FALSE)",
             (diagram_id, set_id, diagram_type, notation, package_id, now, user_id, now),
         )
         await db.execute(
