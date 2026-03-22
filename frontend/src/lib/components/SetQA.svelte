@@ -103,8 +103,10 @@ function promptForLocation() {
 		showLocationPicker = false;
 		applyingDiagrams = true;
 		error = null;
+		const diagramsToApply = pendingDiagrams;
+		pendingDiagrams = null;  // Clear immediately to prevent duplicate prompts
 		try {
-			const body: Record<string, unknown> = { diagrams_json: JSON.stringify(pendingDiagrams) };
+			const body: Record<string, unknown> = { diagrams_json: JSON.stringify(diagramsToApply) };
 			if (packageId) body.package_id = packageId;
 			const result = await apiFetch<{ diagram_ids: string[]; primary_diagram_id: string | null }>(
 				`/api/ai/sets/${setId}/create-diagram/apply`,
@@ -113,7 +115,6 @@ function promptForLocation() {
 					body: JSON.stringify(body),
 				}
 			);
-			pendingDiagrams = null;
 			if (result.primary_diagram_id) {
 				goto(`/diagrams/${result.primary_diagram_id}`);
 			}
