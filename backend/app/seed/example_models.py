@@ -1693,9 +1693,16 @@ async def seed_example_models(db: DatabasePort) -> None:
       - Otherwise → clear + reseed v6
     """
     # --- Skip if initial setup not yet completed ------------------------------
-    cursor = await db.execute(
-        "SELECT COUNT(*) FROM users WHERE is_active = 1"
-    )
+    # Check users table (SQLite) or profiles table (Supabase)
+    try:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM users WHERE is_active = 1"
+        )
+    except Exception:  # noqa: BLE001
+        # Supabase mode: users table doesn't exist, check profiles instead
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM profiles WHERE is_active = TRUE"
+        )
     row = await cursor.fetchone()
     if not row or row[0] == 0:
         return

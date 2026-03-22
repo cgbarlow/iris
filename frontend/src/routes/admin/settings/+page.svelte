@@ -17,6 +17,9 @@
 	let regenerating = $state(false);
 	let regenSuccess = $state<string | null>(null);
 	let regenError = $state<string | null>(null);
+	let seeding = $state(false);
+	let seedSuccess = $state<string | null>(null);
+	let seedError = $state<string | null>(null);
 
 	// Form values
 	let sessionTimeout = $state(15);
@@ -64,6 +67,19 @@
 				e instanceof ApiError ? e.message : 'Failed to regenerate thumbnails';
 		}
 		regenerating = false;
+	}
+
+	async function seedExampleData() {
+		seeding = true;
+		seedSuccess = null;
+		seedError = null;
+		try {
+			await apiFetch('/api/settings/seed-example-data', { method: 'POST' });
+			seedSuccess = 'Example diagrams seeded into the Default set';
+		} catch (e) {
+			seedError = e instanceof ApiError ? e.message : 'Failed to seed example data';
+		}
+		seeding = false;
 	}
 
 	async function saveAll() {
@@ -195,6 +211,41 @@
 				style="background-color: var(--color-primary)"
 			>
 				{regenerating ? 'Regenerating...' : 'Regenerate Thumbnails'}
+			</button>
+		</div>
+
+		<div class="rounded border p-4" style="border-color: var(--color-border)">
+			<h2 class="text-lg font-medium" style="color: var(--color-fg)">
+				Seed Example Data
+			</h2>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">
+				Populate the Default set with example diagrams (Simple View, UML, ArchiMate, Sequence, DoView). Safe to run multiple times.
+			</p>
+			{#if seedError}
+				<div
+					role="alert"
+					class="mt-3 rounded border p-3 text-sm"
+					style="border-color: var(--color-danger); color: var(--color-danger)"
+				>
+					{seedError}
+				</div>
+			{/if}
+			{#if seedSuccess}
+				<div
+					role="status"
+					class="mt-3 rounded border p-3 text-sm"
+					style="border-color: var(--color-success, #16a34a); color: var(--color-success, #16a34a)"
+				>
+					{seedSuccess}
+				</div>
+			{/if}
+			<button
+				onclick={seedExampleData}
+				disabled={seeding}
+				class="mt-3 rounded px-4 py-2 text-sm text-white disabled:opacity-50"
+				style="background-color: var(--color-primary)"
+			>
+				{seeding ? 'Seeding...' : 'Seed Example Diagrams'}
 			</button>
 		</div>
 

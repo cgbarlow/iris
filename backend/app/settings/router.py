@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth.dependencies import get_current_user
 from app.settings.models import SettingResponse, SettingUpdate
+from app.seed.example_models import seed_example_models
 from app.settings.service import get_all_settings, get_setting, update_setting
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -58,3 +59,16 @@ async def update_setting_by_key(
     if result is None:
         raise HTTPException(status_code=404, detail="Setting not found")
     return SettingResponse(**result)
+
+
+@router.post("/seed-example-data")
+async def seed_example_data(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, str]:
+    """Populate the default set with example diagrams. Requires admin role."""
+    _require_admin(current_user)
+    db = request.app.state.db_manager.main_db
+    await seed_example_models(db)
+    await db.commit()
+    return {"detail": "Example data seeded successfully"}
