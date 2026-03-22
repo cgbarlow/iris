@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 
@@ -39,30 +40,36 @@ async def import_sparx(
     sqlite_path: str | None = None
     try:
         db = request.app.state.db_manager.main_db
-        # Validate set_id if provided
-        if set_id:
-            cursor = await db.execute(
-                "SELECT id FROM sets WHERE id = ? AND is_deleted = 0",
-                (set_id,),
+
+        # Hold a single pool connection for the entire import to avoid
+        # per-execute acquire/release overhead (hundreds of INSERTs).
+        from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+        hold_ctx = db.hold_connection() if isinstance(db, SupabaseAdapter) else contextlib.nullcontext()
+        async with hold_ctx:
+            # Validate set_id if provided
+            if set_id:
+                cursor = await db.execute(
+                    "SELECT id FROM sets WHERE id = ? AND is_deleted = 0",
+                    (set_id,),
+                )
+                if await cursor.fetchone() is None:
+                    raise HTTPException(status_code=400, detail="Invalid set_id")
+
+            # Convert EAP to SQLite if needed
+            if is_eap:
+                try:
+                    sqlite_path = await convert_eap_to_sqlite(tmp_path)
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                except RuntimeError as exc:
+                    raise HTTPException(status_code=500, detail=str(exc)) from exc
+                import_path = sqlite_path
+            else:
+                import_path = tmp_path
+
+            summary = await import_sparx_file(
+                db, import_path, imported_by=current_user["id"], set_id=set_id,
             )
-            if await cursor.fetchone() is None:
-                raise HTTPException(status_code=400, detail="Invalid set_id")
-
-        # Convert EAP to SQLite if needed
-        if is_eap:
-            try:
-                sqlite_path = await convert_eap_to_sqlite(tmp_path)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-            except RuntimeError as exc:
-                raise HTTPException(status_code=500, detail=str(exc)) from exc
-            import_path = sqlite_path
-        else:
-            import_path = tmp_path
-
-        summary = await import_sparx_file(
-            db, import_path, imported_by=current_user["id"], set_id=set_id,
-        )
         return {
             "packages_created": summary.packages_created,
             "packages_skipped": summary.packages_skipped,

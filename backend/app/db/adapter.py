@@ -10,7 +10,9 @@ Supabase mode:          SupabaseAdapter wraps asyncpg pool â€” auto-converts ? â
 
 from __future__ import annotations
 
+import contextlib
 import re
+from collections.abc import AsyncIterator
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from uuid import UUID
@@ -298,9 +300,38 @@ class SupabaseAdapter:
 
     def __init__(self, pool: asyncpg.Pool) -> None:  # type: ignore[name-defined]
         self._pool = pool
+        self._held_conn: asyncpg.Connection | None = None  # type: ignore[name-defined]
 
     # SQLite FTS virtual tables that don't exist in PostgreSQL (uses tsvector instead)
     _FTS_TABLES = {"elements_fts", "diagrams_fts"}
+
+    @contextlib.asynccontextmanager
+    async def hold_connection(self) -> AsyncIterator[None]:
+        """Hold a single pool connection for a batch of operations.
+
+        Use this for bulk operations (e.g. import) to avoid per-execute
+        pool acquire/release overhead. Normal requests should NOT use this.
+        """
+        self._held_conn = await self._pool.acquire()
+        try:
+            yield
+        finally:
+            await self._pool.release(self._held_conn)
+            self._held_conn = None
+
+    async def _execute_on(
+        self, conn: asyncpg.Connection, pg_query: str, params: tuple[Any, ...]  # type: ignore[name-defined]
+    ) -> _AsyncpgCursor:
+        upper = pg_query.strip().upper()
+        if _is_select(pg_query):
+            rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
+            return _AsyncpgCursor(rows, rowcount=len(rows))
+        elif "RETURNING" in upper:
+            rows = await conn.fetch(pg_query, *params)
+            return _AsyncpgCursor(rows, rowcount=len(rows))
+        else:
+            status: str = await conn.execute(pg_query, *params)
+            return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
 
     async def execute(self, query: str, params: tuple[Any, ...] = ()) -> _AsyncpgCursor:
         pg_query = _convert_placeholders(query)
@@ -312,18 +343,12 @@ class SupabaseAdapter:
             if fts.upper() in upper_stripped:
                 return _AsyncpgCursor([], rowcount=0)
 
+        # Use held connection if available (bulk mode), otherwise acquire per-execute
+        if self._held_conn is not None:
+            return await self._execute_on(self._held_conn, pg_query, params)
+
         async with self._pool.acquire() as conn:
-            if _is_select(pg_query):
-                rows: list[asyncpg.Record] = await conn.fetch(pg_query, *params)
-                return _AsyncpgCursor(rows, rowcount=len(rows))
-            else:
-                upper = upper_stripped
-                if "RETURNING" in upper:
-                    rows = await conn.fetch(pg_query, *params)
-                    return _AsyncpgCursor(rows, rowcount=len(rows))
-                else:
-                    status: str = await conn.execute(pg_query, *params)
-                    return _AsyncpgCursor([], rowcount=_parse_rowcount(status))
+            return await self._execute_on(conn, pg_query, params)
 
     async def commit(self) -> None:
         pass

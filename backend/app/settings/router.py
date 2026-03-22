@@ -67,8 +67,14 @@ async def seed_example_data(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
     """Populate the default set with example diagrams. Requires admin role."""
+    import contextlib  # noqa: PLC0415
+
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
-    await seed_example_models(db)
-    await db.commit()
+
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+    hold_ctx = db.hold_connection() if isinstance(db, SupabaseAdapter) else contextlib.nullcontext()
+    async with hold_ctx:
+        await seed_example_models(db)
+        await db.commit()
     return {"detail": "Example data seeded successfully"}
