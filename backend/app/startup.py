@@ -140,6 +140,16 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     await seed_roles_and_permissions(port)
     await seed_defaults(port)
 
+    # Run lightweight schema patches that don't require dollar-quoting (safe for asyncpg).
+    # m031: add mode and thread_id columns to ai_conversations if missing.
+    await port.execute(
+        "ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'discuss'"
+    )
+    await port.execute(
+        "ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS thread_id TEXT"
+    )
+    await port.commit()
+
     # Sync profiles → users table so FK constraints (elements.created_by, etc.) are satisfied.
     # The `users` table is the SQLite-era user store; in Supabase mode it's empty but still
     # referenced by FKs. Mirror each profile into `users` so CRUD operations succeed.
