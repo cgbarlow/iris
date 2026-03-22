@@ -169,7 +169,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("iris-default-uml", "Iris Default UML", "Clean white look — Iris defaults", "uml",
-         json.dumps(iris_uml_config), 1, "system", now, now),
+         json.dumps(iris_uml_config), True, "system", now, now),
     )
 
     # Sparx EA Default UML — faithful EA rendering: cream boxes, 1px black border, no radius,
@@ -226,7 +226,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("ea-default-uml", "Sparx EA Default UML", "EA default UML class diagram palette with stereotype colours", "uml",
-         json.dumps(ea_uml_config), 1, "system", now, now),
+         json.dumps(ea_uml_config), True, "system", now, now),
     )
 
     # Iris Default Simple — current defaults
@@ -251,7 +251,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("iris-default-simple", "Iris Default Simple", "Clean simple look", "simple",
-         json.dumps(iris_simple_config), 1, "system", now, now),
+         json.dumps(iris_simple_config), True, "system", now, now),
     )
 
     # C4 Default — canonical hybrid colours (c4model.com)
@@ -276,7 +276,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("c4-default", "C4 Default", "Canonical C4 hybrid colours — c4model.com", "c4",
-         json.dumps(c4_default_config), 1, "system", now, now),
+         json.dumps(c4_default_config), True, "system", now, now),
     )
 
     # ArchiMate Default — canonical ArchiMate layer colours
@@ -343,7 +343,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("archimate-default", "ArchiMate Default", "Canonical ArchiMate layer colours", "archimate",
-         json.dumps(archimate_config), 1, "system", now, now),
+         json.dumps(archimate_config), True, "system", now, now),
     )
 
     # DoView Default — official DoView 10-color palette (DoViewPlanning.org)
@@ -385,7 +385,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("doview-default", "DoView Default", "Official DoView 10-color palette — DoViewPlanning.org", "doview",
-         json.dumps(doview_config), 1, "system", now, now),
+         json.dumps(doview_config), True, "system", now, now),
     )
 
     await db.commit()
