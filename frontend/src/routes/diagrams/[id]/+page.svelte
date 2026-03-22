@@ -20,6 +20,7 @@
 	import RelationshipDialog from '$lib/canvas/controls/RelationshipDialog.svelte';
 	import EdgeStylePanel from '$lib/canvas/controls/EdgeStylePanel.svelte';
 	import NodeStylePanel from '$lib/canvas/controls/NodeStylePanel.svelte';
+	import LinkedDiagramPanel from '$lib/canvas/controls/LinkedDiagramPanel.svelte';
 	import ElementEditPanel from '$lib/canvas/controls/ElementEditPanel.svelte';
 	import EntityDetailPanel from '$lib/canvas/controls/EntityDetailPanel.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
@@ -1153,6 +1154,12 @@
 		if (!selectedEditNodeId) return '';
 		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
 		return node?.data?.description ?? '';
+	});
+
+	const selectedNodeLinkedModelId = $derived.by(() => {
+		if (!selectedEditNodeId) return null;
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return (node?.data?.linkedModelId as string) ?? null;
 	});
 
 	function handleConnectNodes(sourceId: string, targetId: string) {
@@ -2701,6 +2708,7 @@
 										<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; display: flex; flex-direction: column; gap: 8px;">
 											<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
 											<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} themeVisual={selectedNodeThemeVisual} {notation} entityType={selectedNodeEntityType} />
+											<LinkedDiagramPanel nodeId={selectedEditNodeId} linkedModelId={selectedNodeLinkedModelId} excludeDiagramId={diagram?.id} />
 										</div>
 									{/if}
 								</div>
@@ -2732,6 +2740,7 @@
 							<div style="width: 300px; display: flex; flex-direction: column; gap: 8px;">
 								<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
 								<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} themeVisual={selectedNodeThemeVisual} {notation} entityType={selectedNodeEntityType} />
+								<LinkedDiagramPanel nodeId={selectedEditNodeId} linkedModelId={selectedNodeLinkedModelId} excludeDiagramId={diagram?.id} />
 							</div>
 						{/if}
 					</div>
