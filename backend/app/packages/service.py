@@ -32,11 +32,17 @@ async def create_package(
     effective_set_id = set_id or DEFAULT_SET_ID
 
     # Compute next sequence_order within the parent group
-    seq_cursor = await db.execute(
-        "SELECT COALESCE(MAX(sequence_order), 0) + 1 FROM packages "
-        "WHERE parent_package_id IS ? AND is_deleted = 0",
-        (parent_package_id,),
-    )
+    if parent_package_id:
+        seq_cursor = await db.execute(
+            "SELECT COALESCE(MAX(sequence_order), 0) + 1 FROM packages "
+            "WHERE parent_package_id = ? AND is_deleted = 0",
+            (parent_package_id,),
+        )
+    else:
+        seq_cursor = await db.execute(
+            "SELECT COALESCE(MAX(sequence_order), 0) + 1 FROM packages "
+            "WHERE parent_package_id IS NULL AND is_deleted = 0",
+        )
     seq_row = await seq_cursor.fetchone()
     next_seq = seq_row[0] if seq_row else 1
 
