@@ -56,6 +56,60 @@ async def _minimal_schema(conn: aiosqlite.Connection) -> None:
             PRIMARY KEY (diagram_id, version)
         )
     """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS elements (
+            id TEXT PRIMARY KEY,
+            element_type TEXT NOT NULL,
+            set_id TEXT,
+            current_version INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            created_by TEXT NOT NULL DEFAULT 'system',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            notation TEXT
+        )
+    """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS element_versions (
+            element_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            description TEXT,
+            data TEXT NOT NULL DEFAULT '{}',
+            change_type TEXT NOT NULL DEFAULT 'create',
+            change_summary TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            created_by TEXT NOT NULL DEFAULT 'system',
+            metadata TEXT,
+            PRIMARY KEY (element_id, version)
+        )
+    """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS relationships (
+            id TEXT PRIMARY KEY,
+            source_element_id TEXT NOT NULL,
+            target_element_id TEXT NOT NULL,
+            relationship_type TEXT NOT NULL,
+            current_version INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            created_by TEXT NOT NULL DEFAULT 'system',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            is_deleted INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS relationship_versions (
+            relationship_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            description TEXT,
+            data TEXT NOT NULL DEFAULT '{}',
+            change_type TEXT NOT NULL DEFAULT 'create',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            created_by TEXT NOT NULL DEFAULT 'system',
+            PRIMARY KEY (relationship_id, version)
+        )
+    """)
     await conn.execute("INSERT OR IGNORE INTO sets VALUES ('test-set', 'Test Set', NULL, datetime('now'), 'system', datetime('now'), 0)")
     await conn.commit()
 

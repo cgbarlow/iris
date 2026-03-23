@@ -18,6 +18,7 @@
 	} from '$lib/types/canvas';
 	import C4TypePicker from '$lib/c4/C4TypePicker.svelte';
 	import DOMPurify from 'dompurify';
+	import { getThemeRendering, getActiveTheme } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
 		entityId?: string | null;
@@ -29,9 +30,11 @@
 		nodeDescription?: string;
 		/** Fallback entity type for unlinked nodes. */
 		nodeEntityType?: string;
+		/** Whether description is hidden on the node. */
+		nodeHideDescription?: boolean;
 	}
 
-	let { entityId, nodeId, notation, nodeLabel = '', nodeDescription = '', nodeEntityType = 'component' }: Props = $props();
+	let { entityId, nodeId, notation, nodeLabel = '', nodeDescription = '', nodeEntityType = 'component', nodeHideDescription = false }: Props = $props();
 
 	const isLinked = $derived(!!entityId);
 
@@ -79,6 +82,9 @@
 	});
 
 	const effectiveNotation = $derived(element?.notation ?? notation ?? 'simple');
+	const themeRendering = $derived(getThemeRendering(effectiveNotation));
+	const themeHidesDescription = $derived(themeRendering?.hideDescription ?? false);
+	const activeThemeName = $derived(getActiveTheme(effectiveNotation)?.name);
 
 	$effect(() => {
 		if (entityId) {
@@ -267,6 +273,30 @@
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 				></textarea>
 			</label>
+
+			<div class="mt-2">
+				<label class="flex items-center gap-2" class:opacity-50={themeHidesDescription}>
+					<input
+						type="checkbox"
+						checked={themeHidesDescription ? false : !nodeHideDescription}
+						disabled={themeHidesDescription}
+						onchange={(e) => {
+							const show = (e.target as HTMLInputElement).checked;
+							document.dispatchEvent(
+								new CustomEvent('nodedatachange', {
+									detail: { nodeId, field: 'hideDescription', value: !show }
+								})
+							);
+						}}
+					/>
+					<span class="text-xs" style="color: var(--color-muted)">Show description on node</span>
+				</label>
+				{#if themeHidesDescription}
+					<p class="mt-0.5 text-xs" style="color: var(--color-muted); font-style: italic">
+						Overridden by theme {activeThemeName ?? effectiveNotation}
+					</p>
+				{/if}
+			</div>
 
 			<div class="text-xs" style="color: var(--color-fg)">
 				<span>Type</span>

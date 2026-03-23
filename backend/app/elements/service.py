@@ -119,6 +119,25 @@ async def get_element(
     tag_rows = await tag_cursor.fetchall()
     element["tags"] = [r[0] for r in tag_rows]
 
+    # Relationship count
+    rel_cursor = await db.execute(
+        "SELECT COUNT(*) FROM relationships "
+        "WHERE (source_element_id = ? OR target_element_id = ?) AND is_deleted = 0",
+        (element_id, element_id),
+    )
+    rel_row = await rel_cursor.fetchone()
+    element["relationship_count"] = rel_row[0] if rel_row else 0
+
+    # Diagram usage count
+    diagram_cursor = await db.execute(
+        "SELECT COUNT(DISTINCT d.id) FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
+        "WHERE d.is_deleted = 0 AND dv.data LIKE ?",
+        (f'%{element_id}%',),
+    )
+    diagram_row = await diagram_cursor.fetchone()
+    element["diagram_usage_count"] = diagram_row[0] if diagram_row else 0
+
     return element
 
 

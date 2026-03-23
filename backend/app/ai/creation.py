@@ -12,6 +12,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.elements.materialise import materialise_element, materialise_relationship
+
 if TYPE_CHECKING:
     import aiosqlite
 
@@ -147,6 +149,62 @@ async def create_diagrams_from_ai(
 
     await db.commit()
 
+    # Phase 1.5: materialise elements and relationships for each diagram
+    for i, (diagram_id, canvas_data, diag_def) in enumerate(
+        zip(diagram_ids, canvas_data_list, diagrams_def)
+    ):
+        notation = diag_def.get("notation", "doview")
+        node_element_map: dict[str, str] = {}  # node_id → element_id
+
+        # Create element for each node
+        for node in canvas_data.get("nodes", []):
+            node_data = node.get("data", {})
+            element_id = str(uuid.uuid4())
+            node_id = node.get("id", "")
+            node_element_map[node_id] = element_id
+
+            await materialise_element(
+                db,
+                element_id=element_id,
+                element_type=node_data.get("entityType", "outcome_box"),
+                name=node_data.get("label", ""),
+                description=node_data.get("description"),
+                set_id=set_id,
+                notation=notation,
+                created_by=user_id,
+                now=now,
+            )
+            node_data["entityId"] = element_id
+
+        # Create relationship for each edge
+        for edge in canvas_data.get("edges", []):
+            source_eid = node_element_map.get(edge.get("source", ""))
+            target_eid = node_element_map.get(edge.get("target", ""))
+            if source_eid and target_eid:
+                rel_id = str(uuid.uuid4())
+                edge_data = edge.get("data", {})
+
+                await materialise_relationship(
+                    db,
+                    rel_id=rel_id,
+                    source_element_id=source_eid,
+                    target_element_id=target_eid,
+                    relationship_type=edge_data.get("relationshipType", "causal_link"),
+                    label="",
+                    description="",
+                    created_by=user_id,
+                    now=now,
+                )
+                edge_data["relationshipId"] = rel_id
+
+        # Update diagram_versions with enriched canvas data
+        await db.execute(
+            "UPDATE diagram_versions SET data = ? WHERE diagram_id = ? AND version = 1",
+            (json.dumps(canvas_data), diagram_id),
+        )
+
+    await db.commit()
+
     # Phase 2: resolve linkedDiagramIndex → linkedModelId in overview_tile nodes
     for i, (diagram_id, canvas_data) in enumerate(zip(diagram_ids, canvas_data_list)):
         updated = False
@@ -183,6 +241,9 @@ def _build_canvas_nodes(ai_nodes: list[dict]) -> list[dict]:
             "label": label,
             "entityType": entity_type,
         }
+        description = ai_node.get("description", "")
+        if description:
+            node_data["description"] = description
         if visual:
             node_data["visual"] = visual
 

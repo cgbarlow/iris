@@ -9,6 +9,7 @@ class ThemeRenderingConfig(BaseModel):
     """Presentation hints for theme rendering (e.g. hide icons, border radius)."""
 
     hideIcons: bool | None = None
+    hideDescription: bool | None = None
     borderRadius: int | None = None
     attrFontColor: str | None = None
     hideTypeStereotypes: bool | None = None
