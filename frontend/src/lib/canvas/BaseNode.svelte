@@ -7,10 +7,13 @@
 	 * Used as fallback by DynamicNode and as a wrapper by notation renderers.
 	 */
 	import { Handle, Position } from '@xyflow/svelte';
+	import { getContext } from 'svelte';
 	import type { Snippet } from 'svelte';
-	import type { CanvasNodeData } from '$lib/types/canvas';
+	import type { CanvasNodeData, NotationType } from '$lib/types/canvas';
 	import { nodeOverrideStyle, titleFontStyle, descFontStyle } from '$lib/canvas/utils/visualStyles';
+	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
 	import IconDisplay from '$lib/icons/IconDisplay.svelte';
+	import { getShowElementCount } from '$lib/stores/showElementCount.svelte';
 
 	interface Props {
 		data: CanvasNodeData;
@@ -32,11 +35,17 @@
 		children,
 	}: Props = $props();
 
+	const notation = getContext<NotationType>('notation') ?? 'simple';
+	const rendering = $derived(getThemeRendering(notation));
+	const hideDesc = $derived(rendering?.hideDescription ?? false);
+
 	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 	const titleStyle = $derived(titleFontStyle(data.visual));
 	const descStyle = $derived(descFontStyle(data.visual));
 	const hasCustomIcon = $derived(!!data.visual?.icon);
 	const iconColor = $derived(data.visual?.iconColor);
+	const showCount = $derived(getShowElementCount());
+	const usageCount = $derived((data as Record<string, unknown>).diagramUsageCount as number | undefined);
 </script>
 
 <div
@@ -45,6 +54,11 @@
 	style={visualStyle}
 	aria-label="{data.label}, {typeLabel}"
 >
+	{#if showCount && usageCount && usageCount > 0}
+		<span class="canvas-node__count-badge" aria-label="Used in {usageCount} diagram{usageCount === 1 ? '' : 's'}">
+			{usageCount}
+		</span>
+	{/if}
 	<div class="canvas-node__header" style={titleStyle}>
 		{#if hasCustomIcon && data.visual?.icon}
 			<span class="canvas-node__icon" aria-hidden="true">
@@ -60,7 +74,7 @@
 	{#if children}
 		{@render children()}
 	{/if}
-	{#if data.description && !children}
+	{#if data.description && !children && !hideDesc && !data.hideDescription}
 		<div class="canvas-node__description" style={descStyle}>{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}

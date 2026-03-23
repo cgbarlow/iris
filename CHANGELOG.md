@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Linked Diagram property editor** — set, change, or clear a node's linked diagram directly from the edit sidebar (ADR-099)
 
+## [2.7.2] - 2026-03-23
+
+### Added
+- **Visual Toggles** settings section — user-controlled display preferences for diagram nodes (ADR-101)
+- **Element count badge** — optional top-right badge on nodes showing how many diagrams each element is used in, toggled via Settings → Visual Toggles
+- **Hide description toggle** — `hideDescription` theme rendering option; DoView defaults to hidden, per-node override in edit sidebar
+
+### Changed
+- **DoView element-backed nodes** — all DoView diagram nodes are now created as proper elements with `entityId` linkage, and all causal links as relationships with `relationshipId`, enabling cross-diagram element reuse and diagram-entity relationship tracking (ADR-100)
+- AI diagram creation (`create_diagrams_from_ai`) now materialises element and relationship records for every node and edge
+
+### Fixed
+- Double borders on DoView nodes — removed duplicate `visualStyle` application from DoviewRenderer wrapper
+- Stale seed test assertions for diagram count (35 → 39) after DoView diagrams were added in v2.6.0
+- Seed test setup missing migrations m028 (AI creation prompts) and m029 (sequence order)
+
 ## [2.7.1] - 2026-03-22
 
 ### Added

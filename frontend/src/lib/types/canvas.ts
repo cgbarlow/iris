@@ -84,6 +84,7 @@ export interface CanvasNodeData {
 	entityType: SimpleEntityType;
 	entityId?: string;
 	description?: string;
+	hideDescription?: boolean;
 	linkedModelId?: string;
 	browseMode?: boolean;
 	notation?: string;

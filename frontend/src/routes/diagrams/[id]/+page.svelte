@@ -527,7 +527,7 @@
 					const element = await apiFetch<Element>(`/api/elements/${entityId}`);
 					const rawDesc = element.description ?? '';
 					const desc = rawDesc.startsWith(node.data.label) ? rawDesc.slice(rawDesc.indexOf('\n') + 1).replace(/^\r?\n/, '') : rawDesc;
-					if (desc !== node.data.description || element.name !== node.data.label) {
+					if (desc !== node.data.description || element.name !== node.data.label || (node.data as Record<string, unknown>).diagramUsageCount !== (element.diagram_usage_count ?? 0)) {
 						updated = true;
 						return {
 							...node,
@@ -535,6 +535,7 @@
 								...node.data,
 								label: element.name,
 								description: desc,
+								diagramUsageCount: element.diagram_usage_count ?? 0,
 							},
 						};
 					}
@@ -1154,6 +1155,13 @@
 		if (!selectedEditNodeId) return '';
 		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
 		return node?.data?.description ?? '';
+	});
+
+	/** Whether the selected node has hideDescription set. */
+	const selectedNodeHideDescription = $derived.by(() => {
+		if (!selectedEditNodeId) return false;
+		const node = canvasNodes.find((n) => n.id === selectedEditNodeId);
+		return !!(node?.data?.hideDescription);
 	});
 
 	const selectedNodeLinkedModelId = $derived.by(() => {
@@ -2706,7 +2714,7 @@
 									</div>
 									{#if selectedEditNodeId && selectedNodeVisual}
 										<div style="width: 300px; flex-shrink: 0; margin: 8px 8px 8px 0; overflow-y: auto; max-height: calc(100% - 16px); align-self: flex-start; display: flex; flex-direction: column; gap: 8px;">
-											<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
+											<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} nodeHideDescription={selectedNodeHideDescription} />
 											<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} themeVisual={selectedNodeThemeVisual} {notation} entityType={selectedNodeEntityType} />
 											<LinkedDiagramPanel nodeId={selectedEditNodeId} linkedModelId={selectedNodeLinkedModelId} excludeDiagramId={diagram?.id} />
 										</div>
@@ -2738,7 +2746,7 @@
 						</div>
 						{#if selectedEditNodeId && selectedNodeVisual}
 							<div style="width: 300px; display: flex; flex-direction: column; gap: 8px;">
-								<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} />
+								<ElementEditPanel entityId={selectedNodeEntityId} nodeId={selectedEditNodeId} {notation} nodeLabel={selectedNodeLabel} nodeDescription={selectedNodeDescription} nodeEntityType={selectedNodeEntityType} nodeHideDescription={selectedNodeHideDescription} />
 								<NodeStylePanel nodeId={selectedEditNodeId} visual={selectedNodeVisual} themeVisual={selectedNodeThemeVisual} {notation} entityType={selectedNodeEntityType} />
 								<LinkedDiagramPanel nodeId={selectedEditNodeId} linkedModelId={selectedNodeLinkedModelId} excludeDiagramId={diagram?.id} />
 							</div>

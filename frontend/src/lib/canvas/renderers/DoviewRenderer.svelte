@@ -8,7 +8,6 @@
 	import { getContext } from 'svelte';
 	import BaseNode from '../BaseNode.svelte';
 	import type { CanvasNodeData, NotationType } from '$lib/types/canvas';
-	import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
 
 	interface Props {
@@ -31,7 +30,6 @@
 	};
 
 	const icon = $derived(DOVIEW_ICONS[data.entityType] ?? '▭');
-	const visualStyle = $derived(nodeOverrideStyle(data.visual));
 	const isFinalOutcome = $derived(data.entityType === 'final_outcome');
 </script>
 
@@ -39,7 +37,7 @@
 	class="doview-node doview-node--{data.entityType}"
 	class:doview-node--final={isFinalOutcome}
 	class:doview-node--wrap={wrapLabels}
-	style="{visualStyle} --doview-text-align: {textAlign};"
+	style="--doview-text-align: {textAlign};"
 >
 	<BaseNode
 		{data}

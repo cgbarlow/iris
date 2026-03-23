@@ -3,10 +3,12 @@
 	import { onMount } from 'svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { getDefaultNotation, setDefaultNotation } from '$lib/stores/defaultNotation.svelte';
+	import { getShowElementCount, setShowElementCount } from '$lib/stores/showElementCount.svelte';
 
 	let highContrast = $state(false);
 	let isSystem = $state(false);
 	let defaultNotation = $state('simple');
+	let showElementCount = $state(false);
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -19,6 +21,7 @@
 		highContrast = localStorage.getItem('iris-high-contrast') === 'true';
 		isSystem = localStorage.getItem('iris-theme') === 'system';
 		defaultNotation = getDefaultNotation();
+		showElementCount = getShowElementCount();
 		if (highContrast) {
 			document.documentElement.classList.add('high-contrast');
 		}
@@ -139,6 +142,20 @@
 			<option value="c4">C4 — person, software system, container, component</option>
 		</select>
 	</div>
+</section>
+
+<section class="mt-6">
+	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Visual Toggles</h2>
+	<p class="mt-1 text-sm" style="color: var(--color-muted)">Control what information is displayed on diagram nodes.</p>
+	<label class="mt-3 flex items-center gap-2 cursor-pointer">
+		<input
+			type="checkbox"
+			bind:checked={showElementCount}
+			onchange={() => setShowElementCount(showElementCount)}
+			class="rounded"
+		/>
+		<span class="text-sm" style="color: var(--color-fg)">Display element count — show how many diagrams each element is used in</span>
+	</label>
 </section>
 
 <section class="mt-6">

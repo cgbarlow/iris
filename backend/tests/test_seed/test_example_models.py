@@ -58,6 +58,8 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     from app.migrations.m025_diagram_links import up as m025
     from app.migrations.m026_ai_providers import up as m026
     from app.migrations.m027_doview_notation import up as m027
+    from app.migrations.m028_ai_creation_prompts import up as m028
+    from app.migrations.m029_sequence_order import up as m029
     from app.migrations.seed import seed_roles_and_permissions
 
     await m001(db)
@@ -86,6 +88,8 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await m025(db)
     await m026(db)
     await m027(db)
+    await m028(db)
+    await m029(db)
     await seed_roles_and_permissions(db)
 
 
@@ -226,14 +230,14 @@ async def test_notation_package_names(seeded_db: aiosqlite.Connection) -> None:
 
 
 @pytest.mark.asyncio
-async def test_thirty_five_diagrams_total(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 35 diagrams (33 notation permutations + 1 AI module + 1 overview)."""
+async def test_thirty_nine_diagrams_total(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 39 diagrams (33 notation permutations + 1 AI module + 1 navigation + 4 DoView subpages)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
     row = await cursor.fetchone()
-    assert row[0] == 35
+    assert row[0] == 39
 
 
 @pytest.mark.asyncio
@@ -245,7 +249,7 @@ async def test_all_diagrams_have_parent_package(seeded_db: aiosqlite.Connection)
         (_DEFAULT_SET_ID,),
     )
     row = await cursor.fetchone()
-    assert row[0] == 35
+    assert row[0] == 39
 
 
 @pytest.mark.asyncio
@@ -301,22 +305,22 @@ async def test_navigation_diagram_has_navigation_cells(seeded_db: aiosqlite.Conn
 
 
 @pytest.mark.asyncio
-async def test_sixty_six_elements(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 66 elements (59 system + 7 DoView)."""
+async def test_eighty_seven_elements(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 87 elements (59 system + 28 DoView)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 66
+    assert (await cursor.fetchone())[0] == 87
 
 
 @pytest.mark.asyncio
-async def test_sixty_three_relationships(seeded_db: aiosqlite.Connection) -> None:
-    """Seed creates exactly 63 relationships (58 system + 5 DoView causal links)."""
+async def test_seventy_seven_relationships(seeded_db: aiosqlite.Connection) -> None:
+    """Seed creates exactly 77 relationships (58 system + 19 DoView causal links)."""
     cursor = await seeded_db.execute(
         "SELECT COUNT(*) FROM relationships WHERE is_deleted = 0",
     )
-    assert (await cursor.fetchone())[0] == 63
+    assert (await cursor.fetchone())[0] == 77
 
 
 @pytest.mark.asyncio
@@ -351,7 +355,96 @@ async def test_elements_have_correct_notations(seeded_db: aiosqlite.Connection) 
     assert notation_counts.get("uml", 0) == 12
     assert notation_counts.get("archimate", 0) == 18
     assert notation_counts.get("c4", 0) == 10
-    assert notation_counts.get("doview", 0) == 7
+    assert notation_counts.get("doview", 0) == 28
+
+
+@pytest.mark.asyncio
+async def test_doview_nodes_have_entity_ids(seeded_db: aiosqlite.Connection) -> None:
+    """All DoView diagram nodes have entityId pointing to real element records."""
+    # Get all DoView diagrams
+    cursor = await seeded_db.execute(
+        "SELECT d.id, dv.data FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
+        "WHERE d.notation = 'doview' AND d.is_deleted = 0",
+    )
+    rows = await cursor.fetchall()
+    assert len(rows) >= 6, "Expected at least 6 DoView diagrams"
+
+    for diagram_id, data_json in rows:
+        data = json.loads(data_json)
+        for node in data.get("nodes", []):
+            node_data = node.get("data", {})
+            entity_id = node_data.get("entityId")
+            assert entity_id, (
+                f"Node {node.get('id')} in diagram {diagram_id} missing entityId"
+            )
+            # Verify element exists
+            cursor = await seeded_db.execute(
+                "SELECT id FROM elements WHERE id = ? AND is_deleted = 0",
+                (entity_id,),
+            )
+            row = await cursor.fetchone()
+            assert row is not None, (
+                f"Node {node.get('id')} entityId {entity_id} not found in elements"
+            )
+
+
+@pytest.mark.asyncio
+async def test_doview_cross_diagram_reuse(seeded_db: aiosqlite.Connection) -> None:
+    """Three final outcome elements appear on both Final Outcomes and Strategic Vision diagrams."""
+    # Collect all entityIds from DoView diagrams
+    cursor = await seeded_db.execute(
+        "SELECT dv.name, dv.data FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
+        "WHERE d.notation = 'doview' AND d.is_deleted = 0",
+    )
+    rows = await cursor.fetchall()
+    diagram_entities: dict[str, set[str]] = {}
+    for name, data_json in rows:
+        data = json.loads(data_json)
+        eids = set()
+        for node in data.get("nodes", []):
+            eid = node.get("data", {}).get("entityId")
+            if eid:
+                eids.add(eid)
+        diagram_entities[name] = eids
+
+    # Find elements shared between Final Outcomes and Strategic Vision
+    fo_eids = diagram_entities.get("Final Outcomes", set())
+    sv_eids = diagram_entities.get("Strategic Vision & Goals", set())
+    shared = fo_eids & sv_eids
+    assert len(shared) == 3, f"Expected 3 shared elements, got {len(shared)}: {shared}"
+
+
+@pytest.mark.asyncio
+async def test_doview_edges_have_relationship_ids(seeded_db: aiosqlite.Connection) -> None:
+    """DoView causal_link edges have relationshipId matching real relationship records."""
+    cursor = await seeded_db.execute(
+        "SELECT d.id, dv.data FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
+        "WHERE d.notation = 'doview' AND d.is_deleted = 0",
+    )
+    rows = await cursor.fetchall()
+    edge_count = 0
+    for diagram_id, data_json in rows:
+        data = json.loads(data_json)
+        for edge in data.get("edges", []):
+            edge_data = edge.get("data", {})
+            if edge_data.get("relationshipType") == "causal_link":
+                rel_id = edge_data.get("relationshipId")
+                assert rel_id, (
+                    f"Edge {edge.get('id')} in diagram {diagram_id} missing relationshipId"
+                )
+                cursor = await seeded_db.execute(
+                    "SELECT id FROM relationships WHERE id = ? AND is_deleted = 0",
+                    (rel_id,),
+                )
+                row = await cursor.fetchone()
+                assert row is not None, (
+                    f"Edge {edge.get('id')} relationshipId {rel_id} not found in relationships"
+                )
+                edge_count += 1
+    assert edge_count == 19, f"Expected 19 causal_link edges with relationshipId, got {edge_count}"
 
 
 # ── Idempotency and migration tests ─────────────────────────────────────────
@@ -375,7 +468,7 @@ async def test_idempotent_no_duplicates(main_db: aiosqlite.Connection) -> None:
         "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 35
+    assert (await cursor.fetchone())[0] == 39
 
 
 @pytest.mark.asyncio
@@ -420,12 +513,12 @@ async def test_v1_seed_cleared_on_reseed(main_db: aiosqlite.Connection) -> None:
     )
     assert (await cursor.fetchone())[0] == 6
 
-    # Should have 66 elements (not 67 — the old one was cleared)
+    # Should have 87 elements (not 88 — the old one was cleared)
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 66
+    assert (await cursor.fetchone())[0] == 87
 
 
 @pytest.mark.asyncio
@@ -467,9 +560,9 @@ async def test_v2_seed_upgraded_to_v3(main_db: aiosqlite.Connection) -> None:
     )
     assert (await cursor.fetchone())[0] == 6
 
-    # Should have 35 diagrams
+    # Should have 39 diagrams
     cursor = await main_db.execute(
         "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
         (_DEFAULT_SET_ID,),
     )
-    assert (await cursor.fetchone())[0] == 35
+    assert (await cursor.fetchone())[0] == 39

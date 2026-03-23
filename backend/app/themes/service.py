@@ -376,6 +376,7 @@ async def seed_default_themes(db: DatabasePort) -> None:
         },
         "rendering": {
             "hideIcons": False,
+            "hideDescription": True,
             "borderRadius": 4,
             "wrapLabels": True,
             "textAlign": "center",
