@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends mdbtools libcai
 
 WORKDIR /opt/render/project/src
 
-# Copy backend code
+# Copy backend code (invalidate cache on every deploy)
 COPY backend/ backend/
 
 # Install Python dependencies
