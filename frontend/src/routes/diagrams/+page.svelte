@@ -103,6 +103,8 @@
 			params.set('page', String(page));
 			params.set('page_size', String(pageSize));
 			if (currentSetId) params.set('set_id', currentSetId);
+			if (notationFilter) params.set('notation', notationFilter);
+			if (typeFilter) params.set('diagram_type', typeFilter);
 			const data = await apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?${params}`);
 			models = data.items;
 			total = data.total;
@@ -400,6 +402,7 @@
 		<select
 			id="diagram-notation-filter"
 			bind:value={notationFilter}
+			onchange={() => { page = 1; loadModels(); }}
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		>
@@ -416,6 +419,7 @@
 		<select
 			id="diagram-type-filter"
 			bind:value={typeFilter}
+			onchange={() => { page = 1; loadModels(); }}
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		>
