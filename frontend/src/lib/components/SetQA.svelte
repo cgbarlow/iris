@@ -150,12 +150,17 @@ function promptForLocation() {
 	}
 
 	function isAwaitingGenerationConfirm(): boolean {
-		// Check if the last AI message is asking the user to confirm before generating
+		// Check if the last AI message is asking the user to confirm before generating.
+		// Matches common confirmation phrases the AI might use.
 		if (creationHistory.length === 0) return false;
 		const lastAssistant = [...creationHistory].reverse().find(m => m.role === 'assistant');
 		if (!lastAssistant) return false;
 		const text = lastAssistant.content.toLowerCase();
-		return text.includes("generate the diagram") || text.includes("i'll generate") || text.includes("generate the json");
+		return text.includes("generate the diagram") || text.includes("i'll generate")
+			|| text.includes("generate the json") || text.includes("shall i")
+			|| text.includes("ready to generate") || text.includes("proceed with")
+			|| text.includes("go ahead") || text.includes("create the diagram")
+			|| text.includes("let me know") || text.includes("want me to");
 	}
 
 	function stopStreaming() {
@@ -303,8 +308,9 @@ function promptForLocation() {
 							streamingQuestion = '';
 							scrollToBottom();
 
-							// Auto-apply diagrams after UI is updated
-							if (pendingDiagrams) {
+							// Auto-apply only if user already chose a location;
+							// otherwise the "Diagrams ready — where?" prompt will show.
+							if (pendingDiagrams && locationChosen) {
 								await applyCreationDiagrams(selectedPackageId);
 							}
 						} else if (payload.error) {
