@@ -25,6 +25,9 @@
 	let availableTags = $state<string[]>([]);
 	let templateFilter = $state(false);
 	let showCreateDialog = $state(false);
+	let showCreatePackageDialog = $state(false);
+	let newPackageName = $state('');
+	let newPackageDescription = $state('');
 	let viewMode = $state<'list' | 'gallery' | 'tree'>(
 		(typeof window !== 'undefined' && localStorage.getItem('iris-diagrams-view') as 'list' | 'gallery' | 'tree') || 'list'
 	);
@@ -169,6 +172,26 @@
 			await goto(`/diagrams/${created.id}`);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create diagram';
+		}
+	}
+
+	async function handleCreatePackage() {
+		if (!newPackageName.trim()) return;
+		try {
+			const created = await apiFetch<{ id: string }>('/api/packages', {
+				method: 'POST',
+				body: JSON.stringify({
+					name: newPackageName.trim(),
+					description: newPackageDescription.trim() || null,
+					set_id: currentSetId || undefined,
+				}),
+			});
+			showCreatePackageDialog = false;
+			newPackageName = '';
+			newPackageDescription = '';
+			await goto(`/packages/${created.id}`);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to create package';
 		}
 	}
 
@@ -347,6 +370,13 @@
 			style="background-color: var(--color-primary)"
 		>
 			New Diagram
+		</button>
+		<button
+			onclick={() => (showCreatePackageDialog = true)}
+			class="rounded border px-4 py-2 text-sm"
+			style="border-color: var(--color-primary); color: var(--color-primary)"
+		>
+			New Package
 		</button>
 	</div>
 </div>
@@ -697,3 +727,36 @@
 	onconfirm={handleBatchDelete}
 	oncancel={() => (showBatchDeleteConfirm = false)}
 />
+
+{#if showCreatePackageDialog}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div style="position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4)" onclick={() => (showCreatePackageDialog = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="rounded-lg p-6 shadow-lg" style="background: var(--color-surface); min-width: 360px" onclick={(e) => e.stopPropagation()}>
+			<h3 class="mb-4 text-lg font-semibold" style="color: var(--color-fg)">Create Package</h3>
+			<label class="mb-3 block text-sm" style="color: var(--color-fg)">
+				Name
+				<input
+					bind:value={newPackageName}
+					class="mt-1 block w-full rounded border px-3 py-2 text-sm"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					placeholder="Package name"
+				/>
+			</label>
+			<label class="mb-4 block text-sm" style="color: var(--color-fg)">
+				Description
+				<textarea
+					bind:value={newPackageDescription}
+					class="mt-1 block w-full rounded border px-3 py-2 text-sm"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					rows="3"
+					placeholder="Optional description"
+				></textarea>
+			</label>
+			<div class="flex justify-end gap-2">
+				<button onclick={() => (showCreatePackageDialog = false)} class="rounded border px-3 py-1.5 text-sm" style="border-color: var(--color-border); color: var(--color-fg)">Cancel</button>
+				<button onclick={handleCreatePackage} disabled={!newPackageName.trim()} class="rounded px-3 py-1.5 text-sm text-white" style="background-color: var(--color-primary)">Create</button>
+			</div>
+		</div>
+	</div>
+{/if}
