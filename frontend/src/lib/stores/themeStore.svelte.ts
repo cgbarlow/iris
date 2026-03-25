@@ -10,6 +10,7 @@ import type { NodeVisualOverrides, EdgeVisualOverrides } from '$lib/types/canvas
 export interface ThemeRenderingConfig {
 	hideIcons?: boolean;
 	hideDescription?: boolean;
+	hideEdgeLabels?: boolean;
 	borderRadius?: number;
 	attrFontColor?: string;
 	hideTypeStereotypes?: boolean;

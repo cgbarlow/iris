@@ -453,11 +453,15 @@
 		if (n === 'archimate') return 'archimate';
 		if (n === 'c4') return 'c4';
 		if (n === 'doview') return 'doview';
+		if (n === 'scenia') return 'simple';
 		return 'simple';
 	});
 
 	/** Notation for UnifiedCanvas context. */
-	const notation = $derived<NotationType>(canvasType === 'sequence' ? 'simple' : canvasType as NotationType);
+	const notation = $derived<NotationType>(
+		canvasType === 'sequence' ? 'simple'
+		: (diagram?.notation === 'scenia' ? 'scenia' : canvasType as NotationType)
+	);
 
 	/** Preferred theme from diagram metadata (e.g. Sparx EA imports set theme_id). */
 	const preferredThemeId = $derived(diagram?.metadata?.theme_id as string | undefined);

@@ -113,13 +113,13 @@ def _edge(
     **extra_data: object,
 ) -> dict:
     """Build an edge dict."""
-    data: dict = {"relationshipType": etype, "label": label}
+    data: dict = {"relationshipType": "uses", "label": label}
     data.update(extra_data)
-    result: dict = {"id": eid, "source": source, "target": target, "type": etype, "data": data}
-    if source_handle:
-        result["sourceHandle"] = source_handle
-    if target_handle:
-        result["targetHandle"] = target_handle
+    result: dict = {
+        "id": eid, "source": source, "target": target, "type": "uses",
+        "sourceHandle": "center", "targetHandle": "center",
+        "data": data,
+    }
     return result
 
 
@@ -708,7 +708,7 @@ def _build_strategic_overview(diagram_ids: dict[int, str]) -> dict:
     # Strategy nodes (top row)
     for i, sk in enumerate(strat_keys):
         nodes.append(_node(
-            f"s-{sk}", "default",
+            f"s-{sk}", "component",
             {"label": _get_strategy_name(sk), "entityType": "scenia_strategy",
              "entityId": _ref(sk)},
             i * 250, 0, 200, 80,
@@ -717,7 +717,7 @@ def _build_strategic_overview(diagram_ids: dict[int, str]) -> dict:
     # Programme nodes (bottom row) with linkedModelId to programme roadmap diagrams
     for i, pk in enumerate(prog_keys):
         nodes.append(_node(
-            f"p-{pk}", "default",
+            f"p-{pk}", "component",
             {"label": _get_programme_name(pk), "entityType": "scenia_programme",
              "entityId": _ref(pk),
              "linkedModelId": diagram_ids.get(1 + i, "")},
@@ -742,7 +742,7 @@ def _build_programme_roadmap(prog_key: str) -> dict:
     nodes = []
     # Programme node at top
     nodes.append(_node(
-        f"prog-{prog_key}", "default",
+        f"prog-{prog_key}", "component",
         {"label": _get_programme_name(prog_key), "entityType": "scenia_programme",
          "entityId": _ref(prog_key)},
         300, 0, 220, 80,
@@ -753,7 +753,7 @@ def _build_programme_roadmap(prog_key: str) -> dict:
         col = i % 3
         row = i // 3
         nodes.append(_node(
-            f"init-{ik}", "default",
+            f"init-{ik}", "component",
             {"label": _get_initiative_name(ik), "entityType": "scenia_initiative",
              "entityId": _ref(ik)},
             col * 280, 120 + row * 120, 240, 80,
@@ -811,7 +811,7 @@ def _build_asset_landscape() -> dict:
             col = ai % 3
             row = ai // 3
             nodes.append(_node(
-                f"asset-{ak}", "default",
+                f"asset-{ak}", "component",
                 {"label": _get_asset_name(ak), "entityType": "scenia_asset",
                  "entityId": _ref(ak)},
                 20 + col * 220, y_offset + 40 + row * 100, 200, 70,
@@ -839,7 +839,7 @@ def _build_dependency_map() -> dict:
         col = i % 4
         row = i // 4
         nodes.append(_node(
-            f"dep-{ik}", "default",
+            f"dep-{ik}", "component",
             {"label": _get_initiative_name(ik), "entityType": "scenia_initiative",
              "entityId": _ref(ik)},
             col * 280, row * 140, 240, 80,
@@ -868,7 +868,7 @@ def _build_resource_allocation() -> dict:
     # Resource nodes on the left
     for ri, rk in enumerate(res_keys):
         nodes.append(_node(
-            f"res-{rk}", "default",
+            f"res-{rk}", "component",
             {"label": res_names[rk], "entityType": "scenia_resource",
              "entityId": _ref(rk)},
             0, ri * 140, 180, 80,
@@ -885,7 +885,7 @@ def _build_resource_allocation() -> dict:
         col = ii % 3
         row = ii // 3
         nodes.append(_node(
-            f"ra-{ik}", "default",
+            f"ra-{ik}", "component",
             {"label": _get_initiative_name(ik), "entityType": "scenia_initiative",
              "entityId": _ref(ik)},
             300 + col * 260, row * 100, 220, 70,
@@ -1040,9 +1040,9 @@ async def _create_diagrams(db: DatabasePort, now: str) -> None:
 
         await db.execute(
             "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
-            "created_at, created_by, updated_at) "
-            "VALUES (?, ?, ?, 1, ?, ?, ?)",
-            (diagram_id, "roadmap", _SET_ID, now, _SYSTEM_USER_ID, now),
+            "created_at, created_by, updated_at, notation) "
+            "VALUES (?, ?, ?, 1, ?, ?, ?, ?)",
+            (diagram_id, "simple-view", _SET_ID, now, _SYSTEM_USER_ID, now, "scenia"),
         )
         await db.execute(
             "INSERT INTO diagram_versions (diagram_id, version, name, description, "

@@ -47,7 +47,7 @@
 		loading = false;
 	}
 
-	const notations = ['simple', 'uml', 'archimate', 'c4', 'doview'];
+	const notations = ['simple', 'uml', 'archimate', 'c4', 'doview', 'scenia'];
 
 	const groupedThemes = $derived(
 		notations.map((n) => ({

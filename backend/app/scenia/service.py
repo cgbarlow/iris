@@ -41,9 +41,10 @@ async def create_scenia_entity(
     data: dict[str, object],
     set_id: str,
     created_by: str,
+    element_id: str | None = None,
 ) -> dict[str, object]:
     """Create a Scenia entity as an Iris element."""
-    element_id = str(uuid.uuid4())
+    element_id = element_id or str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
     effective_set_id = set_id or DEFAULT_SET_ID
@@ -213,9 +214,10 @@ async def create_scenia_dependency(
     set_id: str,
     data: dict[str, object],
     created_by: str,
+    rel_id: str | None = None,
 ) -> dict[str, object]:
     """Create a Scenia dependency as an Iris relationship."""
-    rel_id = str(uuid.uuid4())
+    rel_id = rel_id or str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     dep_data = {**data, "dependency_type": dependency_type, "set_id": set_id}
     data_json = json.dumps(dep_data)
@@ -380,9 +382,10 @@ async def create_asset_category(
     name: str,
     color: str | None,
     display_order: int,
+    cat_id: str | None = None,
 ) -> dict[str, object]:
     """Create an asset category."""
-    cat_id = str(uuid.uuid4())
+    cat_id = cat_id or str(uuid.uuid4())
     await db.execute(
         "INSERT INTO scenia_asset_categories (id, set_id, name, color, display_order) "
         "VALUES (?, ?, ?, ?, ?)",
@@ -436,9 +439,10 @@ async def create_app_status(
     name: str,
     color: str | None,
     display_order: int,
+    status_id: str | None = None,
 ) -> dict[str, object]:
     """Create an application status."""
-    status_id = str(uuid.uuid4())
+    status_id = status_id or str(uuid.uuid4())
     await db.execute(
         "INSERT INTO scenia_application_statuses (id, set_id, name, color, display_order) "
         "VALUES (?, ?, ?, ?, ?)",
@@ -580,6 +584,54 @@ async def get_bulk_data(
     return result
 
 
+async def _upsert_entity(
+    db: DatabasePort,
+    *,
+    element_id: str,
+    element_type: str,
+    name: str,
+    description: str | None,
+    data: dict[str, object],
+    set_id: str,
+    updated_by: str,
+) -> None:
+    """Insert or update a single Scenia entity."""
+    now = datetime.now(tz=UTC).isoformat()
+    data_json = json.dumps(data)
+
+    cursor = await db.execute(
+        "SELECT id, current_version FROM elements WHERE id = ?",
+        (element_id,),
+    )
+    row = await cursor.fetchone()
+
+    if row:
+        # Update existing — bump version, un-delete if needed
+        new_version = row[1] + 1
+        await db.execute(
+            "UPDATE elements SET current_version = ?, updated_at = ?, is_deleted = 0 WHERE id = ?",
+            (new_version, now, element_id),
+        )
+        await db.execute(
+            "INSERT INTO element_versions (element_id, version, name, description, "
+            "data, change_type, change_summary, created_at, created_by) "
+            "VALUES (?, ?, ?, ?, ?, 'update', ?, ?, ?)",
+            (element_id, new_version, name, description, data_json, "Update via Scenia", now, updated_by),
+        )
+    else:
+        # Create new
+        await create_scenia_entity(
+            db,
+            element_type=element_type,
+            name=name,
+            description=description,
+            data=data,
+            set_id=set_id,
+            created_by=updated_by,
+            element_id=element_id,
+        )
+
+
 async def save_bulk_data(
     db: DatabasePort,
     set_id: str,
@@ -587,60 +639,95 @@ async def save_bulk_data(
     data: dict[str, object],
     saved_by: str,
 ) -> dict[str, object]:
-    """Atomic write of all Scenia data for a set.
+    """Granular save of all Scenia data for a set.
 
-    Deletes existing Scenia entities for this set and re-creates them.
-    This matches Scenia's saveAppData() pattern.
+    For each entity type, upserts items present in the payload and
+    soft-deletes items that are no longer present. Preserves IDs
+    so cross-references remain stable.
     """
-    # Delete existing Scenia elements in this set
-    for etype in ENTITY_TYPES.values():
-        await db.execute(
-            "UPDATE elements SET is_deleted = 1 WHERE element_type = ? AND set_id = ? AND is_deleted = 0",
-            (etype, set_id),
-        )
+    now = datetime.now(tz=UTC).isoformat()
 
-    # Delete existing dependencies for this set
-    await db.execute(
-        "UPDATE relationships SET is_deleted = 1 "
-        "WHERE relationship_type = ? AND is_deleted = 0",
-        (DEPENDENCY_TYPE,),
-    )
-
-    # Delete lookup tables for this set
-    await db.execute("DELETE FROM scenia_asset_categories WHERE set_id = ?", (set_id,))
-    await db.execute("DELETE FROM scenia_application_statuses WHERE set_id = ?", (set_id,))
-    await db.commit()
-
-    # Re-create all entities
+    # --- Element-backed entities: upsert + prune ---
     for key, etype in ENTITY_TYPES.items():
-        entities = data.get(key, [])
-        if isinstance(entities, list):
-            for entity in entities:
-                await create_scenia_entity(
-                    db,
-                    element_type=etype,
-                    name=entity.get("name", "Untitled"),
-                    description=entity.get("description"),
-                    data=entity.get("data", {}),
-                    set_id=set_id,
-                    created_by=saved_by,
-                )
+        incoming = data.get(key, [])
+        if not isinstance(incoming, list):
+            continue
 
-    # Re-create dependencies
-    deps = data.get("dependencies", [])
-    if isinstance(deps, list):
-        for dep in deps:
-            await create_scenia_dependency(
+        incoming_ids = set()
+        for entity in incoming:
+            eid = entity.get("id") or str(uuid.uuid4())
+            incoming_ids.add(eid)
+            await _upsert_entity(
                 db,
-                source_id=dep.get("source_id", ""),
-                target_id=dep.get("target_id", ""),
-                dependency_type=dep.get("dependency_type", "blocks"),
+                element_id=eid,
+                element_type=etype,
+                name=entity.get("name", "Untitled"),
+                description=entity.get("description"),
+                data=entity.get("data", {}),
                 set_id=set_id,
-                data=dep.get("data", {}),
-                created_by=saved_by,
+                updated_by=saved_by,
             )
 
-    # Re-create asset categories
+        # Soft-delete entities of this type that aren't in the payload
+        cursor = await db.execute(
+            "SELECT id FROM elements WHERE element_type = ? AND set_id = ? AND is_deleted = 0",
+            (etype, set_id),
+        )
+        existing = await cursor.fetchall()
+        for row in existing:
+            if row[0] not in incoming_ids:
+                await db.execute(
+                    "UPDATE elements SET is_deleted = 1, updated_at = ? WHERE id = ?",
+                    (now, row[0]),
+                )
+
+    # --- Dependencies: replace (these are lightweight) ---
+    incoming_deps = data.get("dependencies", [])
+    if isinstance(incoming_deps, list):
+        incoming_dep_ids = set()
+        for dep in incoming_deps:
+            dep_id = dep.get("id") or str(uuid.uuid4())
+            incoming_dep_ids.add(dep_id)
+
+            # Check if exists
+            cursor = await db.execute(
+                "SELECT id FROM relationships WHERE id = ?", (dep_id,)
+            )
+            if await cursor.fetchone():
+                # Update
+                dep_data = {**dep.get("data", {}), "dependency_type": dep.get("dependency_type", "blocks"), "set_id": set_id}
+                await db.execute(
+                    "UPDATE relationships SET source_element_id = ?, target_element_id = ?, "
+                    "updated_at = ?, is_deleted = 0 WHERE id = ?",
+                    (dep.get("source_id", ""), dep.get("target_id", ""), now, dep_id),
+                )
+            else:
+                await create_scenia_dependency(
+                    db,
+                    source_id=dep.get("source_id", ""),
+                    target_id=dep.get("target_id", ""),
+                    dependency_type=dep.get("dependency_type", "blocks"),
+                    set_id=set_id,
+                    data=dep.get("data", {}),
+                    created_by=saved_by,
+                    rel_id=dep_id,
+                )
+
+        # Soft-delete removed dependencies
+        cursor = await db.execute(
+            "SELECT id FROM relationships WHERE relationship_type = ? AND is_deleted = 0",
+            (DEPENDENCY_TYPE,),
+        )
+        existing_deps = await cursor.fetchall()
+        for row in existing_deps:
+            if row[0] not in incoming_dep_ids:
+                await db.execute(
+                    "UPDATE relationships SET is_deleted = 1, updated_at = ? WHERE id = ?",
+                    (now, row[0]),
+                )
+
+    # --- Lookup tables: replace (small, no FK issues) ---
+    await db.execute("DELETE FROM scenia_asset_categories WHERE set_id = ?", (set_id,))
     cats = data.get("asset_categories", [])
     if isinstance(cats, list):
         for cat in cats:
@@ -650,9 +737,10 @@ async def save_bulk_data(
                 name=cat.get("name", "Untitled"),
                 color=cat.get("color"),
                 display_order=cat.get("display_order", 0),
+                cat_id=cat.get("id"),
             )
 
-    # Re-create app statuses
+    await db.execute("DELETE FROM scenia_application_statuses WHERE set_id = ?", (set_id,))
     statuses = data.get("app_statuses", [])
     if isinstance(statuses, list):
         for status in statuses:
@@ -662,9 +750,10 @@ async def save_bulk_data(
                 name=status.get("name", "Untitled"),
                 color=status.get("color"),
                 display_order=status.get("display_order", 0),
+                status_id=status.get("id"),
             )
 
-    # Upsert timeline settings
+    # --- Timeline settings: upsert ---
     ts = data.get("timeline_settings")
     if isinstance(ts, dict):
         await upsert_timeline_settings(
@@ -677,6 +766,7 @@ async def save_bulk_data(
             data=ts.get("data", {}),
         )
 
+    await db.commit()
     return await get_bulk_data(db, set_id)
 
 

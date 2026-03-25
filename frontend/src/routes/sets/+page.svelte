@@ -6,6 +6,7 @@
 	import type { IrisSet } from '$lib/types/api';
 	import SetDialog from '$lib/components/SetDialog.svelte';
 	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
+	import { openScenia } from '$lib/scenia/config.js';
 
 	let sets = $state<IrisSet[]>([]);
 	let loading = $state(true);
@@ -196,14 +197,13 @@
 					<span>{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}</span>
 					<span>{set.element_count} element{set.element_count !== 1 ? 's' : ''}</span>
 					{#if set.name === 'Scenia Extract'}
-						<a
-							href="/scenia?setId={set.id}"
+						<button
+							onclick={(e) => { e.stopPropagation(); openScenia(set.id); }}
 							class="font-medium"
-							style="color: var(--color-success, #22c55e)"
-							onclick={(e) => e.stopPropagation()}
+							style="color: var(--color-success, #22c55e); background: transparent; border: none; cursor: pointer; padding: 0"
 						>
 							View in Scenia
-						</a>
+						</button>
 					{/if}
 				</div>
 				{#if editMode}

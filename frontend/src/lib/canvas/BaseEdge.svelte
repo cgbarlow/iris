@@ -16,7 +16,9 @@
 	import EdgeEndpointLabels from './edges/EdgeEndpointLabels.svelte';
 	import { edgeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 	import { getActiveConfig } from '$lib/stores/viewStore.svelte';
-	import type { EdgeVisualOverrides, CanvasEdgeData } from '$lib/types/canvas';
+	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
+	import { getContext } from 'svelte';
+	import type { EdgeVisualOverrides, CanvasEdgeData, NotationType } from '$lib/types/canvas';
 
 	interface Props extends EdgeProps {
 		dashArray?: string;
@@ -77,6 +79,11 @@
 	const visualOverride = $derived(edgeOverrideStyle(edgeVisual));
 	const dashFromVisual = $derived(edgeVisual?.dashArray ? `stroke-dasharray: ${edgeVisual.dashArray}; ` : '');
 
+	// Theme-based edge label hiding
+	const edgeNotation = getContext<NotationType>('notation') ?? 'simple';
+	const rendering = $derived(getThemeRendering(edgeNotation));
+	const hideEdgeLabels = $derived(rendering?.hideEdgeLabels ?? false);
+
 	// ViewConfig toggles for endpoint labels (ADR-086)
 	const viewConfig = $derived(getActiveConfig());
 	const showCardinality = $derived(viewConfig.canvas?.show_cardinality !== false);
@@ -96,7 +103,7 @@
 	style="{edgeDash}{dashFromVisual}{visualOverride ? visualOverride + '; ' : ''}{style ?? ''}"
 	aria-label="{data?.label ?? data?.relationshipType ?? 'relationship'}"
 />
-{#if data?.label}
+{#if data?.label && !hideEdgeLabels}
 	<EdgeLabel
 		edgeId={id}
 		label={data.label}

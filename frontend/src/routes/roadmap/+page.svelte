@@ -5,6 +5,7 @@
 	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { isSceniaEnabled, SceniaAdapter } from '$lib/scenia/adapter';
+	import { openScenia } from '$lib/scenia/config.js';
 
 	let extensionEnabled = $state<boolean | null>(null);
 	let loading = $state(true);
@@ -110,13 +111,13 @@
 			</select>
 
 			{#if setId}
-				<a
-					href="/scenia?setId={setId}"
+				<button
+					onclick={() => openScenia(setId)}
 					class="rounded px-4 py-1.5 text-sm font-medium"
-					style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e)"
+					style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e); background: transparent; cursor: pointer"
 				>
 					View in Scenia
-				</a>
+				</button>
 			{/if}
 		</div>
 	</div>

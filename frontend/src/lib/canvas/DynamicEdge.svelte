@@ -59,7 +59,7 @@
 	<C4EdgeRenderer {...props} />
 {:else if notation === 'archimate' || ARCHIMATE_TYPES.has(edgeType)}
 	<ArchimateEdgeRenderer {...props} />
-{:else if notation === 'simple' || SIMPLE_TYPES.has(edgeType)}
+{:else if notation === 'simple' || notation === 'scenia' || SIMPLE_TYPES.has(edgeType)}
 	<SimpleEdgeRenderer {...props} />
 {:else}
 	<IrisBaseEdge {...props} />

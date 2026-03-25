@@ -2,6 +2,8 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { openScenia } from '$lib/scenia/config.js';
+
 	import type {
 		Element,
 		ElementVersion,
@@ -318,13 +320,13 @@
 		</div>
 		<div class="flex gap-2">
 			{#if entity.element_type.startsWith('scenia_')}
-				<a
-					href="/scenia?setId={entity.set_id}&focus={entity.id}"
+				<button
+					onclick={() => openScenia(entity.set_id, entity.id)}
 					class="rounded px-4 py-2 text-sm"
-					style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e)"
+					style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e); background: transparent; cursor: pointer"
 				>
 					View in Scenia
-				</a>
+				</button>
 			{/if}
 			<button
 				onclick={handleClone}

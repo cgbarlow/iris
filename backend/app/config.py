@@ -76,7 +76,7 @@ class AppConfig:
     )
     cors_origins: list[str] = field(
         default_factory=lambda: os.environ.get(
-            "IRIS_CORS_ORIGINS", "http://localhost:5173"
+            "IRIS_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
         ).split(",")
     )
     database: DatabaseConfig = field(default_factory=DatabaseConfig)

@@ -65,6 +65,8 @@
 			params.set('page', String(page));
 			params.set('page_size', String(pageSize));
 			if (currentSetId) params.set('set_id', currentSetId);
+			if (notationFilter) params.set('notation', notationFilter);
+			if (searchQuery.trim()) params.set('search', searchQuery.trim());
 			const data = await apiFetch<PaginatedResponse<Element>>(`/api/elements?${params}`);
 			elements = data.items;
 			total = data.total;
@@ -322,6 +324,7 @@
 		<input
 			id="element-search"
 			bind:value={searchQuery}
+			oninput={() => { page = 1; loadElements(); }}
 			type="search"
 			placeholder="Search elements..."
 			class="rounded border px-3 py-2 text-sm"
@@ -333,6 +336,7 @@
 		<select
 			id="element-notation-filter"
 			bind:value={notationFilter}
+			onchange={() => { page = 1; loadElements(); }}
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		>
@@ -342,6 +346,7 @@
 			<option value="archimate">ArchiMate</option>
 			<option value="c4">C4</option>
 			<option value="doview">DoView</option>
+			<option value="scenia">Scenia</option>
 		</select>
 	</div>
 	<div>

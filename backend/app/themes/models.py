@@ -10,6 +10,7 @@ class ThemeRenderingConfig(BaseModel):
 
     hideIcons: bool | None = None
     hideDescription: bool | None = None
+    hideEdgeLabels: bool | None = None
     borderRadius: int | None = None
     attrFontColor: str | None = None
     hideTypeStereotypes: bool | None = None

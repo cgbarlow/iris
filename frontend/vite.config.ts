@@ -4,10 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
-	optimizeDeps: {
-		include: ['react', 'react-dom', 'scenia'],
-	},
-	server: {
+server: {
 		host: '0.0.0.0',
 		proxy: {
 			'/api': 'http://localhost:8000',

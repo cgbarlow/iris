@@ -226,7 +226,7 @@
 				</button>
 			{:else}
 				<a href="/collections" style="color: inherit; text-decoration: none">
-					<div class="text-3xl font-bold" style="color: var(--color-primary)">{collectionCount}</div>
+					<div class="text-3xl font-bold" style="color: var(--color-primary)">{activeSet && !activeSet.collection_id ? '-' : collectionCount}</div>
 					<div class="mt-1 text-sm" style="color: var(--color-muted)">Collections</div>
 				</a>
 			{/if}

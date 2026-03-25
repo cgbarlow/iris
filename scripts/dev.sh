@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+SCENIA_DIR="/tmp/waylonkenning_scenia"
 
 # Load .env if present (API keys, overrides — never commit this file)
 if [ -f "$ROOT_DIR/.env" ]; then
@@ -26,7 +27,11 @@ backend_pid() {
 }
 
 frontend_pid() {
-    pgrep -f "vite dev" 2>/dev/null | head -1
+    pgrep -f "vite dev.*5173" 2>/dev/null | head -1
+}
+
+scenia_pid() {
+    pgrep -f "vite.*3000" 2>/dev/null | head -1
 }
 
 check_backend() {
@@ -56,11 +61,23 @@ check_frontend() {
     fi
 }
 
+check_scenia() {
+    local pid=$(scenia_pid)
+    if [ -n "$pid" ]; then
+        echo -e "  Scenia:   ${GREEN}running${NC} (pid $pid, http://localhost:3000)"
+        return 0
+    else
+        echo -e "  Scenia:   ${RED}stopped${NC}"
+        return 1
+    fi
+}
+
 status() {
     echo "Iris Dev Environment Status:"
     echo ""
     check_backend || true
     check_frontend || true
+    check_scenia || true
     echo ""
 }
 
@@ -101,6 +118,27 @@ start_frontend() {
     fi
 }
 
+start_scenia() {
+    if [ -n "$(scenia_pid)" ]; then
+        echo "Scenia already running"
+        return 0
+    fi
+    if [ ! -d "$SCENIA_DIR" ]; then
+        echo -e "  Scenia:   ${YELLOW}skipped${NC} (clone not found at $SCENIA_DIR)"
+        return 0
+    fi
+    echo "Starting Scenia..."
+    cd "$SCENIA_DIR"
+    nohup npx vite --port=3000 --host=0.0.0.0 > /tmp/scenia-dev.log 2>&1 &
+    sleep 3
+    if [ -n "$(scenia_pid)" ]; then
+        echo -e "  Scenia:   ${GREEN}started${NC} (http://localhost:3000)"
+    else
+        echo -e "  Scenia:   ${RED}failed to start${NC} — check /tmp/scenia-dev.log"
+        return 1
+    fi
+}
+
 stop_backend() {
     local pid=$(backend_pid)
     if [ -n "$pid" ]; then
@@ -125,6 +163,18 @@ stop_frontend() {
     fi
 }
 
+stop_scenia() {
+    local pid=$(scenia_pid)
+    if [ -n "$pid" ]; then
+        echo "Stopping Scenia (pid $pid)..."
+        kill "$pid" 2>/dev/null || true
+        sleep 1
+        echo -e "  Scenia:   ${RED}stopped${NC}"
+    else
+        echo "Scenia not running"
+    fi
+}
+
 case "${1:-status}" in
     status)
         status
@@ -132,19 +182,23 @@ case "${1:-status}" in
     start)
         start_backend
         start_frontend
+        start_scenia
         echo ""
         status
         ;;
     stop)
         stop_backend
         stop_frontend
+        stop_scenia
         ;;
     restart)
         stop_backend
         stop_frontend
+        stop_scenia
         sleep 1
         start_backend
         start_frontend
+        start_scenia
         echo ""
         status
         ;;

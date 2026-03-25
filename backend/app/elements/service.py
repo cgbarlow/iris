@@ -146,6 +146,8 @@ async def list_elements(
     *,
     element_type: str | None = None,
     set_id: str | None = None,
+    notation: str | None = None,
+    search: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
@@ -161,11 +163,24 @@ async def list_elements(
         where_clauses.append("e.set_id = ?")
         params.append(set_id)
 
+    if notation:
+        where_clauses.append("e.notation = ?")
+        params.append(notation)
+
+    if search:
+        where_clauses.append("(ev.name LIKE ? OR ev.description LIKE ?)")
+        params.append(f"%{search}%")
+        params.append(f"%{search}%")
+
     where_sql = " AND ".join(where_clauses)
 
-    # Count
+    # Count (join element_versions for search filter)
+    count_join = (
+        " JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version"
+        if search else ""
+    )
     cursor = await db.execute(
-        f"SELECT COUNT(*) FROM elements e WHERE {where_sql}",  # noqa: S608
+        f"SELECT COUNT(*) FROM elements e{count_join} WHERE {where_sql}",  # noqa: S608
         params,
     )
     count_row = await cursor.fetchone()

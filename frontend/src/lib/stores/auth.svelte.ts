@@ -31,8 +31,10 @@ function saveToSession(data: StoredAuth | null): void {
 	if (typeof sessionStorage === 'undefined') return;
 	if (data) {
 		sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 	} else {
 		sessionStorage.removeItem(STORAGE_KEY);
+		localStorage.removeItem(STORAGE_KEY);
 	}
 }
 

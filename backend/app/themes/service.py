@@ -389,4 +389,34 @@ async def seed_default_themes(db: DatabasePort) -> None:
          json.dumps(doview_config), True, "system", now, now),
     )
 
+    # Scenia Default — roadmap entity colours with hidden edge labels
+    scenia_config = {
+        "element_defaults": {
+            "scenia_strategy": {"bgColor": "#DBEAFE", "borderColor": "#3B82F6", "fontColor": "#1E3A5F", "borderWidth": 2},
+            "scenia_programme": {"bgColor": "#E0E7FF", "borderColor": "#6366F1", "fontColor": "#312E81", "borderWidth": 2},
+            "scenia_initiative": {"bgColor": "#FEF3C7", "borderColor": "#F59E0B", "fontColor": "#78350F", "borderWidth": 2},
+            "scenia_asset": {"bgColor": "#D1FAE5", "borderColor": "#10B981", "fontColor": "#064E3B", "borderWidth": 2},
+            "scenia_application": {"bgColor": "#FCE7F3", "borderColor": "#EC4899", "fontColor": "#831843", "borderWidth": 2},
+            "scenia_milestone": {"bgColor": "#FEE2E2", "borderColor": "#EF4444", "fontColor": "#7F1D1D", "borderWidth": 2},
+            "scenia_resource": {"bgColor": "#F3E8FF", "borderColor": "#A855F7", "fontColor": "#581C87", "borderWidth": 2},
+        },
+        "stereotype_overrides": {},
+        "edge_defaults": {"uses": {"lineColor": "#9CA3AF", "lineWidth": 1}},
+        "global": {"defaultBgColor": "#F9FAFB", "defaultBorderColor": "#D1D5DB", "defaultFontColor": "#111827"},
+        "rendering": {
+            "hideIcons": True,
+            "hideDescription": True,
+            "hideEdgeLabels": True,
+            "borderRadius": 8,
+            "wrapLabels": True,
+            "textAlign": "center",
+        },
+    }
+    await db.execute(
+        "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("scenia-default", "Scenia Default", "Roadmap entity colours with hidden edge labels", "scenia",
+         json.dumps(scenia_config), True, "system", now, now),
+    )
+
     await db.commit()

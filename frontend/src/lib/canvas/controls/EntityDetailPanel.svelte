@@ -3,6 +3,7 @@
 	import type { CanvasNodeData } from '$lib/types/canvas';
 	import { apiFetch } from '$lib/utils/api';
 	import type { ElementDiagramRef } from '$lib/types/api';
+	import { openScenia } from '$lib/scenia/config.js';
 
 	interface Props {
 		entity: CanvasNodeData | null;
@@ -77,13 +78,13 @@
 				</a>
 
 				{#if entity.entityType?.startsWith('scenia_')}
-					<a
-						href="/scenia?setId={entity.setId}&focus={entity.entityId}"
-						class="block rounded px-3 py-2 text-center text-sm"
-						style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e)"
+					<button
+						onclick={() => openScenia(entity.setId ?? '', entity.entityId)}
+						class="block w-full rounded px-3 py-2 text-center text-sm"
+						style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e); background: transparent; cursor: pointer"
 					>
 						View in Scenia
-					</a>
+					</button>
 				{/if}
 
 				{#if entity.linkedModelId}

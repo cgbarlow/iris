@@ -3,7 +3,7 @@
 import type { Node, Edge } from '@xyflow/svelte';
 
 /** Diagram notation type — determines how elements render on canvas. */
-export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4' | 'doview';
+export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4' | 'doview' | 'scenia';
 
 /** Simple View entity types (6 domain + 2 universal = 8 total). */
 export type SimpleEntityType =
