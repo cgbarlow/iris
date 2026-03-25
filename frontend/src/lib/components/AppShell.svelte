@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { isAuthenticated, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
 	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
+	import { getActiveCollectionId, getActiveCollectionName } from '$lib/stores/activeCollection.svelte.js';
 	import { apiFetch } from '$lib/utils/api';
 
 	let { children } = $props();
@@ -29,10 +30,13 @@
 
 	const activeSetId = $derived(getActiveSetId());
 	const activeSetName = $derived(getActiveSetName());
+	const activeCollectionId = $derived(getActiveCollectionId());
+	const activeCollectionName = $derived(getActiveCollectionName());
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
 		{ href: '/ask', label: 'Ask AI', shortcut: 'A', icon: 'ai' },
+		{ href: '/collections', label: 'Collections', shortcut: 'C', icon: 'collections' },
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
 		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },
 		{ href: '/elements', label: 'Elements', shortcut: 'E', icon: 'elements' },
@@ -60,6 +64,8 @@
 	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="16" height="16" aria-hidden="true" style="flex-shrink: 0">
 		{#if icon === 'dashboard'}
 			<path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V96H40V56ZM40,200V112H120V200Zm96,0V112h80v88Z"/>
+		{:else if icon === 'collections'}
+			<path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72ZM40,56H92.69l16,16H40ZM216,200H40V88H216Z"/>
 		{:else if icon === 'sets'}
 			<path d="M224,48H160a40,40,0,0,0-32,16A40,40,0,0,0,96,48H32A16,16,0,0,0,16,64V192a16,16,0,0,0,16,16H96a24,24,0,0,1,24,24,8,8,0,0,0,16,0,24,24,0,0,1,24-24h64a16,16,0,0,0,16-16V64A16,16,0,0,0,224,48ZM96,192H32V64H96a24,24,0,0,1,24,24V200A39.81,39.81,0,0,0,96,192Zm128,0H160a39.81,39.81,0,0,0-24,8V88a24,24,0,0,1,24-24h64Z"/>
 		{:else if icon === 'diagrams'}
@@ -108,6 +114,10 @@
 				<span aria-hidden="true" class="text-lg">&#9776;</span>
 			</button>
 			<a href="/" class="text-lg font-bold" style="color: var(--color-fg)">Iris</a>
+			{#if activeCollectionId}
+				<span style="color: var(--color-fg)">/</span>
+				<a href="/collections" class="text-lg" style="color: var(--color-fg)">{activeCollectionName}</a>
+			{/if}
 			{#if activeSetId}
 				<span style="color: var(--color-fg)">/</span>
 				<a href="/sets" class="text-lg" style="color: var(--color-fg)">{activeSetName}</a>

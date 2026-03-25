@@ -1,7 +1,8 @@
-"""Set context builder for AI Q&A (ADR-093).
+"""Set context builder for AI Q&A (ADR-093, ADR-102).
 
 Queries elements, relationships, and diagrams for a Set and formats them as
 structured text for the LLM system prompt. Truncates proportionally if over budget.
+Supports multi-set context for Collections (ADR-102).
 """
 
 from __future__ import annotations
@@ -168,3 +169,36 @@ async def build_set_context(
         + "\n"
         + _truncate_to_budget(diags_section, diags_budget)
     )
+
+
+async def build_multi_set_context(
+    db: DatabasePort,
+    set_ids: list[str],
+    *,
+    max_tokens: int = 8000,
+) -> str:
+    """Build combined context from multiple Sets, dividing token budget proportionally.
+
+    Each set gets an equal share of the token budget. Results are concatenated
+    with clear dividers between sets.
+    """
+    if not set_ids:
+        return "No sets selected."
+
+    if len(set_ids) == 1:
+        return await build_set_context(db, set_ids[0], max_tokens=max_tokens)
+
+    # Reserve tokens for preamble and dividers
+    preamble = f"MULTI-SET CONTEXT ({len(set_ids)} sets):\n\n"
+    divider_chars = len("\n---\n\n") * len(set_ids)
+    preamble_chars = len(preamble) + divider_chars
+    available_tokens = max_tokens - (preamble_chars // _CHARS_PER_TOKEN)
+
+    per_set_tokens = max(available_tokens // len(set_ids), 500)
+
+    sections: list[str] = []
+    for sid in set_ids:
+        ctx = await build_set_context(db, sid, max_tokens=per_set_tokens)
+        sections.append(ctx)
+
+    return preamble + "\n---\n\n".join(sections)

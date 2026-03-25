@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.4] - 2026-03-25
+
 ### Added
+- **Collections** — higher-level grouping for Sets with full CRUD, thumbnails, dashboard stats card (4-column layout), collection-scoped filtering on Elements/Diagrams pages, and `Iris / Collection / Set` header breadcrumb (ADR-102)
+- **Multi-set AI context** — Ask AI now supports selecting multiple Sets (with or without a Collection) as context for Discuss and Create Diagram workflows via new `POST /api/ai/ask` endpoint
+- **Collection pill on Sets page** — Sets belonging to a Collection display the collection name as a pill badge
 - **Linked Diagram property editor** — set, change, or clear a node's linked diagram directly from the edit sidebar (ADR-099)
 
 ## [2.7.2] - 2026-03-23

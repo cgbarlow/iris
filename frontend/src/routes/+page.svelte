@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { setActiveSet, clearActiveSet, getActiveSetId } from '$lib/stores/activeSet.svelte.js';
+	import { setActiveCollection, clearActiveCollection, getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import type {
@@ -13,13 +14,16 @@
 		SearchResult,
 		SearchResponse,
 		IrisSet,
+		IrisCollection,
 		DiagramHierarchyNode,
 	} from '$lib/types/api';
 
 	let elementCount = $state(0);
 	let diagramCount = $state(0);
 	let setCount = $state(0);
+	let collectionCount = $state(0);
 	let activeSet = $state<IrisSet | null>(null);
+	let activeCollection = $state<IrisCollection | null>(null);
 	let bookmarkedDiagrams = $state<Diagram[]>([]);
 	let searchQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
@@ -49,15 +53,17 @@
 		try {
 			const setFilter = setId ? `&set_id=${setId}` : '';
 
-			const [elementsData, diagramsData, bookmarks, setsData] = await Promise.all([
+			const [elementsData, diagramsData, bookmarks, setsData, collectionsData] = await Promise.all([
 				apiFetch<PaginatedResponse<Element>>(`/api/elements?page_size=1${setFilter}`),
 				apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?page_size=1${setFilter}`),
 				apiFetch<Bookmark[]>('/api/bookmarks'),
 				apiFetch<{ items: IrisSet[] }>('/api/sets'),
+				apiFetch<{ items: IrisCollection[] }>('/api/collections'),
 			]);
 			elementCount = elementsData.total;
 			diagramCount = diagramsData.total;
 			setCount = setsData.items.length;
+			collectionCount = collectionsData.items.length;
 
 			// Resolve active set if filtering
 			if (setId) {
@@ -67,6 +73,17 @@
 				}
 			} else {
 				activeSet = null;
+			}
+
+			// Infer active collection from active set
+			if (activeSet?.collection_id) {
+				activeCollection = collectionsData.items.find((c) => c.id === activeSet!.collection_id) ?? null;
+				if (activeCollection) {
+					setActiveCollection(activeCollection.id, activeCollection.name);
+				}
+			} else {
+				activeCollection = null;
+				clearActiveCollection();
 			}
 
 			// Resolve bookmarked diagrams (filter out package bookmarks)
@@ -193,7 +210,27 @@
 {:else}
 
 	<!-- Stats -->
-	<div class="mt-6 grid grid-cols-3 gap-4" style="max-width: 600px">
+	<div class="mt-6 grid grid-cols-4 gap-4" style="max-width: 800px">
+		<div
+			class="rounded border p-4 text-center"
+			style="border-color: var(--color-border); color: var(--color-fg)"
+		>
+			{#if activeCollection}
+				<div class="text-xl font-bold" style="color: var(--color-fg)">{activeCollection.name}</div>
+				<button
+					onclick={() => { clearActiveCollection(); clearActiveSet(); window.location.href = '/'; }}
+					class="mt-1 inline-block text-sm"
+					style="color: var(--color-primary); background: none; border: none; cursor: pointer; padding: 0"
+				>
+					Reset filter
+				</button>
+			{:else}
+				<a href="/collections" style="color: inherit; text-decoration: none">
+					<div class="text-3xl font-bold" style="color: var(--color-primary)">{collectionCount}</div>
+					<div class="mt-1 text-sm" style="color: var(--color-muted)">Collections</div>
+				</a>
+			{/if}
+		</div>
 		<div
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"

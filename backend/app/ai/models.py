@@ -86,6 +86,19 @@ class QARequest(BaseModel):
     thread_id: str | None = None   # groups messages in a conversation thread
 
 
+class MultiSetQARequest(BaseModel):
+    """Request body for asking a question across multiple sets (ADR-102)."""
+
+    set_ids: list[str] = Field(min_length=1)
+    collection_id: str | None = None
+    question: str = Field(min_length=1, max_length=4000)
+    provider_id: str | None = None
+    mode: str | None = None
+    notation: str | None = None
+    history: list[dict[str, str]] | None = None
+    thread_id: str | None = None
+
+
 class QAResponse(BaseModel):
     """Response for a Q&A request."""
 

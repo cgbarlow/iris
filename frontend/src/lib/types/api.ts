@@ -278,6 +278,26 @@ export interface IrisSet {
 	has_thumbnail_image: boolean;
 	thumbnail_diagram_data?: Record<string, unknown>;
 	thumbnail_diagram_type?: string;
+	collection_id: string | null;
+	collection_name: string | null;
+}
+
+export interface IrisCollection {
+	id: string;
+	name: string;
+	description: string | null;
+	created_at: string;
+	created_by: string;
+	updated_at: string;
+	is_deleted: boolean;
+	set_count: number;
+	diagram_count: number;
+	element_count: number;
+	thumbnail_source: 'model' | 'diagram' | 'image' | null;
+	thumbnail_diagram_id: string | null;
+	has_thumbnail_image: boolean;
+	thumbnail_diagram_data?: Record<string, unknown>;
+	thumbnail_diagram_type?: string;
 }
 
 export interface BatchResult {

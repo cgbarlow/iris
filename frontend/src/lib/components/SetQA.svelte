@@ -9,10 +9,14 @@
 	import PackagePicker from '$lib/components/PackagePicker.svelte';
 
 	interface Props {
-		setId: string;
+		setIds: string[];
+		collectionId?: string;
 	}
 
-	let { setId }: Props = $props();
+	let { setIds, collectionId }: Props = $props();
+
+	// Primary set ID for backwards compatibility (history, diagram creation)
+	const setId = $derived(setIds[0] || '');
 
 	type ConvEntry = {
 		id: string;
@@ -195,15 +199,15 @@ function promptForLocation() {
 
 		try {
 			const token = getAccessToken();
-			const resp = await fetch(`${API_BASE_URL}/api/ai/sets/${setId}/ask?stream=true`, {
+			const resp = await fetch(`${API_BASE_URL}/api/ai/ask?stream=true`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
 				body: JSON.stringify(creationMode
-					? { question: q, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
-					: { question: q, thread_id: currentThreadId }
+					? { set_ids: setIds, collection_id: collectionId || null, question: q, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
+					: { set_ids: setIds, collection_id: collectionId || null, question: q, thread_id: currentThreadId }
 				),
 				signal: abortController.signal,
 			});

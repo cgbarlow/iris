@@ -13,11 +13,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.ai.client import create_ai_client
-from app.ai.context import build_set_context
+from app.ai.context import build_multi_set_context, build_set_context
 from app.ai.models import ProviderTestResult
 
 # Re-export for router convenience
 build_context = build_set_context
+build_multi_context = build_multi_set_context
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -415,3 +416,90 @@ async def log_usage(
         (provider_id, user_id, endpoint, model, tokens_in, tokens_out, duration_ms, status, error, now),
     )
     await db.commit()
+
+
+async def ask_multi_set_question(
+    db: DatabasePort,
+    *,
+    set_ids: list[str],
+    collection_id: str | None = None,
+    question: str,
+    user_id: str,
+    provider_id: str | None = None,
+) -> dict[str, object]:
+    """Ask a question across multiple Sets. Stores conversation and usage log.
+
+    Returns a conversation dict.
+    """
+    if provider_id:
+        provider = await _get_provider_with_key(db, provider_id)
+    else:
+        provider = await _get_default_provider_with_key(db)
+
+    if provider is None:
+        msg = "No AI provider configured. Ask an admin to add a provider."
+        raise ValueError(msg)
+
+    context = await build_multi_set_context(db, set_ids)
+    primary_set_id = set_ids[0]
+
+    system_prompt = str(provider.get("system_prompt") or "")
+    if system_prompt:
+        system_content = f"{system_prompt}\n\nContext:\n{context}"
+    else:
+        system_content = (
+            "You are an AI assistant helping users understand their architecture models. "
+            "Answer questions based on the provided context from multiple Sets.\n\nContext:\n" + context
+        )
+
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": question},
+    ]
+
+    client = create_ai_client(provider)
+    t0 = time.monotonic()
+    answer, tokens_in, tokens_out = await client.chat(messages)
+    duration_ms = int((time.monotonic() - t0) * 1000)
+
+    conv_id = str(uuid.uuid4())
+    now = datetime.now(tz=UTC).isoformat()
+    model_used = str(provider["model"])
+    context_summary = context[:200] + "..." if len(context) > 200 else context  # noqa: PLR2004
+
+    await db.execute(
+        "INSERT INTO ai_conversations "
+        "(id, set_id, user_id, question, answer, context_summary, model_used, "
+        "provider_id, tokens_in, tokens_out, duration_ms, created_at, collection_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            conv_id, primary_set_id, user_id, question, answer, context_summary,
+            model_used, str(provider["id"]), tokens_in, tokens_out, duration_ms, now,
+            collection_id,
+        ),
+    )
+
+    await db.execute(
+        "INSERT INTO ai_usage_log "
+        "(provider_id, user_id, endpoint, model, tokens_in, tokens_out, duration_ms, status, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            str(provider["id"]), user_id, "ask_multi", model_used,
+            tokens_in, tokens_out, duration_ms, "success", now,
+        ),
+    )
+    await db.commit()
+
+    return {
+        "id": conv_id,
+        "set_id": primary_set_id,
+        "question": question,
+        "answer": answer,
+        "model_used": model_used,
+        "provider_id": str(provider["id"]),
+        "provider_name": str(provider["name"]),
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "duration_ms": duration_ms,
+        "created_at": now,
+    }

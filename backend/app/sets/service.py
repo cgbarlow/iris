@@ -26,13 +26,15 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
         "thumbnail_source": row[7],
         "thumbnail_diagram_id": row[8],
         "has_thumbnail_image": has_thumbnail_image,
+        "collection_id": row[10] if len(row) > 10 else None,
+        "collection_name": row[11] if len(row) > 11 else None,
     }
 
 
 _SET_COLUMNS = (
     "s.id, s.name, s.description, s.created_at, s.created_by, "
     "s.updated_at, s.is_deleted, s.thumbnail_source, s.thumbnail_diagram_id, "
-    "s.thumbnail_image IS NOT NULL"
+    "s.thumbnail_image IS NOT NULL, s.collection_id, col.name"
 )
 
 
@@ -42,15 +44,16 @@ async def create_set(
     name: str,
     description: str | None,
     created_by: str,
+    collection_id: str | None = None,
 ) -> dict[str, object]:
     """Create a new set."""
     set_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
 
     await db.execute(
-        "INSERT INTO sets (id, name, description, created_at, created_by, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (set_id, name, description, now, created_by, now),
+        "INSERT INTO sets (id, name, description, created_at, created_by, updated_at, collection_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (set_id, name, description, now, created_by, now, collection_id),
     )
     await db.commit()
 
@@ -62,6 +65,8 @@ async def create_set(
         "created_by": created_by,
         "updated_at": now,
         "is_deleted": False,
+        "collection_id": collection_id,
+        "collection_name": None,
         "diagram_count": 0,
         "element_count": 0,
         "thumbnail_source": None,
@@ -77,7 +82,8 @@ async def get_set(
     """Get a set by ID with diagram/element counts."""
     cursor = await db.execute(
         f"SELECT {_SET_COLUMNS} "  # noqa: S608
-        "FROM sets s WHERE s.id = ? AND s.is_deleted = 0",
+        "FROM sets s LEFT JOIN collections col ON s.collection_id = col.id "
+        "WHERE s.id = ? AND s.is_deleted = 0",
         (set_id,),
     )
     row = await cursor.fetchone()
@@ -105,12 +111,23 @@ async def get_set(
 
 async def list_sets(
     db: DatabasePort,
+    *,
+    collection_id: str | None = None,
 ) -> list[dict[str, object]]:
-    """List all sets with diagram/element counts."""
-    cursor = await db.execute(
-        f"SELECT {_SET_COLUMNS} "  # noqa: S608
-        "FROM sets s WHERE s.is_deleted = 0 ORDER BY s.name",
-    )
+    """List all sets with diagram/element counts, optionally filtered by collection."""
+    if collection_id is not None:
+        cursor = await db.execute(
+            f"SELECT {_SET_COLUMNS} "  # noqa: S608
+            "FROM sets s LEFT JOIN collections col ON s.collection_id = col.id "
+            "WHERE s.is_deleted = 0 AND s.collection_id = ? ORDER BY s.name",
+            (collection_id,),
+        )
+    else:
+        cursor = await db.execute(
+            f"SELECT {_SET_COLUMNS} "  # noqa: S608
+            "FROM sets s LEFT JOIN collections col ON s.collection_id = col.id "
+            "WHERE s.is_deleted = 0 ORDER BY s.name",
+        )
     rows = await cursor.fetchall()
 
     items = []
@@ -162,8 +179,9 @@ async def update_set(
     description: str | None,
     thumbnail_source: str | None = None,
     thumbnail_diagram_id: str | None = None,
+    collection_id: str | None = None,
 ) -> dict[str, object] | None:
-    """Update a set's name, description, and thumbnail settings.
+    """Update a set's name, description, thumbnail settings, and collection.
 
     Returns None if not found.
     """
@@ -190,16 +208,18 @@ async def update_set(
     if thumbnail_source != "image":
         await db.execute(
             "UPDATE sets SET name = ?, description = ?, updated_at = ?, "
-            "thumbnail_source = ?, thumbnail_diagram_id = ?, thumbnail_image = NULL "
+            "thumbnail_source = ?, thumbnail_diagram_id = ?, thumbnail_image = NULL, "
+            "collection_id = ? "
             "WHERE id = ?",
-            (name, description, now, thumbnail_source, thumbnail_diagram_id, set_id),
+            (name, description, now, thumbnail_source, thumbnail_diagram_id, collection_id, set_id),
         )
     else:
         await db.execute(
             "UPDATE sets SET name = ?, description = ?, updated_at = ?, "
-            "thumbnail_source = ?, thumbnail_diagram_id = ? "
+            "thumbnail_source = ?, thumbnail_diagram_id = ?, "
+            "collection_id = ? "
             "WHERE id = ?",
-            (name, description, now, thumbnail_source, thumbnail_diagram_id, set_id),
+            (name, description, now, thumbnail_source, thumbnail_diagram_id, collection_id, set_id),
         )
     await db.commit()
 
