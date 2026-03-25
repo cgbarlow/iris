@@ -158,6 +158,22 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Entity relationship counts and model usage statistics
 - Entity-to-model cross-reference queries (which models reference an entity)
 
+### Extensions
+
+Iris supports optional integrations via a database-backed extensions registry. Extensions can be managed from **Admin > Settings > Extensions**.
+
+#### Scenia Roadmapping
+
+The first extension integrates [Scenia](https://github.com/waylonkenning/Scenia), an open-source roadmapping tool. When installed:
+
+- **Full Scenia UI** — the complete React-based roadmapping app is embedded at `/scenia`, backed by Iris's database instead of IndexedDB
+- **Roadmap data view** — Iris-native tabular view at `/roadmap` showing all entities with "View in Scenia" links
+- **Demo data** — installing the extension seeds a "Scenia Extract" set with 150+ entities (40 assets incl. GEANZ catalog, 40 initiatives, 6 programmes, 6 strategies) and 10 interlinked diagrams
+- **Cross-links** — Scenia elements show "View in Scenia" buttons in element detail pages; the Scenia app includes "View in Iris" links
+- **Extension gating** — all Scenia API endpoints return 404 when the extension is not installed or disabled
+
+To install: navigate to **Admin > Settings > Extensions** and click **Install** on the Scenia card.
+
 ## Getting Started
 
 ### Prerequisites

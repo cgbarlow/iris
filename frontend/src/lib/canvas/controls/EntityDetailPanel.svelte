@@ -76,6 +76,16 @@
 					View Element
 				</a>
 
+				{#if entity.entityType?.startsWith('scenia_')}
+					<a
+						href="/scenia?setId={entity.setId}&focus={entity.entityId}"
+						class="block rounded px-3 py-2 text-center text-sm"
+						style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e)"
+					>
+						View in Scenia
+					</a>
+				{/if}
+
 				{#if entity.linkedModelId}
 					<a
 						href="/diagrams/{entity.linkedModelId}"

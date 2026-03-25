@@ -10,6 +10,7 @@
 
 	let sidebarOpen = $state(true);
 	let recycleBinCount = $state(0);
+	let sceniaEnabled = $state(false);
 
 	async function loadRecycleBinCount() {
 		try {
@@ -20,11 +21,21 @@
 		}
 	}
 
+	async function checkSceniaEnabled() {
+		try {
+			const data = await apiFetch<{ is_enabled: boolean }>('/api/extensions/scenia');
+			sceniaEnabled = data.is_enabled === true;
+		} catch {
+			sceniaEnabled = false;
+		}
+	}
+
 	$effect(() => {
 		// Re-check on auth state and page navigation
 		void page.url.pathname;
 		if (isAuthenticated()) {
 			loadRecycleBinCount();
+			checkSceniaEnabled();
 		}
 	});
 
@@ -88,6 +99,10 @@
 			<path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24a16,16,0,1,1-16,16A16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/>
 		{:else if icon === 'lock'}
 			<path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-80-36V140a12,12,0,1,1,0-24,12,12,0,0,1,12,12,12,12,0,0,1-12,12v32a8,8,0,0,1-16,0Z"/>
+		{:else if icon === 'roadmap'}
+			<path d="M232,56H176a8,8,0,0,0-8,8V80H88V64a8,8,0,0,0-8-8H24a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8H80a8,8,0,0,0,8-8V96h80v16a8,8,0,0,0,8,8h56a8,8,0,0,0,8-8V64A8,8,0,0,0,232,56ZM72,104H32V72H72Zm152,0H184V72h40ZM232,152H176a8,8,0,0,0-8,8v16H88V160a8,8,0,0,0-8-8H24a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8H80a8,8,0,0,0,8-8V192h80v16a8,8,0,0,0,8,8h56a8,8,0,0,0,8-8V160A8,8,0,0,0,232,152ZM72,200H32V168H72Zm152,0H184V168h40Z"/>
+		{:else if icon === 'extensions'}
+			<path d="M224,67.3a35.79,35.79,0,0,0-11.26-25.66c-14-13.28-36.72-12.78-50.62,1.13L142.8,62.2A24,24,0,0,0,120,40H40A16,16,0,0,0,24,56v80a24,24,0,0,0,22.2,23.94L26.77,179.32c-13.91,13.91-14.41,36.62-1.13,50.62A36.01,36.01,0,0,0,76.68,229.2l19.42-19.42A24,24,0,0,0,120,232h80a16,16,0,0,0,16-16V136a24,24,0,0,0-23.94-22.2l19.43-19.42A35.79,35.79,0,0,0,224,67.3ZM200,136v80H120a8,8,0,0,1,0-16h8a8,8,0,0,0,0-16h-8a24,24,0,0,0-22.2,23.94L65.37,217.89a20,20,0,0,1-27.26-29.25L57.53,169.2A24,24,0,0,0,80,192a8,8,0,0,0,0-16,8,8,0,0,1,0-16H200ZM40,136V56h80a8,8,0,0,1,0,16h-8a8,8,0,0,0,0,16h8a24,24,0,0,0,22.2-23.94l32.43,19.42a20,20,0,0,1-1.13,27.26L154.07,86.8A24,24,0,0,0,176,64a8,8,0,0,0,0,16,8,8,0,0,1,0,16H56Z"/>
 		{:else if icon === 'palette'}
 			<path d="M200.77,53.89A103.27,103.27,0,0,0,128,24h-1.07A104,104,0,0,0,24,128c0,43,26.58,79.06,69.36,94.17A32,32,0,0,0,136,192a16,16,0,0,1,16-16h46.21a31.81,31.81,0,0,0,31.2-24.88,104.43,104.43,0,0,0,2.59-24A103.28,103.28,0,0,0,200.77,53.89ZM213.57,155.21A15.93,15.93,0,0,1,198.21,168H152a32,32,0,0,0-32,32,16,16,0,0,1-21.31,15.07C62.49,201.2,40,170.29,40,128A88,88,0,0,1,127.48,40h.55a88,88,0,0,1,85.54,115.21ZM76,140a12,12,0,1,1,12-12A12,12,0,0,1,76,140Zm0-48a12,12,0,1,1,12-12A12,12,0,0,1,76,92Zm52-24a12,12,0,1,1,12-12A12,12,0,0,1,128,68Zm52,24a12,12,0,1,1,12-12A12,12,0,0,1,180,92Z"/>
 		{:else if icon === 'ai'}
@@ -154,6 +169,21 @@
 			>
 				<ul class="space-y-1">
 					{#each navItems as item}
+						{#if item.icon === 'bookmarks' && sceniaEnabled}
+							<li>
+								<a
+									href="/roadmap"
+									class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
+									style="color: var(--color-fg){page.url.pathname.startsWith('/roadmap') || page.url.pathname.startsWith('/scenia') ? '; background-color: var(--color-bg)' : ''}"
+									aria-current={page.url.pathname.startsWith('/roadmap') || page.url.pathname.startsWith('/scenia') ? 'page' : undefined}
+									title="Roadmap (G)"
+								>
+									{@render navIcon('roadmap')}
+									Roadmap
+								</a>
+							</li>
+							<li aria-hidden="true" class="my-3 border-t" style="border-color: var(--color-border)"></li>
+						{/if}
 						<li>
 							<a
 								href={item.href}

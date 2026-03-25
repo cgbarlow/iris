@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-03-25
+
+### Added
+- **Extensions framework** — database-backed extension registry with admin settings tab for installing, enabling, and disabling optional integrations; all extension state persists across restarts (ADR-103)
+- **Scenia roadmapping integration** — open-source roadmapping tool integrated as the first Iris extension, with full CRUD for strategies, programmes, initiatives, assets, applications, milestones, resources, and dependencies (ADR-104)
+- **Scenia React embedding** — full Scenia React app mounted at `/scenia` via `createRoot`, with pluggable db adapter replacing IndexedDB with Iris API calls (ADR-106, fork: cgbarlow/waylonkenning_scenia)
+- **Roadmap data view** (`/roadmap`) — Iris-native tabular view of all Scenia entities with "View in Scenia" links and set selector
+- **Scenia bulk data API** — atomic read/write endpoints (`GET/PUT /api/scenia/data`) matching Scenia's `getAppData()`/`saveAppData()` interface
+- **Scenia-specific tables** — timeline settings, version snapshots, asset categories, and application statuses with set-scoped data isolation
+- **Extension gating** — FastAPI dependency that gates all Scenia routes on extension availability; returns 404 when extension is not installed or disabled
+- **Scenia seed data** — full demo data (6 strategies, 6 programmes, 40 assets incl. GEANZ catalog, 40 initiatives, 8 applications, 30 app segments, 14 milestones, 9 dependencies, 6 resources) seeded on extension install
+- **10 interlinked diagrams** — Strategic Overview, 6 Programme Roadmaps, Asset Landscape, Dependency Map, Resource Allocation — all with entity-backed nodes and inter-diagram links
+- **Cross-links (Iris ↔ Scenia)** — "View in Scenia" buttons on element detail pages and canvas panel; "View in Iris" links from Scenia
+- **Conditional Roadmap navigation** — sidebar shows "Roadmap" nav item only when Scenia extension is enabled
+
 ## [2.7.4] - 2026-03-25
 
 ### Added

@@ -317,6 +317,15 @@
 			</p>
 		</div>
 		<div class="flex gap-2">
+			{#if entity.element_type.startsWith('scenia_')}
+				<a
+					href="/scenia?setId={entity.set_id}&focus={entity.id}"
+					class="rounded px-4 py-2 text-sm"
+					style="border: 1px solid var(--color-success, #22c55e); color: var(--color-success, #22c55e)"
+				>
+					View in Scenia
+				</a>
+			{/if}
 			<button
 				onclick={handleClone}
 				class="rounded px-4 py-2 text-sm"

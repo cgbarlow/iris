@@ -195,6 +195,16 @@
 				<div class="flex gap-3 text-xs" style="color: var(--color-muted)">
 					<span>{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}</span>
 					<span>{set.element_count} element{set.element_count !== 1 ? 's' : ''}</span>
+					{#if set.name === 'Scenia Extract'}
+						<a
+							href="/scenia?setId={set.id}"
+							class="font-medium"
+							style="color: var(--color-success, #22c55e)"
+							onclick={(e) => e.stopPropagation()}
+						>
+							View in Scenia
+						</a>
+					{/if}
 				</div>
 				{#if editMode}
 					<span class="text-xs" style="color: var(--color-primary)">Edit</span>

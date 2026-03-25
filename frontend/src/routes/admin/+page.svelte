@@ -28,6 +28,6 @@
 		style="border-color: var(--color-border); color: var(--color-fg)"
 	>
 		<div class="text-lg font-semibold" style="color: var(--color-primary)">Settings</div>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure session timeout, themes, and AI providers.</p>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure session timeout, themes, AI providers, and extensions.</p>
 	</a>
 </div>

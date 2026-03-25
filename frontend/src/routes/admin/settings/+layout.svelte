@@ -7,6 +7,7 @@
 		{ href: '/admin/settings', label: 'General' },
 		{ href: '/admin/settings/themes', label: 'Themes' },
 		{ href: '/admin/settings/ai', label: 'AI' },
+		{ href: '/admin/settings/extensions', label: 'Extensions' },
 	];
 
 	const activeTab = $derived(
