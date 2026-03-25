@@ -47,6 +47,7 @@ async def create(
             name=body.name,
             description=body.description,
             created_by=current_user["id"],
+            collection_id=body.collection_id,
         )
     except Exception as exc:
         import logging  # noqa: PLC0415
@@ -61,10 +62,11 @@ async def create(
 async def list_all(
     request: Request,
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    collection_id: str | None = Query(default=None),  # noqa: B008
 ) -> SetListResponse:
-    """List all sets with model/entity counts."""
+    """List all sets with model/entity counts, optionally filtered by collection."""
     db = request.app.state.db_manager.main_db
-    items = await list_sets(db)
+    items = await list_sets(db, collection_id=collection_id)
     return SetListResponse(items=[SetResponse(**item) for item in items])
 
 
@@ -98,6 +100,7 @@ async def update(
             description=body.description,
             thumbnail_source=body.thumbnail_source,
             thumbnail_diagram_id=body.thumbnail_diagram_id,
+            collection_id=body.collection_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

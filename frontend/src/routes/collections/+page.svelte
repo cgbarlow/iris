@@ -1,104 +1,91 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
-	import { getActiveSetId, clearActiveSet, setActiveSet } from '$lib/stores/activeSet.svelte.js';
-	import { setActiveCollection, clearActiveCollection } from '$lib/stores/activeCollection.svelte.js';
-	import type { IrisSet } from '$lib/types/api';
-	import SetDialog from '$lib/components/SetDialog.svelte';
-	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
+	import { getActiveCollectionId, clearActiveCollection, setActiveCollection } from '$lib/stores/activeCollection.svelte.js';
+	import type { IrisCollection } from '$lib/types/api';
+	import CollectionDialog from '$lib/components/CollectionDialog.svelte';
 
-	let sets = $state<IrisSet[]>([]);
+	let collections = $state<IrisCollection[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let viewMode = $state<'list' | 'gallery'>(
-		(typeof localStorage !== 'undefined' && localStorage.getItem('sets-view-mode') as 'list' | 'gallery') || 'list'
+		(typeof localStorage !== 'undefined' && localStorage.getItem('collections-view-mode') as 'list' | 'gallery') || 'list'
 	);
 	let editMode = $state(false);
 	let showCreateDialog = $state(false);
 
-	const activeSetIdValue = $derived(getActiveSetId());
+	const activeCollectionIdValue = $derived(getActiveCollectionId());
 
-	let filteredSets = $derived(
+	let filteredCollections = $derived(
 		searchQuery.trim()
-			? sets.filter(
-					(s) =>
-						s.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-						(s.description ?? '').toLowerCase().includes(searchQuery.trim().toLowerCase())
+			? collections.filter(
+					(c) =>
+						c.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+						(c.description ?? '').toLowerCase().includes(searchQuery.trim().toLowerCase())
 				)
-			: sets
+			: collections
 	);
 
 	$effect(() => {
-		loadSets();
+		loadCollections();
 	});
 
 	$effect(() => {
 		if (typeof localStorage !== 'undefined') {
-			localStorage.setItem('sets-view-mode', viewMode);
+			localStorage.setItem('collections-view-mode', viewMode);
 		}
 	});
 
-	async function loadSets() {
+	async function loadCollections() {
 		loading = true;
 		error = null;
 		try {
-			const data = await apiFetch<{ items: IrisSet[] }>('/api/sets');
-			sets = data.items;
+			const data = await apiFetch<{ items: IrisCollection[] }>('/api/collections');
+			collections = data.items;
 		} catch {
-			error = 'Failed to load sets';
+			error = 'Failed to load collections';
 		}
 		loading = false;
 	}
 
-	function handleSetClick(set: IrisSet) {
+	function handleCollectionClick(collection: IrisCollection) {
 		if (editMode) {
-			goto(`/sets/${set.id}`);
+			goto(`/collections/${collection.id}`);
 		} else {
-			setActiveSet(set.id, set.name);
-			if (set.collection_id && set.collection_name) {
-				setActiveCollection(set.collection_id, set.collection_name);
-			} else {
-				clearActiveCollection();
-			}
-			goto(`/?set_id=${set.id}`);
+			setActiveCollection(collection.id, collection.name);
+			goto(`/?collection_id=${collection.id}`);
 		}
 	}
 
 	function handleResetFilter() {
-		clearActiveSet();
+		clearActiveCollection();
 		goto('/');
 	}
 
 	async function handleCreate(name: string, description: string | null) {
 		try {
-			await apiFetch<IrisSet>('/api/sets', {
+			await apiFetch<IrisCollection>('/api/collections', {
 				method: 'POST',
 				body: JSON.stringify({ name, description }),
 			});
 			showCreateDialog = false;
-			await loadSets();
-		} catch {
-			error = 'Failed to create set';
+			await loadCollections();
+		} catch (e: unknown) {
+			const apiErr = e as { status?: number };
+			error = apiErr.status === 409 ? 'A collection with this name already exists' : 'Failed to create collection';
 		}
-	}
-
-	function getImageThumbnailUrl(set: IrisSet): string | null {
-		if (set.thumbnail_source === 'image' && set.has_thumbnail_image) {
-			return `/api/sets/${set.id}/thumbnail`;
-		}
-		return null;
 	}
 </script>
 
 <svelte:head>
-	<title>Sets — Iris</title>
+	<title>Collections — Iris</title>
 </svelte:head>
 
 <div class="flex items-center justify-between">
-	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Sets</h1>
+	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Collections</h1>
 	<div class="flex items-center gap-2">
-		{#if activeSetIdValue}
+		{#if activeCollectionIdValue}
 			<button
 				onclick={handleResetFilter}
 				class="rounded border px-3 py-2 text-sm"
@@ -114,14 +101,14 @@
 				? 'background: var(--color-primary); color: white'
 				: 'color: var(--color-fg)'}"
 		>
-			Edit Sets
+			Edit Collections
 		</button>
 		<button
 			onclick={() => (showCreateDialog = true)}
 			class="rounded px-4 py-2 text-sm text-white"
 			style="background-color: var(--color-primary)"
 		>
-			New Set
+			New Collection
 		</button>
 	</div>
 </div>
@@ -131,7 +118,7 @@
 	<input
 		type="search"
 		bind:value={searchQuery}
-		placeholder="Search sets..."
+		placeholder="Search collections..."
 		class="rounded border px-3 py-1.5 text-sm"
 		style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); max-width: 300px; width: 100%"
 	/>
@@ -160,41 +147,37 @@
 </div>
 
 {#if loading}
-	<p class="mt-4" style="color: var(--color-muted)">Loading sets...</p>
+	<p class="mt-4" style="color: var(--color-muted)">Loading collections...</p>
 {:else if error}
 	<div role="alert" class="mt-4" style="color: var(--color-danger)">{error}</div>
-{:else if filteredSets.length === 0}
+{:else if filteredCollections.length === 0}
 	<p class="mt-4" style="color: var(--color-muted)">
-		{searchQuery.trim() ? 'No sets match your search.' : 'No sets found.'}
+		{searchQuery.trim() ? 'No collections match your search.' : 'No collections found.'}
 	</p>
 {:else if viewMode === 'list'}
 	<!-- List view -->
 	<div class="mt-4 flex flex-col gap-2">
-		{#each filteredSets as set}
+		{#each filteredCollections as collection}
 			<button
-				onclick={() => handleSetClick(set)}
+				onclick={() => handleCollectionClick(collection)}
 				class="flex items-center gap-4 rounded border p-3 text-left transition-colors"
-				style="border-color: {set.id === activeSetIdValue ? 'var(--color-primary)' : 'var(--color-border)'}; color: var(--color-fg); background: transparent; width: 100%; cursor: pointer; {set.id === activeSetIdValue ? 'border-width: 2px' : ''}"
+				style="border-color: {collection.id === activeCollectionIdValue ? 'var(--color-primary)' : 'var(--color-border)'}; color: var(--color-fg); background: transparent; width: 100%; cursor: pointer; {collection.id === activeCollectionIdValue ? 'border-width: 2px' : ''}"
 				onmouseenter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface)')}
 				onmouseleave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
 			>
 				<div class="min-w-0 flex-1">
-					<div class="font-medium" style="color: var(--color-primary)">{set.name}</div>
-					{#if set.collection_name}
-						<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{set.collection_name}</span>
-					{/if}
-					{#if set.description}
+					<div class="font-medium" style="color: var(--color-primary)">{collection.name}</div>
+					{#if collection.description}
 						<div
 							class="mt-0.5 truncate text-sm"
 							style="color: var(--color-muted)"
 						>
-							{set.description}
+							{collection.description}
 						</div>
 					{/if}
 				</div>
 				<div class="flex gap-3 text-xs" style="color: var(--color-muted)">
-					<span>{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}</span>
-					<span>{set.element_count} element{set.element_count !== 1 ? 's' : ''}</span>
+					<span>{collection.set_count} set{collection.set_count !== 1 ? 's' : ''}</span>
 				</div>
 				{#if editMode}
 					<span class="text-xs" style="color: var(--color-primary)">Edit</span>
@@ -205,12 +188,11 @@
 {:else}
 	<!-- Gallery view -->
 	<div class="mt-4 grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
-		{#each filteredSets as set}
-			{@const imageUrl = getImageThumbnailUrl(set)}
+		{#each filteredCollections as collection}
 			<button
-				onclick={() => handleSetClick(set)}
+				onclick={() => handleCollectionClick(collection)}
 				class="flex flex-col items-center rounded border p-4 text-center transition-colors"
-				style="border-color: {set.id === activeSetIdValue ? 'var(--color-primary)' : 'var(--color-border)'}; color: var(--color-fg); background: transparent; cursor: pointer; {set.id === activeSetIdValue ? 'border-width: 2px' : ''}"
+				style="border-color: {collection.id === activeCollectionIdValue ? 'var(--color-primary)' : 'var(--color-border)'}; color: var(--color-fg); background: transparent; cursor: pointer; {collection.id === activeCollectionIdValue ? 'border-width: 2px' : ''}"
 				onmouseenter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface)')}
 				onmouseleave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
 			>
@@ -218,27 +200,14 @@
 					class="flex items-center justify-center rounded"
 					style="width: 160px; height: 100px; background-color: var(--color-bg); border: 1px solid var(--color-border); overflow: hidden"
 				>
-					{#if set.thumbnail_diagram_data && set.thumbnail_diagram_type}
-						<DiagramThumbnail data={set.thumbnail_diagram_data} diagramType={set.thumbnail_diagram_type} />
-					{:else if imageUrl}
-						<img
-							src={imageUrl}
-							alt="{set.name} thumbnail"
-							style="max-width: 100%; max-height: 100%; object-fit: contain"
-						/>
-					{:else}
-						<span class="text-2xl" style="color: var(--color-muted)">S</span>
-					{/if}
+					<span class="text-2xl" style="color: var(--color-muted)">C</span>
 				</div>
-				<div class="mt-2 font-medium text-sm" style="color: var(--color-primary)">{set.name}</div>
-				{#if set.collection_name}
-					<span class="mt-1 rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{set.collection_name}</span>
-				{/if}
+				<div class="mt-2 font-medium text-sm" style="color: var(--color-primary)">{collection.name}</div>
 				<div class="mt-1 text-xs" style="color: var(--color-muted)">
-					{set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''}, {set.element_count} element{set.element_count !== 1 ? 's' : ''}
+					{collection.set_count} set{collection.set_count !== 1 ? 's' : ''}
 				</div>
-				{#if set.description}
-					<div class="mt-1 text-xs" style="color: var(--color-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">{set.description}</div>
+				{#if collection.description}
+					<div class="mt-1 text-xs" style="color: var(--color-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical">{collection.description}</div>
 				{/if}
 				{#if editMode}
 					<span class="mt-1 text-xs" style="color: var(--color-primary)">Edit</span>
@@ -248,7 +217,7 @@
 	</div>
 {/if}
 
-<SetDialog
+<CollectionDialog
 	open={showCreateDialog}
 	oncreate={handleCreate}
 	oncancel={() => (showCreateDialog = false)}

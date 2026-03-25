@@ -1,43 +1,79 @@
 <script lang="ts">
 	import { apiFetch } from '$lib/utils/api';
-	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
+	import { getActiveSetId } from '$lib/stores/activeSet.svelte.js';
+	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import SetQA from '$lib/components/SetQA.svelte';
-	import type { IrisSet } from '$lib/types/api';
+	import MultiSetSelector from '$lib/components/MultiSetSelector.svelte';
+	import type { IrisSet, IrisCollection } from '$lib/types/api';
 
-	let sets = $state<IrisSet[]>([]);
+	let allSets = $state<IrisSet[]>([]);
+	let collections = $state<IrisCollection[]>([]);
 	let loading = $state(true);
 
 	const activeSetId = $derived(getActiveSetId());
-	const activeSetName = $derived(getActiveSetName());
-	let selectedSetId = $state('');
+	const activeCollectionId = $derived(getActiveCollectionId());
 
-	// Use active set if available, otherwise allow selection
-	let effectiveSetId = $derived(selectedSetId || activeSetId || '');
+	let selectedCollectionId = $state('');
+	let selectedSetIds = $state<string[]>([]);
+
+	// Filter sets by selected collection
+	let displayedSets = $derived(
+		selectedCollectionId
+			? allSets.filter((s) => s.collection_id === selectedCollectionId)
+			: allSets
+	);
+
+	// Derive a stable key for SetQA re-render
+	let setIdsKey = $derived(selectedSetIds.slice().sort().join(','));
 
 	$effect(() => {
-		loadSets();
+		loadData();
 	});
 
 	$effect(() => {
-		if (activeSetId && !selectedSetId) {
-			selectedSetId = activeSetId;
+		// Auto-select active set/collection if available
+		if (activeCollectionId && !selectedCollectionId) {
+			selectedCollectionId = activeCollectionId;
+		}
+		if (activeSetId && selectedSetIds.length === 0) {
+			selectedSetIds = [activeSetId];
 		}
 	});
 
-	async function loadSets() {
+	async function loadData() {
 		loading = true;
 		try {
-			const resp = await apiFetch<{ items: IrisSet[] }>('/api/sets');
-			sets = resp.items;
-			if (!selectedSetId && activeSetId) {
-				selectedSetId = activeSetId;
-			} else if (!selectedSetId && sets.length > 0) {
-				selectedSetId = sets[0].id;
+			const [setsResp, collectionsResp] = await Promise.all([
+				apiFetch<{ items: IrisSet[] }>('/api/sets'),
+				apiFetch<{ items: IrisCollection[] }>('/api/collections'),
+			]);
+			allSets = setsResp.items;
+			collections = collectionsResp.items;
+
+			// Default selection
+			if (selectedSetIds.length === 0) {
+				if (activeSetId) {
+					selectedSetIds = [activeSetId];
+				} else if (allSets.length > 0) {
+					selectedSetIds = [allSets[0].id];
+				}
 			}
 		} catch {
 			// ignore
 		}
 		loading = false;
+	}
+
+	function handleCollectionChange(e: Event) {
+		const select = e.target as HTMLSelectElement;
+		selectedCollectionId = select.value;
+		// When collection changes, pre-select all sets in the collection
+		if (selectedCollectionId) {
+			const collectionSets = allSets.filter((s) => s.collection_id === selectedCollectionId);
+			selectedSetIds = collectionSets.map((s) => s.id);
+		} else {
+			// Keep current selection when clearing collection filter
+		}
 	}
 </script>
 
@@ -49,36 +85,50 @@
 	<div class="flex-none">
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Ask AI</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">
-			Ask questions about your architecture models. Select a Set to provide context.
+			Ask questions about your architecture models. Select one or more Sets to provide context.
 		</p>
 	</div>
 
 	{#if loading}
-		<p class="mt-4 text-sm" style="color: var(--color-muted)">Loading sets...</p>
-	{:else if sets.length === 0}
+		<p class="mt-4 text-sm" style="color: var(--color-muted)">Loading...</p>
+	{:else if allSets.length === 0}
 		<p class="mt-4 text-sm" style="color: var(--color-muted)">No sets available. Import or create a set first.</p>
 	{:else}
-		<div class="mt-4">
-			<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
-				Set
-				<select
-					bind:value={selectedSetId}
-					class="rounded border px-3 py-2"
-					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); max-width: 400px"
-				>
-					{#each sets as s (s.id)}
-						<option value={s.id}>{s.name}</option>
-					{/each}
-				</select>
-			</label>
+		<div class="mt-4 flex flex-wrap items-start gap-4" style="max-width: 600px">
+			{#if collections.length > 0}
+				<div class="flex items-center gap-2">
+					<label for="ask-collection" class="text-sm font-medium" style="color: var(--color-fg)">Collection</label>
+					<select
+						id="ask-collection"
+						value={selectedCollectionId}
+						onchange={handleCollectionChange}
+						class="rounded border px-3 py-1.5 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					>
+						<option value="">All collections</option>
+						{#each collections as c (c.id)}
+							<option value={c.id}>{c.name} ({c.set_count})</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+			<div class="flex-1" style="min-width: 250px">
+				<MultiSetSelector
+					sets={displayedSets}
+					selectedIds={selectedSetIds}
+					onchange={(ids) => { selectedSetIds = ids; }}
+				/>
+			</div>
 		</div>
 
-		{#if effectiveSetId}
+		{#if selectedSetIds.length > 0}
 			<div class="mt-4 flex-1 overflow-hidden">
-				{#key effectiveSetId}
-					<SetQA setId={effectiveSetId} />
+				{#key setIdsKey}
+					<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} />
 				{/key}
 			</div>
+		{:else}
+			<p class="mt-4 text-sm" style="color: var(--color-muted)">Select at least one set to start asking questions.</p>
 		{/if}
 	{/if}
 </div>

@@ -4,8 +4,9 @@
 	import { apiFetch } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
-	import type { IrisSet, Diagram, PaginatedResponse } from '$lib/types/api';
+	import type { IrisSet, IrisCollection, Diagram, PaginatedResponse } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import DOMPurify from 'dompurify';
 
 	let set = $state<IrisSet | null>(null);
@@ -20,6 +21,7 @@
 	let thumbnailSource = $state<'model' | 'diagram' | 'image' | null>(null);
 	let thumbnailDiagramId = $state<string | null>(null);
 	let thumbnailFile = $state<File | null>(null);
+	let collectionId = $state<string | null>(null);
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -46,6 +48,7 @@
 			description = setData.description ?? '';
 			thumbnailSource = setData.thumbnail_source;
 			thumbnailDiagramId = setData.thumbnail_diagram_id;
+			collectionId = setData.collection_id ?? null;
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -69,6 +72,7 @@
 					description: sanitizedDesc,
 					thumbnail_source: thumbnailSource,
 					thumbnail_diagram_id: thumbnailSource === 'model' ? thumbnailDiagramId : null,
+					collection_id: collectionId,
 				}),
 			});
 
@@ -186,6 +190,16 @@
 				class="mt-1 w-full rounded border px-3 py-2 text-sm"
 				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 			></textarea>
+		</div>
+
+		<!-- Collection -->
+		<div class="mt-4">
+			<CollectionSelector
+				value={collectionId || ''}
+				onchange={(id) => { collectionId = id || null; }}
+				showAll={true}
+				label="Collection"
+			/>
 		</div>
 
 		<!-- Thumbnail -->

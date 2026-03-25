@@ -6,6 +6,7 @@
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
 	import type { SimpleEntityType } from '$lib/types/canvas';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import SetSelector from '$lib/components/SetSelector.svelte';
 	import BatchToolbar from '$lib/components/BatchToolbar.svelte';
 	import BatchSetDialog from '$lib/components/BatchSetDialog.svelte';
@@ -32,6 +33,9 @@
 	let page = $state(1);
 	let pageSize = $state(50);
 	let total = $state(0);
+
+	// Collection filter state
+	let currentCollectionId = $state('');
 
 	// Set filter state — initialise from global store
 	let currentSetId = $state(getActiveSetId());
@@ -98,6 +102,14 @@
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create element';
 		}
+	}
+
+	function handleCollectionChange(collectionId: string) {
+		currentCollectionId = collectionId;
+		currentSetId = '';
+		clearActiveSet();
+		page = 1;
+		loadElements();
 	}
 
 	function handleSetChange(newSetId: string, setName?: string) {
@@ -303,6 +315,7 @@
 
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3">
+	<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
 	<SetSelector value={currentSetId} onchange={handleSetChange} />
 	<div>
 		<label for="element-search" class="sr-only">Search elements</label>

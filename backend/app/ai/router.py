@@ -43,6 +43,7 @@ from app.ai.models import (
     ProviderResponse,
     ProviderTestResult,
     ProviderUpdate,
+    MultiSetQARequest,
     QARequest,
     QAResponse,
 )
@@ -375,6 +376,171 @@ async def _ask_streaming(
                 "(provider_id, user_id, endpoint, model, duration_ms, status, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (str(provider["id"]), user_id, "ask_stream", model_used, duration_ms, "success", now),
+            )
+            await db.commit()
+
+            yield "data: " + json.dumps({
+                "done": True,
+                "conversation_id": conv_id,
+                "duration_ms": duration_ms,
+                "model_used": model_used,
+            }) + "\n\n"
+
+        except Exception as exc:  # noqa: BLE001
+            yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# User: Multi-Set Q&A (ADR-102 Collections)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ask")
+async def ask_multi_set(
+    body: MultiSetQARequest,
+    request: Request,
+    stream: bool = Query(False),
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> Any:
+    """Ask a question across multiple Sets. Returns QAResponse or SSE stream."""
+    db = request.app.state.db_manager.main_db
+
+    if stream:
+        return await _ask_multi_set_streaming(
+            db, set_ids=body.set_ids, collection_id=body.collection_id,
+            body=body, user_id=current_user["id"],
+        )
+
+    try:
+        result = await service.ask_multi_set_question(
+            db,
+            set_ids=body.set_ids,
+            collection_id=body.collection_id,
+            question=body.question,
+            user_id=current_user["id"],
+            provider_id=body.provider_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("app.ai").exception("LLM provider error in ask_multi_set")
+        raise HTTPException(status_code=502, detail=f"LLM provider error: {exc}") from exc
+
+    return QAResponse(
+        answer=result["answer"],  # type: ignore[arg-type]
+        model_used=result["model_used"],  # type: ignore[arg-type]
+        provider_name=result["provider_name"],  # type: ignore[arg-type]
+        tokens_in=result.get("tokens_in"),  # type: ignore[arg-type]
+        tokens_out=result.get("tokens_out"),  # type: ignore[arg-type]
+        duration_ms=result["duration_ms"],  # type: ignore[arg-type]
+        conversation_id=result["id"],  # type: ignore[arg-type]
+    )
+
+
+async def _ask_multi_set_streaming(
+    db: Any,
+    *,
+    set_ids: list[str],
+    collection_id: str | None,
+    body: MultiSetQARequest,
+    user_id: str,
+) -> StreamingResponse:
+    """Return a StreamingResponse with SSE chunks for multi-set Q&A."""
+
+    async def _generate() -> AsyncGenerator[str, None]:
+        try:
+            print(f"[AI_ASK_MULTI] mode={body.mode} sets={len(set_ids)} question={body.question[:100]}", flush=True)
+            ai_debug = await _is_ai_debug(db)
+
+            # Resolve provider
+            if body.provider_id:
+                provider = await service._get_provider_with_key(db, body.provider_id)
+            else:
+                provider = await service._get_default_provider_with_key(db)
+
+            if provider is None:
+                yield "data: " + json.dumps({"error": "No AI provider configured"}) + "\n\n"
+                return
+
+            from app.ai.context import build_multi_set_context
+            context = await build_multi_set_context(db, set_ids)
+
+            primary_set_id = set_ids[0]
+
+            if body.mode == "creation":
+                from app.ai.creation import build_creation_system_prompt
+                creation_prompt = await build_creation_system_prompt(
+                    db,
+                    notation=body.notation or "doview",
+                    diagram_type=None,
+                )
+                system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content from the user's Sets. This is BACKGROUND REFERENCE ONLY. The user decides what the DoView is about — do NOT assume the DoView topic matches the Set content. If the user says they want a DoView about X, make it about X regardless of what is in the Sets.\n\n{context}"
+            else:
+                system_prompt = str(provider.get("system_prompt") or "")
+                if system_prompt:
+                    system_content = f"{system_prompt}\n\nContext:\n{context}"
+                else:
+                    system_content = (
+                        "You are an AI assistant helping users understand their architecture models. "
+                        "Answer questions based on the provided context from multiple Sets.\n\nContext:\n" + context
+                    )
+
+            if body.mode == "creation":
+                messages: list[dict[str, str]] = [
+                    {"role": "system", "content": system_content},
+                    {"role": "assistant", "content": "Describe in a couple of lines or less what you want a DoView of."},
+                ]
+                if body.history:
+                    messages.extend(body.history)
+                messages.append({"role": "user", "content": body.question})
+            else:
+                messages = [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": body.question},
+                ]
+
+            if ai_debug:
+                log.info("[AI_DEBUG_MULTI] mode=%s sets=%s", body.mode, set_ids)
+                log.info("[AI_DEBUG_MULTI] provider=%s model=%s", provider["name"], provider["model"])
+                log.info("[AI_DEBUG_MULTI] system_prompt length=%d chars", len(system_content))
+
+            from app.ai.client import create_ai_client
+            client = create_ai_client(provider)
+            t0 = time.monotonic()
+            full_answer: list[str] = []
+
+            async for chunk in client.chat_stream(messages):
+                full_answer.append(chunk)
+                yield "data: " + json.dumps({"chunk": chunk}) + "\n\n"
+
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            answer = "".join(full_answer)
+
+            conv_id = str(uuid.uuid4())
+            now = datetime.now(tz=UTC).isoformat()
+            model_used = str(provider["model"])
+            context_summary = context[:200] + "..." if len(context) > 200 else context  # noqa: PLR2004
+
+            await db.execute(
+                "INSERT INTO ai_conversations "
+                "(id, set_id, user_id, question, answer, context_summary, model_used, "
+                "provider_id, duration_ms, created_at, mode, thread_id, collection_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (conv_id, primary_set_id, user_id, body.question, answer, context_summary,
+                 model_used, str(provider["id"]), duration_ms, now,
+                 body.mode or "discuss", body.thread_id, collection_id),
+            )
+            await db.execute(
+                "INSERT INTO ai_usage_log "
+                "(provider_id, user_id, endpoint, model, duration_ms, status, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (str(provider["id"]), user_id, "ask_multi_stream", model_used, duration_ms, "success", now),
             )
             await db.commit()
 

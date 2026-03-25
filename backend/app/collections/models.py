@@ -1,30 +1,28 @@
-"""Pydantic models for set CRUD operations."""
+"""Pydantic models for collection CRUD operations."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 
-class SetCreate(BaseModel):
-    """Request body for creating a set."""
+class CollectionCreate(BaseModel):
+    """Request body for creating a collection."""
 
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
-    collection_id: str | None = None
 
 
-class SetUpdate(BaseModel):
-    """Request body for updating a set."""
+class CollectionUpdate(BaseModel):
+    """Request body for updating a collection."""
 
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     thumbnail_source: str | None = None
     thumbnail_diagram_id: str | None = None
-    collection_id: str | None = None
 
 
-class SetResponse(BaseModel):
-    """Response for a single set."""
+class CollectionResponse(BaseModel):
+    """Response for a single collection."""
 
     id: str
     name: str
@@ -33,8 +31,7 @@ class SetResponse(BaseModel):
     created_by: str
     updated_at: str
     is_deleted: bool = False
-    collection_id: str | None = None
-    collection_name: str | None = None
+    set_count: int = 0
     diagram_count: int = 0
     element_count: int = 0
     thumbnail_source: str | None = None
@@ -44,14 +41,7 @@ class SetResponse(BaseModel):
     thumbnail_diagram_type: str | None = None
 
 
-class SetListResponse(BaseModel):
-    """List of sets."""
+class CollectionListResponse(BaseModel):
+    """List of collections."""
 
-    items: list[SetResponse]
-
-
-class SetForceDeleteResponse(BaseModel):
-    """Response for force-deleting a set and all its contents."""
-
-    diagrams_deleted: int
-    elements_deleted: int
+    items: list[CollectionResponse]
