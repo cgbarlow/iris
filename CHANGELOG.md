@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **DoView PPTX import** — import DoView models from .pptx files with structural compliance validation, shape classification (overview tiles, final outcomes, outcome boxes, causal arrows), column-based causal link inference, cross-diagram navigation linking, and colour preservation (ADR-106)
+
 ## [2.7.4] - 2026-03-25
 
 ### Added
