@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **10 interlinked diagrams** — Strategic Overview, 6 Programme Roadmaps, Asset Landscape, Dependency Map, Resource Allocation — all with entity-backed nodes and inter-diagram links
 - **Cross-links (Iris ↔ Scenia)** — "View in Scenia" buttons on element detail pages and canvas panel; "View in Iris" links from Scenia
 - **Conditional Roadmap navigation** — sidebar shows "Roadmap" nav item only when Scenia extension is enabled
+- **DoView PPTX import** — import DoView models from .pptx files with structural compliance validation, shape classification (overview tiles, final outcomes, outcome boxes, causal arrows), column-based causal link inference, cross-diagram navigation linking, and colour preservation (ADR-107)
 
 ## [2.7.4] - 2026-03-25
 

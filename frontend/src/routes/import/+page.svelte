@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** SparxEA import page — upload .qea or .eap files to import diagrams, elements, and relationships. */
+	/** Import page — upload .qea/.eap (SparxEA) or .pptx (DoView) files. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
@@ -16,15 +16,18 @@
 
 	interface ImportSummary {
 		packages_created: number;
-		packages_skipped: number;
+		packages_skipped?: number;
 		elements_created: number;
 		relationships_created: number;
 		diagrams_created: number;
-		diagrams_skipped: number;
-		elements_skipped: number;
-		connectors_skipped: number;
+		diagrams_skipped?: number;
+		elements_skipped?: number;
+		connectors_skipped?: number;
+		slides_skipped?: number;
 		warnings: ImportWarning[];
 	}
+
+	let isPptx = $derived(selectedFile?.name.endsWith('.pptx') ?? false);
 
 	let dragOver = $state(false);
 	let uploading = $state(false);
@@ -64,8 +67,8 @@
 	}
 
 	function selectFile(file: File) {
-		if (!file.name.endsWith('.qea') && !file.name.endsWith('.eap')) {
-			error = 'Only .qea and .eap files (SparxEA) are supported.';
+		if (!file.name.endsWith('.qea') && !file.name.endsWith('.eap') && !file.name.endsWith('.pptx')) {
+			error = 'Supported formats: .qea, .eap (SparxEA) or .pptx (DoView).';
 			return;
 		}
 		error = null;
@@ -91,7 +94,8 @@
 			progress = 20;
 
 			const token = getAccessToken();
-			const response = await fetch(`${API_BASE_URL}/api/import/sparx`, {
+			const endpoint = isPptx ? '/api/import/pptx' : '/api/import/sparx';
+			const response = await fetch(`${API_BASE_URL}${endpoint}`, {
 				method: 'POST',
 				headers: token ? { Authorization: `Bearer ${token}` } : {},
 				body: formData,
@@ -150,7 +154,7 @@
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
 	<p class="mt-2" style="color: var(--color-muted)">
-		Import diagrams from SparxEA (.qea, .eap) files.
+		Import diagrams from SparxEA (.qea, .eap) or DoView (.pptx) files.
 	</p>
 </div>
 
@@ -175,22 +179,36 @@
 				<p class="text-2xl font-bold" style="color: var(--color-primary)">{summary.packages_created}</p>
 				<p class="text-sm" style="color: var(--color-muted)">Packages</p>
 			</div>
-			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.packages_skipped}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Packages Skipped</p>
-			</div>
-			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.diagrams_skipped}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Diagrams Skipped</p>
-			</div>
-			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.elements_skipped}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Elements Skipped</p>
-			</div>
-			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-				<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.connectors_skipped}</p>
-				<p class="text-sm" style="color: var(--color-muted)">Connectors Skipped</p>
-			</div>
+			{#if summary.slides_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.slides_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Slides Skipped</p>
+				</div>
+			{/if}
+			{#if summary.packages_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.packages_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Packages Skipped</p>
+				</div>
+			{/if}
+			{#if summary.diagrams_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.diagrams_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Diagrams Skipped</p>
+				</div>
+			{/if}
+			{#if summary.elements_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.elements_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Elements Skipped</p>
+				</div>
+			{/if}
+			{#if summary.connectors_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.connectors_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Connectors Skipped</p>
+				</div>
+			{/if}
 		</div>
 
 		{#if summary.warnings.length > 0}
@@ -230,7 +248,7 @@
 		style="border-color: {dragOver ? 'var(--color-primary)' : 'var(--color-border)'}; background: {dragOver ? 'var(--color-surface)' : 'transparent'}"
 		role="button"
 		tabindex="0"
-		aria-label="Drop .qea or .eap file here or click to browse"
+		aria-label="Drop .qea, .eap, or .pptx file here or click to browse"
 		ondragover={handleDragOver}
 		ondragleave={handleDragLeave}
 		ondrop={handleDrop}
@@ -249,11 +267,11 @@
 			{#if selectedFile}
 				Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
 			{:else}
-				Drop a .qea or .eap file here or click to browse
+				Drop a .qea, .eap, or .pptx file here or click to browse
 			{/if}
 		</p>
 		<p class="mt-1 text-xs" style="color: var(--color-muted)">
-			SparxEA files (.qea, .eap) — SQLite or JET4/MDB format
+			SparxEA (.qea, .eap) or DoView (.pptx) format
 		</p>
 	</div>
 

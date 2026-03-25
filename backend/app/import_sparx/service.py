@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from app.diagrams.service import create_diagram
 from app.elements.service import create_element
+from app.import_common import ImportWarning
 from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position, format_uml_visibility, parse_diagram_link_geometry, parse_diagram_link_path, parse_nid
 from app.import_sparx.icon_matcher import SemanticIconMatcher
 from app.import_sparx.mapper import map_archimate_stereotype, map_connector_type, map_diagram_type, map_object_type
@@ -33,12 +34,6 @@ from app.relationships.service import create_relationship
 if TYPE_CHECKING:
     import aiosqlite
     from app.db.adapter import DatabasePort
-
-
-@dataclass
-class ImportWarning:
-    category: str
-    message: str
 
 
 @dataclass

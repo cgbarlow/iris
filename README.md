@@ -145,7 +145,8 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Canvas modelref-to-modelref connections auto-create backend model relationships
 - Node removal dialog: "Remove from this model" or "Delete entity and all relationships" (cascade deletion)
 - SparxEA import (.qea and .eap): full coverage — Note/Boundary elements, NoteLink connectors, self-references, Package-to-Package dependencies as model relationships
-- Import change summary in version history ("Imported from SparxEA")
+- DoView PPTX import (.pptx): structural compliance validation, shape classification, column-based causal link inference, cross-diagram navigation, colour preservation
+- Import change summary in version history ("Imported from SparxEA" / "Imported from DoView PPTX")
 - Entity CRUD with optimistic concurrency via If-Match headers
 - Model CRUD with type filter on list page (Simple, Component, Sequence, UML, ArchiMate)
 - Bookmark toggle on model detail page
