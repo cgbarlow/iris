@@ -44,8 +44,9 @@
 	let pageSize = $state(50);
 	let total = $state(0);
 
-	// Collection filter state
-	let currentCollectionId = $state('');
+	// Collection filter state — initialise from URL param
+	const urlCollectionId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('collection_id') : null;
+	let currentCollectionId = $state(urlCollectionId || '');
 
 	// Set filter state — initialise from URL param or global store
 	const urlSetId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('set_id') : null;
@@ -107,6 +108,7 @@
 			params.set('page', String(page));
 			params.set('page_size', String(pageSize));
 			if (currentSetId) params.set('set_id', currentSetId);
+			else if (currentCollectionId) params.set('collection_id', currentCollectionId);
 			if (notationFilter) params.set('notation', notationFilter);
 			if (typeFilter) params.set('diagram_type', typeFilter);
 			const data = await apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?${params}`);

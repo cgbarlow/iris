@@ -91,6 +91,7 @@ class MultiSetQARequest(BaseModel):
 
     set_ids: list[str] = Field(min_length=1)
     collection_id: str | None = None
+    package_ids: list[str] | None = None
     question: str = Field(min_length=1, max_length=4000)
     provider_id: str | None = None
     mode: str | None = None

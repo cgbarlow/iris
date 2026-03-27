@@ -15,6 +15,7 @@
 
 	let selectedCollectionId = $state('');
 	let selectedSetIds = $state<string[]>([]);
+	let selectedPackageIds = $state<string[]>([]);
 
 	// Filter sets by selected collection
 	let displayedSets = $derived(
@@ -117,6 +118,8 @@
 					sets={displayedSets}
 					selectedIds={selectedSetIds}
 					onchange={(ids) => { selectedSetIds = ids; }}
+					{selectedPackageIds}
+					onpackagechange={(ids) => { selectedPackageIds = ids; }}
 				/>
 			</div>
 		</div>
@@ -124,7 +127,7 @@
 		{#if selectedSetIds.length > 0}
 			<div class="mt-4 flex-1 overflow-hidden">
 				{#key setIdsKey}
-					<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} />
+					<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} packageIds={selectedPackageIds.length > 0 ? selectedPackageIds : undefined} />
 				{/key}
 			</div>
 		{:else}

@@ -469,7 +469,7 @@ async def _ask_multi_set_streaming(
                 return
 
             from app.ai.context import build_multi_set_context
-            context = await build_multi_set_context(db, set_ids)
+            context = await build_multi_set_context(db, set_ids, package_ids=body.package_ids)
 
             primary_set_id = set_ids[0]
 

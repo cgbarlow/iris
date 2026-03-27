@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
 	import { getActiveSetId, clearActiveSet, setActiveSet } from '$lib/stores/activeSet.svelte.js';
-	import { setActiveCollection, clearActiveCollection } from '$lib/stores/activeCollection.svelte.js';
+	import { setActiveCollection, clearActiveCollection, getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import type { IrisSet } from '$lib/types/api';
 	import SetDialog from '$lib/components/SetDialog.svelte';
 	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
@@ -19,6 +20,7 @@
 	let showCreateDialog = $state(false);
 
 	const activeSetIdValue = $derived(getActiveSetId());
+	let collectionId = $derived(page.url.searchParams.get('collection_id') || getActiveCollectionId() || '');
 
 	let filteredSets = $derived(
 		searchQuery.trim()
@@ -44,7 +46,8 @@
 		loading = true;
 		error = null;
 		try {
-			const data = await apiFetch<{ items: IrisSet[] }>('/api/sets');
+			const collectionFilter = collectionId ? `?collection_id=${collectionId}` : '';
+			const data = await apiFetch<{ items: IrisSet[] }>(`/api/sets${collectionFilter}`);
 			sets = data.items;
 		} catch {
 			error = 'Failed to load sets';

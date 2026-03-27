@@ -27,19 +27,45 @@
 		warnings: ImportWarning[];
 	}
 
-	let isPptx = $derived(selectedFile?.name.endsWith('.pptx') ?? false);
+	interface BatchFileResult {
+		filename: string;
+		success: boolean;
+		error: string | null;
+		packages_created: number;
+		elements_created: number;
+		relationships_created: number;
+		diagrams_created: number;
+		slides_skipped: number;
+		warnings: ImportWarning[];
+	}
+
+	interface BatchSummary {
+		files_processed: number;
+		files_succeeded: number;
+		files_failed: number;
+		total_packages: number;
+		total_elements: number;
+		total_relationships: number;
+		total_diagrams: number;
+		results: BatchFileResult[];
+	}
 
 	let dragOver = $state(false);
 	let uploading = $state(false);
 	let progress = $state(0);
 	let error = $state<string | null>(null);
 	let summary = $state<ImportSummary | null>(null);
-	let selectedFile = $state<File | null>(null);
+	let batchSummary = $state<BatchSummary | null>(null);
+	let selectedFiles = $state<File[]>([]);
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let importSetId = $state('');
 	let importSetName = $state('');
 	let showCreateSetDialog = $state(false);
 	let selectorRef: { reload: () => Promise<void> } | undefined = $state();
+
+	const isBatch = $derived(selectedFiles.length > 1 && selectedFiles.every((f) => f.name.endsWith('.pptx')));
+	const isPptx = $derived(selectedFiles.length === 1 && (selectedFiles[0]?.name.endsWith('.pptx') ?? false));
+	const hasResults = $derived(summary !== null || batchSummary !== null);
 
 	function handleDragOver(event: DragEvent) {
 		event.preventDefault();
@@ -55,29 +81,38 @@
 		dragOver = false;
 		const files = event.dataTransfer?.files;
 		if (files && files.length > 0) {
-			selectFile(files[0]);
+			selectFiles(Array.from(files));
 		}
 	}
 
 	function handleFileInput(event: Event) {
 		const input = event.target as HTMLInputElement;
 		if (input.files && input.files.length > 0) {
-			selectFile(input.files[0]);
+			selectFiles(Array.from(input.files));
 		}
 	}
 
-	function selectFile(file: File) {
-		if (!file.name.endsWith('.qea') && !file.name.endsWith('.eap') && !file.name.endsWith('.pptx')) {
+	function selectFiles(files: File[]) {
+		const valid = files.filter(
+			(f) => f.name.endsWith('.qea') || f.name.endsWith('.eap') || f.name.endsWith('.pptx'),
+		);
+		if (valid.length === 0) {
 			error = 'Supported formats: .qea, .eap (SparxEA) or .pptx (DoView).';
+			return;
+		}
+		// Multi-file only for .pptx
+		if (valid.length > 1 && !valid.every((f) => f.name.endsWith('.pptx'))) {
+			error = 'Batch import is only supported for .pptx (DoView) files.';
 			return;
 		}
 		error = null;
 		summary = null;
-		selectedFile = file;
+		batchSummary = null;
+		selectedFiles = valid;
 	}
 
 	async function uploadFile() {
-		if (!selectedFile) return;
+		if (selectedFiles.length === 0) return;
 		if (importSetId && importSetName) {
 			if (!confirm(`Are you sure you want to import to existing set "${importSetName}"?`)) return;
 		}
@@ -85,32 +120,65 @@
 		progress = 0;
 		error = null;
 		summary = null;
+		batchSummary = null;
 
 		try {
-			const formData = new FormData();
-			formData.append('file', selectedFile);
-			if (importSetId) formData.append('set_id', importSetId);
-
-			progress = 20;
-
 			const token = getAccessToken();
-			const endpoint = isPptx ? '/api/import/pptx' : '/api/import/sparx';
-			const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-				method: 'POST',
-				headers: token ? { Authorization: `Bearer ${token}` } : {},
-				body: formData,
-			});
+			const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-			progress = 80;
+			if (isBatch) {
+				// Batch PPTX import
+				const formData = new FormData();
+				for (const f of selectedFiles) {
+					formData.append('files', f);
+				}
+				formData.append('set_id', importSetId);
 
-			if (!response.ok) {
-				const detail = await response.json().catch(() => null);
-				throw new Error(detail?.detail || `Import failed (${response.status})`);
+				progress = 20;
+
+				const response = await fetch(`${API_BASE_URL}/api/import/pptx/batch`, {
+					method: 'POST',
+					headers,
+					body: formData,
+				});
+
+				progress = 80;
+
+				if (!response.ok) {
+					const detail = await response.json().catch(() => null);
+					throw new Error(detail?.detail || `Import failed (${response.status})`);
+				}
+
+				batchSummary = await response.json();
+				progress = 100;
+			} else {
+				// Single file import
+				const file = selectedFiles[0];
+				const formData = new FormData();
+				formData.append('file', file);
+				if (importSetId) formData.append('set_id', importSetId);
+
+				progress = 20;
+
+				const endpoint = isPptx ? '/api/import/pptx' : '/api/import/sparx';
+				const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+					method: 'POST',
+					headers,
+					body: formData,
+				});
+
+				progress = 80;
+
+				if (!response.ok) {
+					const detail = await response.json().catch(() => null);
+					throw new Error(detail?.detail || `Import failed (${response.status})`);
+				}
+
+				summary = await response.json();
+				progress = 100;
 			}
 
-			summary = await response.json();
-			progress = 100;
-			selectedFile = null;
+			selectedFiles = [];
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Import failed';
 		}
@@ -119,8 +187,9 @@
 	}
 
 	function resetForm() {
-		selectedFile = null;
+		selectedFiles = [];
 		summary = null;
+		batchSummary = null;
 		error = null;
 		progress = 0;
 		if (fileInputEl) fileInputEl.value = '';
@@ -154,12 +223,86 @@
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
 	<p class="mt-2" style="color: var(--color-muted)">
-		Import diagrams from SparxEA (.qea, .eap) or DoView (.pptx) files.
+		Import diagrams from SparxEA (.qea, .eap) or DoView (.pptx) files. Select multiple .pptx files for batch import.
 	</p>
 </div>
 
-{#if summary}
-	<!-- Import Results -->
+{#if batchSummary}
+	<!-- Batch Import Results -->
+	<div class="mt-6 rounded border p-6" style="border-color: var(--color-border); background: var(--color-surface)">
+		<h2 class="text-lg font-bold" style="color: var(--color-fg)">
+			Batch Import Complete — {batchSummary.files_succeeded} of {batchSummary.files_processed} files
+		</h2>
+		<div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{batchSummary.total_diagrams}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Diagrams</p>
+			</div>
+			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{batchSummary.total_elements}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Elements</p>
+			</div>
+			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{batchSummary.total_relationships}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Relationships</p>
+			</div>
+			<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+				<p class="text-2xl font-bold" style="color: var(--color-primary)">{batchSummary.total_packages}</p>
+				<p class="text-sm" style="color: var(--color-muted)">Packages</p>
+			</div>
+		</div>
+
+		<!-- Per-file breakdown -->
+		<div class="mt-4">
+			<h3 class="text-sm font-semibold" style="color: var(--color-fg)">Files</h3>
+			<ul class="mt-2 space-y-2">
+				{#each batchSummary.results as result}
+					<li
+						class="rounded border p-3 text-sm"
+						style="border-color: var(--color-border); color: var(--color-fg)"
+					>
+						<div class="flex items-center justify-between">
+							<span class="font-medium">{result.filename}</span>
+							{#if result.success}
+								<span style="color: var(--color-success, #22c55e)">
+									{result.diagrams_created} diagrams, {result.elements_created} elements
+								</span>
+							{:else}
+								<span style="color: var(--color-danger)">{result.error}</span>
+							{/if}
+						</div>
+						{#if result.warnings.length > 0}
+							<ul class="mt-1 text-xs" style="color: var(--color-muted)">
+								{#each result.warnings as w}
+									<li>[{w.category}] {w.message}</li>
+								{/each}
+							</ul>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		</div>
+
+		<div class="mt-4 flex gap-3">
+			<a
+				href={importSetId ? `/diagrams?set_id=${importSetId}` : '/diagrams'}
+				onclick={() => { if (importSetId && importSetName) setActiveSet(importSetId, importSetName); }}
+				class="rounded px-4 py-2 text-sm text-white"
+				style="background-color: var(--color-primary)"
+			>
+				View Diagrams
+			</a>
+			<button
+				onclick={resetForm}
+				class="rounded px-4 py-2 text-sm"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			>
+				Import More
+			</button>
+		</div>
+	</div>
+{:else if summary}
+	<!-- Single Import Results -->
 	<div class="mt-6 rounded border p-6" style="border-color: var(--color-border); background: var(--color-surface)">
 		<h2 class="text-lg font-bold" style="color: var(--color-fg)">Import Complete</h2>
 		<div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -189,24 +332,6 @@
 				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
 					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.packages_skipped}</p>
 					<p class="text-sm" style="color: var(--color-muted)">Packages Skipped</p>
-				</div>
-			{/if}
-			{#if summary.diagrams_skipped != null}
-				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.diagrams_skipped}</p>
-					<p class="text-sm" style="color: var(--color-muted)">Diagrams Skipped</p>
-				</div>
-			{/if}
-			{#if summary.elements_skipped != null}
-				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.elements_skipped}</p>
-					<p class="text-sm" style="color: var(--color-muted)">Elements Skipped</p>
-				</div>
-			{/if}
-			{#if summary.connectors_skipped != null}
-				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
-					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.connectors_skipped}</p>
-					<p class="text-sm" style="color: var(--color-muted)">Connectors Skipped</p>
 				</div>
 			{/if}
 		</div>
@@ -248,7 +373,7 @@
 		style="border-color: {dragOver ? 'var(--color-primary)' : 'var(--color-border)'}; background: {dragOver ? 'var(--color-surface)' : 'transparent'}"
 		role="button"
 		tabindex="0"
-		aria-label="Drop .qea, .eap, or .pptx file here or click to browse"
+		aria-label="Drop files here or click to browse"
 		ondragover={handleDragOver}
 		ondragleave={handleDragLeave}
 		ondrop={handleDrop}
@@ -258,43 +383,61 @@
 		<input
 			bind:this={fileInputEl}
 			type="file"
+			accept=".qea,.eap,.pptx"
+			multiple
 			class="hidden"
 			onchange={handleFileInput}
 			aria-hidden="true"
 		/>
 		<span class="text-4xl" aria-hidden="true">&#128193;</span>
 		<p class="mt-3 text-sm font-medium" style="color: var(--color-fg)">
-			{#if selectedFile}
-				Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
+			{#if selectedFiles.length > 1}
+				{selectedFiles.length} files selected
+			{:else if selectedFiles.length === 1}
+				Selected: {selectedFiles[0].name} ({(selectedFiles[0].size / 1024 / 1024).toFixed(1)} MB)
 			{:else}
-				Drop a .qea, .eap, or .pptx file here or click to browse
+				Drop files here or click to browse
 			{/if}
 		</p>
 		<p class="mt-1 text-xs" style="color: var(--color-muted)">
-			SparxEA (.qea, .eap) or DoView (.pptx) format
+			SparxEA (.qea, .eap) or DoView (.pptx) — select multiple .pptx for batch import
 		</p>
 	</div>
 
-	{#if selectedFile}
+	{#if selectedFiles.length > 1}
+		<div class="mt-3 rounded border p-3" style="border-color: var(--color-border)">
+			<h3 class="text-sm font-semibold" style="color: var(--color-fg)">Files ({selectedFiles.length})</h3>
+			<ul class="mt-1 text-sm" style="color: var(--color-muted)">
+				{#each selectedFiles as f}
+					<li>{f.name} ({(f.size / 1024 / 1024).toFixed(1)} MB)</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+
+	{#if selectedFiles.length > 0}
 		<div class="mt-4">
 			<SetSelector
 				bind:this={selectorRef}
 				value={importSetId}
 				onchange={handleSetChange}
 				showAll={false}
-				label="Import into set"
+				label={isBatch ? 'Import all into set (required)' : 'Import into set'}
 				showNewSet={true}
 				onNewSet={() => (showCreateSetDialog = true)}
 			/>
 		</div>
+		{#if isBatch && !importSetId}
+			<p class="mt-1 text-xs" style="color: var(--color-danger)">A set must be selected for batch import.</p>
+		{/if}
 		<div class="mt-4 flex items-center gap-4">
 			<button
 				onclick={uploadFile}
-				disabled={uploading}
+				disabled={uploading || (isBatch && !importSetId)}
 				class="rounded px-6 py-2 text-sm text-white"
-				style="background-color: var(--color-primary); opacity: {uploading ? 0.6 : 1}"
+				style="background-color: var(--color-primary); opacity: {uploading || (isBatch && !importSetId) ? 0.6 : 1}"
 			>
-				{uploading ? 'Importing...' : 'Import'}
+				{uploading ? 'Importing...' : isBatch ? `Import ${selectedFiles.length} Files` : 'Import'}
 			</button>
 			<button
 				onclick={resetForm}
@@ -323,7 +466,7 @@
 				{#if progress < 20}
 					Preparing upload...
 				{:else if progress < 80}
-					Reading file and importing data...
+					{isBatch ? `Processing ${selectedFiles.length} files...` : 'Reading file and importing data...'}
 				{:else if progress < 100}
 					Finalizing import...
 				{:else}

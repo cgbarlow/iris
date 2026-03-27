@@ -148,6 +148,7 @@ async def search(
     *,
     limit: int = 50,
     set_id: str | None = None,
+    collection_id: str | None = None,
 ) -> list[dict[str, object]]:
     """Search elements and diagrams.
 
@@ -157,8 +158,8 @@ async def search(
     from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
 
     if isinstance(db, SupabaseAdapter):
-        return await _search_postgres(db, query, limit=limit, set_id=set_id)
-    return await _search_sqlite(db, query, limit=limit, set_id=set_id)
+        return await _search_postgres(db, query, limit=limit, set_id=set_id, collection_id=collection_id)
+    return await _search_sqlite(db, query, limit=limit, set_id=set_id, collection_id=collection_id)
 
 
 async def _search_sqlite(
@@ -167,6 +168,7 @@ async def _search_sqlite(
     *,
     limit: int,
     set_id: str | None,
+    collection_id: str | None = None,
 ) -> list[dict[str, object]]:
     """FTS5-based search for SQLite deployment."""
     results: list[dict[str, object]] = []
@@ -182,6 +184,15 @@ async def _search_sqlite(
             "WHERE elements_fts MATCH ? AND e.set_id = ? "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, set_id, limit),
+        )
+    elif collection_id:
+        cursor = await db.execute(
+            "SELECT f.element_id, f.name, f.element_type, f.description, f.rank "
+            "FROM elements_fts f "
+            "JOIN elements e ON e.id = f.element_id "
+            "WHERE elements_fts MATCH ? AND e.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, collection_id, limit),
         )
     else:
         cursor = await db.execute(
@@ -212,6 +223,15 @@ async def _search_sqlite(
             "WHERE diagrams_fts MATCH ? AND m.set_id = ? "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, set_id, limit),
+        )
+    elif collection_id:
+        cursor = await db.execute(
+            "SELECT f.diagram_id, f.name, f.diagram_type, f.description, f.rank "
+            "FROM diagrams_fts f "
+            "JOIN diagrams m ON m.id = f.diagram_id "
+            "WHERE diagrams_fts MATCH ? AND m.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, collection_id, limit),
         )
     else:
         cursor = await db.execute(
@@ -245,6 +265,7 @@ async def _search_postgres(
     *,
     limit: int,
     set_id: str | None,
+    collection_id: str | None = None,
 ) -> list[dict[str, object]]:
     """tsvector-based search for Supabase/PostgreSQL deployment."""
     results: list[dict[str, object]] = []
@@ -265,6 +286,18 @@ async def _search_postgres(
             "AND e.is_deleted = FALSE "
             "ORDER BY rank DESC LIMIT ?",
             (tsquery, tsquery, set_id, limit),
+        )
+    elif collection_id:
+        cursor = await db.execute(
+            "SELECT e.id, ev.name, e.element_type, ev.description, "
+            "ts_rank(e.search_vector, to_tsquery('english', ?)) AS rank "
+            "FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            "WHERE e.search_vector @@ to_tsquery('english', ?) "
+            "AND e.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
+            "AND e.is_deleted = FALSE "
+            "ORDER BY rank DESC LIMIT ?",
+            (tsquery, tsquery, collection_id, limit),
         )
     else:
         cursor = await db.execute(
@@ -301,6 +334,18 @@ async def _search_postgres(
             "AND m.is_deleted = FALSE "
             "ORDER BY rank DESC LIMIT ?",
             (tsquery, tsquery, set_id, limit),
+        )
+    elif collection_id:
+        cursor = await db.execute(
+            "SELECT m.id, mv.name, m.diagram_type, mv.description, "
+            "ts_rank(m.search_vector, to_tsquery('english', ?)) AS rank "
+            "FROM diagrams m "
+            "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
+            "WHERE m.search_vector @@ to_tsquery('english', ?) "
+            "AND m.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
+            "AND m.is_deleted = FALSE "
+            "ORDER BY rank DESC LIMIT ?",
+            (tsquery, tsquery, collection_id, limit),
         )
     else:
         cursor = await db.execute(

@@ -42,6 +42,7 @@
 	let newPackageDescription = $state('');
 
 	let setId = $derived(page.url.searchParams.get('set_id') || getActiveSetId() || '');
+	let collectionId = $derived(page.url.searchParams.get('collection_id') || getActiveCollectionId() || '');
 
 	$effect(() => {
 		loadDashboard();
@@ -52,12 +53,14 @@
 		error = null;
 		try {
 			const setFilter = setId ? `&set_id=${setId}` : '';
+			const collectionFilter = !setId && collectionId ? `&collection_id=${collectionId}` : '';
 
+			const setsFilter = collectionId ? `?collection_id=${collectionId}` : '';
 			const [elementsData, diagramsData, bookmarks, setsData, collectionsData] = await Promise.all([
-				apiFetch<PaginatedResponse<Element>>(`/api/elements?page_size=1${setFilter}`),
-				apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?page_size=1${setFilter}`),
+				apiFetch<PaginatedResponse<Element>>(`/api/elements?page_size=1${setFilter}${collectionFilter}`),
+				apiFetch<PaginatedResponse<Diagram>>(`/api/diagrams?page_size=1${setFilter}${collectionFilter}`),
 				apiFetch<Bookmark[]>('/api/bookmarks'),
-				apiFetch<{ items: IrisSet[] }>('/api/sets'),
+				apiFetch<{ items: IrisSet[] }>(`/api/sets${setsFilter}`),
 				apiFetch<{ items: IrisCollection[] }>('/api/collections'),
 			]);
 			elementCount = elementsData.total;
@@ -75,8 +78,13 @@
 				activeSet = null;
 			}
 
-			// Infer active collection from active set
-			if (activeSet?.collection_id) {
+			// Resolve active collection: from URL param, from active set, or clear
+			if (collectionId && !setId) {
+				activeCollection = collectionsData.items.find((c) => c.id === collectionId) ?? null;
+				if (activeCollection && page.url.searchParams.get('collection_id')) {
+					setActiveCollection(activeCollection.id, activeCollection.name);
+				}
+			} else if (activeSet?.collection_id) {
 				activeCollection = collectionsData.items.find((c) => c.id === activeSet!.collection_id) ?? null;
 				if (activeCollection) {
 					setActiveCollection(activeCollection.id, activeCollection.name);
@@ -181,7 +189,8 @@
 		searching = true;
 		try {
 			const setFilter = setId ? `&set_id=${setId}` : '';
-			const data = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}${setFilter}`);
+			const collectionFilter = !setId && collectionId ? `&collection_id=${collectionId}` : '';
+			const data = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}${setFilter}${collectionFilter}`);
 			searchResults = data.results;
 		} catch {
 			searchResults = [];
@@ -245,30 +254,30 @@
 					Reset filter
 				</button>
 			{:else}
-				<a href="/sets" style="color: inherit; text-decoration: none">
+				<a href={collectionId ? `/sets?collection_id=${collectionId}` : '/sets'} style="color: inherit; text-decoration: none">
 					<div class="text-3xl font-bold" style="color: var(--color-primary)">{setCount}</div>
-					<div class="mt-1 text-sm" style="color: var(--color-muted)">Sets</div>
+					<div class="mt-1 text-sm" style="color: var(--color-muted)">Sets{#if activeCollection} (filtered){/if}</div>
 				</a>
 			{/if}
 		</div>
 		<a
-			href={setId ? `/diagrams?set_id=${setId}` : '/diagrams'}
+			href={setId ? `/diagrams?set_id=${setId}` : collectionId ? `/diagrams?collection_id=${collectionId}` : '/diagrams'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
 			<div class="text-3xl font-bold" style="color: var(--color-primary)">{diagramCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Diagrams{#if activeSet} (filtered){/if}
+				Diagrams{#if activeSet || activeCollection} (filtered){/if}
 			</div>
 		</a>
 		<a
-			href={setId ? `/elements?set_id=${setId}` : '/elements'}
+			href={setId ? `/elements?set_id=${setId}` : collectionId ? `/elements?collection_id=${collectionId}` : '/elements'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
 			<div class="text-3xl font-bold" style="color: var(--color-primary)">{elementCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Elements{#if activeSet} (filtered){/if}
+				Elements{#if activeSet || activeCollection} (filtered){/if}
 			</div>
 		</a>
 	</div>

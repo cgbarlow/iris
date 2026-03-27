@@ -58,16 +58,17 @@ async def list_all(
     request: Request,
     element_type: str | None = None,
     set_id: str | None = None,
+    collection_id: str | None = None,
     notation: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> ElementListResponse:
-    """List elements with optional type/set/notation/search filter and pagination."""
+    """List elements with optional type/set/collection/notation/search filter and pagination."""
     db = request.app.state.db_manager.main_db
     items, total = await list_elements(
-        db, element_type=element_type, set_id=set_id, notation=notation, search=search, page=page, page_size=page_size,
+        db, element_type=element_type, set_id=set_id, collection_id=collection_id, notation=notation, search=search, page=page, page_size=page_size,
     )
     return ElementListResponse(
         items=[ElementResponse(**item) for item in items],

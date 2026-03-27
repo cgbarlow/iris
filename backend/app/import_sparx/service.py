@@ -164,7 +164,7 @@ async def _build_guid_index(
         "WHERE p.set_id = ? AND p.is_deleted = 0",
         (set_id,),
     )
-    async for row in cursor:
+    for row in await cursor.fetchall():
         if row[1]:
             import json
             try:
@@ -181,7 +181,7 @@ async def _build_guid_index(
         "WHERE e.set_id = ? AND e.is_deleted = 0",
         (set_id,),
     )
-    async for row in cursor:
+    for row in await cursor.fetchall():
         if row[1]:
             import json
             try:
@@ -198,7 +198,7 @@ async def _build_guid_index(
         "WHERE d.set_id = ? AND d.is_deleted = 0",
         (set_id,),
     )
-    async for row in cursor:
+    for row in await cursor.fetchall():
         if row[1]:
             import json
             try:

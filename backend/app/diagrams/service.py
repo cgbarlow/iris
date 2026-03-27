@@ -200,6 +200,7 @@ async def list_diagrams(
     diagram_type: str | None = None,
     notation: str | None = None,
     set_id: str | None = None,
+    collection_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
@@ -218,6 +219,9 @@ async def list_diagrams(
     if set_id:
         where_clauses.append("d.set_id = ?")
         params.append(set_id)
+    elif collection_id:
+        where_clauses.append("d.set_id IN (SELECT id FROM sets WHERE collection_id = ?)")
+        params.append(collection_id)
 
     where_sql = " AND ".join(where_clauses)
 

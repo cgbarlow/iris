@@ -29,6 +29,7 @@ async def build_set_context(
     set_id: str,
     *,
     max_tokens: int = 8000,
+    package_ids: list[str] | None = None,
 ) -> str:
     """Build a structured text context string for the given Set.
 
@@ -123,17 +124,31 @@ async def build_set_context(
         rels_section += "(none)\n"
     rels_section += "\n"
 
-    # 4. Diagrams in set
-    cursor = await db.execute(
-        """
-        SELECT m.diagram_type, mv.name, mv.description
-        FROM diagrams m
-        JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version
-        WHERE m.set_id = ? AND m.is_deleted = 0
-        ORDER BY mv.name ASC
-        """,
-        (set_id,),
-    )
+    # 4. Diagrams in set (optionally filtered by package)
+    if package_ids:
+        pkg_placeholders = ",".join("?" * len(package_ids))
+        cursor = await db.execute(
+            f"""
+            SELECT m.diagram_type, mv.name, mv.description
+            FROM diagrams m
+            JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version
+            WHERE m.set_id = ? AND m.is_deleted = 0
+              AND m.parent_package_id IN ({pkg_placeholders})
+            ORDER BY mv.name ASC
+            """,  # noqa: S608
+            (set_id, *package_ids),
+        )
+    else:
+        cursor = await db.execute(
+            """
+            SELECT m.diagram_type, mv.name, mv.description
+            FROM diagrams m
+            JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version
+            WHERE m.set_id = ? AND m.is_deleted = 0
+            ORDER BY mv.name ASC
+            """,
+            (set_id,),
+        )
     diag_rows = await cursor.fetchall()
     diag_lines = []
     for dtype, dname, ddesc in diag_rows:
@@ -176,17 +191,19 @@ async def build_multi_set_context(
     set_ids: list[str],
     *,
     max_tokens: int = 8000,
+    package_ids: list[str] | None = None,
 ) -> str:
     """Build combined context from multiple Sets, dividing token budget proportionally.
 
     Each set gets an equal share of the token budget. Results are concatenated
-    with clear dividers between sets.
+    with clear dividers between sets. When package_ids is provided, only
+    diagrams within those packages are included in the context.
     """
     if not set_ids:
         return "No sets selected."
 
     if len(set_ids) == 1:
-        return await build_set_context(db, set_ids[0], max_tokens=max_tokens)
+        return await build_set_context(db, set_ids[0], max_tokens=max_tokens, package_ids=package_ids)
 
     # Reserve tokens for preamble and dividers
     preamble = f"MULTI-SET CONTEXT ({len(set_ids)} sets):\n\n"
@@ -198,7 +215,7 @@ async def build_multi_set_context(
 
     sections: list[str] = []
     for sid in set_ids:
-        ctx = await build_set_context(db, sid, max_tokens=per_set_tokens)
+        ctx = await build_set_context(db, sid, max_tokens=per_set_tokens, package_ids=package_ids)
         sections.append(ctx)
 
     return preamble + "\n---\n\n".join(sections)

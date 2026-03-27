@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Bulk DoView PPTX import** — upload multiple .pptx files in one operation via `POST /api/import/pptx/batch`, all grouped under a single set with per-file error reporting and partial success support (ADR-108)
+- **Package-level AI context** — Ask AI set selector now supports drilling down into packages within each set, constraining AI context to specific packages for more focused responses (ADR-109)
+
 ## [3.0.0] - 2026-03-25
 
 ### Added

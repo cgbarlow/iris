@@ -146,6 +146,7 @@ async def list_elements(
     *,
     element_type: str | None = None,
     set_id: str | None = None,
+    collection_id: str | None = None,
     notation: str | None = None,
     search: str | None = None,
     page: int = 1,
@@ -162,6 +163,9 @@ async def list_elements(
     if set_id:
         where_clauses.append("e.set_id = ?")
         params.append(set_id)
+    elif collection_id:
+        where_clauses.append("e.set_id IN (SELECT id FROM sets WHERE collection_id = ?)")
+        params.append(collection_id)
 
     if notation:
         where_clauses.append("e.notation = ?")

@@ -44,10 +44,21 @@ def _emu_to_px(emu: int) -> int:
     return round(emu / _EMU_PER_PX)
 
 
-def _derive_model_name(file_path: str) -> str:
-    """Derive a model name from the PPTX filename."""
+def _derive_model_name(file_path: str, slides: list | None = None) -> str:
+    """Derive a model name from the DoView topic title on slide 1.
+
+    The topic name is in the first TextBox shape on the overview slide.
+    Falls back to the PPTX filename if no title is found.
+    """
+    if slides and len(slides) > 0:
+        for shape in slides[0].shapes:
+            if shape.is_textbox and shape.text:
+                first_line = shape.text.split("\n")[0].strip()
+                if first_line and len(first_line) > 3:
+                    return first_line
+
+    # Fallback: derive from filename
     base = os.path.splitext(os.path.basename(file_path))[0]
-    # Clean up common suffixes
     for suffix in (" DoView", " doview"):
         if base.endswith(suffix):
             base = base[: -len(suffix)]
@@ -84,7 +95,7 @@ async def import_pptx_file(
     classified = classify_slides(slides)
 
     # ── Pass 2: Create entities & diagrams ────────────────────────────
-    model_name = _derive_model_name(file_path)
+    model_name = _derive_model_name(file_path, slides)
 
     root_pkg = await create_package(
         db,
