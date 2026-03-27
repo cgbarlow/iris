@@ -19,11 +19,17 @@ CREATE INDEX IF NOT EXISTS idx_extensions_name ON extensions(name);
 ALTER TABLE extensions ENABLE ROW LEVEL SECURITY;
 
 -- Allow all authenticated users to read extensions
-CREATE POLICY IF NOT EXISTS "extensions_select" ON extensions
-    FOR SELECT USING (TRUE);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'extensions' AND policyname = 'extensions_select') THEN
+        CREATE POLICY "extensions_select" ON extensions FOR SELECT USING (TRUE);
+    END IF;
+END $$;
 
 -- Only admins can modify extensions
-CREATE POLICY IF NOT EXISTS "extensions_admin" ON extensions
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'extensions' AND policyname = 'extensions_admin') THEN
+        CREATE POLICY "extensions_admin" ON extensions FOR ALL USING (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        );
+    END IF;
+END $$;

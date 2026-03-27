@@ -53,35 +53,41 @@ ALTER TABLE scenia_asset_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scenia_application_statuses ENABLE ROW LEVEL SECURITY;
 
 -- Allow all authenticated users to read
-CREATE POLICY IF NOT EXISTS "scenia_timeline_settings_select" ON scenia_timeline_settings
-    FOR SELECT USING (TRUE);
-
-CREATE POLICY IF NOT EXISTS "scenia_versions_select" ON scenia_versions
-    FOR SELECT USING (TRUE);
-
-CREATE POLICY IF NOT EXISTS "scenia_asset_categories_select" ON scenia_asset_categories
-    FOR SELECT USING (TRUE);
-
-CREATE POLICY IF NOT EXISTS "scenia_application_statuses_select" ON scenia_application_statuses
-    FOR SELECT USING (TRUE);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_timeline_settings' AND policyname = 'scenia_timeline_settings_select') THEN
+        CREATE POLICY "scenia_timeline_settings_select" ON scenia_timeline_settings FOR SELECT USING (TRUE);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_versions' AND policyname = 'scenia_versions_select') THEN
+        CREATE POLICY "scenia_versions_select" ON scenia_versions FOR SELECT USING (TRUE);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_asset_categories' AND policyname = 'scenia_asset_categories_select') THEN
+        CREATE POLICY "scenia_asset_categories_select" ON scenia_asset_categories FOR SELECT USING (TRUE);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_application_statuses' AND policyname = 'scenia_application_statuses_select') THEN
+        CREATE POLICY "scenia_application_statuses_select" ON scenia_application_statuses FOR SELECT USING (TRUE);
+    END IF;
+END $$;
 
 -- Only admins can modify
-CREATE POLICY IF NOT EXISTS "scenia_timeline_settings_admin" ON scenia_timeline_settings
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
-
-CREATE POLICY IF NOT EXISTS "scenia_versions_admin" ON scenia_versions
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
-
-CREATE POLICY IF NOT EXISTS "scenia_asset_categories_admin" ON scenia_asset_categories
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
-
-CREATE POLICY IF NOT EXISTS "scenia_application_statuses_admin" ON scenia_application_statuses
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-    );
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_timeline_settings' AND policyname = 'scenia_timeline_settings_admin') THEN
+        CREATE POLICY "scenia_timeline_settings_admin" ON scenia_timeline_settings FOR ALL USING (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        );
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_versions' AND policyname = 'scenia_versions_admin') THEN
+        CREATE POLICY "scenia_versions_admin" ON scenia_versions FOR ALL USING (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        );
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_asset_categories' AND policyname = 'scenia_asset_categories_admin') THEN
+        CREATE POLICY "scenia_asset_categories_admin" ON scenia_asset_categories FOR ALL USING (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        );
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'scenia_application_statuses' AND policyname = 'scenia_application_statuses_admin') THEN
+        CREATE POLICY "scenia_application_statuses_admin" ON scenia_application_statuses FOR ALL USING (
+            EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+        );
+    END IF;
+END $$;
