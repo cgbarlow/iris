@@ -39,13 +39,13 @@ async def install_extension(
     config: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Install (register) an extension."""
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")  # underscore separator avoids adapter ISO regex
     config_json = json.dumps(config or {})
 
     await db.execute(
         "INSERT INTO extensions (id, name, description, version, is_enabled, "
         "installed_at, installed_by, updated_at, config) "
-        "VALUES (?, ?, ?, ?, TRUE, CAST(? AS TEXT), ?, CAST(? AS TEXT), ?)",
+        "VALUES (?, ?, ?, ?, TRUE, ?, ?, ?, ?)",
         (extension_id, name, description, version, now, installed_by, now, config_json),
     )
     await db.commit()
@@ -92,9 +92,9 @@ async def enable_extension(
     if await cursor.fetchone() is None:
         return None
 
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")
     await db.execute(
-        "UPDATE extensions SET is_enabled = TRUE, updated_at = CAST(? AS TEXT) WHERE id = ?",
+        "UPDATE extensions SET is_enabled = TRUE, updated_at = ? WHERE id = ?",
         (now, extension_id),
     )
     await db.commit()
@@ -113,9 +113,9 @@ async def disable_extension(
     if await cursor.fetchone() is None:
         return None
 
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")
     await db.execute(
-        "UPDATE extensions SET is_enabled = FALSE, updated_at = CAST(? AS TEXT) WHERE id = ?",
+        "UPDATE extensions SET is_enabled = FALSE, updated_at = ? WHERE id = ?",
         (now, extension_id),
     )
     await db.commit()
