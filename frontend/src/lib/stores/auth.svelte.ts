@@ -38,7 +38,7 @@ function saveToSession(data: StoredAuth | null): void {
 	}
 }
 
-const initial = DB_BACKEND === 'supabase' ? null : loadFromSession();
+const initial = loadFromSession();
 
 let accessToken = $state<string | null>(initial?.accessToken ?? null);
 let refreshToken = $state<string | null>(initial?.refreshToken ?? null);
