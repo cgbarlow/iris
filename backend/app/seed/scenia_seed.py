@@ -159,12 +159,11 @@ async def seed_scenia_data(db: DatabasePort) -> None:
             return
         # Soft-deleted remnant — un-delete the set and re-seed its contents
         await db.execute(
-            "UPDATE sets SET is_deleted = 0, updated_at = ? WHERE id = ?",
-            (datetime.now(tz=UTC).isoformat(), _SET_ID),
+            "UPDATE sets SET is_deleted = FALSE, updated_at = ? WHERE id = ?",
+            (datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S"), _SET_ID),
         )
         # Clean up old elements/diagrams so we can re-create them.
-        # Temporarily disable FK checks to avoid cascading constraint issues.
-        await db.execute("PRAGMA foreign_keys = OFF")
+        # Delete child rows first to respect FK constraints (works on both SQLite and PostgreSQL).
         await db.execute(
             "DELETE FROM relationship_versions WHERE relationship_id IN "
             "(SELECT id FROM relationships WHERE relationship_type = 'scenia_dependency')",
@@ -176,21 +175,20 @@ async def seed_scenia_data(db: DatabasePort) -> None:
         )
         await db.execute("DELETE FROM elements WHERE set_id = ?", (_SET_ID,))
         await db.execute(
-            "DELETE FROM diagram_versions WHERE diagram_id IN "
+            "DELETE FROM diagram_thumbnails WHERE diagram_id IN "
             "(SELECT id FROM diagrams WHERE set_id = ?)", (_SET_ID,),
         )
         await db.execute(
-            "DELETE FROM diagram_thumbnails WHERE diagram_id IN "
+            "DELETE FROM diagram_versions WHERE diagram_id IN "
             "(SELECT id FROM diagrams WHERE set_id = ?)", (_SET_ID,),
         )
         await db.execute("DELETE FROM diagrams WHERE set_id = ?", (_SET_ID,))
         await db.execute("DELETE FROM scenia_asset_categories WHERE set_id = ?", (_SET_ID,))
         await db.execute("DELETE FROM scenia_application_statuses WHERE set_id = ?", (_SET_ID,))
         await db.execute("DELETE FROM scenia_timeline_settings WHERE set_id = ?", (_SET_ID,))
-        await db.execute("PRAGMA foreign_keys = ON")
         await db.commit()
 
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")
 
     # Ensure system user exists for FK constraints
     await db.execute(
@@ -1103,16 +1101,16 @@ async def _create_dependency(
 
 async def remove_scenia_seed_data(db: DatabasePort) -> None:
     """Remove Scenia seed data on uninstall. Soft-deletes elements and relationships."""
-    now = datetime.now(tz=UTC).isoformat()
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")
 
     # Soft-delete all elements in the Scenia set
     await db.execute(
-        "UPDATE elements SET is_deleted = 1, updated_at = ? WHERE set_id = ? AND element_type LIKE 'scenia_%'",
+        "UPDATE elements SET is_deleted = TRUE, updated_at = ? WHERE set_id = ? AND element_type LIKE 'scenia_%'",
         (now, _SET_ID),
     )
     # Soft-delete diagrams in the Scenia set
     await db.execute(
-        "UPDATE diagrams SET is_deleted = 1, updated_at = ? WHERE set_id = ?",
+        "UPDATE diagrams SET is_deleted = TRUE, updated_at = ? WHERE set_id = ?",
         (now, _SET_ID),
     )
     # Clean up lookup tables
@@ -1122,7 +1120,7 @@ async def remove_scenia_seed_data(db: DatabasePort) -> None:
 
     # Soft-delete the set (hard-delete would violate FK constraints from elements/diagrams)
     await db.execute(
-        "UPDATE sets SET is_deleted = 1, updated_at = ? WHERE id = ?",
+        "UPDATE sets SET is_deleted = TRUE, updated_at = ? WHERE id = ?",
         (now, _SET_ID),
     )
     await db.commit()
