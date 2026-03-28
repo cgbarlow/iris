@@ -120,9 +120,10 @@ function entityToNative(entity: SceniaEntity): Record<string, unknown> {
 function nativeToEntity(
 	native: Record<string, unknown>,
 	setId: string,
-): { name: string; description: string | null; data: Record<string, unknown>; set_id: string } {
-	const { id: _id, name, description, ...rest } = native;
+): { id?: string; name: string; description: string | null; data: Record<string, unknown>; set_id: string } {
+	const { id, name, description, ...rest } = native;
 	return {
+		...(id != null ? { id: String(id) } : {}),
 		name: (name as string) ?? 'Untitled',
 		description: (description as string) ?? null,
 		data: rest,
@@ -196,8 +197,9 @@ export function sceniaToApi(
 
 	if (data.dependencies) {
 		result.dependencies = data.dependencies.map((dep) => {
-			const { id: _id, sourceId, targetId, type, ...rest } = dep;
+			const { id, sourceId, targetId, type, ...rest } = dep;
 			return {
+				...(id != null ? { id: String(id) } : {}),
 				source_id: sourceId,
 				target_id: targetId,
 				dependency_type: type,
@@ -209,6 +211,7 @@ export function sceniaToApi(
 
 	if (data.assetCategories) {
 		result.asset_categories = data.assetCategories.map((cat) => ({
+			...(cat.id != null ? { id: String(cat.id) } : {}),
 			name: cat.name,
 			display_order: cat.order ?? 0,
 			set_id: setId,
@@ -217,6 +220,7 @@ export function sceniaToApi(
 
 	if (data.applicationStatuses) {
 		result.app_statuses = data.applicationStatuses.map((s) => ({
+			...(s.id != null ? { id: String(s.id) } : {}),
 			name: s.name,
 			color: s.color,
 			display_order: 0,
@@ -226,12 +230,12 @@ export function sceniaToApi(
 
 	if (data.timelineSettings) {
 		const ts = data.timelineSettings as Record<string, unknown>;
-		const { startDate, ...tsRest } = ts;
+		const { startDate, monthsToShow: _months, columnZoom: _zoom, ...tsRest } = ts;
 		result.timeline_settings = {
 			start_date: startDate,
-			view_mode: (ts.monthsToShow as string) ?? 'quarterly',
+			view_mode: 'custom',
 			zoom_level: (ts.columnZoom as number) ?? 1.0,
-			data: tsRest,
+			data: { ...tsRest, monthsToShow: ts.monthsToShow, columnZoom: ts.columnZoom },
 		};
 	}
 

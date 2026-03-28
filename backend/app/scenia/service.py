@@ -761,8 +761,8 @@ async def save_bulk_data(
             set_id,
             start_date=ts.get("start_date"),
             end_date=ts.get("end_date"),
-            view_mode=ts.get("view_mode", "quarterly"),
-            zoom_level=ts.get("zoom_level", 1.0),
+            view_mode=str(ts.get("view_mode", "quarterly")),
+            zoom_level=float(ts.get("zoom_level", 1.0)),
             data=ts.get("data", {}),
         )
 
