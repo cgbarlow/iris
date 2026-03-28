@@ -31,7 +31,7 @@ services:
     runtime: static
     repo: https://github.com/cgbarlow/waylonkenning_scenia
     branch: feature/iris-embed
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci && npx vite build --config vite.config.app.ts
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
