@@ -160,7 +160,7 @@ async def seed_scenia_data(db: DatabasePort) -> None:
         # Soft-deleted remnant — un-delete the set and re-seed its contents
         await db.execute(
             "UPDATE sets SET is_deleted = FALSE, updated_at = ? WHERE id = ?",
-            (datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S"), _SET_ID),
+            (datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%S"), _SET_ID),
         )
         # Clean up old elements/diagrams so we can re-create them.
         # Delete child rows first to respect FK constraints (works on both SQLite and PostgreSQL).
@@ -188,7 +188,7 @@ async def seed_scenia_data(db: DatabasePort) -> None:
         await db.execute("DELETE FROM scenia_timeline_settings WHERE set_id = ?", (_SET_ID,))
         await db.commit()
 
-    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
     # Ensure system user exists for FK constraints
     await db.execute(
@@ -1101,7 +1101,7 @@ async def _create_dependency(
 
 async def remove_scenia_seed_data(db: DatabasePort) -> None:
     """Remove Scenia seed data on uninstall. Soft-deletes elements and relationships."""
-    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
     # Soft-delete all elements in the Scenia set
     await db.execute(

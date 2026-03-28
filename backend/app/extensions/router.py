@@ -108,7 +108,13 @@ async def uninstall(
     if extension_id == "scenia":
         from app.seed.scenia_seed import remove_scenia_seed_data  # noqa: PLC0415
 
-        await remove_scenia_seed_data(db)
+        try:
+            await remove_scenia_seed_data(db)
+        except Exception as exc:
+            raise HTTPException(  # noqa: B904
+                status_code=500,
+                detail=f"Failed to clean up seed data: {exc}",
+            )
 
     removed = await uninstall_extension(db, extension_id)
     if not removed:
