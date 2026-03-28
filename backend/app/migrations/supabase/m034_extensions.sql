@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS extensions (
     description TEXT,
     version TEXT NOT NULL,
     is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    installed_at TEXT NOT NULL,
+    installed_at TIMESTAMPTZ NOT NULL,
     installed_by TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
     config TEXT DEFAULT '{}'
 );
 

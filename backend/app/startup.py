@@ -174,6 +174,28 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     )
     await port.commit()
 
+    # m036: Fix timestamp columns TEXT → TIMESTAMPTZ.
+    # The _convert_params adapter converts ISO strings to datetime objects, which
+    # asyncpg rejects for TEXT columns. Alter to TIMESTAMPTZ so datetimes are accepted.
+    for _table, _col in [
+        ("scenia_timeline_settings", "updated_at"),
+        ("scenia_versions", "created_at"),
+        ("extensions", "installed_at"),
+        ("extensions", "updated_at"),
+    ]:
+        try:
+            # Fix any underscore-separated timestamps from legacy seed data
+            await port.execute(
+                f"UPDATE {_table} SET {_col} = REPLACE({_col}::text, '_', 'T')"  # noqa: S608
+            )
+            await port.execute(
+                f"ALTER TABLE {_table} ALTER COLUMN {_col} TYPE TIMESTAMPTZ "  # noqa: S608
+                f"USING {_col}::TIMESTAMPTZ"
+            )
+        except Exception:  # noqa: BLE001
+            pass  # Table may not exist yet (scenia extension not installed)
+    await port.commit()
+
     # Sync profiles → users table so FK constraints (elements.created_by, etc.) are satisfied.
     # The `users` table is the SQLite-era user store; in Supabase mode it's empty but still
     # referenced by FKs. Mirror each profile into `users` so CRUD operations succeed.

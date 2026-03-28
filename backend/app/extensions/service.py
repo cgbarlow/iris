@@ -39,7 +39,7 @@ async def install_extension(
     config: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Install (register) an extension."""
-    now = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H:%M:%S")  # underscore separator avoids adapter ISO regex
+    now = datetime.now(tz=UTC).isoformat()
     config_json = json.dumps(config or {})
 
     await db.execute(
