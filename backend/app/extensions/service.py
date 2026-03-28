@@ -45,7 +45,7 @@ async def install_extension(
     await db.execute(
         "INSERT INTO extensions (id, name, description, version, is_enabled, "
         "installed_at, installed_by, updated_at, config) "
-        "VALUES (?, ?, ?, ?, TRUE, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, TRUE, CAST(? AS TEXT), ?, CAST(? AS TEXT), ?)",
         (extension_id, name, description, version, now, installed_by, now, config_json),
     )
     await db.commit()
@@ -94,7 +94,7 @@ async def enable_extension(
 
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
-        "UPDATE extensions SET is_enabled = TRUE, updated_at = ? WHERE id = ?",
+        "UPDATE extensions SET is_enabled = TRUE, updated_at = CAST(? AS TEXT) WHERE id = ?",
         (now, extension_id),
     )
     await db.commit()
@@ -115,7 +115,7 @@ async def disable_extension(
 
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
-        "UPDATE extensions SET is_enabled = FALSE, updated_at = ? WHERE id = ?",
+        "UPDATE extensions SET is_enabled = FALSE, updated_at = CAST(? AS TEXT) WHERE id = ?",
         (now, extension_id),
     )
     await db.commit()
