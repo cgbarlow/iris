@@ -18,6 +18,24 @@ services:
         sync: false
       - key: VITE_API_BASE_URL
         sync: false
+      - key: VITE_SCENIA_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # --- Scenia: React roadmapping SPA (external fork) ---
+  - type: web
+    name: scenia
+    runtime: static
+    repo: https://github.com/cgbarlow/waylonkenning_scenia
+    branch: feature/iris-embed
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*

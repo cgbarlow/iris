@@ -21,7 +21,7 @@ iris/
 | Mode | Database | Auth | Hosting |
 |------|----------|------|---------|
 | **SQLite** (default) | SQLite (aiosqlite) | Iris JWT (Argon2id) | Self-hosted (any server) |
-| **Supabase** (optional) | PostgreSQL (asyncpg) | Supabase Auth (JWTs) | Render (static site + web service) |
+| **Supabase** (optional) | PostgreSQL (asyncpg) | Supabase Auth (JWTs) | Render (2 static sites + web service) |
 
 The default self-hosted mode requires no external services. The optional Render + Supabase mode is a cloud-native deployment path. See [docs/deployment-render-supabase.md](docs/deployment-render-supabase.md) for setup instructions.
 

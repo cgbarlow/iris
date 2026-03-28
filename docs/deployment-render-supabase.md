@@ -1,6 +1,6 @@
 # Deploying Iris to Render + Supabase
 
-This guide covers deploying Iris as a static SvelteKit frontend and a FastAPI backend on **Render**, backed by a **Supabase** PostgreSQL database and Supabase Auth.
+This guide covers deploying Iris as a static SvelteKit frontend, a Scenia React roadmapping SPA, and a FastAPI backend on **Render**, backed by a **Supabase** PostgreSQL database and Supabase Auth.
 
 > **Default deployment is SQLite (self-hosted).** Render + Supabase is an optional cloud deployment path. See the main README for standard self-hosted setup.
 
@@ -33,7 +33,7 @@ This guide covers deploying Iris as a static SvelteKit frontend and a FastAPI ba
 
 ## Step 2 — Run the PostgreSQL migrations
 
-All 30 migration files are in `backend/app/migrations/supabase/` (m001–m030). They are idempotent and safe to re-run.
+All 35 migration files are in `backend/app/migrations/supabase/` (m001–m035). They are idempotent and safe to re-run.
 
 ### Option A: Script (recommended)
 
@@ -111,18 +111,28 @@ To add more users after initial setup:
 1. Push your Iris fork/repo to GitHub.
 2. Log in to [Render](https://render.com), click **New → Blueprint**.
 3. Connect to GitHub and select your Iris repository.
-4. Render will detect `render.yaml` and create two services:
+4. Render will detect `render.yaml` and create three services:
    - **iris-frontend** — Static Site serving the SvelteKit SPA
+   - **scenia** — Static Site serving the Scenia React roadmapping SPA (from external fork)
    - **iris-api** — Web Service running FastAPI via uvicorn
+
+> **Note:** The `scenia` service uses the `repo` and `branch` fields to build from `cgbarlow/waylonkenning_scenia` (branch `feature/iris-embed`). The Render GitHub integration must have access to this repository.
 
 ### Option B: Manual setup
 
-Create two services manually in the Render Dashboard:
+Create three services manually in the Render Dashboard:
 
 **Static Site (frontend):**
 - Name: `iris-frontend`
 - Build command: `cd frontend && npm ci && npm run build`
 - Publish directory: `frontend/build`
+- Add rewrite rule: `/* → /index.html` (for SPA client-side routing)
+
+**Static Site (Scenia):**
+- Name: `scenia`
+- Repository: `cgbarlow/waylonkenning_scenia` (branch `feature/iris-embed`)
+- Build command: `npm ci && npm run build`
+- Publish directory: `dist`
 - Add rewrite rule: `/* → /index.html` (for SPA client-side routing)
 
 **Web Service (backend):**
@@ -143,8 +153,17 @@ Create two services manually in the Render Dashboard:
 | `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key |
 | `VITE_API_BASE_URL` | `https://iris-api.onrender.com` | URL of the iris-api web service |
+| `VITE_SCENIA_URL` | `https://scenia.onrender.com` | URL of the Scenia static site |
 
 > **Security note:** `VITE_*` variables are embedded in the frontend bundle at build time and visible to users. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. RLS (m030) prevents the publishable key from accessing any table data directly.
+
+### Scenia (scenia)
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `VITE_API_BASE_URL` | `https://iris-api.onrender.com` | URL of the iris-api web service |
+
+> Scenia receives auth tokens at runtime via URL query parameters from the Iris frontend (see `openScenia()` in `frontend/src/lib/scenia/config.ts`). No Supabase keys are needed at build time.
 
 ### Backend (iris-api)
 
@@ -156,9 +175,9 @@ Create two services manually in the Render Dashboard:
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Supabase secret key (backend only) |
 | `SUPABASE_DB_URL` | `postgresql://...` | Transaction pooler connection string |
 | `SUPABASE_JWT_SECRET` | `your-jwt-secret` | JWT secret from Supabase settings |
-| `IRIS_CORS_ORIGINS` | `https://iris-frontend.onrender.com` | Frontend URL (for CORS) |
+| `IRIS_CORS_ORIGINS` | `https://iris-frontend.onrender.com,https://scenia.onrender.com` | Frontend + Scenia URLs (for CORS) |
 
-> Set `IRIS_CORS_ORIGINS` to your frontend's Render URL. Multiple origins can be comma-separated.
+> Set `IRIS_CORS_ORIGINS` to your frontend and Scenia Render URLs, comma-separated. Scenia makes cross-origin API calls to the backend.
 
 ---
 
@@ -180,7 +199,9 @@ If API calls fail with CORS errors, check that `IRIS_CORS_ORIGINS` on the backen
 Browser
   ↓  HTTPS
 Render Static Site (frontend/build — SvelteKit SPA)
-  ↓  VITE_API_BASE_URL (cross-origin fetch)
+  ↓  window.open (new tab, passes JWT + API URL as query params)
+Render Static Site (dist — Scenia React SPA)
+  ↓  fetch (cross-origin, Bearer token)
 Render Web Service (backend — FastAPI via uvicorn)
   ↓  asyncpg (statement_cache_size=0)
 Supabase PostgreSQL (Transaction Pooler, port 6543)

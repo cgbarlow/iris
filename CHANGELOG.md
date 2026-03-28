@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Bulk DoView PPTX import** — upload multiple .pptx files in one operation via `POST /api/import/pptx/batch`, all grouped under a single set with per-file error reporting and partial success support (ADR-108)
 - **Package-level AI context** — Ask AI set selector now supports drilling down into packages within each set, constraining AI context to specific packages for more focused responses (ADR-109)
+- **Scenia cloud deployment** — Scenia roadmapping app added as a third Render Blueprint service, pulling from the external fork as a static site with CORS and cross-service URL configuration (ADR-110)
+- **Collection-scoped filtering** — clicking a collection card now filters sets, diagrams, elements, and search results across dashboard and list pages
+
+### Fixed
+- **AI discuss crash** — added missing `mode` and `thread_id` columns to `ai_conversations` table (SQLite migration m033)
 
 ## [3.0.0] - 2026-03-25
 
