@@ -64,6 +64,7 @@ if (DB_BACKEND === 'supabase' && supabase) {
 		if (session) {
 			accessToken = session.access_token;
 			refreshToken = session.refresh_token;
+			saveToSession({ accessToken: session.access_token, refreshToken: session.refresh_token, user: currentUser! });
 			if (!currentUser) {
 				_fetchProfile(session.access_token);
 			}
@@ -74,6 +75,8 @@ if (DB_BACKEND === 'supabase' && supabase) {
 		if (session) {
 			accessToken = session.access_token;
 			refreshToken = session.refresh_token;
+			// Persist to storage so cross-window consumers (e.g. Scenia) can read the token
+			saveToSession({ accessToken: session.access_token, refreshToken: session.refresh_token, user: currentUser! });
 			if (!currentUser) {
 				_fetchProfile(session.access_token);
 			}
@@ -81,6 +84,7 @@ if (DB_BACKEND === 'supabase' && supabase) {
 			accessToken = null;
 			refreshToken = null;
 			currentUser = null;
+			saveToSession(null);
 		}
 	});
 }
