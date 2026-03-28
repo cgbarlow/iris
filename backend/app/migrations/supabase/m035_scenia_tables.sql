@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS scenia_timeline_settings (
     view_mode TEXT DEFAULT 'quarterly',
     zoom_level REAL DEFAULT 1.0,
     data TEXT DEFAULT '{}',
-    updated_at TEXT NOT NULL
+    updated_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_scenia_timeline_settings_set_id ON scenia_timeline_settings(set_id);
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS scenia_versions (
     version_number INTEGER NOT NULL,
     name TEXT,
     data TEXT DEFAULT '{}',
-    created_at TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
     created_by TEXT NOT NULL
 );
 
