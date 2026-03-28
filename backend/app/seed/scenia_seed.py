@@ -189,6 +189,7 @@ async def seed_scenia_data(db: DatabasePort) -> None:
         await db.commit()
 
     now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%S")
+    now_text = now.replace("T", "_")  # underscore format for TEXT columns (bypasses adapter conversion)
 
     # Ensure system user exists for FK constraints
     await db.execute(
@@ -625,7 +626,7 @@ async def seed_scenia_data(db: DatabasePort) -> None:
              "showDependencies": True,
              "showProgress": True,
              "showBudget": True,
-         }), now),
+         }), now_text),
     )
 
     # ── Diagrams (10) ───────────────────────────────────────────────────────
