@@ -423,6 +423,7 @@ async def ask_multi_set_question(
     *,
     set_ids: list[str],
     collection_id: str | None = None,
+    docref_doc_ids: list[str] | None = None,
     question: str,
     user_id: str,
     provider_id: str | None = None,
@@ -441,6 +442,21 @@ async def ask_multi_set_question(
         raise ValueError(msg)
 
     context = await build_multi_set_context(db, set_ids)
+
+    # Append DocRef legislation context if requested (ADR-112)
+    if docref_doc_ids:
+        try:
+            from app.extensions.service import is_extension_enabled  # noqa: PLC0415
+
+            if await is_extension_enabled(db, "docref"):
+                from app.docref.service import build_docref_context  # noqa: PLC0415
+
+                docref_ctx = await build_docref_context(db, docref_doc_ids)
+                if docref_ctx:
+                    context += "\n\n---\n\nLEGISLATION REFERENCE:\n" + docref_ctx
+        except Exception:  # noqa: BLE001
+            pass  # Graceful degradation
+
     primary_set_id = set_ids[0]
 
     system_prompt = str(provider.get("system_prompt") or "")

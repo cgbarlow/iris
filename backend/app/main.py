@@ -23,6 +23,7 @@ from app.diagrams.router import router as diagrams_router
 from app.locks.router import admin_router as admin_locks_router
 from app.locks.router import router as locks_router
 from app.elements.router import router as elements_router
+from app.docref.router import router as docref_router
 from app.extensions.router import router as extensions_router
 from app.import_pptx.router import router as import_pptx_router
 from app.scenia.router import router as scenia_router
@@ -49,11 +50,21 @@ if TYPE_CHECKING:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: initialize databases on startup, close on shutdown."""
+    import asyncio
+
     config: AppConfig = app.state.config
     db_manager = DatabaseManager(config)
     await initialize_databases(db_manager)
     app.state.db_manager = db_manager
+
+    # Start DocRef hourly index refresh (ADR-112)
+    from app.docref.scheduler import start_docref_refresh_loop
+
+    docref_task = asyncio.create_task(start_docref_refresh_loop(app))
+
     yield
+
+    docref_task.cancel()
     await db_manager.close()
 
 
@@ -140,6 +151,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(admin_locks_router)
     app.include_router(ai_router)
     app.include_router(extensions_router)
+    app.include_router(docref_router)
     app.include_router(scenia_router)
 
     return app

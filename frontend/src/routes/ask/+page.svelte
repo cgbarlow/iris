@@ -4,11 +4,18 @@
 	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import SetQA from '$lib/components/SetQA.svelte';
 	import MultiSetSelector from '$lib/components/MultiSetSelector.svelte';
+	import DocRefSelector from '$lib/components/DocRefSelector.svelte';
 	import type { IrisSet, IrisCollection } from '$lib/types/api';
+
+	type Extension = {
+		id: string;
+		is_enabled: boolean;
+	};
 
 	let allSets = $state<IrisSet[]>([]);
 	let collections = $state<IrisCollection[]>([]);
 	let loading = $state(true);
+	let docrefEnabled = $state(false);
 
 	const activeSetId = $derived(getActiveSetId());
 	const activeCollectionId = $derived(getActiveCollectionId());
@@ -16,6 +23,7 @@
 	let selectedCollectionId = $state('');
 	let selectedSetIds = $state<string[]>([]);
 	let selectedPackageIds = $state<string[]>([]);
+	let selectedDocRefIds = $state<string[]>([]);
 
 	// Filter sets by selected collection
 	let displayedSets = $derived(
@@ -59,6 +67,14 @@
 					selectedSetIds = [allSets[0].id];
 				}
 			}
+
+			// Check if DocRef extension is enabled
+			try {
+				const extResp = await apiFetch<{ items: Extension[] }>('/api/extensions');
+				docrefEnabled = extResp.items.some((e) => e.id === 'docref' && e.is_enabled);
+			} catch {
+				// Extensions API may not be available
+			}
 		} catch {
 			// ignore
 		}
@@ -95,16 +111,16 @@
 	{:else if allSets.length === 0}
 		<p class="mt-4 text-sm" style="color: var(--color-muted)">No sets available. Import or create a set first.</p>
 	{:else}
-		<div class="mt-4 flex flex-wrap items-start gap-4" style="max-width: 600px">
+		<div class="mt-4 flex flex-wrap items-end gap-4" style="max-width: 800px">
 			{#if collections.length > 0}
-				<div class="flex items-center gap-2">
-					<label for="ask-collection" class="text-sm font-medium" style="color: var(--color-fg)">Collection</label>
+				<div>
+					<label for="ask-collection" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">Collection</label>
 					<select
 						id="ask-collection"
 						value={selectedCollectionId}
 						onchange={handleCollectionChange}
 						class="rounded border px-3 py-1.5 text-sm"
-						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); min-width: 200px"
 					>
 						<option value="">All collections</option>
 						{#each collections as c (c.id)}
@@ -113,7 +129,7 @@
 					</select>
 				</div>
 			{/if}
-			<div class="flex-1" style="min-width: 250px">
+			<div style="min-width: 250px">
 				<MultiSetSelector
 					sets={displayedSets}
 					selectedIds={selectedSetIds}
@@ -123,11 +139,19 @@
 				/>
 			</div>
 		</div>
+		{#if docrefEnabled}
+			<div class="mt-3" style="max-width: 800px">
+				<DocRefSelector
+					selectedDocIds={selectedDocRefIds}
+					onchange={(ids) => { selectedDocRefIds = ids; }}
+				/>
+			</div>
+		{/if}
 
 		{#if selectedSetIds.length > 0}
 			<div class="mt-4 flex-1 overflow-hidden">
 				{#key setIdsKey}
-					<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} packageIds={selectedPackageIds.length > 0 ? selectedPackageIds : undefined} />
+					<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} packageIds={selectedPackageIds.length > 0 ? selectedPackageIds : undefined} docrefDocIds={selectedDocRefIds.length > 0 ? selectedDocRefIds : undefined} />
 				{/key}
 			</div>
 		{:else}

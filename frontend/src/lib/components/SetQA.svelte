@@ -12,9 +12,10 @@
 		setIds: string[];
 		collectionId?: string;
 		packageIds?: string[];
+		docrefDocIds?: string[];
 	}
 
-	let { setIds, collectionId, packageIds }: Props = $props();
+	let { setIds, collectionId, packageIds, docrefDocIds }: Props = $props();
 
 	// Primary set ID for backwards compatibility (history, diagram creation)
 	const setId = $derived(setIds[0] || '');
@@ -207,8 +208,8 @@ function promptForLocation() {
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
 				body: JSON.stringify(creationMode
-					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, question: q, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
-					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, question: q, thread_id: currentThreadId }
+					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, question: q, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
+					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, question: q, thread_id: currentThreadId }
 				),
 				signal: abortController.signal,
 			});

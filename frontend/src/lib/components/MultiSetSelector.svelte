@@ -98,8 +98,8 @@
 	}
 </script>
 
-<div class="flex items-center gap-2" style="position: relative">
-	<label class="text-sm font-medium" style="color: var(--color-fg)">{label}</label>
+<div style="position: relative">
+	<label class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">{label}</label>
 	<button
 		type="button"
 		onclick={() => { open = !open; }}

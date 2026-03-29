@@ -83,11 +83,23 @@ async def install(
             detail=f"Failed to install extension: {exc}",
         )
 
-    # Seed demo data for known extensions
+    # Post-install hooks for known extensions
     if extension_id == "scenia":
         from app.seed.scenia_seed import seed_scenia_data  # noqa: PLC0415
 
         await seed_scenia_data(db)
+
+    if extension_id == "docref":
+        from app.docref.service import refresh_document_index  # noqa: PLC0415
+
+        try:
+            refresh_result = await refresh_document_index(db)
+            print(
+                f"[DocRef] Index populated: {refresh_result['documents_found']} documents found",
+                flush=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"[DocRef] Warning: index refresh failed: {exc}", flush=True)
 
     return ExtensionResponse(**result)
 

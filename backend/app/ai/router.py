@@ -422,6 +422,7 @@ async def ask_multi_set(
             db,
             set_ids=body.set_ids,
             collection_id=body.collection_id,
+            docref_doc_ids=body.docref_doc_ids,
             question=body.question,
             user_id=current_user["id"],
             provider_id=body.provider_id,
@@ -470,6 +471,20 @@ async def _ask_multi_set_streaming(
 
             from app.ai.context import build_multi_set_context
             context = await build_multi_set_context(db, set_ids, package_ids=body.package_ids)
+
+            # Append DocRef legislation context if requested (ADR-112)
+            if body.docref_doc_ids:
+                try:
+                    from app.extensions.service import is_extension_enabled  # noqa: PLC0415
+
+                    if await is_extension_enabled(db, "docref"):
+                        from app.docref.service import build_docref_context  # noqa: PLC0415
+
+                        docref_ctx = await build_docref_context(db, body.docref_doc_ids)
+                        if docref_ctx:
+                            context += "\n\n---\n\nLEGISLATION REFERENCE:\n" + docref_ctx
+                except Exception:  # noqa: BLE001
+                    pass  # Graceful degradation
 
             primary_set_id = set_ids[0]
 
