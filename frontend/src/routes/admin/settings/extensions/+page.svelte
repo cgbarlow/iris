@@ -27,6 +27,13 @@
 			description: 'Open-source roadmapping tool for strategic planning and initiative tracking.',
 			version: '1.0.0',
 		},
+		{
+			id: 'mnemos',
+			name: 'MNEMOS',
+			description:
+				'Semantic memory and retrieval service for improved AI context quality across large datasets.',
+			version: '1.0.0',
+		},
 	];
 
 	let extensions = $state<Extension[]>([]);

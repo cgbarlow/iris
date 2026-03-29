@@ -83,11 +83,19 @@ async def install(
             detail=f"Failed to install extension: {exc}",
         )
 
-    # Seed demo data for known extensions
+    # Post-install hooks for known extensions
     if extension_id == "scenia":
         from app.seed.scenia_seed import seed_scenia_data  # noqa: PLC0415
 
         await seed_scenia_data(db)
+
+    if extension_id == "mnemos":
+        from app.mnemos.setup import ensure_sdk_importable, start_container  # noqa: PLC0415
+
+        ensure_sdk_importable()
+        ok, msg = await start_container()
+        if not ok:
+            print(f"[MNEMOS] Warning: {msg}", flush=True)
 
     return ExtensionResponse(**result)
 
@@ -104,7 +112,7 @@ async def uninstall(
 
     db = request.app.state.db_manager.main_db
 
-    # Clean up seed data for known extensions
+    # Pre-uninstall hooks for known extensions
     if extension_id == "scenia":
         from app.seed.scenia_seed import remove_scenia_seed_data  # noqa: PLC0415
 
@@ -115,6 +123,13 @@ async def uninstall(
                 status_code=500,
                 detail=f"Failed to clean up seed data: {exc}",
             )
+
+    if extension_id == "mnemos":
+        from app.mnemos.setup import stop_container  # noqa: PLC0415
+
+        ok, msg = await stop_container()
+        if not ok:
+            print(f"[MNEMOS] Warning during uninstall: {msg}", flush=True)
 
     removed = await uninstall_extension(db, extension_id)
     if not removed:

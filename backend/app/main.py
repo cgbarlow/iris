@@ -25,6 +25,7 @@ from app.locks.router import router as locks_router
 from app.elements.router import router as elements_router
 from app.extensions.router import router as extensions_router
 from app.import_pptx.router import router as import_pptx_router
+from app.mnemos.router import router as mnemos_router
 from app.scenia.router import router as scenia_router
 from app.import_sparx.router import router as import_router
 from app.middleware.audit import AuditMiddleware
@@ -140,6 +141,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(admin_locks_router)
     app.include_router(ai_router)
     app.include_router(extensions_router)
+    app.include_router(mnemos_router)
     app.include_router(scenia_router)
 
     return app
