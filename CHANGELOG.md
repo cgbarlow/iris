@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **DocRef legislation integration** — optional extension for importing NZ legislation documents from legislation.docref.nz as AI context; browse and import chunked CSVs with progress indicators, select imported legislation alongside sets and collections on the Ask AI page, with hourly background index refresh (ADR-112)
+- **MNEMOS semantic retrieval** — optional MNEMOS extension for AI-powered semantic context retrieval, replacing naive token-budget truncation with question-aware ranking across sets; managed via admin Extensions tab with graceful fallback to direct retrieval when unavailable (ADR-111)
+- **RetrievalPort abstraction** — protocol-based retrieval strategy allowing pluggable context backends; `DirectRetrieval` wraps existing `context.py`, `SemanticRetrieval` uses MNEMOS (ADR-111)
 - **Bulk DoView PPTX import** — upload multiple .pptx files in one operation via `POST /api/import/pptx/batch`, all grouped under a single set with per-file error reporting and partial success support (ADR-108)
 - **Package-level AI context** — Ask AI set selector now supports drilling down into packages within each set, constraining AI context to specific packages for more focused responses (ADR-109)
 - **Scenia cloud deployment** — Scenia roadmapping app added as a third Render Blueprint service, pulling from the external fork as a static site with CORS and cross-service URL configuration (ADR-110)

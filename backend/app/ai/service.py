@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from app.ai.client import create_ai_client
 from app.ai.context import build_multi_set_context, build_set_context
 from app.ai.models import ProviderTestResult
+from app.ai.retrieval import DirectRetrieval, get_retrieval_strategy
 
 # Re-export for router convenience
 build_context = build_set_context
@@ -288,8 +289,9 @@ async def ask_question(
         msg = "No AI provider configured. Ask an admin to add a provider."
         raise ValueError(msg)
 
-    # 2. Build set context
-    context = await build_set_context(db, set_id)
+    # 2. Build set context (via retrieval strategy — ADR-111)
+    retrieval = await get_retrieval_strategy(db)
+    context = await retrieval.retrieve_context(db, question, [set_id])
 
     # 3. Build messages
     system_prompt = str(provider.get("system_prompt") or "")
@@ -441,7 +443,8 @@ async def ask_multi_set_question(
         msg = "No AI provider configured. Ask an admin to add a provider."
         raise ValueError(msg)
 
-    context = await build_multi_set_context(db, set_ids)
+    retrieval = await get_retrieval_strategy(db)
+    context = await retrieval.retrieve_context(db, question, set_ids)
 
     # Append DocRef legislation context if requested (ADR-112)
     if docref_doc_ids:
