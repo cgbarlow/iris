@@ -123,7 +123,7 @@
 	</div>
 </div>
 
-<p class="mt-1" style="color: var(--color-muted)">View system audit trail with SHA-256 hash chain verification.</p>
+<p class="mt-1 text-sm" style="color: var(--color-muted)">View system audit trail with SHA-256 hash chain verification.</p>
 
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3 items-end">

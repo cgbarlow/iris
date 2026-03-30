@@ -99,7 +99,7 @@
 	}
 </script>
 
-<p class="mb-4" style="color: var(--color-muted)">Configure session timeout and system preferences.</p>
+<p class="mb-4 text-sm" style="color: var(--color-muted)">Configure session timeout and system preferences.</p>
 
 {#if loading}
 	<p class="mt-4" style="color: var(--color-muted)">Loading settings...</p>

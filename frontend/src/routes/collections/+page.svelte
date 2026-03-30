@@ -83,12 +83,15 @@
 </svelte:head>
 
 <div class="flex items-center justify-between">
-	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Collections</h1>
+	<div>
+		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Collections</h1>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Group and organise related Sets into Collections.</p>
+	</div>
 	<div class="flex items-center gap-2">
 		{#if activeCollectionIdValue}
 			<button
 				onclick={handleResetFilter}
-				class="rounded border px-3 py-2 text-sm"
+				class="rounded border px-3 py-1.5 text-sm"
 				style="border-color: var(--color-border); color: var(--color-primary)"
 			>
 				Reset filter
@@ -112,9 +115,7 @@
 		</button>
 	</div>
 </div>
-
-<!-- Controls row -->
-<div class="mt-4 flex items-center gap-4">
+<div class="mt-3 flex items-center gap-4">
 	<input
 		type="search"
 		bind:value={searchQuery}

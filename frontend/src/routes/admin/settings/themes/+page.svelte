@@ -121,7 +121,7 @@
 </script>
 
 <div class="flex items-center justify-between mb-4">
-	<p style="color: var(--color-muted)">Manage visual themes for diagram notations.</p>
+	<p class="text-sm" style="color: var(--color-muted)">Manage visual themes for diagram notations.</p>
 	<button
 		class="rounded px-3 py-1.5 text-sm text-white"
 		style="background-color: var(--color-primary)"

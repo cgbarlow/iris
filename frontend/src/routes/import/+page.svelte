@@ -222,7 +222,7 @@
 
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
-	<p class="mt-2" style="color: var(--color-muted)">
+	<p class="mt-1 text-sm" style="color: var(--color-muted)">
 		Import diagrams from SparxEA (.qea, .eap) or DoView (.pptx) files. Select multiple .pptx files for batch import.
 	</p>
 </div>

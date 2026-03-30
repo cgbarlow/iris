@@ -3,7 +3,7 @@
 </svelte:head>
 
 <h1 class="text-2xl font-bold" style="color: var(--color-fg)">Help</h1>
-<p class="mt-2" style="color: var(--color-muted)">
+<p class="mt-1 text-sm" style="color: var(--color-muted)">
 	Iris is an architectural modelling tool for managing elements, relationships, and diagrams.
 </p>
 

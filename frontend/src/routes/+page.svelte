@@ -210,7 +210,7 @@
 </svelte:head>
 
 <h1 class="text-2xl font-bold" style="color: var(--color-fg)">Dashboard</h1>
-<p class="mt-1" style="color: var(--color-muted)">Integrated Repository for Information & Systems</p>
+<p class="mt-1 text-sm" style="color: var(--color-muted)">Integrated Repository for Information & Systems</p>
 
 {#if loading}
 	<p class="mt-4" style="color: var(--color-muted)">Loading dashboard...</p>
@@ -281,6 +281,10 @@
 			</div>
 		</a>
 	</div>
+
+	<p class="mt-4 text-sm" style="color: var(--color-muted)">
+		Select a Collection or Set above to filter, or use the search below to find diagrams and elements.
+	</p>
 
 	<!-- Diagram Hierarchy (when set selected) -->
 	{#if activeSet}

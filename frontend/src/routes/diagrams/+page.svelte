@@ -370,7 +370,7 @@
 <div class="flex items-center justify-between">
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Diagrams</h1>
-		<p class="mt-2" style="color: var(--color-muted)">Browse and manage architectural diagrams.</p>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Browse and manage architectural diagrams.</p>
 	</div>
 	<div class="flex items-center gap-2">
 		<button

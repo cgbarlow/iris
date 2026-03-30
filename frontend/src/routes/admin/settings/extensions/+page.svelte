@@ -140,7 +140,7 @@
 	}
 </script>
 
-<p class="mb-4" style="color: var(--color-muted)">Manage optional integrations and extensions.</p>
+<p class="mb-4 text-sm" style="color: var(--color-muted)">Manage optional integrations and extensions.</p>
 
 {#if error}
 	<div
