@@ -18,9 +18,10 @@
 	interface Props {
 		selectedDocIds: string[];
 		onchange: (ids: string[]) => void;
+		ondocuments?: (docs: { id: string; title: string }[]) => void;
 	}
 
-	let { selectedDocIds, onchange }: Props = $props();
+	let { selectedDocIds, onchange, ondocuments }: Props = $props();
 
 	let documents = $state<DocRefDocument[]>([]);
 	let loading = $state(true);
@@ -57,6 +58,7 @@
 		try {
 			const resp = await apiFetch<{ items: DocRefDocument[] }>('/api/docref/documents');
 			documents = resp.items;
+			ondocuments?.(resp.items.map(d => ({ id: d.id, title: d.title })));
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 404) {
 				// Extension not available — hide component
@@ -111,22 +113,17 @@
 	<button
 		type="button"
 		onclick={() => { open = !open; }}
-		class="flex w-full items-center justify-between rounded border px-3 py-1.5 text-left text-sm"
-		style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); min-width: 250px"
+		class="w-full rounded border px-3 py-1.5 text-left text-sm"
+		style="border-color: var(--color-border); background: var(--color-bg); color: {selectedCount === 0 ? 'var(--color-muted)' : 'var(--color-fg)'}; min-width: 250px; padding-right: 2rem; background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 0.5rem center;"
 	>
-		<span class:text-muted={selectedCount === 0} style={selectedCount === 0 ? 'color: var(--color-muted)' : ''}>
-			{summaryText}
-		</span>
-		<svg class="h-4 w-4" style="color: var(--color-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-		</svg>
+		{summaryText}
 	</button>
 
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="absolute z-50 mt-1 w-full rounded border shadow-lg"
-			style="border-color: var(--color-border); background: var(--color-surface)"
+			style="border-color: var(--color-border); background: var(--color-surface); max-height: 300px; overflow: hidden; display: flex; flex-direction: column"
 		>
 			{#if loading}
 				<p class="p-3 text-sm" style="color: var(--color-muted)">Loading documents...</p>
@@ -145,7 +142,7 @@
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 					/>
 				</div>
-				<div class="max-h-64 overflow-y-auto">
+				<div style="overflow-y: auto; flex: 1; min-height: 0">
 				{#each filteredDocuments as doc (doc.id)}
 					<div
 						class="flex items-center gap-2 border-b px-3 py-2"

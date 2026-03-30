@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Scenia cloud deployment** — Scenia roadmapping app added as a third Render Blueprint service, pulling from the external fork as a static site with CORS and cross-service URL configuration (ADR-110)
 - **Collection-scoped filtering** — clicking a collection card now filters sets, diagrams, elements, and search results across dashboard and list pages
 
+### Changed
+- **Ask AI tabbed layout** — split Ask AI page into Context and Request tabs; context selectors on first tab, expanded chat dialogue on second tab with selected dataset summary (ADR-113)
+
 ### Fixed
 - **AI discuss crash** — added missing `mode` and `thread_id` columns to `ai_conversations` table (SQLite migration m033)
 

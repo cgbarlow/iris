@@ -52,7 +52,35 @@ async def build_set_context(
         header += f"{set_desc}\n"
     header += "\n"
 
-    # 2. Elements in set — elements.set_id column (no join table)
+    # 2. When packages are selected, resolve which element IDs belong to those
+    #    packages by extracting entityId from diagram canvas nodes (ADR-109).
+    package_element_ids: set[str] | None = None
+    if package_ids:
+        pkg_placeholders = ",".join("?" * len(package_ids))
+        cursor = await db.execute(
+            f"""
+            SELECT dv.data
+            FROM diagrams d
+            JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version
+            WHERE d.set_id = ? AND d.is_deleted = 0
+              AND d.parent_package_id IN ({pkg_placeholders})
+            """,  # noqa: S608
+            (set_id, *package_ids),
+        )
+        package_element_ids = set()
+        for (canvas_data_raw,) in await cursor.fetchall():
+            try:
+                canvas_data = json.loads(canvas_data_raw) if isinstance(canvas_data_raw, str) else canvas_data_raw
+                for node in (canvas_data or {}).get("nodes", []):
+                    node_data = node.get("data", {})
+                    if isinstance(node_data, dict):
+                        eid = node_data.get("entityId")
+                        if eid:
+                            package_element_ids.add(eid)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+
+    # 3. Elements in set (filtered to package elements when applicable)
     cursor = await db.execute(
         """
         SELECT e.id, e.element_type, ev.name, ev.description, ev.data
@@ -64,6 +92,8 @@ async def build_set_context(
         (set_id,),
     )
     element_rows = await cursor.fetchall()
+    if package_element_ids is not None:
+        element_rows = [r for r in element_rows if r[0] in package_element_ids]
 
     elements_lines: list[str] = []
     element_ids: set[str] = set()
@@ -93,7 +123,7 @@ async def build_set_context(
         elements_section += "(none)\n"
     elements_section += "\n"
 
-    # 3. Relationships between set elements
+    # 4. Relationships between elements (scoped to package when applicable)
     rels_lines: list[str] = []
     if element_ids:
         placeholders = ",".join("?" * len(element_ids))
@@ -124,7 +154,7 @@ async def build_set_context(
         rels_section += "(none)\n"
     rels_section += "\n"
 
-    # 4. Diagrams in set (optionally filtered by package)
+    # 5. Diagrams in set (optionally filtered by package)
     if package_ids:
         pkg_placeholders = ",".join("?" * len(package_ids))
         cursor = await db.execute(
@@ -197,7 +227,7 @@ async def build_multi_set_context(
 
     Each set gets an equal share of the token budget. Results are concatenated
     with clear dividers between sets. When package_ids is provided, only
-    diagrams within those packages are included in the context.
+    elements, relationships, and diagrams within those packages are included.
     """
     if not set_ids:
         return "No sets selected."
