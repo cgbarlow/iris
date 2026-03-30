@@ -46,7 +46,7 @@
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
-		{ href: '/ask', label: 'Ask AI', shortcut: 'A', icon: 'ai' },
+		{ href: '/ask', label: 'Iris AI', shortcut: 'A', icon: 'ai' },
 		{ href: '/collections', label: 'Collections', shortcut: 'C', icon: 'collections' },
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
 		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },

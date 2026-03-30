@@ -122,19 +122,19 @@
 </script>
 
 <svelte:head>
-	<title>Ask AI — Iris</title>
+	<title>Iris AI</title>
 </svelte:head>
 
 <div class="flex flex-col" style="height: calc(100vh - 56px - 48px); overflow: hidden">
 	<div class="flex-none">
-		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Ask AI</h1>
+		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Iris AI</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">
-			Ask questions about your architecture models.
+			Chat with AI to explore, analyse, and create architecture models.
 		</p>
 	</div>
 
 	<!-- Tab bar -->
-	<div class="mt-3 flex flex-none gap-0 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Ask AI sections">
+	<div class="mt-3 flex flex-none gap-0 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Iris AI sections">
 		<button
 			role="tab"
 			aria-selected={activeTab === 'context'}

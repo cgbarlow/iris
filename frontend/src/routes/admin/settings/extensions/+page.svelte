@@ -38,7 +38,7 @@
 			id: 'docref',
 			name: 'DocRef',
 			description:
-				'NZ legislation from legislation.docref.nz as AI context for the Ask AI feature.',
+				'NZ legislation from legislation.docref.nz as AI context for Iris AI.',
 			version: '1.0.0',
 		},
 	];

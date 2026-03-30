@@ -286,7 +286,7 @@
 	<div class="mt-6">
 		<a href="/ask" class="inline-flex items-center gap-2 rounded border px-4 py-2 text-sm"
 			style="border-color: var(--color-border); color: var(--color-primary)">
-			Ask AI about this Set →
+			Iris AI — ask about this Set →
 		</a>
 	</div>
 
