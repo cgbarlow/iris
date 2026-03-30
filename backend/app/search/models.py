@@ -15,6 +15,9 @@ class SearchResult(BaseModel):
     type_detail: str  # element_type or diagram_type
     rank: float = 0.0
     deep_link: str
+    set_name: str | None = None
+    collection_name: str | None = None
+    package_name: str | None = None
 
 
 class SearchResponse(BaseModel):

@@ -152,7 +152,7 @@
 	<!-- Drop zone -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="rounded border-2 border-dashed px-4 py-3 text-center text-sm transition-colors"
+		class="rounded border-2 border-dashed px-4 py-6 text-center text-sm transition-colors"
 		style="border-color: {dragOver ? 'var(--color-primary)' : 'var(--color-border)'}; background: {dragOver ? 'var(--color-primary-muted, rgba(59,130,246,0.05))' : 'var(--color-bg)'}; color: var(--color-muted); cursor: pointer"
 		ondrop={handleDrop}
 		ondragover={handleDragOver}

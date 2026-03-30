@@ -30,6 +30,7 @@ class RetrievalPort(Protocol):
         *,
         max_tokens: int = 8000,
         package_ids: list[str] | None = None,
+        diagram_ids: list[str] | None = None,
     ) -> str:
         """Retrieve context for an AI question. Returns structured text."""
         ...
@@ -49,14 +50,15 @@ class DirectRetrieval:
         *,
         max_tokens: int = 8000,
         package_ids: list[str] | None = None,
+        diagram_ids: list[str] | None = None,
     ) -> str:
         """Build context by querying the database directly."""
         if len(set_ids) == 1:
             return await build_set_context(
-                db, set_ids[0], max_tokens=max_tokens, package_ids=package_ids,
+                db, set_ids[0], max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
             )
         return await build_multi_set_context(
-            db, set_ids, max_tokens=max_tokens, package_ids=package_ids,
+            db, set_ids, max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
         )
 
 

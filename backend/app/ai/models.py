@@ -118,6 +118,7 @@ class MultiSetQARequest(BaseModel):
     set_ids: list[str] = Field(default_factory=list)
     collection_id: str | None = None
     package_ids: list[str] | None = None
+    diagram_ids: list[str] | None = None  # Diagram-level context scoping
     docref_doc_ids: list[str] | None = None  # DocRef legislation document IDs (ADR-112)
     file_contexts: list[FileContext] | None = None  # Session file uploads (ADR-115)
     question: str = Field(min_length=1, max_length=4000)

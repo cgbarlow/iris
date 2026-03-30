@@ -64,17 +64,18 @@ class SemanticRetrieval:
         *,
         max_tokens: int = 8000,
         package_ids: list[str] | None = None,
+        diagram_ids: list[str] | None = None,
     ) -> str:
         """Retrieve context via MNEMOS, falling back to direct on failure.
 
-        When package_ids is provided, uses DirectRetrieval instead since
-        MNEMOS engrams don't carry package scope for elements/relationships.
+        When package_ids or diagram_ids is provided, uses DirectRetrieval
+        instead since MNEMOS engrams don't carry scope metadata.
         """
-        if package_ids:
-            print("[MNEMOS] Package filter active — using DirectRetrieval for scoped context", flush=True)
+        if package_ids or diagram_ids:
+            print("[MNEMOS] Scoped filter active — using DirectRetrieval for scoped context", flush=True)
             return await self._fallback.retrieve_context(
                 db, question, set_ids,
-                max_tokens=max_tokens, package_ids=package_ids,
+                max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
             )
         print(f"[MNEMOS] Attempting semantic retrieval from {self._url}", flush=True)
         try:
@@ -84,11 +85,11 @@ class SemanticRetrieval:
             # LLM needs for structural questions.
             direct_ctx = await self._fallback.retrieve_context(
                 db, question, set_ids,
-                max_tokens=max_tokens, package_ids=package_ids,
+                max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
             )
             result = await self._semantic_retrieve(
                 db, question, set_ids,
-                max_tokens=max_tokens, package_ids=package_ids,
+                max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
             )
             # Combine: direct structural context first, then semantic highlights
             combined = direct_ctx + "\n\n---\n\n" + result
@@ -98,7 +99,7 @@ class SemanticRetrieval:
             print(f"[MNEMOS] Semantic retrieval failed ({exc}) — falling back to DirectRetrieval", flush=True)
             return await self._fallback.retrieve_context(
                 db, question, set_ids,
-                max_tokens=max_tokens, package_ids=package_ids,
+                max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
             )
 
     async def _semantic_retrieve(
@@ -109,6 +110,7 @@ class SemanticRetrieval:
         *,
         max_tokens: int = 8000,
         package_ids: list[str] | None = None,
+        diagram_ids: list[str] | None = None,
     ) -> str:
         """Query MNEMOS for semantically relevant architecture engrams."""
         try:
@@ -157,7 +159,7 @@ class SemanticRetrieval:
             # No results — fall back to direct
             return await self._fallback.retrieve_context(
                 db, question, set_ids,
-                max_tokens=max_tokens, package_ids=package_ids,
+                max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids,
             )
 
         # Build set name headers for context identity

@@ -28,6 +28,22 @@
 	let searchQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
 	let searching = $state(false);
+	let searchTypeFilter = $state('');
+
+	const _typeOrder = ['package', 'diagram', 'element'];
+	let searchTypeCounts = $derived.by(() => {
+		const counts: Record<string, number> = {};
+		for (const r of searchResults) {
+			counts[r.result_type] = (counts[r.result_type] || 0) + 1;
+		}
+		return Object.fromEntries(
+			_typeOrder.filter((t) => t in counts).map((t) => [t, counts[t]])
+		);
+	});
+
+	let filteredSearchResults = $derived(
+		searchTypeFilter ? searchResults.filter((r) => r.result_type === searchTypeFilter) : searchResults
+	);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let hierarchyTree = $state<DiagramHierarchyNode[]>([]);
@@ -187,6 +203,7 @@
 			return;
 		}
 		searching = true;
+		searchTypeFilter = '';
 		try {
 			const setFilter = setId ? `&set_id=${setId}` : '';
 			const collectionFilter = !setId && collectionId ? `&collection_id=${collectionId}` : '';
@@ -357,18 +374,55 @@
 	{:else if searchResults.length > 0}
 		<div class="mt-3" aria-live="polite">
 			<p class="mb-2 text-sm" style="color: var(--color-muted)">{searchResults.length} result{searchResults.length === 1 ? '' : 's'}</p>
-			<ul class="flex flex-col gap-2" style="max-width: 500px">
-				{#each searchResults as result}
+			<div class="mb-2 flex flex-wrap items-center gap-2" style="max-width: 800px">
+				{#each Object.entries(searchTypeCounts) as [type, count]}
+					<button
+						onclick={() => { searchTypeFilter = searchTypeFilter === type ? '' : type; }}
+						class="rounded px-2 py-0.5 text-xs"
+						style="background: {searchTypeFilter === type ? 'var(--color-primary)' : 'var(--color-surface)'}; color: {searchTypeFilter === type ? 'white' : 'var(--color-muted)'}; cursor: pointer"
+					>
+						{type} ({count})
+					</button>
+				{/each}
+				{#if searchTypeFilter}
+					<button
+						onclick={() => { searchTypeFilter = ''; }}
+						class="text-xs underline"
+						style="color: var(--color-muted)"
+					>
+						reset
+					</button>
+				{/if}
+			</div>
+			<ul class="flex flex-col gap-2" style="max-width: 800px">
+				{#each filteredSearchResults as result}
 					<li>
 						<a
 							href={result.deep_link}
-							class="flex items-center gap-3 rounded border p-3"
+							class="block rounded border p-3"
 							style="border-color: var(--color-border); color: var(--color-fg)"
 						>
-							<span class="text-sm font-medium" style="color: var(--color-primary)">{result.name}</span>
-							<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-								{result.result_type} · {result.type_detail}
-							</span>
+							<div class="flex flex-wrap items-center gap-2">
+								<span class="text-sm font-medium" style="color: var(--color-primary)">{result.name}</span>
+								<span class="rounded border px-2 py-0.5 text-xs" style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)">
+									{result.result_type} · {result.type_detail}
+								</span>
+								{#if result.collection_name}
+									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+										{result.collection_name}
+									</span>
+								{/if}
+								{#if result.set_name}
+									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+										{result.set_name}
+									</span>
+								{/if}
+							</div>
+							{#if result.package_name}
+								<div class="mt-1 text-xs" style="color: var(--color-muted)">
+									{result.package_name}
+								</div>
+							{/if}
 						</a>
 					</li>
 				{/each}

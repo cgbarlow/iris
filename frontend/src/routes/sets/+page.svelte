@@ -101,7 +101,18 @@
 
 <div class="flex items-center justify-between">
 	<div>
-		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Sets</h1>
+		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">
+			Sets
+			{#if collectionId}
+				<span class="ml-2 text-sm font-normal" style="color: var(--color-muted)">
+					filtered · <button
+						onclick={() => { clearActiveCollection(); goto('/sets'); }}
+						class="underline"
+						style="color: var(--color-primary)"
+					>reset</button>
+				</span>
+			{/if}
+		</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Manage architecture model Sets and their packages.</p>
 	</div>
 	<div class="flex items-center gap-2">

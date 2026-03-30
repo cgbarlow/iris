@@ -106,7 +106,7 @@
 	<button
 		type="button"
 		onclick={() => { open = !open; }}
-		class="rounded border px-3 py-1.5 text-left text-sm"
+		class="w-full truncate rounded border px-3 py-1.5 text-left text-sm"
 		style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); min-width: 200px; padding-right: 2rem; background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 0.5rem center;"
 	>
 		{summaryText}

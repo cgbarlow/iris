@@ -12,11 +12,12 @@
 		setIds: string[];
 		collectionId?: string;
 		packageIds?: string[];
+		diagramIds?: string[];
 		docrefDocIds?: string[];
 		fileContexts?: { filename: string; text: string }[];
 	}
 
-	let { setIds, collectionId, packageIds, docrefDocIds, fileContexts }: Props = $props();
+	let { setIds, collectionId, packageIds, diagramIds, docrefDocIds, fileContexts }: Props = $props();
 
 	// Primary set ID for backwards compatibility (history, diagram creation)
 	const setId = $derived(setIds[0] || '');
@@ -243,8 +244,8 @@ function promptForLocation() {
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
 				body: JSON.stringify(creationMode
-					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
-					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, thread_id: currentThreadId }
+					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, diagram_ids: diagramIds?.length ? diagramIds : null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
+					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, diagram_ids: diagramIds?.length ? diagramIds : null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, thread_id: currentThreadId }
 				),
 				signal: abortController.signal,
 			});

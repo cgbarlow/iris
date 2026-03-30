@@ -438,6 +438,7 @@ async def ask_multi_set_question(
     collection_id: str | None = None,
     docref_doc_ids: list[str] | None = None,
     file_contexts: list[dict[str, str]] | None = None,
+    diagram_ids: list[str] | None = None,
     question: str,
     user_id: str,
     provider_id: str | None = None,

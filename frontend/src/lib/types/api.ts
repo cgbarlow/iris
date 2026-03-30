@@ -130,12 +130,15 @@ export interface LockCheckResponse {
 
 export interface SearchResult {
 	id: string;
-	result_type: 'element' | 'diagram';
+	result_type: 'element' | 'diagram' | 'package';
 	name: string;
 	description: string | null;
 	type_detail: string;
 	rank: number;
 	deep_link: string;
+	set_name: string | null;
+	collection_name: string | null;
+	package_name: string | null;
 }
 
 export interface SearchResponse {

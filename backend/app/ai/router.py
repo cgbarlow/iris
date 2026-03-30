@@ -569,7 +569,7 @@ async def _ask_multi_set_streaming(
                 from app.ai.retrieval import get_retrieval_strategy
                 retrieval = await get_retrieval_strategy(db)
                 context = await retrieval.retrieve_context(
-                    db, body.question, set_ids, package_ids=body.package_ids,
+                    db, body.question, set_ids, package_ids=body.package_ids, diagram_ids=body.diagram_ids,
                 )
 
             # Append DocRef legislation context if requested (ADR-112)
