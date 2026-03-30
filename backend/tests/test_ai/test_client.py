@@ -115,6 +115,34 @@ class TestOpenAICompatibleClient:
         assert answer == "ollama says hi"
 
 
+    # --- Advanced parameter payload tests (ADR-114) ---
+
+    def test_payload_includes_advanced_params(self):
+        params = json.dumps({
+            "temperature": 0.7, "max_tokens": 4096, "top_p": 0.9,
+            "top_k": 40, "min_p": 0.05,
+            "frequency_penalty": 0.5, "presence_penalty": -0.5,
+            "stop": ["END", "\n"],
+        })
+        provider = make_provider(parameters=params)
+        client = OpenAICompatibleClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        assert payload["temperature"] == 0.7
+        assert payload["top_p"] == 0.9
+        assert payload["top_k"] == 40
+        assert payload["min_p"] == 0.05
+        assert payload["frequency_penalty"] == 0.5
+        assert payload["presence_penalty"] == -0.5
+        assert payload["stop"] == ["END", "\n"]
+
+    def test_payload_omits_null_advanced_params(self):
+        provider = make_provider(parameters="{}")
+        client = OpenAICompatibleClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        for key in ("top_k", "min_p", "frequency_penalty", "presence_penalty", "stop"):
+            assert key not in payload
+
+
 class TestAnthropicClient:
     def _make_messages_response(self, content: str, tokens_in=15, tokens_out=30):
         return {
@@ -157,6 +185,34 @@ class TestAnthropicClient:
         client = AnthropicClient(provider)
         result = await client.test_connection()
         assert result.ok is False
+
+    # --- Advanced parameter payload tests (ADR-114) ---
+
+    def test_payload_includes_top_k(self):
+        params = json.dumps({"top_k": 40, "max_tokens": 4096})
+        provider = make_provider(provider_type="anthropic", model="claude-3-5-sonnet-20241022", parameters=params)
+        client = AnthropicClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        assert payload["top_k"] == 40
+
+    def test_payload_maps_stop_to_stop_sequences(self):
+        params = json.dumps({"stop": ["END", "\n"], "max_tokens": 4096})
+        provider = make_provider(provider_type="anthropic", model="claude-3-5-sonnet-20241022", parameters=params)
+        client = AnthropicClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        assert payload["stop_sequences"] == ["END", "\n"]
+        assert "stop" not in payload
+
+    def test_payload_omits_unsupported_params(self):
+        params = json.dumps({
+            "frequency_penalty": 0.5, "presence_penalty": -0.5, "min_p": 0.05,
+            "max_tokens": 4096,
+        })
+        provider = make_provider(provider_type="anthropic", model="claude-3-5-sonnet-20241022", parameters=params)
+        client = AnthropicClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        for key in ("frequency_penalty", "presence_penalty", "min_p"):
+            assert key not in payload
 
 
 class TestFactory:

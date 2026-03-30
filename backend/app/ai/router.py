@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 log = logging.getLogger("app.ai")
@@ -34,11 +34,13 @@ async def _is_ai_debug(db: object) -> bool:
 
 from app.auth.dependencies import get_current_user
 from app.ai.models import (
+    ActiveProviderResponse,
     ApplyCreationRequest,
     ApplyCreationResponse,
     ConversationResponse,
     CreationPromptResponse,
     CreationPromptUpdate,
+    FileExtractResponse,
     ProviderCreate,
     ProviderResponse,
     ProviderTestResult,
@@ -53,10 +55,45 @@ from app.ai.creation import create_diagrams_from_ai
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
+_MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
 def _require_admin(current_user: dict[str, Any]) -> None:
     """Raise 403 if not admin."""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+
+
+# ---------------------------------------------------------------------------
+# File extraction (ADR-115)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/files/extract", response_model=FileExtractResponse)
+async def extract_file(
+    file: UploadFile,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> FileExtractResponse:
+    """Extract text from an uploaded file for AI context. Session-scoped, no storage."""
+    content = await file.read()
+    if len(content) > _MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File exceeds 5 MB limit")
+
+    from app.ai.extract import extract_text  # noqa: PLC0415
+
+    result = await extract_text(
+        filename=file.filename or "unknown",
+        content=content,
+        content_type=file.content_type or "application/octet-stream",
+    )
+    return FileExtractResponse(
+        filename=result.filename,
+        content_type=result.content_type,
+        size_bytes=result.size_bytes,
+        extracted_text=result.extracted_text,
+        truncated=result.truncated,
+        error=result.error,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +138,50 @@ async def create_provider(
         created_by=current_user["id"],
     )
     return ProviderResponse(**provider)
+
+
+@router.get("/providers/active", response_model=list[ActiveProviderResponse])
+async def list_active_providers(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> list[ActiveProviderResponse]:
+    """List active AI providers (id, name, model, type). Any authenticated user."""
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "SELECT id, name, model, provider_type, base_url, is_default FROM ai_providers WHERE is_active = 1 ORDER BY name",
+    )
+    rows = await cursor.fetchall()
+    return [
+        ActiveProviderResponse(id=r[0], name=r[1], model=r[2], provider_type=r[3], base_url=r[4], is_default=bool(r[5]))
+        for r in rows
+    ]
+
+
+@router.post("/providers/ping")
+async def ping_providers(
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, bool]:
+    """Quick connectivity check for all active providers. Any authenticated user."""
+    import asyncio
+    import httpx as _httpx
+
+    db = request.app.state.db_manager.main_db
+    providers = await service.list_providers_internal(db)
+
+    async def _ping(p: dict[str, Any]) -> tuple[str, bool]:
+        """Ping by sending a minimal chat completion with the specific model."""
+        from app.ai.client import create_ai_client
+
+        try:
+            client = create_ai_client(p)
+            result = await client.test_connection()
+            return (str(p["id"]), result.ok)
+        except Exception:  # noqa: BLE001
+            return (str(p["id"]), False)
+
+    results = await asyncio.gather(*[_ping(p) for p in providers])
+    return dict(results)
 
 
 @router.get("/providers/{provider_id}", response_model=ProviderResponse)
@@ -354,6 +435,7 @@ async def _ask_streaming(
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             answer = "".join(full_answer)
+            tokens_in, tokens_out = getattr(client, "stream_usage", (None, None))
 
             if ai_debug:
                 log.info("[AI_DEBUG] --- streaming complete ---")
@@ -375,9 +457,9 @@ async def _ask_streaming(
             )
             await db.execute(
                 "INSERT INTO ai_usage_log "
-                "(provider_id, user_id, endpoint, model, duration_ms, status, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (str(provider["id"]), user_id, "ask_stream", model_used, duration_ms, "success", now),
+                "(provider_id, user_id, endpoint, model, tokens_in, tokens_out, duration_ms, status, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (str(provider["id"]), user_id, "ask_stream", model_used, tokens_in, tokens_out, duration_ms, "success", now),
             )
             await db.commit()
 
@@ -386,6 +468,8 @@ async def _ask_streaming(
                 "conversation_id": conv_id,
                 "duration_ms": duration_ms,
                 "model_used": model_used,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
             }) + "\n\n"
 
         except Exception as exc:  # noqa: BLE001
@@ -411,10 +495,10 @@ async def ask_multi_set(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> Any:
     """Ask a question across multiple Sets. Returns QAResponse or SSE stream."""
-    if not body.set_ids and not body.docref_doc_ids:
+    if not body.set_ids and not body.docref_doc_ids and not body.file_contexts:
         raise HTTPException(
             status_code=400,
-            detail="At least one set or legislation document must be selected",
+            detail="At least one set, legislation document, or file must be provided",
         )
     db = request.app.state.db_manager.main_db
 
@@ -430,6 +514,7 @@ async def ask_multi_set(
             set_ids=body.set_ids,
             collection_id=body.collection_id,
             docref_doc_ids=body.docref_doc_ids,
+            file_contexts=[{"filename": fc.filename, "text": fc.text} for fc in body.file_contexts] if body.file_contexts else None,
             question=body.question,
             user_id=current_user["id"],
             provider_id=body.provider_id,
@@ -503,6 +588,14 @@ async def _ask_multi_set_streaming(
                 except Exception:  # noqa: BLE001
                     pass  # Graceful degradation
 
+            # Append uploaded file context if provided (ADR-115)
+            if body.file_contexts:
+                file_parts = [f"FILE: {fc.filename}\n{fc.text}" for fc in body.file_contexts]
+                file_context_str = "\n\n---\n\n".join(file_parts)
+                if context:
+                    context += "\n\n---\n\n"
+                context += "UPLOADED FILES:\n" + file_context_str
+
             primary_set_id = set_ids[0] if set_ids else None
 
             if body.mode == "creation":
@@ -517,6 +610,7 @@ async def _ask_multi_set_streaming(
                 system_prompt = str(provider.get("system_prompt") or "")
                 has_sets = bool(set_ids)
                 has_docref = bool(body.docref_doc_ids)
+                has_files = bool(body.file_contexts)
                 if system_prompt:
                     system_content = f"{system_prompt}\n\nContext:\n{context}"
                 elif has_sets and has_docref:
@@ -529,6 +623,11 @@ async def _ask_multi_set_streaming(
                     system_content = (
                         "You are an AI assistant helping users understand NZ legislation. "
                         "Answer questions based on the provided legislation reference.\n\nContext:\n" + context
+                    )
+                elif has_files and not has_sets:
+                    system_content = (
+                        "You are an AI assistant. Answer questions based on the uploaded file content "
+                        "provided.\n\nContext:\n" + context
                     )
                 else:
                     system_content = (
@@ -566,6 +665,7 @@ async def _ask_multi_set_streaming(
 
             duration_ms = int((time.monotonic() - t0) * 1000)
             answer = "".join(full_answer)
+            tokens_in, tokens_out = getattr(client, "stream_usage", (None, None))
 
             conv_id = str(uuid.uuid4())
             now = datetime.now(tz=UTC).isoformat()
@@ -583,9 +683,9 @@ async def _ask_multi_set_streaming(
             )
             await db.execute(
                 "INSERT INTO ai_usage_log "
-                "(provider_id, user_id, endpoint, model, duration_ms, status, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (str(provider["id"]), user_id, "ask_multi_stream", model_used, duration_ms, "success", now),
+                "(provider_id, user_id, endpoint, model, tokens_in, tokens_out, duration_ms, status, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (str(provider["id"]), user_id, "ask_multi_stream", model_used, tokens_in, tokens_out, duration_ms, "success", now),
             )
             await db.commit()
 
@@ -594,6 +694,8 @@ async def _ask_multi_set_streaming(
                 "conversation_id": conv_id,
                 "duration_ms": duration_ms,
                 "model_used": model_used,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
             }) + "\n\n"
 
         except Exception as exc:  # noqa: BLE001

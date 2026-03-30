@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Session file upload for AI context** — upload files (PDF, DOCX, XLSX, PPTX, CSV, text) on the Ask AI Context tab as session-scoped AI context; text extracted server-side via stateless endpoint, held in browser state, and included alongside sets and legislation in chat requests; supports drag-and-drop, 5 MB limit, and files-only conversations (ADR-115)
+- **Advanced provider parameters** — collapsible Advanced Settings section in the AI provider edit modal exposing top_p, top_k, min_p, frequency_penalty, presence_penalty, and stop sequences; parameters are provider-aware with unsupported ones silently omitted (ADR-114)
+- **Model selector in Ask AI** — compact dropdown in the chat toolbar allowing users to choose which AI provider to use per conversation, with a new lightweight `GET /api/ai/providers/active` endpoint (ADR-114)
 - **DocRef legislation integration** — optional extension for importing NZ legislation documents from legislation.docref.nz as AI context; browse and import chunked CSVs with progress indicators, select imported legislation alongside sets and collections on the Ask AI page, with hourly background index refresh (ADR-112)
 - **MNEMOS semantic retrieval** — optional MNEMOS extension for AI-powered semantic context retrieval, replacing naive token-budget truncation with question-aware ranking across sets; managed via admin Extensions tab with graceful fallback to direct retrieval when unavailable (ADR-111)
 - **RetrievalPort abstraction** — protocol-based retrieval strategy allowing pluggable context backends; `DirectRetrieval` wraps existing `context.py`, `SemanticRetrieval` uses MNEMOS (ADR-111)

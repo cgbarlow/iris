@@ -13,6 +13,11 @@ class ModelParameters(BaseModel):
     temperature: float | None = Field(None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(None, ge=1, le=200000)
     top_p: float | None = Field(None, ge=0.0, le=1.0)
+    top_k: int | None = Field(None, ge=1)
+    min_p: float | None = Field(None, ge=0.0, le=1.0)
+    frequency_penalty: float | None = Field(None, ge=-2.0, le=2.0)
+    presence_penalty: float | None = Field(None, ge=-2.0, le=2.0)
+    stop: list[str] | None = None
 
 
 class ProviderCreate(BaseModel):
@@ -67,6 +72,17 @@ class ProviderResponse(BaseModel):
     updated_at: str
 
 
+class ActiveProviderResponse(BaseModel):
+    """Lightweight provider info for non-admin users (ADR-114)."""
+
+    id: str
+    name: str
+    model: str
+    provider_type: str
+    base_url: str | None = None
+    is_default: bool = False
+
+
 class ProviderTestResult(BaseModel):
     """Result of testing a provider connection."""
 
@@ -86,16 +102,24 @@ class QARequest(BaseModel):
     thread_id: str | None = None   # groups messages in a conversation thread
 
 
+class FileContext(BaseModel):
+    """File context included in chat requests (ADR-115)."""
+
+    filename: str
+    text: str
+
+
 class MultiSetQARequest(BaseModel):
     """Request body for asking a question across multiple sets (ADR-102).
 
-    At least one of set_ids or docref_doc_ids must be non-empty.
+    At least one of set_ids, docref_doc_ids, or file_contexts must be non-empty.
     """
 
     set_ids: list[str] = Field(default_factory=list)
     collection_id: str | None = None
     package_ids: list[str] | None = None
     docref_doc_ids: list[str] | None = None  # DocRef legislation document IDs (ADR-112)
+    file_contexts: list[FileContext] | None = None  # Session file uploads (ADR-115)
     question: str = Field(min_length=1, max_length=4000)
     provider_id: str | None = None
     mode: str | None = None
@@ -170,3 +194,14 @@ class ApplyCreationResponse(BaseModel):
 
     diagram_ids: list[str]
     primary_diagram_id: str | None = None
+
+
+class FileExtractResponse(BaseModel):
+    """Response from file text extraction (ADR-115)."""
+
+    filename: str
+    content_type: str
+    size_bytes: int
+    extracted_text: str
+    truncated: bool = False
+    error: str | None = None

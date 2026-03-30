@@ -116,6 +116,28 @@
 		}
 		actionLoading = null;
 	}
+
+	// MNEMOS reindex
+	let reindexing = $state(false);
+	let reindexResult = $state<string | null>(null);
+
+	async function reindexMnemos() {
+		reindexing = true;
+		reindexResult = null;
+		error = null;
+		try {
+			const result = await apiFetch<{ indexed: number; errors: number; duration_ms: number }>(
+				'/api/mnemos/reindex',
+				{ method: 'POST' },
+			);
+			reindexResult = `Indexed ${result.indexed} items in ${result.duration_ms}ms` +
+				(result.errors > 0 ? ` (${result.errors} errors)` : '');
+			setTimeout(() => { reindexResult = null; }, 5000);
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Reindex failed';
+		}
+		reindexing = false;
+	}
 </script>
 
 <p class="mb-4" style="color: var(--color-muted)">Manage optional integrations and extensions.</p>
@@ -174,9 +196,22 @@
 								Installed {new Date(installed.installed_at).toLocaleDateString()}
 							</p>
 						{/if}
+						{#if known.id === 'mnemos' && installed?.is_enabled && reindexResult}
+							<p class="mt-2 text-xs" style="color: var(--color-success, #16a34a)">{reindexResult}</p>
+						{/if}
 					</div>
 					<div class="flex items-center gap-2">
 						{#if installed}
+							{#if known.id === 'mnemos' && installed.is_enabled}
+								<button
+									onclick={reindexMnemos}
+									disabled={reindexing}
+									class="rounded px-3 py-1.5 text-sm"
+									style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								>
+									{reindexing ? 'Reindexing…' : 'Reindex'}
+								</button>
+							{/if}
 							<button
 								onclick={() => toggleExtension(installed)}
 								disabled={actionLoading === known.id}

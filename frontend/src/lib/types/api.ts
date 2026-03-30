@@ -352,6 +352,21 @@ export interface AIConversation {
 	thread_id: string | null;
 }
 
+/** File upload types (ADR-115) */
+export interface FileExtractResponse {
+	filename: string;
+	content_type: string;
+	size_bytes: number;
+	extracted_text: string;
+	truncated: boolean;
+	error: string | null;
+}
+
+export interface FileContext {
+	filename: string;
+	text: string;
+}
+
 /** @deprecated Use Element instead */
 export type Entity = Element;
 /** @deprecated Use Diagram instead */

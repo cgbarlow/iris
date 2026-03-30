@@ -63,17 +63,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     docref_task = asyncio.create_task(start_docref_refresh_loop(app))
 
-    # Background MNEMOS reindex on startup (ADR-113)
-    async def _startup_reindex() -> None:
-        from app.mnemos.sync import background_reindex
-        await background_reindex(db_manager.main_db)
-
-    mnemos_task = asyncio.create_task(_startup_reindex())
-
     yield
 
     docref_task.cancel()
-    mnemos_task.cancel()
     await db_manager.close()
 
 

@@ -13,9 +13,10 @@
 		collectionId?: string;
 		packageIds?: string[];
 		docrefDocIds?: string[];
+		fileContexts?: { filename: string; text: string }[];
 	}
 
-	let { setIds, collectionId, packageIds, docrefDocIds }: Props = $props();
+	let { setIds, collectionId, packageIds, docrefDocIds, fileContexts }: Props = $props();
 
 	// Primary set ID for backwards compatibility (history, diagram creation)
 	const setId = $derived(setIds[0] || '');
@@ -65,6 +66,17 @@
 	let historyLoading = $state(false);
 	let currentThreadId = $state(crypto.randomUUID());
 
+	// Model selector (ADR-114)
+	type ActiveProvider = { id: string; name: string; model: string; provider_type: string; base_url: string | null; is_default: boolean };
+	function hostLabel(url: string | null): string {
+		if (!url) return '';
+		return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+	}
+	let activeProviders = $state<ActiveProvider[]>([]);
+	let selectedProviderId = $state('');
+	let providerAvailability = $state<Record<string, boolean>>({});
+	let providerDropdownOpen = $state(false);
+
 	function isClearedSession(): boolean {
 		return sessionStorage.getItem(`qa-cleared-${setId}`) === '1';
 	}
@@ -73,6 +85,29 @@
 		if (setId && !isClearedSession()) loadHistory();
 		else historyLoaded = true;
 	});
+
+	$effect(() => {
+		loadActiveProviders();
+		const interval = setInterval(pingProviders, 10000);
+		return () => clearInterval(interval);
+	});
+
+	function pingProviders() {
+		apiFetch<Record<string, boolean>>('/api/ai/providers/ping', { method: 'POST' })
+			.then(result => { providerAvailability = result; })
+			.catch(() => {});
+	}
+
+	async function loadActiveProviders() {
+		try {
+			activeProviders = await apiFetch<ActiveProvider[]>('/api/ai/providers/active');
+			const defaultProvider = activeProviders.find(p => p.is_default) ?? activeProviders[0];
+			if (defaultProvider) selectedProviderId = defaultProvider.id;
+			pingProviders();
+		} catch {
+			// Graceful degradation — selector just won't appear
+		}
+	}
 
 	function scrollToBottom() {
 		if (chatContainer) {
@@ -208,8 +243,8 @@ function promptForLocation() {
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
 				body: JSON.stringify(creationMode
-					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, question: q, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
-					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, question: q, thread_id: currentThreadId }
+					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
+					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, thread_id: currentThreadId }
 				),
 				signal: abortController.signal,
 			});
@@ -303,8 +338,8 @@ function promptForLocation() {
 									question: q,
 									answer: displayAnswer,
 									model_used: payload.model_used,
-									tokens_in: null,
-									tokens_out: null,
+									tokens_in: payload.tokens_in ?? null,
+									tokens_out: payload.tokens_out ?? null,
 									duration_ms: payload.duration_ms,
 									created_at: new Date().toISOString(),
 									isCreation: creationMode,
@@ -557,14 +592,53 @@ function promptForLocation() {
 				</button>
 			{/if}
 		</div>
-		<button
-			onclick={toggleHistorySidebar}
-			class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
-			style="border: 1px solid var(--color-border); color: var(--color-fg)"
-			aria-pressed={showHistorySidebar}
-		>
-			History
-		</button>
+		<div class="flex items-center gap-2">
+			{#if activeProviders.length > 0 && selectedProviderId}
+				{@const selectedProvider = activeProviders.find(p => p.id === selectedProviderId)}
+				<div class="provider-dropdown">
+					<button
+						type="button"
+						class="provider-dropdown-trigger rounded border px-2 py-1 text-xs"
+						style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)"
+						onclick={() => { providerDropdownOpen = !providerDropdownOpen; }}
+					>
+						<span class="provider-status-dot {Object.hasOwn(providerAvailability, selectedProviderId) ? (providerAvailability[selectedProviderId] ? 'available' : 'unavailable') : 'pending'}"></span>
+						<span>{selectedProvider?.is_default ? '★ ' : ''}{selectedProvider?.name}{selectedProvider?.base_url ? ` (${hostLabel(selectedProvider.base_url)})` : ''}</span>
+						<span class="provider-dropdown-arrow">▾</span>
+					</button>
+					{#if providerDropdownOpen}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="provider-dropdown-backdrop" onclick={() => { providerDropdownOpen = false; }} onkeydown={() => {}}></div>
+						<ul class="provider-dropdown-menu rounded border" style="border-color: var(--color-border); background: var(--color-surface);">
+							{#each activeProviders as p}
+								{@const pinged = Object.hasOwn(providerAvailability, p.id)}
+								{@const available = !!providerAvailability[p.id]}
+								<li>
+									<button
+										type="button"
+										class="provider-dropdown-item text-xs"
+										style="color: var(--color-fg){p.is_default ? '; font-weight: bold' : ''}"
+										disabled={pinged && !available}
+										onclick={() => { selectedProviderId = p.id; providerDropdownOpen = false; }}
+									>
+										<span class="provider-status-dot {pinged ? (available ? 'available' : 'unavailable') : 'pending'}"></span>
+										<span>{p.is_default ? '★ ' : ''}{p.name}{p.base_url ? ` (${hostLabel(p.base_url)})` : ''}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
+			{/if}
+			<button
+				onclick={toggleHistorySidebar}
+				class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+				aria-pressed={showHistorySidebar}
+			>
+				History
+			</button>
+		</div>
 	</div>
 
 	<!-- Chat messages area -->
@@ -598,6 +672,9 @@ function promptForLocation() {
 								<span>{conv.model_used}</span>
 								{#if conv.duration_ms != null}
 									<span>{formatDuration(conv.duration_ms)}</span>
+								{/if}
+								{#if conv.tokens_in != null || conv.tokens_out != null}
+									<span>{(conv.tokens_in ?? 0) + (conv.tokens_out ?? 0)} tokens</span>
 								{/if}
 							</div>
 							<button
@@ -827,6 +904,75 @@ function promptForLocation() {
 {/if}
 
 <style>
+	.provider-dropdown {
+		position: relative;
+	}
+	.provider-dropdown-trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		cursor: pointer;
+	}
+	.provider-dropdown-arrow {
+		font-size: 0.7em;
+		opacity: 0.6;
+	}
+	.provider-dropdown-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 49;
+	}
+	.provider-dropdown-menu {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 4px);
+		z-index: 50;
+		list-style: none;
+		margin: 0;
+		padding: 4px 0;
+		min-width: 100%;
+		white-space: nowrap;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+	}
+	.provider-dropdown-item {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+		padding: 5px 10px;
+		border: none;
+		background: none;
+		cursor: pointer;
+		text-align: left;
+	}
+	.provider-dropdown-item:hover:not(:disabled) {
+		background-color: var(--color-bg);
+	}
+	.provider-dropdown-item:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.provider-status-dot {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+	.provider-status-dot.available {
+		background-color: #22c55e;
+	}
+	.provider-status-dot.unavailable {
+		background-color: #ef4444;
+	}
+	.provider-status-dot.pending {
+		background-color: var(--color-muted);
+		animation: pulse-dot 1.5s ease-in-out infinite;
+	}
+	@keyframes pulse-dot {
+		0%, 100% { opacity: 0.4; }
+		50% { opacity: 1; }
+	}
 	.thinking-dots .dot {
 		animation: blink 1.4s infinite both;
 		font-size: 1.5em;

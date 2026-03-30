@@ -34,6 +34,9 @@
 	let testResults = $state<Record<string, { ok: boolean; latency_ms?: number; error?: string; testing?: boolean }>>({});
 
 	// Form fields
+	// Advanced settings toggle (ADR-114)
+	let showAdvanced = $state(false);
+
 	let form = $state({
 		name: '',
 		provider_type: 'openai' as typeof PROVIDER_TYPES[number],
@@ -47,6 +50,12 @@
 		is_active: true,
 		temperature: '',
 		max_tokens: '',
+		top_p: '',
+		top_k: '',
+		min_p: '',
+		frequency_penalty: '',
+		presence_penalty: '',
+		stop: '',
 	});
 
 	$effect(() => {
@@ -67,6 +76,7 @@
 	function openCreate() {
 		editingId = null;
 		modalError = null;
+		showAdvanced = false;
 		form = {
 			name: '',
 			provider_type: 'openai',
@@ -80,6 +90,12 @@
 			is_active: true,
 			temperature: '',
 			max_tokens: '',
+			top_p: '',
+			top_k: '',
+			min_p: '',
+			frequency_penalty: '',
+			presence_penalty: '',
+			stop: '',
 		};
 		showModal = true;
 	}
@@ -88,6 +104,9 @@
 		editingId = p.id;
 		modalError = null;
 		const params = p.parameters as Record<string, unknown>;
+		// Auto-expand advanced section if any advanced params are set
+		showAdvanced = [params.top_p, params.top_k, params.min_p,
+			params.frequency_penalty, params.presence_penalty, params.stop].some(v => v != null);
 		form = {
 			name: p.name,
 			provider_type: p.provider_type as typeof PROVIDER_TYPES[number],
@@ -101,6 +120,12 @@
 			is_active: p.is_active,
 			temperature: params.temperature != null ? String(params.temperature) : '',
 			max_tokens: params.max_tokens != null ? String(params.max_tokens) : '',
+			top_p: params.top_p != null ? String(params.top_p) : '',
+			top_k: params.top_k != null ? String(params.top_k) : '',
+			min_p: params.min_p != null ? String(params.min_p) : '',
+			frequency_penalty: params.frequency_penalty != null ? String(params.frequency_penalty) : '',
+			presence_penalty: params.presence_penalty != null ? String(params.presence_penalty) : '',
+			stop: Array.isArray(params.stop) ? (params.stop as string[]).join(', ') : '',
 		};
 		showModal = true;
 	}
@@ -113,9 +138,15 @@
 	async function saveProvider() {
 		saving = true;
 		modalError = null;
-		const parameters: Record<string, number> = {};
+		const parameters: Record<string, number | string[]> = {};
 		if (form.temperature !== '') parameters.temperature = Number(form.temperature);
 		if (form.max_tokens !== '') parameters.max_tokens = Number(form.max_tokens);
+		if (form.top_p !== '') parameters.top_p = Number(form.top_p);
+		if (form.top_k !== '') parameters.top_k = Number(form.top_k);
+		if (form.min_p !== '') parameters.min_p = Number(form.min_p);
+		if (form.frequency_penalty !== '') parameters.frequency_penalty = Number(form.frequency_penalty);
+		if (form.presence_penalty !== '') parameters.presence_penalty = Number(form.presence_penalty);
+		if (form.stop !== '') parameters.stop = form.stop.split(',').map(s => s.trim()).filter(Boolean);
 
 		const body = {
 			name: form.name,
@@ -430,6 +461,70 @@
 							placeholder="4096" />
 					</label>
 				</div>
+
+				<!-- Advanced Settings toggle (ADR-114) -->
+				<button
+					type="button"
+					onclick={() => { showAdvanced = !showAdvanced; }}
+					class="flex items-center gap-2 text-sm font-medium w-full py-2"
+					style="color: var(--color-fg)"
+					aria-expanded={showAdvanced}
+				>
+					<span aria-hidden="true">{showAdvanced ? '▼' : '▶'}</span>
+					Advanced Settings
+					<span class="text-xs" style="color: var(--color-muted)">(optional)</span>
+				</button>
+
+				{#if showAdvanced}
+					<div class="flex flex-col gap-3 pl-4 border-l-2" style="border-color: var(--color-border)">
+						<div class="grid grid-cols-3 gap-3">
+							<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+								Top P <span style="color: var(--color-muted)">(0–1)</span>
+								<input type="number" bind:value={form.top_p} min="0" max="1" step="0.05"
+									class="rounded border px-3 py-2"
+									style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									placeholder="0.9" />
+							</label>
+							<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+								Top K <span style="color: var(--color-muted)">(≥1)</span>
+								<input type="number" bind:value={form.top_k} min="1" step="1"
+									class="rounded border px-3 py-2"
+									style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									placeholder="40" />
+							</label>
+							<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+								Min P <span style="color: var(--color-muted)">(0–1)</span>
+								<input type="number" bind:value={form.min_p} min="0" max="1" step="0.05"
+									class="rounded border px-3 py-2"
+									style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									placeholder="0.05" />
+							</label>
+						</div>
+						<div class="grid grid-cols-2 gap-3">
+							<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+								Frequency penalty <span style="color: var(--color-muted)">(-2–2)</span>
+								<input type="number" bind:value={form.frequency_penalty} min="-2" max="2" step="0.1"
+									class="rounded border px-3 py-2"
+									style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									placeholder="0" />
+							</label>
+							<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+								Presence penalty <span style="color: var(--color-muted)">(-2–2)</span>
+								<input type="number" bind:value={form.presence_penalty} min="-2" max="2" step="0.1"
+									class="rounded border px-3 py-2"
+									style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+									placeholder="0" />
+							</label>
+						</div>
+						<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+							Stop sequences <span style="color: var(--color-muted)">(comma-separated)</span>
+							<input type="text" bind:value={form.stop}
+								class="rounded border px-3 py-2"
+								style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+								placeholder="e.g. END, \n" />
+						</label>
+					</div>
+				{/if}
 
 				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
 					System prompt <span style="color: var(--color-muted)">(optional)</span>

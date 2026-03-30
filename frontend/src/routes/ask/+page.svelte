@@ -5,6 +5,8 @@
 	import SetQA from '$lib/components/SetQA.svelte';
 	import MultiSetSelector from '$lib/components/MultiSetSelector.svelte';
 	import DocRefSelector from '$lib/components/DocRefSelector.svelte';
+	import FileUploader from '$lib/components/FileUploader.svelte';
+	import type { UploadedFile } from '$lib/components/FileUploader.svelte';
 	import type { IrisSet, IrisCollection } from '$lib/types/api';
 
 	type Extension = {
@@ -24,6 +26,7 @@
 	let selectedSetIds = $state<string[]>([]);
 	let selectedPackageIds = $state<string[]>([]);
 	let selectedDocRefIds = $state<string[]>([]);
+	let uploadedFiles = $state<UploadedFile[]>([]);
 
 	// Tab state
 	let activeTab = $state<'context' | 'request'>('context');
@@ -41,11 +44,16 @@
 			: allSets
 	);
 
+	// Ready files: uploaded, no error, not still uploading
+	let readyFiles = $derived(uploadedFiles.filter((f) => !f.uploading && !f.error));
+
 	// Derive a stable key for SetQA re-render
 	let contextKey = $derived(
-		selectedSetIds.slice().sort().join(',') + '|' + selectedDocRefIds.slice().sort().join(',')
+		selectedSetIds.slice().sort().join(',') + '|' +
+		selectedDocRefIds.slice().sort().join(',') + '|' +
+		readyFiles.map((f) => f.id).sort().join(',')
 	);
-	let hasContext = $derived(selectedSetIds.length > 0 || selectedDocRefIds.length > 0);
+	let hasContext = $derived(selectedSetIds.length > 0 || selectedDocRefIds.length > 0 || readyFiles.length > 0);
 
 	// Summary of selected context for display on the Chat tab
 	let contextSummary = $derived.by(() => {
@@ -62,7 +70,8 @@
 		const docNames = docRefDocuments
 			.filter((d) => selectedDocRefIds.includes(d.id))
 			.map((d) => d.title);
-		return [...setLabels, ...docNames].join(', ');
+		const fileNames = readyFiles.map((f) => f.filename);
+		return [...setLabels, ...docNames, ...fileNames].join(', ');
 	});
 
 	$effect(() => {
@@ -179,14 +188,6 @@
 						onpackages={(pkgs) => { packagesBySet = pkgs; }}
 					/>
 				</div>
-				<button
-					onclick={() => (activeTab = 'request')}
-					class="rounded px-4 py-2 text-sm text-white"
-					style="background-color: {hasContext ? 'var(--color-primary)' : 'var(--color-muted)'}; cursor: {hasContext ? 'pointer' : 'not-allowed'}"
-					disabled={!hasContext}
-				>
-					Chat
-				</button>
 			</div>
 			{#if docrefEnabled}
 				<div class="mt-3" style="max-width: 800px">
@@ -197,6 +198,22 @@
 					/>
 				</div>
 			{/if}
+			<div class="mt-3" style="max-width: 800px">
+				<FileUploader
+					files={uploadedFiles}
+					onchange={(f) => { uploadedFiles = f; }}
+				/>
+			</div>
+			<div class="mt-3">
+				<button
+					onclick={() => (activeTab = 'request')}
+					class="rounded px-4 py-2 text-sm text-white"
+					style="background-color: {hasContext ? 'var(--color-primary)' : 'var(--color-muted)'}; cursor: {hasContext ? 'pointer' : 'not-allowed'}"
+					disabled={!hasContext}
+				>
+					Chat
+				</button>
+			</div>
 		{/if}
 	</div>
 
@@ -214,7 +231,7 @@
 				</p>
 			{:else}
 				<p class="mt-3 flex-none text-sm" style="color: var(--color-muted)">
-					No context selected. Go to the Context tab to select sets{docrefEnabled ? ' or legislation' : ''}.
+					No context selected. Go to the Context tab to select sets{docrefEnabled ? ', legislation,' : ''} or upload files.
 				</p>
 			{/if}
 
@@ -222,11 +239,11 @@
 			{#if hasContext}
 				<div class="mt-2 flex-1 overflow-hidden">
 					{#key contextKey}
-						<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} packageIds={selectedPackageIds.length > 0 ? selectedPackageIds : undefined} docrefDocIds={selectedDocRefIds.length > 0 ? selectedDocRefIds : undefined} />
+						<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} packageIds={selectedPackageIds.length > 0 ? selectedPackageIds : undefined} docrefDocIds={selectedDocRefIds.length > 0 ? selectedDocRefIds : undefined} fileContexts={readyFiles.length > 0 ? readyFiles.map((f) => ({ filename: f.filename, text: f.extracted_text })) : undefined} />
 					{/key}
 				</div>
 			{:else}
-				<p class="mt-4 text-sm" style="color: var(--color-muted)">Select at least one set{docrefEnabled ? ' or legislation document' : ''} to start asking questions.</p>
+				<p class="mt-4 text-sm" style="color: var(--color-muted)">Select at least one set{docrefEnabled ? ', legislation document,' : ''} or upload a file to start asking questions.</p>
 			{/if}
 		{/if}
 	</div>

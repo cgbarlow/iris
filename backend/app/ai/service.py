@@ -133,6 +133,17 @@ async def list_providers(
     return [_row_to_provider(r) for r in rows]
 
 
+async def list_providers_internal(
+    db: DatabasePort,
+) -> list[dict[str, object]]:
+    """List active providers with api_key included — for internal use only (ping)."""
+    cursor = await db.execute(
+        f"{_SELECT} WHERE is_active = 1 ORDER BY is_default DESC, name ASC"
+    )
+    rows = await cursor.fetchall()
+    return [_row_to_provider_with_key(r) for r in rows]
+
+
 async def update_provider(
     db: DatabasePort,
     provider_id: str,
@@ -426,6 +437,7 @@ async def ask_multi_set_question(
     set_ids: list[str],
     collection_id: str | None = None,
     docref_doc_ids: list[str] | None = None,
+    file_contexts: list[dict[str, str]] | None = None,
     question: str,
     user_id: str,
     provider_id: str | None = None,
@@ -467,10 +479,19 @@ async def ask_multi_set_question(
         except Exception:  # noqa: BLE001
             pass  # Graceful degradation
 
+    # Append uploaded file context if provided (ADR-115)
+    if file_contexts:
+        file_parts = [f"FILE: {fc['filename']}\n{fc['text']}" for fc in file_contexts]
+        file_context_str = "\n\n---\n\n".join(file_parts)
+        if context:
+            context += "\n\n---\n\n"
+        context += "UPLOADED FILES:\n" + file_context_str
+
     primary_set_id = set_ids[0] if set_ids else None
 
     has_sets = bool(set_ids)
     has_docref = bool(docref_doc_ids)
+    has_files = bool(file_contexts)
     system_prompt = str(provider.get("system_prompt") or "")
     if system_prompt:
         system_content = f"{system_prompt}\n\nContext:\n{context}"
@@ -484,6 +505,11 @@ async def ask_multi_set_question(
         system_content = (
             "You are an AI assistant helping users understand NZ legislation. "
             "Answer questions based on the provided legislation reference.\n\nContext:\n" + context
+        )
+    elif has_files and not has_sets:
+        system_content = (
+            "You are an AI assistant. Answer questions based on the uploaded file content "
+            "provided.\n\nContext:\n" + context
         )
     else:
         system_content = (

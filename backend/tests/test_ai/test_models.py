@@ -40,6 +40,61 @@ class TestModelParameters:
         with pytest.raises(ValidationError):
             ModelParameters(top_p=1.1)
 
+    # --- Advanced parameters (ADR-114) ---
+
+    def test_top_k_valid(self):
+        p = ModelParameters(top_k=40)
+        assert p.top_k == 40
+
+    def test_top_k_zero_invalid(self):
+        with pytest.raises(ValidationError):
+            ModelParameters(top_k=0)
+
+    def test_min_p_valid(self):
+        p = ModelParameters(min_p=0.1)
+        assert p.min_p == 0.1
+
+    def test_min_p_out_of_range(self):
+        with pytest.raises(ValidationError):
+            ModelParameters(min_p=1.5)
+
+    def test_frequency_penalty_valid(self):
+        p = ModelParameters(frequency_penalty=-0.5)
+        assert p.frequency_penalty == -0.5
+
+    def test_frequency_penalty_out_of_range(self):
+        with pytest.raises(ValidationError):
+            ModelParameters(frequency_penalty=2.5)
+
+    def test_presence_penalty_valid(self):
+        p = ModelParameters(presence_penalty=1.0)
+        assert p.presence_penalty == 1.0
+
+    def test_presence_penalty_out_of_range(self):
+        with pytest.raises(ValidationError):
+            ModelParameters(presence_penalty=-2.5)
+
+    def test_stop_sequences(self):
+        p = ModelParameters(stop=["END", "\n"])
+        assert p.stop == ["END", "\n"]
+
+    def test_stop_sequences_empty(self):
+        p = ModelParameters(stop=[])
+        assert p.stop == []
+
+    def test_all_advanced_parameters(self):
+        p = ModelParameters(
+            temperature=0.7, max_tokens=4096, top_p=0.9,
+            top_k=40, min_p=0.05, frequency_penalty=0.5,
+            presence_penalty=-0.5, stop=["END"],
+        )
+        dumped = p.model_dump(exclude_none=True)
+        assert dumped["top_k"] == 40
+        assert dumped["min_p"] == 0.05
+        assert dumped["frequency_penalty"] == 0.5
+        assert dumped["presence_penalty"] == -0.5
+        assert dumped["stop"] == ["END"]
+
 
 class TestProviderCreate:
     def test_valid_minimal(self):
