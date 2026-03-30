@@ -748,7 +748,7 @@ function promptForLocation() {
 			bind:this={qaInput}
 			bind:value={question}
 			onkeydown={handleKeydown}
-			placeholder={creationMode ? `Describe what you'd like a ${selectedNotation === 'doview' ? 'DoView' : selectedNotation} diagram of...` : 'Ask a question about this Set...'}
+			placeholder={creationMode ? `Describe what you'd like a ${selectedNotation === 'doview' ? 'DoView' : selectedNotation} diagram of...` : 'Ask a question...'}
 			rows="2"
 			maxlength="4000"
 			disabled={asking}

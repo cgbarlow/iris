@@ -443,8 +443,13 @@ async def ask_multi_set_question(
         msg = "No AI provider configured. Ask an admin to add a provider."
         raise ValueError(msg)
 
-    retrieval = await get_retrieval_strategy(db)
-    context = await retrieval.retrieve_context(db, question, set_ids)
+    # Build context from sets (if any).
+    # MNEMOS filters by iris_type so architecture and legislation
+    # results never interfere — safe to always use retrieval strategy.
+    context = ""
+    if set_ids:
+        retrieval = await get_retrieval_strategy(db)
+        context = await retrieval.retrieve_context(db, question, set_ids)
 
     # Append DocRef legislation context if requested (ADR-112)
     if docref_doc_ids:
@@ -454,17 +459,32 @@ async def ask_multi_set_question(
             if await is_extension_enabled(db, "docref"):
                 from app.docref.service import build_docref_context  # noqa: PLC0415
 
-                docref_ctx = await build_docref_context(db, docref_doc_ids)
+                docref_ctx = await build_docref_context(db, docref_doc_ids, question=question)
                 if docref_ctx:
-                    context += "\n\n---\n\nLEGISLATION REFERENCE:\n" + docref_ctx
+                    if context:
+                        context += "\n\n---\n\n"
+                    context += "LEGISLATION REFERENCE:\n" + docref_ctx
         except Exception:  # noqa: BLE001
             pass  # Graceful degradation
 
-    primary_set_id = set_ids[0]
+    primary_set_id = set_ids[0] if set_ids else None
 
+    has_sets = bool(set_ids)
+    has_docref = bool(docref_doc_ids)
     system_prompt = str(provider.get("system_prompt") or "")
     if system_prompt:
         system_content = f"{system_prompt}\n\nContext:\n{context}"
+    elif has_sets and has_docref:
+        system_content = (
+            "You are an AI assistant helping users understand their architecture models "
+            "and related legislation. Answer questions using BOTH the architecture Set context "
+            "AND the legislation reference provided. Give equal weight to both sources.\n\nContext:\n" + context
+        )
+    elif has_docref:
+        system_content = (
+            "You are an AI assistant helping users understand NZ legislation. "
+            "Answer questions based on the provided legislation reference.\n\nContext:\n" + context
+        )
     else:
         system_content = (
             "You are an AI assistant helping users understand their architecture models. "

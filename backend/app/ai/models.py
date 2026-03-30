@@ -87,9 +87,12 @@ class QARequest(BaseModel):
 
 
 class MultiSetQARequest(BaseModel):
-    """Request body for asking a question across multiple sets (ADR-102)."""
+    """Request body for asking a question across multiple sets (ADR-102).
 
-    set_ids: list[str] = Field(min_length=1)
+    At least one of set_ids or docref_doc_ids must be non-empty.
+    """
+
+    set_ids: list[str] = Field(default_factory=list)
     collection_id: str | None = None
     package_ids: list[str] | None = None
     docref_doc_ids: list[str] | None = None  # DocRef legislation document IDs (ADR-112)

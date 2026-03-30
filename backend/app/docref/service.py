@@ -262,6 +262,17 @@ async def import_document(
         )
         await db.commit()
 
+        # Fire-and-forget: sync docref chunks to MNEMOS if extension enabled
+        try:
+            from app.extensions.service import is_extension_enabled  # noqa: PLC0415
+
+            if await is_extension_enabled(db, "mnemos"):
+                from app.mnemos.sync import sync_docref_document_hook  # noqa: PLC0415
+
+                await sync_docref_document_hook(db, document_id)
+        except Exception:  # noqa: BLE001
+            pass  # MNEMOS sync is optional
+
         return {
             "document_id": document_id,
             "status": "imported",
@@ -314,15 +325,40 @@ async def build_docref_context(
     document_ids: list[str],
     *,
     max_tokens: int = 4000,
+    question: str | None = None,
 ) -> str:
     """Build structured text context from imported DocRef chunks.
 
+    When MNEMOS is available and a question is provided, uses semantic search
+    filtered to docref_chunk engrams for the selected documents. Falls back
+    to reading all chunks from the database with proportional truncation.
+
     Returns a string suitable for appending to the LLM system prompt context.
-    Each document gets an equal share of the token budget.
     """
     if not document_ids:
         return ""
 
+    # Try MNEMOS semantic search first (if question provided and MNEMOS available)
+    if question:
+        try:
+            from app.extensions.service import is_extension_enabled  # noqa: PLC0415
+
+            if await is_extension_enabled(db, "mnemos"):
+                from app.mnemos.setup import ensure_sdk_importable  # noqa: PLC0415
+
+                ensure_sdk_importable()
+
+                from app.mnemos.adapter import search_docref_semantic  # noqa: PLC0415
+
+                semantic_result = await search_docref_semantic(
+                    db, question, document_ids, max_tokens=max_tokens,
+                )
+                if semantic_result:
+                    return semantic_result
+        except Exception:  # noqa: BLE001
+            pass  # Fall through to direct DB reads
+
+    # Fallback: read chunks directly from DB
     max_chars = max_tokens * _CHARS_PER_TOKEN
 
     sections: list[str] = []

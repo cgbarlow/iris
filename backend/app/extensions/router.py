@@ -96,6 +96,13 @@ async def install(
         ok, msg = await start_container()
         if not ok:
             print(f"[MNEMOS] Warning: {msg}", flush=True)
+        else:
+            # Background reindex so the fresh index has data
+            import asyncio  # noqa: PLC0415
+
+            from app.mnemos.sync import background_reindex  # noqa: PLC0415
+
+            asyncio.create_task(background_reindex(db))
 
     if extension_id == "docref":
         from app.docref.service import refresh_document_index  # noqa: PLC0415
@@ -159,6 +166,15 @@ async def enable(
     result = await enable_extension(db, extension_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    # Background reindex when MNEMOS is re-enabled
+    if extension_id == "mnemos":
+        import asyncio  # noqa: PLC0415
+
+        from app.mnemos.sync import background_reindex  # noqa: PLC0415
+
+        asyncio.create_task(background_reindex(db))
+
     return ExtensionResponse(**result)
 
 

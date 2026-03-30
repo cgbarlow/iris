@@ -105,7 +105,9 @@ async def reindex(
 
     db = request.app.state.db_manager.main_db
 
+    from app.mnemos.setup import ensure_sdk_importable
     from app.mnemos.sync import bulk_reindex
 
+    ensure_sdk_importable()
     result = await bulk_reindex(db)
     return MnemosReindexResponse(**result)

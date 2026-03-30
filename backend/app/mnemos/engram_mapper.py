@@ -120,10 +120,34 @@ def diagram_to_engram(
     }
 
 
+def docref_chunk_to_engram(
+    chunk_id: str,
+    chunk_ref: str,
+    content: str,
+    document_id: str,
+    document_title: str,
+) -> dict[str, Any]:
+    """Convert a DocRef legislation chunk to a MNEMOS engram dict."""
+    return {
+        "content": f"[{chunk_ref}] {content}",
+        "source": f"iris://docref/{document_id}/{chunk_ref}",
+        "neuro_tags": ["docref", f"doc:{document_id}"],
+        "confidence": 0.9,
+        "metadata": {
+            "iris_id": chunk_id,
+            "iris_type": "docref_chunk",
+            "document_id": document_id,
+            "document_title": document_title,
+            "chunk_ref": chunk_ref,
+        },
+    }
+
+
 async def build_all_engrams(db: DatabasePort) -> list[dict[str, Any]]:
     """Build engrams for all active entities in the database.
 
-    Used for bulk reindex operations.
+    Used for bulk reindex operations. Includes Iris elements, relationships,
+    diagrams, and DocRef legislation chunks.
     """
     engrams: list[dict[str, Any]] = []
 
@@ -181,5 +205,23 @@ async def build_all_engrams(db: DatabasePort) -> list[dict[str, Any]]:
     )
     for did, dtype, dname, ddesc, dset_id, dpkg_id in await cursor.fetchall():
         engrams.append(diagram_to_engram(did, dtype, dname, ddesc, dset_id, dpkg_id))
+
+    # DocRef legislation chunks — indexed with iris_type="docref_chunk".
+    # Architecture queries filter to iris_type in [element, relationship, diagram],
+    # so docref chunks never pollute set search results (ADR-113).
+    try:
+        cursor = await db.execute(
+            """
+            SELECT c.id, c.chunk_id, c.content, c.document_id, d.title
+            FROM docref_chunks c
+            JOIN docref_documents d ON c.document_id = d.id
+            WHERE d.status = 'imported'
+            ORDER BY d.title ASC, c.sort_order ASC
+            """,
+        )
+        for cid, chunk_ref, content, doc_id, doc_title in await cursor.fetchall():
+            engrams.append(docref_chunk_to_engram(cid, chunk_ref, content, doc_id, doc_title))
+    except Exception:  # noqa: BLE001
+        pass  # docref tables may not exist if extension never installed
 
     return engrams

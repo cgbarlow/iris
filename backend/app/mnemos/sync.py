@@ -85,10 +85,35 @@ async def delete_engram(
         log.warning("Failed to delete engram from MNEMOS", exc_info=True)
 
 
+async def background_reindex(db: DatabasePort) -> None:
+    """Fire-and-forget reindex — logs results but never raises.
+
+    Called on app startup and MNEMOS install/enable.
+    """
+    try:
+        from app.extensions.service import is_extension_enabled
+
+        if not await is_extension_enabled(db, "mnemos"):
+            return
+
+        from app.mnemos.setup import ensure_sdk_importable
+
+        ensure_sdk_importable()
+
+        result = await bulk_reindex(db)
+        print(
+            f"[MNEMOS] Background reindex: {result['indexed']} indexed, "
+            f"{result['errors']} errors, {result['duration_ms']}ms",
+            flush=True,
+        )
+    except Exception:  # noqa: BLE001
+        log.warning("Background MNEMOS reindex failed", exc_info=True)
+
+
 async def bulk_reindex(db: DatabasePort) -> dict[str, int]:
     """Reindex all Iris entities into MNEMOS. Returns counts.
 
-    This is called from the admin reindex endpoint.
+    This is called from the admin reindex endpoint and background_reindex.
     """
     from app.mnemos.engram_mapper import build_all_engrams
 
@@ -173,3 +198,51 @@ async def sync_diagram_hook(
 
     engram = diagram_to_engram(diagram_id, diagram_type, name, description, set_id, package_id)
     await sync_engram(db, engram)
+
+
+async def sync_docref_document_hook(
+    db: DatabasePort,
+    document_id: str,
+) -> None:
+    """Sync hook called after a DocRef document is imported. Fire-and-forget.
+
+    Indexes all chunks from the given document into MNEMOS.
+    """
+    try:
+        client = await _get_client_from_config(db)
+        if client is None:
+            return
+
+        from app.mnemos.engram_mapper import docref_chunk_to_engram
+
+        cursor = await db.execute(
+            "SELECT c.id, c.chunk_id, c.content, c.document_id, d.title "
+            "FROM docref_chunks c JOIN docref_documents d ON c.document_id = d.id "
+            "WHERE c.document_id = ? AND d.status = 'imported' "
+            "ORDER BY c.sort_order ASC",
+            (document_id,),
+        )
+        rows = await cursor.fetchall()
+        if not rows:
+            return
+
+        engrams = [
+            docref_chunk_to_engram(cid, chunk_ref, content, doc_id, doc_title)
+            for cid, chunk_ref, content, doc_id, doc_title in rows
+        ]
+
+        # Index in batches of 50
+        batch_size = 50
+        for i in range(0, len(engrams), batch_size):
+            batch = engrams[i : i + batch_size]
+            try:
+                client.index(batch)
+            except Exception:  # noqa: BLE001
+                log.warning(
+                    "Failed to sync docref batch %d-%d for document %s",
+                    i, i + len(batch), document_id, exc_info=True,
+                )
+
+        log.info("Synced %d docref chunks for document %s", len(engrams), document_id)
+    except Exception:  # noqa: BLE001
+        log.warning("Failed to sync docref document to MNEMOS", exc_info=True)

@@ -411,6 +411,11 @@ async def ask_multi_set(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> Any:
     """Ask a question across multiple Sets. Returns QAResponse or SSE stream."""
+    if not body.set_ids and not body.docref_doc_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one set or legislation document must be selected",
+        )
     db = request.app.state.db_manager.main_db
 
     if stream:
@@ -471,11 +476,16 @@ async def _ask_multi_set_streaming(
                 yield "data: " + json.dumps({"error": "No AI provider configured"}) + "\n\n"
                 return
 
-            from app.ai.retrieval import get_retrieval_strategy
-            retrieval = await get_retrieval_strategy(db)
-            context = await retrieval.retrieve_context(
-                db, body.question, set_ids, package_ids=body.package_ids,
-            )
+            # Build context from sets (if any).
+            # MNEMOS filters by iris_type so architecture and legislation
+            # results never interfere — safe to always use retrieval strategy.
+            context = ""
+            if set_ids:
+                from app.ai.retrieval import get_retrieval_strategy
+                retrieval = await get_retrieval_strategy(db)
+                context = await retrieval.retrieve_context(
+                    db, body.question, set_ids, package_ids=body.package_ids,
+                )
 
             # Append DocRef legislation context if requested (ADR-112)
             if body.docref_doc_ids:
@@ -485,13 +495,15 @@ async def _ask_multi_set_streaming(
                     if await is_extension_enabled(db, "docref"):
                         from app.docref.service import build_docref_context  # noqa: PLC0415
 
-                        docref_ctx = await build_docref_context(db, body.docref_doc_ids)
+                        docref_ctx = await build_docref_context(db, body.docref_doc_ids, question=body.question)
                         if docref_ctx:
-                            context += "\n\n---\n\nLEGISLATION REFERENCE:\n" + docref_ctx
+                            if context:
+                                context += "\n\n---\n\n"
+                            context += "LEGISLATION REFERENCE:\n" + docref_ctx
                 except Exception:  # noqa: BLE001
                     pass  # Graceful degradation
 
-            primary_set_id = set_ids[0]
+            primary_set_id = set_ids[0] if set_ids else None
 
             if body.mode == "creation":
                 from app.ai.creation import build_creation_system_prompt
@@ -503,8 +515,21 @@ async def _ask_multi_set_streaming(
                 system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content from the user's Sets. This is BACKGROUND REFERENCE ONLY. The user decides what the DoView is about — do NOT assume the DoView topic matches the Set content. If the user says they want a DoView about X, make it about X regardless of what is in the Sets.\n\n{context}"
             else:
                 system_prompt = str(provider.get("system_prompt") or "")
+                has_sets = bool(set_ids)
+                has_docref = bool(body.docref_doc_ids)
                 if system_prompt:
                     system_content = f"{system_prompt}\n\nContext:\n{context}"
+                elif has_sets and has_docref:
+                    system_content = (
+                        "You are an AI assistant helping users understand their architecture models "
+                        "and related legislation. Answer questions using BOTH the architecture Set context "
+                        "AND the legislation reference provided. Give equal weight to both sources.\n\nContext:\n" + context
+                    )
+                elif has_docref:
+                    system_content = (
+                        "You are an AI assistant helping users understand NZ legislation. "
+                        "Answer questions based on the provided legislation reference.\n\nContext:\n" + context
+                    )
                 else:
                     system_content = (
                         "You are an AI assistant helping users understand their architecture models. "
