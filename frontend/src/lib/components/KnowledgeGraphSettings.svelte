@@ -5,9 +5,14 @@
 	interface Props {
 		settings: GraphSettings;
 		onchange: (settings: GraphSettings) => void;
+		isAdmin?: boolean;
+		onSaveDefault?: (settings: GraphSettings) => void | Promise<void>;
+		onResetToDefaults?: (tab: 'visibility' | 'display') => void;
 	}
 
-	let { settings, onchange }: Props = $props();
+	let { settings, onchange, isAdmin = false, onSaveDefault, onResetToDefaults }: Props = $props();
+
+	let activeTab = $state<'visibility' | 'display'>('visibility');
 
 	const EDGE_GROUPS: { label: string; items: { key: string; label: string }[] }[] = [
 		{
@@ -51,6 +56,11 @@
 		onchange(updated);
 	}
 
+	function updateSetting(key: string, value: number) {
+		const updated = { ...settings, [key]: value };
+		onchange(updated);
+	}
+
 	function toggleGroup(group: { items: { key: string }[] }) {
 		const allOn = group.items.every((i) => settings.edges[i.key] !== false);
 		const newEdges = { ...settings.edges };
@@ -62,37 +72,101 @@
 </script>
 
 <div
-	style="position: absolute; top: 100%; right: 0; z-index: 20; margin-top: 4px; min-width: 220px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 12px"
+	style="position: absolute; top: 100%; right: 0; z-index: 20; margin-top: 4px; min-width: 220px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 0"
 >
-	<h4 class="mb-2 text-xs font-semibold uppercase" style="color: var(--color-muted)">Node Types</h4>
-	{#each Object.entries(NODE_TYPE_LABELS) as [key, label]}
-		<label class="mb-1 flex cursor-pointer items-center gap-2 text-sm" style="color: var(--color-fg)">
-			<input type="checkbox" checked={settings.nodes[key]} onchange={() => toggleNode(key)} />
-			<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: {getNodeTypeColor(key)}"></span>
-			{label}
-		</label>
-	{/each}
+	<!-- Tabs -->
+	<div class="flex" style="border-bottom: 1px solid var(--color-border)">
+		<button
+			onclick={() => (activeTab = 'visibility')}
+			class="flex-1 px-3 py-2 text-xs font-medium"
+			style="color: {activeTab === 'visibility' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'visibility' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
+		>Visibility</button>
+		<button
+			onclick={() => (activeTab = 'display')}
+			class="flex-1 px-3 py-2 text-xs font-medium"
+			style="color: {activeTab === 'display' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'display' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
+		>Display</button>
+	</div>
 
-	<hr class="my-2" style="border-color: var(--color-border)" />
+	<div style="padding: 12px">
+		{#if activeTab === 'visibility'}
+			<!-- Node Types -->
+			<h4 class="mb-2 text-xs font-semibold uppercase" style="color: var(--color-muted)">Node Types</h4>
+			{#each Object.entries(NODE_TYPE_LABELS) as [key, label]}
+				<label class="mb-1 flex cursor-pointer items-center gap-2 text-sm" style="color: var(--color-fg)">
+					<input type="checkbox" checked={settings.nodes[key]} onchange={() => toggleNode(key)} />
+					<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: {getNodeTypeColor(key)}"></span>
+					{label}
+				</label>
+			{/each}
 
-	<h4 class="mb-2 text-xs font-semibold uppercase" style="color: var(--color-muted)">Relationship Types</h4>
-	{#each EDGE_GROUPS as group}
-		{@const allOn = group.items.every((i) => settings.edges[i.key] !== false)}
-		{@const someOn = group.items.some((i) => settings.edges[i.key] !== false)}
-		<label class="mb-0.5 flex cursor-pointer items-center gap-2 text-sm font-medium" style="color: var(--color-fg)">
-			<input
-				type="checkbox"
-				checked={allOn}
-				indeterminate={!allOn && someOn}
-				onchange={() => toggleGroup(group)}
-			/>
-			{group.label}
-		</label>
-		{#each group.items as item}
-			<label class="mb-0.5 flex cursor-pointer items-center gap-2 text-sm" style="color: var(--color-fg); padding-left: 20px">
-				<input type="checkbox" checked={settings.edges[item.key] !== false} onchange={() => toggleEdge(item.key)} />
-				{item.label}
+			<hr class="my-2" style="border-color: var(--color-border)" />
+
+			<!-- Relationship Types -->
+			<h4 class="mb-2 text-xs font-semibold uppercase" style="color: var(--color-muted)">Relationship Types</h4>
+			{#each EDGE_GROUPS as group}
+				{@const allOn = group.items.every((i) => settings.edges[i.key] !== false)}
+				{@const someOn = group.items.some((i) => settings.edges[i.key] !== false)}
+				<label class="mb-0.5 flex cursor-pointer items-center gap-2 text-sm font-medium" style="color: var(--color-fg)">
+					<input
+						type="checkbox"
+						checked={allOn}
+						indeterminate={!allOn && someOn}
+						onchange={() => toggleGroup(group)}
+					/>
+					{group.label}
+				</label>
+				{#each group.items as item}
+					<label class="mb-0.5 flex cursor-pointer items-center gap-2 text-sm" style="color: var(--color-fg); padding-left: 20px">
+						<input type="checkbox" checked={settings.edges[item.key] !== false} onchange={() => toggleEdge(item.key)} />
+						{item.label}
+					</label>
+				{/each}
+			{/each}
+		{:else}
+			<!-- Display Settings -->
+			<label class="mb-3 flex cursor-pointer items-center justify-between gap-2 text-sm" style="color: var(--color-fg)">
+				Label density
+				<input type="number" min="1" max="50" value={settings.label_density ?? 10}
+					onchange={(e) => updateSetting('label_density', parseInt(e.currentTarget.value) || 10)}
+					style="width: 50px; padding: 2px 4px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-surface); color: var(--color-fg); text-align: center; font-size: 0.75rem" />
 			</label>
-		{/each}
-	{/each}
+			<label class="mb-3 flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+				<span class="flex justify-between"><span>Spread</span><span style="color: var(--color-muted)">{(settings.node_spacing ?? 1.0).toFixed(2)}x</span></span>
+				<input type="range" min="0.2" max="3" step="0.01" value={settings.node_spacing ?? 1.0}
+					oninput={(e) => { const v = parseFloat(e.currentTarget.value); onchange({ ...settings, node_spacing: v, link_length: v }); }}
+					style="width: 100%; accent-color: var(--color-primary)" />
+			</label>
+			<label class="mb-3 flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+				<span class="flex justify-between"><span>Size contrast</span><span style="color: var(--color-muted)">{(settings.size_contrast ?? 1.0).toFixed(2)}x</span></span>
+				<input type="range" min="0" max="3" step="0.01" value={settings.size_contrast ?? 1.0}
+					oninput={(e) => updateSetting('size_contrast', parseFloat(e.currentTarget.value))}
+					style="width: 100%; accent-color: var(--color-primary)" />
+			</label>
+		{/if}
+
+		<!-- Action buttons (always visible) -->
+		{#if onResetToDefaults || (isAdmin && onSaveDefault)}
+			<hr class="my-2" style="border-color: var(--color-border)" />
+			<div class="flex gap-2">
+				{#if onResetToDefaults}
+					<button
+						onclick={() => onResetToDefaults(activeTab)}
+						style="flex: 1; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-muted); font-size: 0.7rem; cursor: pointer"
+					>Reset</button>
+				{/if}
+				{#if isAdmin && onSaveDefault}
+					<button
+						onclick={async (e) => {
+							const btn = e.currentTarget as HTMLButtonElement;
+							try { await onSaveDefault(settings); } catch { /* ignore */ }
+							btn.textContent = 'Saved';
+							setTimeout(() => { btn.textContent = 'Save as default'; }, 1500);
+						}}
+						style="flex: 1; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--color-primary); background: var(--color-primary); color: white; font-size: 0.7rem; cursor: pointer"
+					>Save as default</button>
+				{/if}
+			</div>
+		{/if}
+	</div>
 </div>

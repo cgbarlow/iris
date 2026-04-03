@@ -394,11 +394,23 @@ export interface GraphEdge {
 export interface GraphSettings {
 	nodes: Record<string, boolean>;
 	edges: Record<string, boolean>;
+	label_density: number;
+	node_spacing: number;
+	size_contrast: number;
+	link_length: number;
 }
 
 export interface GraphResponse {
 	nodes: GraphNode[];
 	edges: GraphEdge[];
+}
+
+export interface GraphSettingsResponse {
+	scope_type: string;
+	scope_id: string;
+	settings: GraphSettings;
+	updated_at: string | null;
+	updated_by: string | null;
 }
 
 /** @deprecated Use Element instead */

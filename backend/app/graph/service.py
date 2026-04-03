@@ -425,3 +425,138 @@ async def get_graph_data(
                        "relationship_count": rel_counts.get(r[0], 0)})
 
     return {"nodes": nodes, "edges": edges}
+
+
+# ── GRAPH SETTINGS (ADR-117) ──────────────────────────────────────────
+
+from copy import deepcopy
+from datetime import datetime, timezone
+
+
+GRAPH_SETTINGS_DEFAULTS: dict[str, Any] = {
+    "nodes": {
+        "collection": True, "set": True, "package": True,
+        "diagram": True, "element": True,
+    },
+    "edges": {
+        "collection_membership": True, "set_membership": True,
+        "direct_diagram_links": True, "hierarchy": True,
+        "diagram_element": True, "diagram_package": True,
+        "diagram_link": True, "package_relationship": True,
+        "element_relationship": True,
+    },
+    "label_density": 10,
+    "node_spacing": 1.0,
+    "size_contrast": 1.0,
+    "link_length": 1.0,
+}
+
+
+async def seed_graph_settings_defaults(db: "DatabasePort") -> None:
+    """Insert the global defaults row if it doesn't already exist."""
+    cursor = await db.execute(
+        "SELECT 1 FROM graph_settings WHERE scope_type = 'global' AND scope_id = '__global__'",
+    )
+    if await cursor.fetchone():
+        return
+    await db.execute(
+        "INSERT INTO graph_settings (scope_type, scope_id, settings_json, updated_at) "
+        "VALUES (?, ?, ?, ?)",
+        ["global", "__global__", json.dumps(GRAPH_SETTINGS_DEFAULTS),
+         datetime.now(timezone.utc).isoformat()],
+    )
+    await db.commit()
+
+
+async def get_graph_settings(
+    db: "DatabasePort",
+    scope_type: str,
+    scope_id: str,
+) -> dict[str, Any] | None:
+    """Return raw settings for a single scope, or None."""
+    cursor = await db.execute(
+        "SELECT settings_json, updated_at, updated_by "
+        "FROM graph_settings WHERE scope_type = ? AND scope_id = ?",
+        [scope_type, scope_id],
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    return {
+        "scope_type": scope_type,
+        "scope_id": scope_id,
+        "settings": json.loads(row[0]),
+        "updated_at": row[1],
+        "updated_by": row[2],
+    }
+
+
+async def get_graph_settings_cascaded(
+    db: "DatabasePort",
+    *,
+    set_id: str | None = None,
+    collection_id: str | None = None,
+) -> dict[str, Any]:
+    """Return merged settings: global → collection → set."""
+    base = deepcopy(GRAPH_SETTINGS_DEFAULTS)
+
+    global_row = await get_graph_settings(db, "global", "__global__")
+    if global_row:
+        _merge_settings(base, global_row["settings"])
+
+    effective_scope = ("global", "__global__")
+    if collection_id:
+        col_row = await get_graph_settings(db, "collection", collection_id)
+        if col_row:
+            _merge_settings(base, col_row["settings"])
+            effective_scope = ("collection", collection_id)
+
+    if set_id:
+        set_row = await get_graph_settings(db, "set", set_id)
+        if set_row:
+            _merge_settings(base, set_row["settings"])
+            effective_scope = ("set", set_id)
+
+    return {
+        "scope_type": effective_scope[0],
+        "scope_id": effective_scope[1],
+        "settings": base,
+    }
+
+
+def _merge_settings(base: dict[str, Any], override: dict[str, Any]) -> None:
+    """Merge override into base in-place. Dicts are shallow-merged, scalars replaced."""
+    for key, val in override.items():
+        if isinstance(val, dict) and isinstance(base.get(key), dict):
+            base[key] = {**base[key], **val}
+        else:
+            base[key] = val
+
+
+async def update_graph_settings(
+    db: "DatabasePort",
+    *,
+    scope_type: str,
+    scope_id: str,
+    settings: dict[str, Any],
+    updated_by: str,
+) -> dict[str, Any]:
+    """Upsert graph settings for a scope."""
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        "INSERT INTO graph_settings (scope_type, scope_id, settings_json, updated_at, updated_by) "
+        "VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(scope_type, scope_id) DO UPDATE SET "
+        "settings_json = excluded.settings_json, "
+        "updated_at = excluded.updated_at, "
+        "updated_by = excluded.updated_by",
+        [scope_type, scope_id, json.dumps(settings), now, updated_by],
+    )
+    await db.commit()
+    return {
+        "scope_type": scope_type,
+        "scope_id": scope_id,
+        "settings": settings,
+        "updated_at": now,
+        "updated_by": updated_by,
+    }

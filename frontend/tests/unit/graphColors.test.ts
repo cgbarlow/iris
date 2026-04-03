@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNodeTypeColor, defaultGraphSettings } from '../../src/lib/utils/graphColors';
+import { getNodeTypeColor, defaultGraphSettings, clearUserOverrides } from '../../src/lib/utils/graphColors';
 
 describe('getNodeTypeColor', () => {
 	it('returns blue for elements', () => {
@@ -39,5 +39,63 @@ describe('defaultGraphSettings', () => {
 		for (const key of expectedEdges) {
 			expect(s.edges[key], `${key} should default to true`).toBe(true);
 		}
+	});
+
+	it('has label_density defaulting to 10', () => {
+		const s = defaultGraphSettings();
+		expect(s.label_density).toBe(10);
+	});
+
+	it('has node_spacing defaulting to 1.0', () => {
+		const s = defaultGraphSettings();
+		expect(s.node_spacing).toBe(1.0);
+	});
+
+	it('has size_contrast defaulting to 1.0', () => {
+		const s = defaultGraphSettings();
+		expect(s.size_contrast).toBe(1.0);
+	});
+
+	it('has link_length defaulting to 1.0', () => {
+		const s = defaultGraphSettings();
+		expect(s.link_length).toBe(1.0);
+	});
+});
+
+describe('clearUserOverrides', () => {
+	it('does not throw when called without arguments', () => {
+		expect(() => clearUserOverrides()).not.toThrow();
+	});
+
+	it('does not throw when called with a scopeId', () => {
+		expect(() => clearUserOverrides('some-scope')).not.toThrow();
+	});
+
+	it('removes the correct localStorage key', () => {
+		const storage: Record<string, string> = { 'iris-graph-settings:test-scope': '{}' };
+		globalThis.localStorage = {
+			getItem: (key: string) => storage[key] ?? null,
+			setItem: (key: string, value: string) => { storage[key] = value; },
+			removeItem: (key: string) => { delete storage[key]; },
+			clear: () => { Object.keys(storage).forEach(k => delete storage[k]); },
+			length: 0,
+			key: () => null,
+		};
+		clearUserOverrides('test-scope');
+		expect(storage['iris-graph-settings:test-scope']).toBeUndefined();
+	});
+
+	it('removes global key when no scopeId provided', () => {
+		const storage: Record<string, string> = { 'iris-graph-settings:__global__': '{}' };
+		globalThis.localStorage = {
+			getItem: (key: string) => storage[key] ?? null,
+			setItem: (key: string, value: string) => { storage[key] = value; },
+			removeItem: (key: string) => { delete storage[key]; },
+			clear: () => { Object.keys(storage).forEach(k => delete storage[k]); },
+			length: 0,
+			key: () => null,
+		};
+		clearUserOverrides();
+		expect(storage['iris-graph-settings:__global__']).toBeUndefined();
 	});
 });

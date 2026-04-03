@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { GraphNode, GraphEdge, GraphSettings } from '$lib/types/api';
 	import { getNodeTypeColor, NODE_TYPE_LABELS } from '$lib/utils/graphColors';
 	import KnowledgeGraphSettings from '$lib/components/KnowledgeGraphSettings.svelte';
@@ -12,9 +12,12 @@
 		onNodeClick?: (nodeId: string, nodeType: string) => void;
 		onNodeHover?: (nodeId: string | null) => void;
 		highlightNodeId?: string | null;
+		isAdmin?: boolean;
+		onSaveDefault?: (settings: GraphSettings) => void | Promise<void>;
+		onResetToDefaults?: (tab: 'visibility' | 'display') => void;
 	}
 
-	let { nodes, edges, settings, onSettingsChange, onNodeClick, onNodeHover, highlightNodeId = null }: Props = $props();
+	let { nodes, edges, settings, onSettingsChange, onNodeClick, onNodeHover, highlightNodeId = null, isAdmin = false, onSaveDefault, onResetToDefaults }: Props = $props();
 
 	let showSettings = $state(false);
 
@@ -59,6 +62,28 @@
 		);
 	});
 
+	// Hierarchy rank order (low to high)
+	const RANK_ORDER = ['element', 'diagram', 'package', 'set', 'collection'];
+	const BASE_SIZES: Record<string, number> = { collection: 160, set: 55, package: 40, diagram: 12, element: 0.5 };
+
+	function _computeNodeSize(nodeType: string, s: GraphSettings): number {
+		const contrast = s.size_contrast ?? 1.0;
+		if (contrast === 1.0) return BASE_SIZES[nodeType] ?? 1;
+
+		const visible = RANK_ORDER.filter((t) => s.nodes[t] !== false);
+		const rank = visible.indexOf(nodeType);
+		if (rank < 0) return BASE_SIZES[nodeType] ?? 1;
+
+		const n = visible.length;
+		// Position from -1 (lowest) to +1 (highest)
+		const pos = n > 1 ? (2 * rank) / (n - 1) - 1 : 0;
+		const base = BASE_SIZES[nodeType] ?? 1;
+		// Scale: at contrast=0 all uniform, at contrast=1 base sizes, above=amplified
+		// Spread per unit of contrast beyond 1.0
+		const spread = 40;
+		return Math.max(0.5, base + pos * spread * (contrast - 1.0));
+	}
+
 	function readThemeColors() {
 		const style = getComputedStyle(document.documentElement);
 		return {
@@ -93,11 +118,7 @@
 			.nodeLabel(() => '') // labels drawn in onRenderFramePost
 			.nodeRelSize(3)
 			.nodeVal((n: any) => {
-				if (n.node_type === 'collection') return 160;
-				if (n.node_type === 'set') return 55;
-				if (n.node_type === 'package') return 40;
-				if (n.node_type === 'diagram') return 12;
-				return 0.5;
+				return _computeNodeSize(n.node_type, settings);
 			})
 			.linkColor((l: any) => {
 				if (focusActive && focusNeighbors) {
@@ -132,6 +153,33 @@
 				links: filteredEdges.map((e) => ({ ...e })),
 			});
 
+		// Reconfigure forces when settings change
+		const chargeForce = graphInstance.d3Force('charge');
+		if (chargeForce?.strength) {
+			const spacing = settings.node_spacing ?? 1.0;
+			chargeForce.strength((n: any) => {
+				const bases: Record<string, number> = { collection: -300, set: -200, package: -80, diagram: -40 };
+				return (bases[n.node_type] ?? -30) * spacing;
+			});
+		}
+		const linkForce = graphInstance.d3Force('link');
+		if (linkForce?.distance) {
+			const ll = settings.link_length ?? 1.0;
+			linkForce.distance((l: any) => {
+				const tgt = typeof l.target === 'object' ? l.target : null;
+				const tgtType = tgt?.node_type;
+				let base = 60;
+				if (l.edge_type === 'collection_membership') base = 200;
+				else if (l.edge_type === 'set_membership') {
+					if (tgtType === 'package') base = 60;
+					else if (tgtType === 'diagram') base = 120;
+					else base = 80;
+				} else if (l.edge_type === 'hierarchy') {
+					base = tgtType === 'package' ? 25 : 40;
+				} else if (l.edge_type === 'diagram_element' || l.edge_type === 'diagram_package') base = 40;
+				return base * ll;
+			});
+		}
 	}
 
 	onMount(() => {
@@ -152,7 +200,7 @@
 			const PACKAGE_ZOOM = 0.5;
 			const DIAGRAM_ZOOM = 1.5;
 			const ELEMENT_ZOOM = 3.0;
-			const MAX_PER_TIER = 10;
+			const MAX_PER_TIER = settings.label_density ?? 10;
 
 			let wasDragged = false;
 
@@ -234,16 +282,20 @@
 							const fontSize = 12 / globalScale;
 							ctx.font = `bold ${fontSize}px sans-serif`;
 							ctx.textAlign = 'center';
-							ctx.textBaseline = 'bottom';
+							ctx.textBaseline = 'middle';
 							ctx.fillStyle = themeColors.fg;
-							ctx.fillText(target.name || '', target.x, target.y - r - 4 / globalScale);
+							ctx.fillText(target.name || '', target.x, target.y);
 						}
 					}
 
-					// Progressive labels: packages first, then diagrams, then elements
+					// Progressive labels with overlap suppression.
+					// Higher-precedence tiers (collection > set > package > diagram > element)
+					// suppress lower-precedence labels that would overlap.
+					// Same-tier labels never suppress each other.
 					const labelled = new Set(hlId ? [hlId] : []);
+					const drawnBoxes: { x: number; y: number; w: number; h: number; tier: number }[] = [];
 					ctx.textAlign = 'center';
-					ctx.textBaseline = 'bottom';
+					ctx.textBaseline = 'middle';
 
 					const tiers: { type: string; minZoom: number; bold: boolean; size: number }[] = [
 						{ type: 'collection', minZoom: 0, bold: true, size: 22 },
@@ -253,7 +305,8 @@
 						{ type: 'element', minZoom: ELEMENT_ZOOM, bold: false, size: 7 },
 					];
 
-					for (const tier of tiers) {
+					for (let ti = 0; ti < tiers.length; ti++) {
+						const tier = tiers[ti];
 						if (globalScale < tier.minZoom) continue;
 						const fontSize = tier.size / globalScale;
 						ctx.font = `${tier.bold ? 'bold ' : ''}${fontSize}px sans-serif`;
@@ -264,11 +317,25 @@
 							.slice(0, MAX_PER_TIER);
 
 						for (const n of tierNodes) {
+							const text = n.name || '';
+							const tw = ctx.measureText(text).width;
+							const th = fontSize;
+							const lx = n.x - tw / 2;
+							const ly = n.y - th / 2;
+
+							// Check overlap with higher-precedence labels only
+							const overlaps = drawnBoxes.some((b) =>
+								b.tier < ti &&
+								lx < b.x + b.w && lx + tw > b.x &&
+								ly < b.y + b.h && ly + th > b.y
+							);
+							if (overlaps) continue;
+
 							const isFaded = focusActive && focusNeighbors && !focusNeighbors.has(n.id);
 							ctx.globalAlpha = isFaded ? focusFade : 1.0;
 							ctx.fillStyle = themeColors.fg;
-							const r = Math.sqrt(Math.max(n.__val || 1, 1)) * fg.nodeRelSize() + 2;
-							ctx.fillText(n.name || '', n.x, n.y - r - 2 / globalScale);
+							ctx.fillText(text, n.x, n.y);
+							drawnBoxes.push({ x: lx, y: ly, w: tw, h: th, tier: ti });
 							labelled.add(n.id);
 						}
 						ctx.globalAlpha = 1.0;
@@ -277,44 +344,11 @@
 
 			graph = fg;
 
-			// Per-node charge
-			const chargeForce = fg.d3Force('charge');
-			if (chargeForce?.strength) {
-				chargeForce.strength((n: any) => {
-					if (n.node_type === 'collection') return -300;
-					if (n.node_type === 'set') return -200;
-					if (n.node_type === 'package') return -80;
-					if (n.node_type === 'diagram') return -40;
-					return -30;
-				});
-			}
-
-			// Link distances enforce the hierarchy:
-			// Collection → Set → Package → Diagram → Element
-			const linkForce = fg.d3Force('link');
-			if (linkForce) {
-				linkForce.distance((l: any) => {
-					const tgt = typeof l.target === 'object' ? l.target : null;
-					const tgtType = tgt?.node_type;
-					if (l.edge_type === 'collection_membership') return 200;
-					if (l.edge_type === 'set_membership') {
-						if (tgtType === 'package') return 60;
-						if (tgtType === 'diagram') return 120;
-						return 80;
-					}
-					if (l.edge_type === 'hierarchy') {
-						if (tgtType === 'package') return 25;
-						return 40;
-					}
-					if (l.edge_type === 'diagram_element' || l.edge_type === 'diagram_package') return 40;
-					return 60;
-				});
-			}
-
 			// Custom cluster force: two-level hierarchical clustering.
 			// Level 1: collection clusters — pushes entire collections apart
 			// Level 2: set clusters — keeps each set's subtree cohesive and separated
 			fg.d3Force('cluster', (alpha: number) => {
+				const spread = settings.node_spacing ?? 1.0;
 				const graphData = fg.graphData();
 				if (!graphData.nodes.length) return;
 
@@ -419,17 +453,18 @@
 				}
 
 				// 1. Collection separation (strong — pushes entire collections apart)
+				const s3 = spread * spread * spread;
 				if (nodeCollectionMap.size > 0) {
 					const colCentroids = computeCentroids(nodeCollectionMap);
 					if (colCentroids.size > 1) {
-						applySeparation(colCentroids, nodeCollectionMap, 80);
+						applySeparation(colCentroids, nodeCollectionMap, 80 * s3);
 					}
 				}
 
 				// 2. Set separation (moderate — pushes sets apart within/across collections)
 				const setCentroids = computeCentroids(nodeSetFull);
 				if (setCentroids.size > 1) {
-					applySeparation(setCentroids, nodeSetFull, 50);
+					applySeparation(setCentroids, nodeSetFull, 50 * s3);
 				}
 
 				// 3. Root-package separation (within a set, pushes package subtrees apart)
@@ -437,12 +472,12 @@
 				if (nodeRootPkgMap.size > 0) {
 					pkgCentroids = computeCentroids(nodeRootPkgMap);
 					if (pkgCentroids.size > 1) {
-						applySeparation(pkgCentroids, nodeRootPkgMap, 30);
+						applySeparation(pkgCentroids, nodeRootPkgMap, 30 * s3);
 					}
 				}
 
 				// 4. Cohesion: pull each node toward its finest-level cluster centroid
-				const cohesion = 0.03 * alpha;
+				const cohesion = (0.03 / Math.max(spread, 0.2)) * alpha;
 				for (const n of graphData.nodes) {
 					// Prefer root-package cohesion, fall back to set
 					const rpid = nodeRootPkgMap.get(n.id);
@@ -506,18 +541,69 @@
 		};
 	});
 
-	// Re-render when data or settings change
+	// Stable keys for visibility toggles — only changes when toggles change, not sliders
+	let visibilityKey = $derived(
+		JSON.stringify(settings.nodes) + JSON.stringify(settings.edges)
+	);
+
+	// Re-render when data or visibility toggles change (re-feeds graph data).
+	// untrack prevents updateGraph's internal reads from subscribing this effect
+	// to slider settings — only visibilityKey/nodes/edges trigger a data re-feed.
 	$effect(() => {
-		const nodeCount = filteredNodes.length;
-		void filteredEdges.length;
+		void visibilityKey;
+		void nodes.length;
+		void edges.length;
 		if (graph) {
-			updateGraph(graph);
-			// Re-fit when data arrives or changes significantly
-			if (nodeCount !== prevNodeCount && nodeCount > 0) {
-				prevNodeCount = nodeCount;
-				setTimeout(() => graph.zoomToFit(400, 40), 1500);
-			}
+			untrack(() => {
+				updateGraph(graph);
+				const nodeCount = filteredNodes.length;
+				if (nodeCount !== prevNodeCount && nodeCount > 0) {
+					prevNodeCount = nodeCount;
+					setTimeout(() => graph.zoomToFit(400, 40), 1500);
+				}
+			});
 		}
+	});
+
+	// Reconfigure physics when sliders change (no data re-feed, keeps positions)
+	$effect(() => {
+		void settings.node_spacing;
+		void settings.size_contrast;
+		void settings.link_length;
+		void settings.label_density;
+		if (!graph) return;
+		// Update node sizes based on hierarchy rank
+		graph.nodeVal((n: any) => _computeNodeSize(n.node_type, settings));
+		// Update charge
+		const chargeForce = graph.d3Force('charge');
+		if (chargeForce?.strength) {
+			const spacing = settings.node_spacing ?? 1.0;
+			chargeForce.strength((n: any) => {
+				const bases: Record<string, number> = { collection: -300, set: -200, package: -80, diagram: -40 };
+				return (bases[n.node_type] ?? -30) * spacing;
+			});
+		}
+		// Update link distances
+		const linkForce = graph.d3Force('link');
+		if (linkForce?.distance) {
+			const ll = settings.link_length ?? 1.0;
+			linkForce.distance((l: any) => {
+				const tgt = typeof l.target === 'object' ? l.target : null;
+				const tgtType = tgt?.node_type;
+				let base = 60;
+				if (l.edge_type === 'collection_membership') base = 200;
+				else if (l.edge_type === 'set_membership') {
+					if (tgtType === 'package') base = 60;
+					else if (tgtType === 'diagram') base = 120;
+					else base = 80;
+				} else if (l.edge_type === 'hierarchy') {
+					base = tgtType === 'package' ? 25 : 40;
+				} else if (l.edge_type === 'diagram_element' || l.edge_type === 'diagram_package') base = 40;
+				return base * ll;
+			});
+		}
+		// Reheat so forces take effect from current positions
+		graph.d3ReheatSimulation();
 	});
 
 	// Resize graph when maximised state changes
@@ -582,6 +668,9 @@
 					<KnowledgeGraphSettings
 						{settings}
 						onchange={(s) => { onSettingsChange(s); }}
+						{isAdmin}
+						{onSaveDefault}
+						{onResetToDefaults}
 					/>
 				{/if}
 			</div>

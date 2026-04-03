@@ -9,7 +9,8 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
 
-	import { loadGraphSettings, saveGraphSettings } from '$lib/utils/graphColors';
+	import { loadGraphSettings, saveGraphSettings, fetchAdminDefaults, clearUserOverrides, migrateLocalSettingsToAdmin } from '$lib/utils/graphColors';
+	import { getCurrentUser } from '$lib/stores/auth.svelte.js';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { getVisitHistory, clearVisitHistory, type VisitEntry } from '$lib/stores/visitHistory.svelte.js';
 	import type {
@@ -39,12 +40,22 @@
 	let graphLoading = $state(true);
 	let graphScopeId = $derived(setId || collectionId || '');
 	let graphSettings = $state(loadGraphSettings());
+	let adminDefaults = $state<import('$lib/types/api').GraphSettings | undefined>(undefined);
+	let isAdmin = $derived(getCurrentUser()?.role === 'admin');
+
+	// One-time: migrate existing localStorage settings to DB as admin defaults
+	$effect(() => {
+		if (isAdmin) migrateLocalSettingsToAdmin();
+	});
 
 	// Reload settings when scope changes (set overrides collection)
 	$effect(() => {
 		void setId;
 		void collectionId;
-		graphSettings = loadGraphSettings(setId || undefined, collectionId || undefined);
+		fetchAdminDefaults(setId || undefined, collectionId || undefined).then((defaults) => {
+			adminDefaults = defaults;
+			graphSettings = loadGraphSettings(setId || undefined, collectionId || undefined, defaults);
+		});
 	});
 
 	let searchQuery = $state('');
@@ -658,6 +669,22 @@
 								edges={graphEdges}
 								settings={graphSettings}
 								onSettingsChange={(s) => { graphSettings = s; saveGraphSettings(s, graphScopeId); }}
+								{isAdmin}
+								onSaveDefault={async (s) => {
+									const scopeType = setId ? 'set' : collectionId ? 'collection' : 'global';
+									const scopeId = setId || collectionId || '__global__';
+									await apiFetch(`/api/graph/settings`, { method: 'PUT', body: JSON.stringify({ scope_type: scopeType, scope_id: scopeId, settings: s }) });
+								}}
+								onResetToDefaults={async (tab) => {
+									const defaults = await fetchAdminDefaults(setId || undefined, collectionId || undefined);
+									adminDefaults = defaults;
+									if (tab === 'visibility') {
+										graphSettings = { ...graphSettings, nodes: { ...defaults.nodes }, edges: { ...defaults.edges } };
+									} else {
+										graphSettings = { ...graphSettings, label_density: defaults.label_density, node_spacing: defaults.node_spacing, size_contrast: defaults.size_contrast, link_length: defaults.link_length };
+									}
+									saveGraphSettings(graphSettings, graphScopeId);
+								}}
 								onNodeClick={(nodeId, nodeType) => {
 									if (nodeType === 'collection') {
 										goto(`/?collection_id=${nodeId}`);
