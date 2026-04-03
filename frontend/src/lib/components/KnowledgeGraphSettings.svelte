@@ -15,6 +15,7 @@
 			items: [
 				{ key: 'collection_membership', label: 'Collection \u2192 Sets' },
 				{ key: 'set_membership', label: 'Set \u2192 Contents' },
+				{ key: 'direct_diagram_links', label: 'Direct diagram links' },
 			],
 		},
 		{

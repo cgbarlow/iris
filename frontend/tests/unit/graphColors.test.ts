@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNodeTypeColor, defaultGraphSettings, EDGE_TYPE_LABELS } from '../../src/lib/utils/graphColors';
+import { getNodeTypeColor, defaultGraphSettings } from '../../src/lib/utils/graphColors';
 
 describe('getNodeTypeColor', () => {
 	it('returns blue for elements', () => {
@@ -25,12 +25,19 @@ describe('defaultGraphSettings', () => {
 		expect(s.nodes.element).toBe(true);
 		expect(s.nodes.diagram).toBe(true);
 		expect(s.nodes.package).toBe(true);
+		expect(s.nodes.collection).toBe(true);
+		expect(s.nodes.set).toBe(true);
 	});
 
 	it('has all edge types enabled', () => {
 		const s = defaultGraphSettings();
-		for (const key of Object.keys(EDGE_TYPE_LABELS)) {
-			expect(s.edges[key]).toBe(true);
+		const expectedEdges = [
+			'collection_membership', 'set_membership', 'direct_diagram_links',
+			'hierarchy', 'diagram_element', 'diagram_package',
+			'diagram_link', 'package_relationship', 'element_relationship',
+		];
+		for (const key of expectedEdges) {
+			expect(s.edges[key], `${key} should default to true`).toBe(true);
 		}
 	});
 });

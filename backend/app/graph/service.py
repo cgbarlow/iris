@@ -62,22 +62,33 @@ async def get_graph_data(
     set_rows = await cursor.fetchall()
     set_ids = {r[0] for r in set_rows}
 
-    # Unscoped / collection-scoped: show collections, sets, and diagrams only
-    # (skip elements/packages — too many nodes for the proxy to handle)
+    # Unscoped / collection-scoped: show collections, sets, packages, and diagrams
+    # (skip elements — too many nodes for the proxy to handle)
     if not set_id:
-        diag_filter = ""
-        diag_params: list[object] = []
+        scope_filter = ""
+        scope_params: list[object] = []
         if collection_id:
-            diag_filter = "AND d.set_id IN (SELECT id FROM sets WHERE collection_id = ?)"
-            diag_params = [collection_id]
+            scope_filter = "AND {a}.set_id IN (SELECT id FROM sets WHERE collection_id = ?)"
+            scope_params = [collection_id]
+
         cursor = await db.execute(
-            "SELECT d.id, dv.name, d.diagram_type, dv.description, d.parent_package_id, d.set_id "
+            "SELECT p.id, pv.name, p.parent_package_id, p.set_id "
+            "FROM packages p "
+            "JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+            f"WHERE p.is_deleted = 0 {scope_filter.format(a='p')}",  # noqa: S608
+            scope_params,
+        )
+        package_rows_light = await cursor.fetchall()
+        package_ids_light = {r[0] for r in package_rows_light}
+
+        cursor = await db.execute(
+            "SELECT d.id, dv.name, d.diagram_type, d.parent_package_id, d.set_id "
             "FROM diagrams d "
             "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
-            f"WHERE d.is_deleted = 0 {diag_filter}",  # noqa: S608
-            diag_params,
+            f"WHERE d.is_deleted = 0 {scope_filter.format(a='d')}",  # noqa: S608
+            scope_params,
         )
-        diagram_rows_unscoped = await cursor.fetchall()
+        diagram_rows_light = await cursor.fetchall()
 
         edges: list[dict[str, Any]] = []
         # Collection → Set
@@ -91,9 +102,20 @@ async def get_graph_data(
                     "label": None,
                     "edge_type": "collection_membership",
                 })
+        # Set → Package
+        for row in package_rows_light:
+            pid, sid = row[0], row[3]
+            if sid and sid in set_ids:
+                edges.append({
+                    "id": str(uuid.uuid4()),
+                    "source": sid, "target": pid,
+                    "relationship_type": "contains",
+                    "label": None,
+                    "edge_type": "set_membership",
+                })
         # Set → Diagram
-        for row in diagram_rows_unscoped:
-            did, sid = row[0], row[5]
+        for row in diagram_rows_light:
+            did, sid = row[0], row[4]
             if sid and sid in set_ids:
                 edges.append({
                     "id": str(uuid.uuid4()),
@@ -102,11 +124,47 @@ async def get_graph_data(
                     "label": None,
                     "edge_type": "set_membership",
                 })
+        # Package hierarchy
+        for row in package_rows_light:
+            pkg_id, parent_pkg = row[0], row[2]
+            if parent_pkg and parent_pkg in package_ids_light:
+                edges.append({
+                    "id": str(uuid.uuid4()),
+                    "source": parent_pkg, "target": pkg_id,
+                    "relationship_type": "contains",
+                    "label": None,
+                    "edge_type": "hierarchy",
+                })
+        # Diagram → parent package hierarchy
+        for row in diagram_rows_light:
+            diagram_id, parent_pkg = row[0], row[3]
+            if parent_pkg and parent_pkg in package_ids_light:
+                edges.append({
+                    "id": str(uuid.uuid4()),
+                    "source": parent_pkg, "target": diagram_id,
+                    "relationship_type": "contains",
+                    "label": None,
+                    "edge_type": "hierarchy",
+                })
+        # Package relationships
+        if package_ids_light:
+            ph = ",".join("?" * len(package_ids_light))
+            pkg_list = list(package_ids_light)
+            cursor = await db.execute(
+                f"SELECT id, source_package_id, target_package_id, relationship_type, label "  # noqa: S608
+                f"FROM package_relationships "
+                f"WHERE source_package_id IN ({ph}) AND target_package_id IN ({ph})",
+                [*pkg_list, *pkg_list],
+            )
+            for r in await cursor.fetchall():
+                edges.append({"id": r[0], "source": r[1], "target": r[2],
+                               "relationship_type": r[3], "label": r[4],
+                               "edge_type": "package_relationship"})
         # Diagram links
-        diagram_ids_unscoped = {r[0] for r in diagram_rows_unscoped}
-        if diagram_ids_unscoped:
-            dh = ",".join("?" * len(diagram_ids_unscoped))
-            diag_list = list(diagram_ids_unscoped)
+        diagram_ids_light = {r[0] for r in diagram_rows_light}
+        if diagram_ids_light:
+            dh = ",".join("?" * len(diagram_ids_light))
+            diag_list = list(diagram_ids_light)
             cursor = await db.execute(
                 f"SELECT id, source_diagram_id, target_diagram_id, link_type, label "  # noqa: S608
                 f"FROM diagram_links "
@@ -129,7 +187,10 @@ async def get_graph_data(
         for r in set_rows:
             nodes.append({"id": r[0], "name": r[1], "node_type": "set",
                            "type_detail": "set", "relationship_count": rel_counts.get(r[0], 0)})
-        for r in diagram_rows_unscoped:
+        for r in package_rows_light:
+            nodes.append({"id": r[0], "name": r[1], "node_type": "package",
+                           "type_detail": "package", "relationship_count": rel_counts.get(r[0], 0)})
+        for r in diagram_rows_light:
             nodes.append({"id": r[0], "name": r[1], "node_type": "diagram",
                            "type_detail": r[2], "relationship_count": rel_counts.get(r[0], 0)})
         return {"nodes": nodes, "edges": edges}

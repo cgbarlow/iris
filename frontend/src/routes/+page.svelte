@@ -8,7 +8,7 @@
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
-	import KnowledgeGraphSettings from '$lib/components/KnowledgeGraphSettings.svelte';
+
 	import { loadGraphSettings, saveGraphSettings } from '$lib/utils/graphColors';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { getVisitHistory, clearVisitHistory, type VisitEntry } from '$lib/stores/visitHistory.svelte.js';
@@ -28,6 +28,7 @@
 
 	let elementCount = $state(0);
 	let diagramCount = $state(0);
+	let packageCount = $state(0);
 	let setCount = $state(0);
 	let collectionCount = $state(0);
 	let activeSet = $state<IrisSet | null>(null);
@@ -45,7 +46,7 @@
 		void collectionId;
 		graphSettings = loadGraphSettings(setId || undefined, collectionId || undefined);
 	});
-	let showGraphSettings = $state(false);
+
 	let searchQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
 	let searching = $state(false);
@@ -194,14 +195,16 @@
 			const collectionFilter = !setId && collectionId ? `&collection_id=${collectionId}` : '';
 
 			const setsFilter = collectionId ? `?collection_id=${collectionId}` : '';
-			const [elementsData, diagramsData, setsData, collectionsData] = await Promise.all([
+			const [elementsData, diagramsData, packagesData, setsData, collectionsData] = await Promise.all([
 				apiFetch<PaginatedResponse<Element>>(`/api/elements?page_size=1${setFilter}${collectionFilter}`),
 				apiFetch<PaginatedResponse<Element>>(`/api/diagrams?page_size=1${setFilter}${collectionFilter}`),
+				apiFetch<PaginatedResponse<Element>>(`/api/packages?page_size=1${setFilter}${collectionFilter}`),
 				apiFetch<{ items: IrisSet[] }>(`/api/sets${setsFilter}`),
 				apiFetch<{ items: IrisCollection[] }>('/api/collections'),
 			]);
 			elementCount = elementsData.total;
 			diagramCount = diagramsData.total;
+			packageCount = packagesData.total;
 			setCount = setsData.items.length;
 			collectionCount = collectionsData.items.length;
 
@@ -483,7 +486,7 @@
 	{/if}
 
 	<!-- Stats -->
-	<div class="mt-6 grid grid-cols-4 gap-4" style="max-width: 800px">
+	<div class="mt-6 grid grid-cols-5 gap-4" style="max-width: 1000px">
 		<div
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
@@ -524,6 +527,16 @@
 				</a>
 			{/if}
 		</div>
+		<a
+			href={setId ? `/packages?set_id=${setId}` : collectionId ? `/packages?collection_id=${collectionId}` : '/packages'}
+			class="rounded border p-4 text-center"
+			style="border-color: var(--color-border); color: var(--color-fg)"
+		>
+			<div class="text-3xl font-bold" style="color: var(--color-primary)">{packageCount}</div>
+			<div class="mt-1 text-sm" style="color: var(--color-muted)">
+				Packages {#if activeSet || activeCollection}(filtered){/if}
+			</div>
+		</a>
 		<a
 			href={setId ? `/diagrams?set_id=${setId}` : collectionId ? `/diagrams?collection_id=${collectionId}` : '/diagrams'}
 			class="rounded border p-4 text-center"
@@ -634,26 +647,7 @@
 				<!-- Graph panel -->
 				{#if showSideBySide || viewTab === 'graph' || !hasHierarchy}
 					<div class="flex flex-1 flex-col" style="min-height: 0; min-width: 0">
-						<div class="mb-2 flex items-center justify-end" style="position: relative">
-							<button
-								onclick={() => { showGraphSettings = !showGraphSettings; }}
-								class="rounded p-1"
-								style="color: var(--color-muted); background: none; border: none; cursor: pointer"
-								title="Graph settings"
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="16" height="16">
-									<path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24a16,16,0,1,1-16,16A16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/>
-								</svg>
-							</button>
-							{#if showGraphSettings}
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div style="position: fixed; inset: 0; z-index: 19" onclick={() => (showGraphSettings = false)}></div>
-								<KnowledgeGraphSettings
-									settings={graphSettings}
-									onchange={(s) => { graphSettings = s; saveGraphSettings(s, graphScopeId); }}
-								/>
-							{/if}
-						</div>
+						<div></div>
 						{#if graphLoading}
 							<p class="text-sm" style="color: var(--color-muted)">Loading graph...</p>
 						{:else if graphNodes.length === 0}
@@ -663,6 +657,7 @@
 								nodes={graphNodes}
 								edges={graphEdges}
 								settings={graphSettings}
+								onSettingsChange={(s) => { graphSettings = s; saveGraphSettings(s, graphScopeId); }}
 								onNodeClick={(nodeId, nodeType) => {
 									if (nodeType === 'collection') {
 										goto(`/?collection_id=${nodeId}`);

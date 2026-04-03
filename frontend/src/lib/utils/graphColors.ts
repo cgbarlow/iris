@@ -33,12 +33,13 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
 
 const STORAGE_PREFIX = 'iris-graph-settings';
 
-function _defaults(): { nodes: Record<string, boolean>; edges: Record<string, boolean> } {
+export function defaultGraphSettings(): { nodes: Record<string, boolean>; edges: Record<string, boolean> } {
 	return {
 		nodes: { collection: true, set: true, package: true, diagram: true, element: true },
 		edges: {
 			collection_membership: true,
 			set_membership: true,
+			direct_diagram_links: true,
 			hierarchy: true,
 			diagram_element: true,
 			diagram_package: true,
@@ -54,11 +55,23 @@ function _storageKey(scopeId: string): string {
 }
 
 export function loadGraphSettings(setId?: string, collectionId?: string): { nodes: Record<string, boolean>; edges: Record<string, boolean> } {
-	if (typeof localStorage === 'undefined') return _defaults();
-	const defaults = _defaults();
+	if (typeof localStorage === 'undefined') return defaultGraphSettings();
+	const defaults = defaultGraphSettings();
 
-	// Start with collection-level settings if available
+	// Start with global settings as base
 	let base = defaults;
+	try {
+		const raw = localStorage.getItem(_storageKey('__global__'));
+		if (raw) {
+			const saved = JSON.parse(raw);
+			base = {
+				nodes: { ...defaults.nodes, ...saved.nodes },
+				edges: { ...defaults.edges, ...saved.edges },
+			};
+		}
+	} catch { /* ignore */ }
+
+	// Override with collection-level settings if available
 	if (collectionId) {
 		try {
 			const raw = localStorage.getItem(_storageKey(collectionId));
@@ -90,7 +103,7 @@ export function loadGraphSettings(setId?: string, collectionId?: string): { node
 }
 
 export function saveGraphSettings(settings: { nodes: Record<string, boolean>; edges: Record<string, boolean> }, scopeId?: string): void {
-	if (typeof localStorage !== 'undefined' && scopeId) {
-		localStorage.setItem(_storageKey(scopeId), JSON.stringify(settings));
+	if (typeof localStorage !== 'undefined') {
+		localStorage.setItem(_storageKey(scopeId || '__global__'), JSON.stringify(settings));
 	}
 }

@@ -2,20 +2,25 @@
 	import { onMount } from 'svelte';
 	import type { GraphNode, GraphEdge, GraphSettings } from '$lib/types/api';
 	import { getNodeTypeColor, NODE_TYPE_LABELS } from '$lib/utils/graphColors';
+	import KnowledgeGraphSettings from '$lib/components/KnowledgeGraphSettings.svelte';
 
 	interface Props {
 		nodes: GraphNode[];
 		edges: GraphEdge[];
 		settings: GraphSettings;
+		onSettingsChange?: (settings: GraphSettings) => void;
 		onNodeClick?: (nodeId: string, nodeType: string) => void;
 		onNodeHover?: (nodeId: string | null) => void;
 		highlightNodeId?: string | null;
 	}
 
-	let { nodes, edges, settings, onNodeClick, onNodeHover, highlightNodeId = null }: Props = $props();
+	let { nodes, edges, settings, onSettingsChange, onNodeClick, onNodeHover, highlightNodeId = null }: Props = $props();
+
+	let showSettings = $state(false);
 
 	let container: HTMLDivElement | undefined = $state();
 	let graph: any = $state(null);
+	let maximised = $state(false);
 
 	// Track previous node count to detect data loads that need a re-fit
 	let prevNodeCount = 0;
@@ -39,12 +44,18 @@
 	let filteredNodes = $derived.by(() => {
 		return nodes.filter((n) => settings.nodes[n.node_type] !== false);
 	});
+	// Diagrams that have a hierarchy parent (used to suppress redundant set→diagram edges)
+	let diagramsWithParent = $derived(new Set(
+		edges.filter((e) => e.edge_type === 'hierarchy').map((e) => e.target as string)
+	));
 	let filteredEdges = $derived.by(() => {
 		const visibleNodeIds = new Set(filteredNodes.map((n) => n.id));
+		const hideDirectDiagramLinks = settings.edges['direct_diagram_links'] === false;
 		return edges.filter((e) =>
 			settings.edges[e.edge_type] !== false &&
 			visibleNodeIds.has(e.source as string) &&
-			visibleNodeIds.has(e.target as string)
+			visibleNodeIds.has(e.target as string) &&
+			!(hideDirectDiagramLinks && e.edge_type === 'set_membership' && diagramsWithParent.has(e.target as string))
 		);
 	});
 
@@ -120,6 +131,7 @@
 				nodes: nodeData,
 				links: filteredEdges.map((e) => ({ ...e })),
 			});
+
 	}
 
 	onMount(() => {
@@ -140,7 +152,7 @@
 			const PACKAGE_ZOOM = 0.5;
 			const DIAGRAM_ZOOM = 1.5;
 			const ELEMENT_ZOOM = 3.0;
-			const MAX_PER_TIER = 20;
+			const MAX_PER_TIER = 10;
 
 			let wasDragged = false;
 
@@ -236,8 +248,8 @@
 					const tiers: { type: string; minZoom: number; bold: boolean; size: number }[] = [
 						{ type: 'collection', minZoom: 0, bold: true, size: 22 },
 						{ type: 'set', minZoom: 0, bold: true, size: 16 },
-						{ type: 'package', minZoom: PACKAGE_ZOOM, bold: true, size: 12 },
-						{ type: 'diagram', minZoom: DIAGRAM_ZOOM, bold: false, size: 9 },
+						{ type: 'package', minZoom: 0.3, bold: true, size: 12 },
+						{ type: 'diagram', minZoom: 2.0, bold: false, size: 9 },
 						{ type: 'element', minZoom: ELEMENT_ZOOM, bold: false, size: 7 },
 					];
 
@@ -265,23 +277,195 @@
 
 			graph = fg;
 
-			// Shorter link distances for containment edges
+			// Per-node charge
+			const chargeForce = fg.d3Force('charge');
+			if (chargeForce?.strength) {
+				chargeForce.strength((n: any) => {
+					if (n.node_type === 'collection') return -300;
+					if (n.node_type === 'set') return -200;
+					if (n.node_type === 'package') return -80;
+					if (n.node_type === 'diagram') return -40;
+					return -30;
+				});
+			}
+
+			// Link distances enforce the hierarchy:
+			// Collection → Set → Package → Diagram → Element
 			const linkForce = fg.d3Force('link');
 			if (linkForce) {
 				linkForce.distance((l: any) => {
-					if (l.edge_type === 'collection_membership') return 40;
-					if (l.edge_type === 'set_membership') return 30;
-					if (l.edge_type === 'hierarchy') return 30;
+					const tgt = typeof l.target === 'object' ? l.target : null;
+					const tgtType = tgt?.node_type;
+					if (l.edge_type === 'collection_membership') return 200;
+					if (l.edge_type === 'set_membership') {
+						if (tgtType === 'package') return 60;
+						if (tgtType === 'diagram') return 120;
+						return 80;
+					}
+					if (l.edge_type === 'hierarchy') {
+						if (tgtType === 'package') return 25;
+						return 40;
+					}
 					if (l.edge_type === 'diagram_element' || l.edge_type === 'diagram_package') return 40;
 					return 60;
 				});
 			}
 
+			// Custom cluster force: two-level hierarchical clustering.
+			// Level 1: collection clusters — pushes entire collections apart
+			// Level 2: set clusters — keeps each set's subtree cohesive and separated
+			fg.d3Force('cluster', (alpha: number) => {
+				const graphData = fg.graphData();
+				if (!graphData.nodes.length) return;
+
+				// Build node→set, set→collection, and child→parent mappings from edges
+				const nodeSetMap = new Map<string, string>();
+				const setCollectionMap = new Map<string, string>();
+				const childParentMap = new Map<string, string>(); // hierarchy: target→source
+				for (const l of graphData.links) {
+					const src = typeof l.source === 'object' ? l.source.id : l.source;
+					const tgt = typeof l.target === 'object' ? l.target.id : l.target;
+					if (l.edge_type === 'set_membership') nodeSetMap.set(tgt, src);
+					if (l.edge_type === 'collection_membership') setCollectionMap.set(tgt, src);
+					if (l.edge_type === 'hierarchy') childParentMap.set(tgt, src);
+				}
+				// Walk hierarchy so children inherit the set
+				for (const [tgt, src] of childParentMap) {
+					const parentSet = nodeSetMap.get(src);
+					if (parentSet && !nodeSetMap.has(tgt)) nodeSetMap.set(tgt, parentSet);
+				}
+
+				// Resolve each node's collection (node→set→collection)
+				const nodeCollectionMap = new Map<string, string>();
+				for (const n of graphData.nodes) {
+					if (n.node_type === 'collection') { nodeCollectionMap.set(n.id, n.id); continue; }
+					const sid = nodeSetMap.get(n.id) || (n.node_type === 'set' ? n.id : null);
+					if (!sid) continue;
+					const cid = setCollectionMap.get(sid);
+					if (cid) nodeCollectionMap.set(n.id, cid);
+				}
+
+				// Helper: compute centroids for a grouping
+				type Centroid = { x: number; y: number; count: number };
+				function computeCentroids(nodeGroupMap: Map<string, string>) {
+					const centroids = new Map<string, Centroid>();
+					for (const n of graphData.nodes) {
+						const gid = nodeGroupMap.get(n.id);
+						if (!gid) continue;
+						let c = centroids.get(gid);
+						if (!c) { c = { x: 0, y: 0, count: 0 }; centroids.set(gid, c); }
+						c.x += n.x || 0;
+						c.y += n.y || 0;
+						c.count++;
+					}
+					for (const c of centroids.values()) {
+						if (c.count > 0) { c.x /= c.count; c.y /= c.count; }
+					}
+					return centroids;
+				}
+
+				function applySeparation(centroids: Map<string, Centroid>, nodeGroupMap: Map<string, string>, strength: number) {
+					const entries = [...centroids.entries()];
+					const sep = strength * alpha;
+					for (let i = 0; i < entries.length; i++) {
+						for (let j = i + 1; j < entries.length; j++) {
+							const a = entries[i][1];
+							const b = entries[j][1];
+							let dx = a.x - b.x;
+							let dy = a.y - b.y;
+							const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+							const force = sep / dist;
+							dx *= force / dist;
+							dy *= force / dist;
+							const aId = entries[i][0];
+							const bId = entries[j][0];
+							for (const n of graphData.nodes) {
+								const gid = nodeGroupMap.get(n.id);
+								if (gid === aId) { n.vx += dx; n.vy += dy; }
+								else if (gid === bId) { n.vx -= dx; n.vy -= dy; }
+							}
+						}
+					}
+				}
+
+				// Build set-level node map (includes set nodes themselves)
+				const nodeSetFull = new Map<string, string>();
+				for (const n of graphData.nodes) {
+					const sid = nodeSetMap.get(n.id) || (n.node_type === 'set' ? n.id : null);
+					if (sid) nodeSetFull.set(n.id, sid);
+				}
+
+				// Resolve each node's root package (walk up hierarchy to the top)
+				function findRoot(id: string): string {
+					let cur = id;
+					const visited = new Set<string>();
+					while (childParentMap.has(cur) && !visited.has(cur)) {
+						visited.add(cur);
+						cur = childParentMap.get(cur)!;
+					}
+					return cur;
+				}
+				const hierarchyNodes = new Set<string>();
+				for (const [child, parent] of childParentMap) {
+					hierarchyNodes.add(child);
+					hierarchyNodes.add(parent);
+				}
+				const nodeRootPkgMap = new Map<string, string>();
+				for (const n of graphData.nodes) {
+					if (n.node_type === 'collection' || n.node_type === 'set') continue;
+					if (hierarchyNodes.has(n.id)) {
+						nodeRootPkgMap.set(n.id, findRoot(n.id));
+					}
+				}
+
+				// 1. Collection separation (strong — pushes entire collections apart)
+				if (nodeCollectionMap.size > 0) {
+					const colCentroids = computeCentroids(nodeCollectionMap);
+					if (colCentroids.size > 1) {
+						applySeparation(colCentroids, nodeCollectionMap, 80);
+					}
+				}
+
+				// 2. Set separation (moderate — pushes sets apart within/across collections)
+				const setCentroids = computeCentroids(nodeSetFull);
+				if (setCentroids.size > 1) {
+					applySeparation(setCentroids, nodeSetFull, 50);
+				}
+
+				// 3. Root-package separation (within a set, pushes package subtrees apart)
+				let pkgCentroids: Map<string, Centroid> | null = null;
+				if (nodeRootPkgMap.size > 0) {
+					pkgCentroids = computeCentroids(nodeRootPkgMap);
+					if (pkgCentroids.size > 1) {
+						applySeparation(pkgCentroids, nodeRootPkgMap, 30);
+					}
+				}
+
+				// 4. Cohesion: pull each node toward its finest-level cluster centroid
+				const cohesion = 0.03 * alpha;
+				for (const n of graphData.nodes) {
+					// Prefer root-package cohesion, fall back to set
+					const rpid = nodeRootPkgMap.get(n.id);
+					if (rpid && pkgCentroids && pkgCentroids.size > 1) {
+						const c = pkgCentroids.get(rpid);
+						if (c) {
+							n.vx += (c.x - (n.x || 0)) * cohesion;
+							n.vy += (c.y - (n.y || 0)) * cohesion;
+							continue;
+						}
+					}
+					const sid = nodeSetFull.get(n.id);
+					if (!sid) continue;
+					const c = setCentroids.get(sid);
+					if (!c) continue;
+					n.vx += (c.x - (n.x || 0)) * cohesion;
+					n.vy += (c.y - (n.y || 0)) * cohesion;
+				}
+			});
+
 			// After initial layout settles, keep a tiny alpha target so nodes drift gently
 			breatheInterval = setTimeout(() => {
 				if (!destroyed && fg && typeof fg.d3AlphaTarget === 'function') {
-					const engine = fg.d3Force('charge');
-					if (engine?.strength) engine.strength(-30);
 					fg.d3AlphaTarget(0.02);
 				}
 			}, 3000) as unknown as ReturnType<typeof setInterval>;
@@ -336,6 +520,19 @@
 		}
 	});
 
+	// Resize graph when maximised state changes
+	$effect(() => {
+		void maximised;
+		if (!graph || !container) return;
+		setTimeout(() => {
+			const r = container!.getBoundingClientRect();
+			if (r.width > 0 && r.height > 0) {
+				graph.width(r.width).height(r.height);
+				graph.zoomToFit(400, 40);
+			}
+		}, 100);
+	});
+
 	// Zoom to highlighted node (visuals handled in onRenderFramePost)
 	$effect(() => {
 		if (!graph || !highlightNodeId) return;
@@ -349,11 +546,11 @@
 	});
 </script>
 
-<div class="knowledge-graph-wrapper">
-	<!-- Legend -->
+<svelte:window onkeydown={(e) => { if (maximised && e.key === 'Escape') maximised = false; }} />
+<div class="knowledge-graph-wrapper" class:knowledge-graph-maximised={maximised}>
 	{#if legend.length > 0}
 		<div
-			style="position: absolute; top: 8px; right: 8px; z-index: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); font-size: 0.75rem; display: flex; flex-wrap: wrap; gap: 8px; max-width: 300px"
+			style="position: absolute; bottom: 8px; right: 8px; z-index: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); font-size: 0.75rem; display: flex; flex-wrap: wrap; gap: 8px; max-width: 300px"
 		>
 			{#each legend as entry}
 				<span class="flex items-center gap-1">
@@ -366,14 +563,59 @@
 		</div>
 	{/if}
 
-	<!-- Reset zoom button -->
-	<button
-		onclick={() => { if (graph) graph.zoomToFit(400, 40); }}
-		style="position: absolute; bottom: 8px; right: 8px; z-index: 1; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-muted); font-size: 0.7rem; cursor: pointer"
-		title="Reset zoom to fit all nodes"
-	>
-		Fit
-	</button>
+	<!-- Graph controls -->
+	<div style="position: absolute; top: 8px; right: 8px; z-index: 1; display: flex; gap: 4px; align-items: stretch">
+		{#if onSettingsChange}
+			<div style="position: relative; display: flex">
+				<button
+					onclick={() => { showSettings = !showSettings; }}
+					style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-muted); cursor: pointer; display: flex; align-items: center; font-size: 0.7rem"
+					title="Graph settings"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12">
+						<path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24a16,16,0,1,1-16,16A16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/>
+					</svg>
+				</button>
+				{#if showSettings}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div style="position: fixed; inset: 0; z-index: 19" onclick={() => (showSettings = false)}></div>
+					<KnowledgeGraphSettings
+						{settings}
+						onchange={(s) => { onSettingsChange(s); }}
+					/>
+				{/if}
+			</div>
+		{/if}
+		<button
+			onclick={() => {
+				if (!graph) return;
+				updateGraph(graph);
+				setTimeout(() => graph.zoomToFit(400, 40), 1500);
+			}}
+			style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-muted); font-size: 0.7rem; cursor: pointer"
+			title="Reset graph to default layout"
+		>
+			Reset
+		</button>
+		<button
+			onclick={() => { if (graph) graph.zoomToFit(400, 40); }}
+			style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-muted); font-size: 0.7rem; cursor: pointer"
+			title="Zoom to fit all nodes"
+		>
+			Fit
+		</button>
+		<button
+			onclick={() => { maximised = !maximised; }}
+			style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-muted); cursor: pointer; display: flex; align-items: center; font-size: 0.7rem"
+			title={maximised ? 'Exit full screen' : 'Full screen'}
+		>
+			{#if maximised}
+				<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><polyline points="14 20 14 14 20 14"></polyline><polyline points="10 4 10 10 4 10"></polyline></svg>
+			{:else}
+				<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><polyline points="21 15 21 21 15 21"></polyline><polyline points="3 9 3 3 9 3"></polyline></svg>
+			{/if}
+		</button>
+	</div>
 
 	<!-- Graph container -->
 	<div
@@ -393,6 +635,36 @@
 		border: 1px solid var(--color-border);
 		flex: 1 1 0;
 		min-height: 300px;
+	}
+	.knowledge-graph-maximised {
+		position: fixed;
+		inset: 0;
+		z-index: 50;
+		border: none;
+		border-radius: 0;
+		height: 100%;
+		min-height: 0;
+		background: var(--color-bg);
+	}
+	.knowledge-graph-exit {
+		position: absolute;
+		top: 8px;
+		left: 8px;
+		z-index: 2;
+		width: 28px;
+		height: 28px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		background: var(--color-surface);
+		color: var(--color-fg);
+		font-size: 1.1rem;
+		cursor: pointer;
+	}
+	.knowledge-graph-exit:hover {
+		background: var(--color-border);
 	}
 	.knowledge-graph-canvas {
 		width: 100%;
