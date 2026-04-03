@@ -95,6 +95,7 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Entity and model counts with linked navigation
 - Bookmarked models with quick access
 - Full-text search across entities and models
+- **Knowledge graph** — interactive force-directed graph (force-graph library) showing all elements and their relationships for the active set/collection, with colour-coded nodes by element type, directional edges, click-to-navigate to element detail, drag-to-rearrange, zoom/pan, and theme-aware rendering
 - Quick navigation cards for key sections
 
 ### Admin Panel

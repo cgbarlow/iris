@@ -7,6 +7,9 @@
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
+	import KnowledgeGraphSettings from '$lib/components/KnowledgeGraphSettings.svelte';
+	import { loadGraphSettings, saveGraphSettings } from '$lib/utils/graphColors';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { getVisitHistory, clearVisitHistory, type VisitEntry } from '$lib/stores/visitHistory.svelte.js';
 	import type {
@@ -18,6 +21,9 @@
 		IrisSet,
 		IrisCollection,
 		DiagramHierarchyNode,
+		GraphNode,
+		GraphEdge,
+		GraphResponse,
 	} from '$lib/types/api';
 
 	let elementCount = $state(0);
@@ -27,6 +33,19 @@
 	let activeSet = $state<IrisSet | null>(null);
 	let activeCollection = $state<IrisCollection | null>(null);
 	let setCollectionNameMap = $state<Record<string, string>>({});
+	let graphNodes = $state<GraphNode[]>([]);
+	let graphEdges = $state<GraphEdge[]>([]);
+	let graphLoading = $state(true);
+	let graphScopeId = $derived(setId || collectionId || '');
+	let graphSettings = $state(loadGraphSettings());
+
+	// Reload settings when scope changes (set overrides collection)
+	$effect(() => {
+		void setId;
+		void collectionId;
+		graphSettings = loadGraphSettings(setId || undefined, collectionId || undefined);
+	});
+	let showGraphSettings = $state(false);
 	let searchQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
 	let searching = $state(false);
@@ -56,6 +75,7 @@
 	let error = $state<string | null>(null);
 	let hierarchyTree = $state<DiagramHierarchyNode[]>([]);
 	let hierarchyLoading = $state(false);
+	let autoExpandDepth = $state(2);
 	let treeSearchQuery = $state('');
 	let treeExpandedIds = $state(new Set<string>());
 	let reorderMode = $state(false);
@@ -67,6 +87,49 @@
 
 	// Dashboard tabs
 	let dashboardTab = $state<'discover' | 'history'>('discover');
+	let viewTab = $state<'hierarchy' | 'graph'>('hierarchy');
+	let wideEnough = $state(false);
+	let hoveredNodeId = $state<string | null>(null);
+	let graphHoveredNodeId = $state<string | null>(null);
+
+	// Find the ancestor path to a node in the hierarchy tree.
+	function findAncestorPath(trees: DiagramHierarchyNode[], targetId: string): string[] {
+		for (const node of trees) {
+			if (node.id === targetId) return [node.id];
+			if (node.children?.length) {
+				const path = findAncestorPath(node.children, targetId);
+				if (path.length) return [node.id, ...path];
+			}
+		}
+		return [];
+	}
+
+	// Peek: temporarily expand ancestors to reveal hovered graph node.
+	// If expanding would push the tree beyond the viewport (i.e. the target
+	// is deeper than autoExpandDepth), don't expand — just highlight the
+	// deepest already-visible ancestor instead.
+	let graphHoverIds = $derived.by(() => {
+		if (!graphHoveredNodeId || !hierarchyTree.length) return new Set<string>();
+		const path = findAncestorPath(hierarchyTree, graphHoveredNodeId);
+		if (!path.length) return new Set<string>();
+		// If the target is already visible (within auto-expand depth), highlight it directly
+		if (path.length - 1 <= autoExpandDepth) return new Set([graphHoveredNodeId]);
+		// Otherwise highlight the deepest visible ancestor
+		const deepestVisible = path[Math.max(autoExpandDepth, 0)];
+		return new Set([deepestVisible]);
+	});
+
+	let peekExpandedIds = $derived.by(() => {
+		if (!graphHoveredNodeId || !hierarchyTree.length) return new Set<string>();
+		const path = findAncestorPath(hierarchyTree, graphHoveredNodeId);
+		if (!path.length) return new Set<string>();
+		// Only peek-expand if the target is within reach (won't cause overflow)
+		if (path.length - 1 <= autoExpandDepth) {
+			return new Set(path.slice(0, -1));
+		}
+		// Too deep — don't expand anything
+		return new Set<string>();
+	});
 
 	// History tab
 	let historySearchQuery = $state('');
@@ -103,14 +166,24 @@
 		return groups;
 	});
 
-	// Read filter IDs once at mount — not reactive to store changes to avoid re-trigger loops
-	const mountSetId = page.url.searchParams.get('set_id') || getActiveSetId() || '';
-	const mountCollectionId = page.url.searchParams.get('collection_id') || getActiveCollectionId() || '';
-	let setId = $state(mountSetId);
-	let collectionId = $state(mountCollectionId);
+	// Reactive to URL param changes so clicking a set/collection in the graph updates the view
+	let setId = $derived(page.url.searchParams.get('set_id') || getActiveSetId() || '');
+	let collectionId = $derived(page.url.searchParams.get('collection_id') || getActiveCollectionId() || '');
 
 	$effect(() => {
+		// Re-run when scope changes
+		void setId;
+		void collectionId;
 		loadDashboard();
+	});
+
+	// Responsive: side-by-side when wide enough
+	$effect(() => {
+		const mql = window.matchMedia('(min-width: 1024px)');
+		wideEnough = mql.matches;
+		const handler = (e: MediaQueryListEvent) => { wideEnough = e.matches; };
+		mql.addEventListener('change', handler);
+		return () => mql.removeEventListener('change', handler);
 	});
 
 	async function loadDashboard() {
@@ -146,6 +219,11 @@
 				activeSet = setsData.items.find((s) => s.id === setId) ?? null;
 				if (activeSet && hasUrlSetId) {
 					setActiveSet(activeSet.id, activeSet.name);
+				} else if (!activeSet && hasUrlSetId) {
+					// Invalid set_id in URL — clear it
+					clearActiveSet();
+					goto('/', { replaceState: true });
+					return;
 				}
 			} else {
 				activeSet = null;
@@ -155,6 +233,11 @@
 				activeCollection = collectionsData.items.find((c) => c.id === collectionId) ?? null;
 				if (activeCollection && hasUrlCollectionId) {
 					setActiveCollection(activeCollection.id, activeCollection.name);
+				} else if (!activeCollection && hasUrlCollectionId) {
+					// Invalid collection_id in URL — clear it
+					clearActiveCollection();
+					goto('/', { replaceState: true });
+					return;
 				}
 			} else if (activeSet?.collection_id) {
 				activeCollection = collectionsData.items.find((c) => c.id === activeSet!.collection_id) ?? null;
@@ -171,6 +254,35 @@
 		} else {
 			hierarchyTree = [];
 		}
+
+		loadGraph();
+	}
+
+	// Count visible nodes at a given auto-expand depth
+	function countVisibleNodes(trees: DiagramHierarchyNode[], depth: number, maxDepth: number): number {
+		let count = trees.length;
+		if (depth < maxDepth) {
+			for (const node of trees) {
+				if (node.children?.length) {
+					count += countVisibleNodes(node.children, depth + 1, maxDepth);
+				}
+			}
+		}
+		return count;
+	}
+
+	function calcAutoExpandDepth(trees: DiagramHierarchyNode[]): number {
+		// ~30px per row, reserve ~300px for stats/search/tabs above the tree
+		const availableHeight = (typeof window !== 'undefined' ? window.innerHeight : 800) - 300;
+		const rowHeight = 30;
+		const maxRows = Math.floor(availableHeight / rowHeight);
+
+		// Try increasing depth until too many nodes
+		for (let d = 0; d <= 6; d++) {
+			const count = countVisibleNodes(trees, 0, d);
+			if (count > maxRows) return Math.max(d - 1, 0);
+		}
+		return 6;
 	}
 
 	async function loadHierarchy() {
@@ -179,10 +291,26 @@
 			hierarchyTree = await apiFetch<DiagramHierarchyNode[]>(
 				`/api/diagrams/hierarchy?set_id=${setId}`
 			);
+			autoExpandDepth = calcAutoExpandDepth(hierarchyTree);
 		} catch {
 			hierarchyTree = [];
 		}
 		hierarchyLoading = false;
+	}
+
+	async function loadGraph() {
+		graphLoading = true;
+		try {
+			const params = setId ? `set_id=${setId}` : collectionId ? `collection_id=${collectionId}` : '';
+			const url = params ? `/api/graph?${params}` : '/api/graph';
+			const data = await apiFetch<GraphResponse>(url);
+			graphNodes = data.nodes;
+			graphEdges = data.edges;
+		} catch {
+			graphNodes = [];
+			graphEdges = [];
+		}
+		graphLoading = false;
 	}
 
 	async function handleReorder(parentId: string | null, orderedIds: string[]) {
@@ -422,55 +550,136 @@
 		Filter by Collection or Set above, or search across your architecture repository below.
 	</p>
 
-	<!-- Diagram Hierarchy (when set selected) -->
-	{#if activeSet}
-		<div class="mt-6" style="max-width: 500px">
-			<div class="flex items-center justify-between">
-				<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Diagram Hierarchy</h2>
-				<div class="flex items-center gap-1" style="position: relative">
+	<!-- Diagram Hierarchy + Knowledge Graph -->
+	{#if true}
+		{@const hasHierarchy = !!activeSet}
+		{@const showSideBySide = hasHierarchy && wideEnough}
+
+		<div class="mt-4 flex flex-1 flex-col" style="min-height: 0">
+			<!-- Tabs (narrow mode with hierarchy, or collection-only = graph only) -->
+			{#if hasHierarchy && !showSideBySide}
+				<div class="flex gap-0 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Set view">
 					<button
-						onclick={() => { showCreateMenu = !showCreateMenu; }}
-						class="rounded px-2 py-1 text-xs"
-						style="background: var(--color-primary); color: white"
-						title="Create new item"
-					>+ New</button>
-					{#if showCreateMenu}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div style="position: fixed; inset: 0; z-index: 9" onclick={() => (showCreateMenu = false)}></div>
-						<div style="position: absolute; top: 100%; right: 0; z-index: 10; margin-top: 4px; min-width: 120px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden">
-							<button onclick={() => { showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Diagram</button>
-							<button onclick={() => { showCreatePackageDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; border-top: 1px solid var(--color-border); cursor: pointer">Package</button>
-						</div>
-					{/if}
-					<button
-						onclick={() => { reorderMode = !reorderMode; }}
-						class="rounded px-2 py-1 text-xs"
-						style="border: 1px solid {reorderMode ? 'var(--color-primary)' : 'var(--color-border)'}; background: {reorderMode ? 'var(--color-primary)' : 'transparent'}; color: {reorderMode ? 'white' : 'var(--color-muted)'}"
-						title={reorderMode ? 'Exit reorder mode' : 'Reorder diagrams'}
+						role="tab"
+						aria-selected={viewTab === 'hierarchy'}
+						onclick={() => (viewTab = 'hierarchy')}
+						class="px-5 py-2 text-sm font-medium transition-colors"
+						style="color: {viewTab === 'hierarchy' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {viewTab === 'hierarchy' ? 'var(--color-primary)' : 'transparent'}; margin-bottom: -1px"
 					>
-						{reorderMode ? 'Done' : 'Reorder'}
+						Diagram Hierarchy
+					</button>
+					<button
+						role="tab"
+						aria-selected={viewTab === 'graph'}
+						onclick={() => (viewTab = 'graph')}
+						class="px-5 py-2 text-sm font-medium transition-colors"
+						style="color: {viewTab === 'graph' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {viewTab === 'graph' ? 'var(--color-primary)' : 'transparent'}; margin-bottom: -1px"
+					>
+						Knowledge Graph
 					</button>
 				</div>
-			</div>
-			<input
-				id="tree-search"
-				bind:value={treeSearchQuery}
-				type="search"
-				placeholder="Filter diagrams..."
-				class="mt-2 w-full rounded border px-3 py-2 text-sm"
-				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-			/>
-			{#if hierarchyLoading}
-				<p class="mt-2 text-sm" style="color: var(--color-muted)">Loading hierarchy...</p>
-			{:else if hierarchyTree.length === 0}
-				<p class="mt-2 text-sm" style="color: var(--color-muted)">No diagrams in this set.</p>
-			{:else}
-				<ul role="tree" class="mt-4" style="list-style: none; padding: 0; margin: 0">
-					{#each hierarchyTree as node (node.id)}
-						<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} {contextItemIds} onaddcontext={handleTreeAddToContext} onremovecontext={removeAiContextItem} />
-					{/each}
-				</ul>
 			{/if}
+
+			<!-- Content -->
+			<div class="mt-4 flex flex-1 gap-4" style="min-height: 0">
+				<!-- Hierarchy panel -->
+				{#if hasHierarchy && (showSideBySide || viewTab === 'hierarchy')}
+					<div style="max-width: 500px; min-width: 280px; {showSideBySide ? 'flex: 0 0 380px;' : 'width: 100%;'} overflow-y: auto">
+						<div class="flex items-center gap-1" style="position: relative">
+							<button
+								onclick={() => { showCreateMenu = !showCreateMenu; }}
+								class="rounded px-2 py-1 text-xs"
+								style="background: var(--color-primary); color: white"
+								title="Create new item"
+							>+ New</button>
+							{#if showCreateMenu}
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div style="position: fixed; inset: 0; z-index: 9" onclick={() => (showCreateMenu = false)}></div>
+								<div style="position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; min-width: 120px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden">
+									<button onclick={() => { showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Diagram</button>
+									<button onclick={() => { showCreatePackageDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; border-top: 1px solid var(--color-border); cursor: pointer">Package</button>
+								</div>
+							{/if}
+							<button
+								onclick={() => { reorderMode = !reorderMode; }}
+								class="rounded px-2 py-1 text-xs"
+								style="border: 1px solid {reorderMode ? 'var(--color-primary)' : 'var(--color-border)'}; background: {reorderMode ? 'var(--color-primary)' : 'transparent'}; color: {reorderMode ? 'white' : 'var(--color-muted)'}"
+								title={reorderMode ? 'Exit reorder mode' : 'Reorder diagrams'}
+							>
+								{reorderMode ? 'Done' : 'Reorder'}
+							</button>
+						</div>
+						<input
+							id="tree-search"
+							bind:value={treeSearchQuery}
+							type="search"
+							placeholder="Filter diagrams..."
+							class="mt-2 w-full rounded border px-3 py-2 text-sm"
+							style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+						/>
+						{#if hierarchyLoading}
+							<p class="mt-2 text-sm" style="color: var(--color-muted)">Loading hierarchy...</p>
+						{:else if hierarchyTree.length === 0}
+							<p class="mt-2 text-sm" style="color: var(--color-muted)">No diagrams in this set.</p>
+						{:else}
+							<ul role="tree" class="mt-4" style="list-style: none; padding: 0; margin: 0">
+								{#each hierarchyTree as node (node.id)}
+									<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} {contextItemIds} onaddcontext={handleTreeAddToContext} onremovecontext={removeAiContextItem} onhover={(id) => { hoveredNodeId = id; }} {graphHoverIds} {peekExpandedIds} {autoExpandDepth} />
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				{/if}
+
+				<!-- Graph panel -->
+				{#if showSideBySide || viewTab === 'graph' || !hasHierarchy}
+					<div class="flex flex-1 flex-col" style="min-height: 0; min-width: 0">
+						<div class="mb-2 flex items-center justify-end" style="position: relative">
+							<button
+								onclick={() => { showGraphSettings = !showGraphSettings; }}
+								class="rounded p-1"
+								style="color: var(--color-muted); background: none; border: none; cursor: pointer"
+								title="Graph settings"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="16" height="16">
+									<path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24a16,16,0,1,1-16,16A16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/>
+								</svg>
+							</button>
+							{#if showGraphSettings}
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div style="position: fixed; inset: 0; z-index: 19" onclick={() => (showGraphSettings = false)}></div>
+								<KnowledgeGraphSettings
+									settings={graphSettings}
+									onchange={(s) => { graphSettings = s; saveGraphSettings(s, graphScopeId); }}
+								/>
+							{/if}
+						</div>
+						{#if graphLoading}
+							<p class="text-sm" style="color: var(--color-muted)">Loading graph...</p>
+						{:else if graphNodes.length === 0}
+							<p class="text-sm" style="color: var(--color-muted)">No elements yet.</p>
+						{:else}
+							<KnowledgeGraph
+								nodes={graphNodes}
+								edges={graphEdges}
+								settings={graphSettings}
+								onNodeClick={(nodeId, nodeType) => {
+									if (nodeType === 'collection') {
+										goto(`/?collection_id=${nodeId}`);
+									} else if (nodeType === 'set') {
+										goto(`/?set_id=${nodeId}`);
+									} else {
+										const routeMap: Record<string, string> = { package: '/packages', diagram: '/diagrams', element: '/elements' };
+										goto(`${routeMap[nodeType] || '/elements'}/${nodeId}`);
+									}
+								}}
+								highlightNodeId={hoveredNodeId}
+								onNodeHover={(id) => { graphHoveredNodeId = id; }}
+							/>
+						{/if}
+					</div>
+				{/if}
+			</div>
 		</div>
 	{/if}
 

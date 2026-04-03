@@ -14,6 +14,10 @@
 		contextItemIds?: Set<string>;
 		onaddcontext?: (node: DiagramHierarchyNode) => void;
 		onremovecontext?: (id: string) => void;
+		onhover?: (nodeId: string | null, nodeName: string | null) => void;
+		graphHoverIds?: Set<string>;
+		peekExpandedIds?: Set<string>;
+		autoExpandDepth?: number;
 	}
 
 	let {
@@ -28,9 +32,17 @@
 		contextItemIds,
 		onaddcontext,
 		onremovecontext,
+		onhover,
+		graphHoverIds,
+		peekExpandedIds,
+		autoExpandDepth = 2,
 	}: Props = $props();
 
-	let expanded = $state(expandedIds.has(node.id) || depth < 2);
+	const isGraphHighlighted = $derived(graphHoverIds?.has(node.id) ?? false);
+	const isPeeked = $derived(peekExpandedIds?.has(node.id) ?? false);
+
+	let expanded = $state(expandedIds.has(node.id) || depth < autoExpandDepth);
+	let effectiveExpanded = $derived(expanded || isPeeked);
 	let dropPosition = $state<'before' | 'after' | null>(null);
 
 	const hasChildren = $derived(node.children && node.children.length > 0);
@@ -148,7 +160,7 @@
 {#if visible}
 	<li
 		role="treeitem"
-		aria-expanded={hasChildren ? expanded : undefined}
+		aria-expanded={hasChildren ? effectiveExpanded : undefined}
 		aria-current={isCurrent ? 'page' : undefined}
 		class="tree-node"
 	>
@@ -156,6 +168,7 @@
 		<div
 			class="tree-node__row"
 			class:tree-node__row--current={isCurrent}
+			class:tree-node__row--graph-highlight={isGraphHighlighted}
 			class:tree-node__row--drop-before={dropPosition === 'before'}
 			class:tree-node__row--drop-after={dropPosition === 'after'}
 			style="padding-left: {depth * 20 + 8}px"
@@ -164,6 +177,8 @@
 			ondragover={handleDragOver}
 			ondragleave={handleDragLeave}
 			ondrop={handleDrop}
+			onmouseenter={() => onhover?.(node.id, node.name)}
+			onmouseleave={() => onhover?.(null, null)}
 		>
 			{#if onreorder}
 				<span class="tree-node__grip" aria-hidden="true">⠿</span>
@@ -175,7 +190,7 @@
 					class="tree-node__toggle"
 					aria-label={expanded ? 'Collapse' : 'Expand'}
 				>
-					<span aria-hidden="true">{expanded ? '▼' : '▶'}</span>
+					<span aria-hidden="true">{effectiveExpanded ? '▼' : '▶'}</span>
 				</button>
 			{:else}
 				<span class="tree-node__spacer" aria-hidden="true"></span>
@@ -225,7 +240,7 @@
 				{/if}
 			{/if}
 		</div>
-		{#if hasChildren && expanded}
+		{#if hasChildren && effectiveExpanded}
 			<ul role="group" class="tree-node__children">
 				{#each node.children as child (child.id)}
 					<svelte:self
@@ -240,6 +255,10 @@
 						{contextItemIds}
 						{onaddcontext}
 						{onremovecontext}
+						{onhover}
+						{graphHoverIds}
+						{peekExpandedIds}
+						{autoExpandDepth}
 					/>
 				{/each}
 			</ul>
@@ -262,6 +281,12 @@
 	.tree-node__row--current {
 		background-color: var(--color-bg);
 		font-weight: 600;
+	}
+	.tree-node__row--graph-highlight {
+		background-color: var(--color-bg);
+		outline: 2px solid var(--color-primary);
+		outline-offset: -2px;
+		border-radius: 4px;
 	}
 	.tree-node__row--drop-before {
 		border-top: 2px solid var(--color-primary);

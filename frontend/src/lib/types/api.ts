@@ -372,6 +372,35 @@ export interface FileContext {
 	text: string;
 }
 
+/** Knowledge graph types (ADR-116) */
+
+export interface GraphNode {
+	id: string;
+	name: string;
+	node_type: 'element' | 'diagram' | 'package';
+	type_detail: string;
+	relationship_count: number;
+}
+
+export interface GraphEdge {
+	id: string;
+	source: string;
+	target: string;
+	relationship_type: string;
+	label: string | null;
+	edge_type: string;
+}
+
+export interface GraphSettings {
+	nodes: Record<string, boolean>;
+	edges: Record<string, boolean>;
+}
+
+export interface GraphResponse {
+	nodes: GraphNode[];
+	edges: GraphEdge[];
+}
+
 /** @deprecated Use Element instead */
 export type Entity = Element;
 /** @deprecated Use Diagram instead */
