@@ -6,6 +6,7 @@
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
 	import type { AIConversation } from '$lib/types/api';
+	import { getActiveProviders, getProviderAvailability, type ActiveProvider } from '$lib/stores/aiProviders.svelte.js';
 	import PackagePicker from '$lib/components/PackagePicker.svelte';
 
 	interface Props {
@@ -54,6 +55,11 @@
 	let copiedId = $state<string | null>(null);
 	let abortController: AbortController | null = null;
 	let creationJsonBuffer = $state('');  // accumulates raw JSON in creation mode (hidden from UI)
+	let askStartTime = $state(0);
+	let elapsedSeconds = $state(0);
+	let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+	let streamingTokensIn = $state<number | null>(null);
+	let streamingTokensOut = $state<number | null>(null);
 	let generatingDiagrams = $state(false);  // true when AI is outputting JSON
 	let diagramsGenerated = $state(0);  // count of diagrams seen so far in the JSON stream
 	let expectedDiagramCount = $state(0);  // estimated total from conversation
@@ -67,15 +73,14 @@
 	let historyLoading = $state(false);
 	let currentThreadId = $state(crypto.randomUUID());
 
-	// Model selector (ADR-114)
-	type ActiveProvider = { id: string; name: string; model: string; provider_type: string; base_url: string | null; is_default: boolean };
+	// Model selector (ADR-114) — providers & availability from global store
 	function hostLabel(url: string | null): string {
 		if (!url) return '';
 		return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 	}
-	let activeProviders = $state<ActiveProvider[]>([]);
+	let activeProviders = $derived(getActiveProviders());
 	let selectedProviderId = $state('');
-	let providerAvailability = $state<Record<string, boolean>>({});
+	let providerAvailability = $derived(getProviderAvailability());
 	let providerDropdownOpen = $state(false);
 
 	function isClearedSession(): boolean {
@@ -88,27 +93,12 @@
 	});
 
 	$effect(() => {
-		loadActiveProviders();
-		const interval = setInterval(pingProviders, 10000);
-		return () => clearInterval(interval);
-	});
-
-	function pingProviders() {
-		apiFetch<Record<string, boolean>>('/api/ai/providers/ping', { method: 'POST' })
-			.then(result => { providerAvailability = result; })
-			.catch(() => {});
-	}
-
-	async function loadActiveProviders() {
-		try {
-			activeProviders = await apiFetch<ActiveProvider[]>('/api/ai/providers/active');
+		// Auto-select default provider when providers load from global store
+		if (activeProviders.length > 0 && !selectedProviderId) {
 			const defaultProvider = activeProviders.find(p => p.is_default) ?? activeProviders[0];
 			if (defaultProvider) selectedProviderId = defaultProvider.id;
-			pingProviders();
-		} catch {
-			// Graceful degradation — selector just won't appear
 		}
-	}
+	});
 
 	function scrollToBottom() {
 		if (chatContainer) {
@@ -230,8 +220,13 @@ function promptForLocation() {
 		error = null;
 		asking = true;
 		streamingAnswer = '';
+		streamingTokensIn = null;
+		streamingTokensOut = null;
 		pendingDiagrams = null;
 		abortController = new AbortController();
+		askStartTime = Date.now();
+		elapsedSeconds = 0;
+		elapsedTimer = setInterval(() => { elapsedSeconds = Math.floor((Date.now() - askStartTime) / 1000); }, 100);
 
 		setTimeout(scrollToBottom, 50);
 
@@ -311,6 +306,8 @@ function promptForLocation() {
 							}
 							scrollToBottom();
 						} else if (payload.done) {
+							streamingTokensIn = payload.tokens_in ?? null;
+							streamingTokensOut = payload.tokens_out ?? null;
 							// In creation mode, auto-apply the generated diagrams
 							let displayAnswer = streamingAnswer;
 							if (creationMode) {
@@ -393,6 +390,7 @@ function promptForLocation() {
 			}
 		}
 		abortController = null;
+		if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
 		asking = false;
 		setTimeout(() => qaInput?.focus(), 50);
 	}
@@ -745,11 +743,14 @@ function promptForLocation() {
 								{@html renderMarkdown(streamingAnswer)}
 							</div>
 						{:else}
-							<div class="flex items-center gap-2">
-								<span class="thinking-dots" style="color: var(--color-muted)">
-									<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+							<div class="thinking-row">
+								<span class="thinking-brain">
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="16" height="16" aria-hidden="true">
+										<path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/>
+									</svg>
 								</span>
-								<span class="text-xs" style="color: var(--color-muted)">Thinking</span>
+								<span class="thinking-label">Thinking...</span>
+								<span class="thinking-stats">{elapsedSeconds}s</span>
 							</div>
 						{/if}
 					</div>
@@ -974,18 +975,6 @@ function promptForLocation() {
 		0%, 100% { opacity: 0.4; }
 		50% { opacity: 1; }
 	}
-	.thinking-dots .dot {
-		animation: blink 1.4s infinite both;
-		font-size: 1.5em;
-		line-height: 1;
-	}
-	.thinking-dots .dot:nth-child(2) { animation-delay: 0.2s; }
-	.thinking-dots .dot:nth-child(3) { animation-delay: 0.4s; }
-
-	@keyframes blink {
-		0%, 80%, 100% { opacity: 0; }
-		40% { opacity: 1; }
-	}
 
 	.spinner-icon {
 		animation: spin 2s linear infinite;
@@ -1014,6 +1003,48 @@ function promptForLocation() {
 	@keyframes pulse-next {
 		0%, 100% { opacity: 0.15; }
 		50% { opacity: 0.4; }
+	}
+
+	.thinking-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.thinking-label, .thinking-stats {
+		font-size: 0.75rem;
+		line-height: 1;
+		color: var(--color-muted);
+	}
+	.thinking-stats {
+		font-variant-numeric: tabular-nums;
+		opacity: 0.7;
+	}
+
+	.thinking-brain {
+		display: inline-flex;
+		align-items: center;
+		color: var(--color-primary, #3b82f6);
+		animation: brain-pulse 2s ease-in-out infinite;
+	}
+	/* Functional loading indicator — exempt from reduced-motion blanket reset.
+	   Scoped selector specificity (0,2,0) beats global * (0,0,0) even with !important. */
+	@media (prefers-reduced-motion: reduce) {
+		.thinking-brain {
+			animation-duration: 2s !important;
+			animation-iteration-count: infinite !important;
+		}
+	}
+	@keyframes brain-pulse {
+		0%, 100% {
+			opacity: 0.4;
+			transform: scale(1);
+			filter: drop-shadow(0 0 0px #3b82f6);
+		}
+		50% {
+			opacity: 1;
+			transform: scale(1.15);
+			filter: drop-shadow(0 0 8px #3b82f6);
+		}
 	}
 
 	/* Markdown styling inside chat bubbles */

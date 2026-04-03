@@ -2,7 +2,12 @@
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
+	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
+	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import type { Diagram, PaginatedResponse, DiagramHierarchyNode, BatchResult } from '$lib/types/api';
+
+	let contextItems = $derived(getAiContextItems());
+	let contextItemIds = $derived(new Set(contextItems.map((i) => i.id)));
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
@@ -44,9 +49,9 @@
 	let pageSize = $state(50);
 	let total = $state(0);
 
-	// Collection filter state — initialise from URL param
+	// Collection filter state — initialise from URL param or global store
 	const urlCollectionId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('collection_id') : null;
-	let currentCollectionId = $state(urlCollectionId || '');
+	let currentCollectionId = $state(urlCollectionId || getActiveCollectionId());
 
 	// Set filter state — initialise from URL param or global store
 	const urlSetId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('set_id') : null;
@@ -587,7 +592,7 @@
 			<ul class="flex flex-col gap-2" data-testid="diagrams-list">
 				{#each filteredModels as model}
 					<li>
-						<div class="flex items-center gap-2">
+						<div class="card-wrapper flex items-center gap-2" style="position: relative">
 							{#if selectMode}
 								<input
 									type="checkbox"
@@ -634,6 +639,33 @@
 									</span>
 								{/if}
 							</a>
+							<div class="ctx-overlay">
+								{#if contextItemIds.has(model.id)}
+									<button
+										onclick={() => removeAiContextItem(model.id)}
+										class="added-context-btn rounded border px-2 py-1 text-xs"
+										style="border-color: var(--color-primary); background: var(--color-primary); color: white; cursor: pointer; display: flex; align-items: center; gap: 4px"
+										title="Remove from AI context"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12" aria-hidden="true"><path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/></svg>
+										<span class="added-label">Added</span>
+										<span class="remove-label">Remove</span>
+									</button>
+								{:else}
+									<button
+										onclick={() => addAiContextItem({ id: model.id, result_type: 'diagram', name: model.name, set_id: model.set_id ?? null, set_name: model.set_name ?? null })}
+										class="add-context-btn rounded border py-1 text-xs"
+										style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-primary); cursor: pointer"
+										title="Add to Iris AI context"
+									>
+										<span class="add-context-inner">
+											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12" aria-hidden="true" style="flex-shrink: 0"><path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/></svg>
+											<span class="add-context-plus">+</span>
+											<span class="add-context-label">Add to context</span>
+										</span>
+									</button>
+								{/if}
+							</div>
 						</div>
 					</li>
 				{/each}
@@ -641,7 +673,7 @@
 		{:else}
 			<div class="grid gap-4" data-testid="diagrams-gallery" style="grid-template-columns: repeat(auto-fill, minmax({cardSize}px, 1fr))">
 				{#each filteredModels as model}
-					<div class="relative flex flex-col rounded border overflow-hidden" style="border-color: var(--color-border); color: var(--color-fg)">
+					<div class="card-wrapper relative flex flex-col rounded border overflow-hidden" style="border-color: var(--color-border); color: var(--color-fg)">
 						{#if selectMode}
 							<div class="absolute top-2 left-2 z-10">
 								<input
@@ -690,6 +722,32 @@
 								</span>
 							</div>
 						</a>
+						<div class="ctx-overlay">
+							{#if contextItemIds.has(model.id)}
+								<button
+									onclick={() => removeAiContextItem(model.id)}
+									class="added-context-btn rounded border px-2 py-1 text-xs"
+									style="border-color: var(--color-primary); background: var(--color-primary); color: white; cursor: pointer; display: flex; align-items: center; gap: 4px"
+									title="Remove from AI context"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12" aria-hidden="true"><path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/></svg>
+									In context
+								</button>
+							{:else}
+								<button
+									onclick={() => addAiContextItem({ id: model.id, result_type: 'diagram', name: model.name, set_id: model.set_id ?? null, set_name: model.set_name ?? null })}
+									class="add-context-btn rounded border py-1 text-xs"
+									style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-primary); cursor: pointer"
+									title="Add to Iris AI context"
+								>
+									<span class="add-context-inner">
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12" aria-hidden="true" style="flex-shrink: 0"><path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/></svg>
+										<span class="add-context-plus">+</span>
+										<span class="add-context-label">Add to context</span>
+									</span>
+								</button>
+							{/if}
+						</div>
 					</div>
 				{/each}
 			</div>
@@ -779,3 +837,54 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.ctx-overlay {
+		display: none;
+		position: absolute;
+		bottom: 8px;
+		right: 8px;
+		z-index: 1;
+	}
+	.card-wrapper:hover .ctx-overlay,
+	.ctx-overlay:has(.added-context-btn) {
+		display: block;
+	}
+	.add-context-btn {
+		overflow: hidden;
+		white-space: nowrap;
+		width: 40px;
+		padding-left: 8px;
+		padding-right: 8px;
+		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.add-context-btn:hover {
+		width: 128px;
+	}
+	.add-context-inner {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.add-context-btn .add-context-plus {
+		display: inline-block;
+		width: 8px;
+		opacity: 1;
+		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease;
+	}
+	.add-context-btn:hover .add-context-plus {
+		width: 0;
+		opacity: 0;
+	}
+	.add-context-btn .add-context-label {
+		display: inline-block;
+		width: 0;
+		overflow: hidden;
+		opacity: 0;
+		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease 0.1s;
+	}
+	.add-context-btn:hover .add-context-label {
+		width: 80px;
+		opacity: 1;
+	}
+</style>

@@ -2,6 +2,7 @@
 	import { apiFetch } from '$lib/utils/api';
 	import { getActiveSetId } from '$lib/stores/activeSet.svelte.js';
 	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
+	import { getAiContextItems, clearAiContext, removeAiContextItem, type AiContextItem } from '$lib/stores/aiContext.svelte.js';
 	import SetQA from '$lib/components/SetQA.svelte';
 	import MultiSetSelector from '$lib/components/MultiSetSelector.svelte';
 	import DocRefSelector from '$lib/components/DocRefSelector.svelte';
@@ -30,6 +31,7 @@
 	let allDiagrams = $state<Diagram[]>([]);
 	let diagramDropdownOpen = $state(false);
 	let uploadedFiles = $state<UploadedFile[]>([]);
+	let pinnedItems = $derived(getAiContextItems());
 
 	// Tab state
 	let activeTab = $state<'context' | 'request'>('context');
@@ -57,14 +59,36 @@
 	// Ready files: uploaded, no error, not still uploading
 	let readyFiles = $derived(uploadedFiles.filter((f) => !f.uploading && !f.error));
 
+	// Pinned context items merged into selection IDs
+	let pinnedDiagramIds = $derived(pinnedItems.filter((i) => i.result_type === 'diagram').map((i) => i.id));
+	let pinnedPackageIds = $derived(pinnedItems.filter((i) => i.result_type === 'package').map((i) => i.id));
+	// Sets pinned directly + sets from pinned diagrams/packages
+	let pinnedSetIds = $derived([...new Set(
+		pinnedItems
+			.filter((i) => i.result_type === 'set')
+			.map((i) => i.id)
+			.concat(pinnedItems.filter((i) => i.set_id).map((i) => i.set_id!))
+	)]);
+	// Collections: resolve to all sets in that collection
+	let pinnedCollectionIds = $derived(pinnedItems.filter((i) => i.result_type === 'collection').map((i) => i.id));
+	let pinnedCollectionSetIds = $derived(
+		allSets.filter((s) => pinnedCollectionIds.includes(s.collection_id ?? '')).map((s) => s.id)
+	);
+
+	// Combined IDs (manual selections + pinned)
+	let allSetIds = $derived([...new Set([...selectedSetIds, ...pinnedSetIds, ...pinnedCollectionSetIds])]);
+	let allDiagramIds = $derived([...new Set([...selectedDiagramIds, ...pinnedDiagramIds])]);
+	let allPackageIds = $derived([...new Set([...selectedPackageIds, ...pinnedPackageIds])]);
+
 	// Derive a stable key for SetQA re-render
 	let contextKey = $derived(
-		selectedSetIds.slice().sort().join(',') + '|' +
+		allSetIds.slice().sort().join(',') + '|' +
 		selectedDocRefIds.slice().sort().join(',') + '|' +
-		selectedDiagramIds.slice().sort().join(',') + '|' +
+		allDiagramIds.slice().sort().join(',') + '|' +
+		allPackageIds.slice().sort().join(',') + '|' +
 		readyFiles.map((f) => f.id).sort().join(',')
 	);
-	let hasContext = $derived(selectedSetIds.length > 0 || selectedDocRefIds.length > 0 || readyFiles.length > 0);
+	let hasContext = $derived(allSetIds.length > 0 || selectedDocRefIds.length > 0 || readyFiles.length > 0);
 
 	// Summary of selected context for display on the Chat tab
 	let contextSummary = $derived.by(() => {
@@ -85,8 +109,10 @@
 			.filter((d) => selectedDiagramIds.includes(d.id))
 			.map((d) => d.name);
 		const fileNames = readyFiles.map((f) => f.filename);
+		const pinnedNames = pinnedItems.map((i) => i.name);
 		const parts = [...setLabels, ...docNames, ...fileNames];
 		if (diagramNames.length > 0) parts.push(`Diagrams: ${diagramNames.join(', ')}`);
+		if (pinnedNames.length > 0) parts.push(`Pinned: ${pinnedNames.join(', ')}`);
 		return parts.join(', ');
 	});
 
@@ -94,12 +120,10 @@
 		loadData();
 	});
 
-	$effect(() => {
-		// Auto-select active collection if available
-		if (activeCollectionId && !selectedCollectionId) {
-			selectedCollectionId = activeCollectionId;
-		}
-	});
+	// Auto-select active collection on mount only (not reactively)
+	if (activeCollectionId) {
+		selectedCollectionId = activeCollectionId;
+	}
 
 	$effect(() => {
 		// Load diagrams when selected sets change
@@ -182,6 +206,7 @@
 		selectedDiagramIds = [];
 		selectedDocRefIds = [];
 		uploadedFiles = [];
+		clearAiContext();
 	}
 
 	function handleCollectionChange(e: Event) {
@@ -335,6 +360,31 @@
 					onchange={(f) => { uploadedFiles = f; }}
 				/>
 			</div>
+			{#if pinnedItems.length > 0}
+				<div class="mt-3" style="max-width: 800px">
+					<label class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">Pinned from search</label>
+					<div class="flex flex-wrap gap-2">
+						{#each pinnedItems as item (item.id)}
+							<span
+								class="flex items-center gap-1 rounded border px-2 py-1 text-xs"
+								style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="var(--color-primary)" width="10" height="10" aria-hidden="true">
+									<path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/>
+								</svg>
+								{item.name}
+								<span style="color: var(--color-muted)">{item.result_type}</span>
+								<button
+									onclick={() => removeAiContextItem(item.id)}
+									class="ml-1"
+									style="color: var(--color-muted); background: none; border: none; cursor: pointer; padding: 0; font-size: 14px; line-height: 1"
+									title="Remove from context"
+								>&times;</button>
+							</span>
+						{/each}
+					</div>
+				</div>
+			{/if}
 			<div class="mt-3 flex gap-2">
 				<button
 					onclick={resetSelections}
@@ -377,7 +427,7 @@
 			{#if hasContext}
 				<div class="mt-2 flex-1 overflow-hidden">
 					{#key contextKey}
-						<SetQA setIds={selectedSetIds} collectionId={selectedCollectionId || undefined} packageIds={selectedPackageIds.length > 0 ? selectedPackageIds : undefined} diagramIds={selectedDiagramIds.length > 0 ? selectedDiagramIds : undefined} docrefDocIds={selectedDocRefIds.length > 0 ? selectedDocRefIds : undefined} fileContexts={readyFiles.length > 0 ? readyFiles.map((f) => ({ filename: f.filename, text: f.extracted_text })) : undefined} />
+						<SetQA setIds={allSetIds} collectionId={selectedCollectionId || undefined} packageIds={allPackageIds.length > 0 ? allPackageIds : undefined} diagramIds={allDiagramIds.length > 0 ? allDiagramIds : undefined} docrefDocIds={selectedDocRefIds.length > 0 ? selectedDocRefIds : undefined} fileContexts={readyFiles.length > 0 ? readyFiles.map((f) => ({ filename: f.filename, text: f.extracted_text })) : undefined} />
 					{/key}
 				</div>
 			{:else}

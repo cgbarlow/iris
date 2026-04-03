@@ -130,12 +130,13 @@ export interface LockCheckResponse {
 
 export interface SearchResult {
 	id: string;
-	result_type: 'element' | 'diagram' | 'package';
+	result_type: 'element' | 'diagram' | 'package' | 'set' | 'collection';
 	name: string;
 	description: string | null;
 	type_detail: string;
 	rank: number;
 	deep_link: string;
+	set_id: string | null;
 	set_name: string | null;
 	collection_name: string | null;
 	package_name: string | null;
@@ -161,6 +162,7 @@ export interface Comment {
 export interface Bookmark {
 	diagram_id: string | null;
 	package_id: string | null;
+	element_id: string | null;
 	created_at: string;
 }
 

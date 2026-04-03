@@ -11,6 +11,9 @@
 		expandedIds?: Set<string>;
 		siblings?: DiagramHierarchyNode[];
 		onreorder?: (parentId: string | null, orderedIds: string[]) => void;
+		contextItemIds?: Set<string>;
+		onaddcontext?: (node: DiagramHierarchyNode) => void;
+		onremovecontext?: (id: string) => void;
 	}
 
 	let {
@@ -22,6 +25,9 @@
 		expandedIds = new Set<string>(),
 		siblings = [],
 		onreorder,
+		contextItemIds,
+		onaddcontext,
+		onremovecontext,
 	}: Props = $props();
 
 	let expanded = $state(expandedIds.has(node.id) || depth < 2);
@@ -188,6 +194,36 @@
 				{/if}
 				<span class="tree-node__name">{node.name}</span>
 			</a>
+			{#if onaddcontext && onremovecontext && contextItemIds}
+				{#if contextItemIds.has(node.id)}
+					<button
+						onclick={(e) => { e.preventDefault(); e.stopPropagation(); onremovecontext(node.id); }}
+						class="tree-node__ctx-added rounded border px-2 py-1 text-xs"
+						style="border-color: var(--color-primary); background: var(--color-primary); color: white; cursor: pointer; display: flex; align-items: center; gap: 4px"
+						title="Remove from AI context"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12" aria-hidden="true">
+							<path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/>
+						</svg>
+						In context
+					</button>
+				{:else}
+					<button
+						onclick={(e) => { e.preventDefault(); e.stopPropagation(); onaddcontext(node); }}
+						class="tree-node__ctx-add rounded border py-1 text-xs"
+						style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-primary); cursor: pointer"
+						title="Add to Iris AI context"
+					>
+						<span class="tree-node__ctx-add-inner">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="12" height="12" aria-hidden="true" style="flex-shrink: 0">
+								<path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/>
+							</svg>
+							<span class="tree-node__ctx-plus">+</span>
+							<span class="tree-node__ctx-label">Add to context</span>
+						</span>
+					</button>
+				{/if}
+			{/if}
 		</div>
 		{#if hasChildren && expanded}
 			<ul role="group" class="tree-node__children">
@@ -201,6 +237,9 @@
 						{expandedIds}
 						siblings={node.children}
 						{onreorder}
+						{contextItemIds}
+						{onaddcontext}
+						{onremovecontext}
 					/>
 				{/each}
 			</ul>
@@ -274,7 +313,6 @@
 		text-decoration: none;
 		color: var(--color-fg);
 		font-size: 0.875rem;
-		flex: 1;
 		min-width: 0;
 		padding: 2px 0;
 	}
@@ -313,5 +351,48 @@
 		list-style: none;
 		padding: 0;
 		margin: 0;
+	}
+	/* Add-to-context button (matches search pattern) */
+	.tree-node__ctx-add {
+		display: none;
+		overflow: hidden;
+		white-space: nowrap;
+		width: 40px;
+		padding-left: 8px;
+		padding-right: 8px;
+		flex-shrink: 0;
+		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.tree-node__row:hover .tree-node__ctx-add {
+		display: inline-block;
+	}
+	.tree-node__ctx-add:hover {
+		width: 128px;
+	}
+	.tree-node__ctx-add-inner {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.tree-node__ctx-add .tree-node__ctx-plus {
+		display: inline-block;
+		width: 8px;
+		opacity: 1;
+		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease;
+	}
+	.tree-node__ctx-add:hover .tree-node__ctx-plus {
+		width: 0;
+		opacity: 0;
+	}
+	.tree-node__ctx-add .tree-node__ctx-label {
+		display: inline-block;
+		width: 0;
+		overflow: hidden;
+		opacity: 0;
+		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease 0.1s;
+	}
+	.tree-node__ctx-add:hover .tree-node__ctx-label {
+		width: 80px;
+		opacity: 1;
 	}
 </style>

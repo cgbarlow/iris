@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
+	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import type { Element, PaginatedResponse, BatchResult } from '$lib/types/api';
 	import { SIMPLE_ENTITY_TYPES } from '$lib/types/canvas';
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
@@ -34,9 +35,9 @@
 	let pageSize = $state(50);
 	let total = $state(0);
 
-	// Collection filter state — initialise from URL param
+	// Collection filter state — initialise from URL param or global store
 	const urlCollectionId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('collection_id') : null;
-	let currentCollectionId = $state(urlCollectionId || '');
+	let currentCollectionId = $state(urlCollectionId || getActiveCollectionId());
 
 	// Set filter state — initialise from global store
 	let currentSetId = $state(getActiveSetId());

@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { openScenia } from '$lib/scenia/config.js';
+	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
+	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
 
 	import type {
 		Element,
@@ -10,6 +12,7 @@
 		Relationship,
 		RelationshipListResponse,
 		ElementDiagramRef,
+		Bookmark,
 	} from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
@@ -36,6 +39,12 @@
 	let error = $state<string | null>(null);
 	let activeTab = $state<'details' | 'versions' | 'relationships' | 'diagrams'>('details');
 	let showDeleteDialog = $state(false);
+	let isBookmarked = $state(false);
+	let bookmarkLoading = $state(false);
+
+	// AI context state
+	let contextItems = $derived(getAiContextItems());
+	let isInContext = $derived(entity ? contextItems.some((i) => i.id === entity!.id) : false);
 
 	// Inline metadata editing state
 	let editingDetails = $state(false);
@@ -95,12 +104,14 @@
 		error = null;
 		try {
 			entity = await apiFetch<Element>(`/api/elements/${id}`);
+			recordVisit({ id: entity.id, type: 'element', name: entity.name, detail: entity.element_type, setId: entity.set_id ?? undefined, setName: entity.set_name ?? undefined, description: entity.description ?? undefined, href: `/elements/${entity.id}` });
 			// Load tab data in parallel
 			await Promise.all([
 				loadVersions(id),
 				loadRelationships(id),
 				loadDiagrams(id),
 				loadAllTags(),
+				loadBookmarkStatus(id),
 			]);
 		} catch (e) {
 			error = e instanceof ApiError && e.status === 404
@@ -173,6 +184,32 @@
 		} catch {
 			allTags = [];
 		}
+	}
+
+	async function loadBookmarkStatus(id: string) {
+		try {
+			const bookmarks = await apiFetch<Bookmark[]>('/api/bookmarks');
+			isBookmarked = bookmarks.some((b) => b.element_id === id);
+		} catch {
+			isBookmarked = false;
+		}
+	}
+
+	async function toggleBookmark() {
+		if (!entity || bookmarkLoading) return;
+		bookmarkLoading = true;
+		try {
+			if (isBookmarked) {
+				await apiFetch(`/api/elements/${entity.id}/bookmark`, { method: 'DELETE' });
+				isBookmarked = false;
+			} else {
+				await apiFetch(`/api/elements/${entity.id}/bookmark`, { method: 'POST' });
+				isBookmarked = true;
+			}
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to update bookmark';
+		}
+		bookmarkLoading = false;
 	}
 
 	function enterDetailsEdit() {
@@ -328,6 +365,14 @@
 					View in Scenia
 				</button>
 			{/if}
+			<button
+				onclick={toggleBookmark}
+				disabled={bookmarkLoading}
+				class="rounded px-4 py-2 text-sm"
+				style="border: 1px solid {isBookmarked ? 'var(--color-primary)' : 'var(--color-border)'}; color: {isBookmarked ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {isBookmarked ? 'var(--color-surface, transparent)' : 'transparent'}"
+			>
+				{isBookmarked ? 'Bookmarked' : 'Bookmark'}
+			</button>
 			<button
 				onclick={handleClone}
 				class="rounded px-4 py-2 text-sm"

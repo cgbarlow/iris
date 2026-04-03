@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -157,31 +158,58 @@ async def list_active_providers(
     ]
 
 
+_ping_cache: dict[str, bool] = {}
+_ping_cache_time: float = 0.0
+_ping_task: asyncio.Task[None] | None = None
+_PING_CACHE_TTL = 30.0  # seconds
+
+
+async def _run_ping_check(db_manager: Any) -> None:
+    """Background task that pings providers without blocking request handlers."""
+    global _ping_cache, _ping_cache_time  # noqa: PLW0603
+    from app.ai.client import create_ai_client
+
+    try:
+        db = db_manager.main_db
+        providers = await service.list_providers_internal(db)
+
+        async def _ping_one(p: dict[str, Any]) -> tuple[str, bool]:
+            try:
+                client = create_ai_client(p)
+                result = await asyncio.wait_for(client.test_connection(), timeout=5.0)
+                return (str(p["id"]), result.ok)
+            except Exception:  # noqa: BLE001
+                return (str(p["id"]), False)
+
+        results = await asyncio.gather(*[_ping_one(p) for p in providers])
+        _ping_cache = dict(results)
+        _ping_cache_time = time.monotonic()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @router.post("/providers/ping")
 async def ping_providers(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, bool]:
-    """Quick connectivity check for all active providers. Any authenticated user."""
-    import asyncio
-    import httpx as _httpx
+    """Quick connectivity check for all active providers.
 
-    db = request.app.state.db_manager.main_db
-    providers = await service.list_providers_internal(db)
+    Returns cached results if fresh (< 30s). Spawns a background task
+    for the actual ping so it never blocks request handling.
+    """
+    global _ping_task  # noqa: PLW0603
 
-    async def _ping(p: dict[str, Any]) -> tuple[str, bool]:
-        """Ping by sending a minimal chat completion with the specific model."""
-        from app.ai.client import create_ai_client
+    # Return cache if still fresh
+    if _ping_cache and (time.monotonic() - _ping_cache_time) < _PING_CACHE_TTL:
+        return _ping_cache
 
-        try:
-            client = create_ai_client(p)
-            result = await client.test_connection()
-            return (str(p["id"]), result.ok)
-        except Exception:  # noqa: BLE001
-            return (str(p["id"]), False)
+    # Spawn background ping if not already running
+    if _ping_task is None or _ping_task.done():
+        _ping_task = asyncio.create_task(_run_ping_check(request.app.state.db_manager))
 
-    results = await asyncio.gather(*[_ping(p) for p in providers])
-    return dict(results)
+    # Return stale cache immediately (or empty on first call)
+    return _ping_cache
 
 
 @router.get("/providers/{provider_id}", response_model=ProviderResponse)
@@ -364,7 +392,7 @@ async def _ask_streaming(
     async def _generate() -> AsyncGenerator[str, None]:
         try:
             print(f"[AI_ASK] mode={body.mode} notation={body.notation} question={body.question[:100]}", flush=True)
-            ai_debug = await _is_ai_debug(db)
+            ai_debug = await _is_ai_debug(db)  # noqa: F841
 
             # Resolve provider
             if body.provider_id:
@@ -472,6 +500,12 @@ async def _ask_streaming(
                 "tokens_out": tokens_out,
             }) + "\n\n"
 
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
+        except OSError as exc:
+            if exc.errno == 32:  # Broken pipe
+                return
+            yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
         except Exception as exc:  # noqa: BLE001
             yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
 
@@ -698,6 +732,8 @@ async def _ask_multi_set_streaming(
                 "tokens_out": tokens_out,
             }) + "\n\n"
 
+        except (BrokenPipeError, ConnectionResetError):
+            return
         except Exception as exc:  # noqa: BLE001
             yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
 

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS ai_providers (
 
 CREATE TABLE IF NOT EXISTS ai_conversations (
     id              TEXT        PRIMARY KEY,
-    set_id          TEXT        NOT NULL REFERENCES sets(id),
+    set_id          TEXT        REFERENCES sets(id),
     user_id         TEXT        NOT NULL,
     question        TEXT        NOT NULL,
     answer          TEXT        NOT NULL,

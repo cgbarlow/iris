@@ -105,6 +105,16 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         max_age=3600,
     )
 
+    # Suppress broken pipe errors from client disconnects (SSE streams, navigation)
+    @app.middleware("http")
+    async def broken_pipe_middleware(
+        request: Request, call_next: object
+    ) -> Response:
+        try:
+            return await call_next(request)  # type: ignore[misc]
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return Response(status_code=499)  # Client closed request
+
     # Security headers middleware per SPEC-004-A
     @app.middleware("http")
     async def security_headers_middleware(

@@ -78,3 +78,6 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- m029: AI creation prompts
 ALTER TABLE ai_creation_prompts ENABLE ROW LEVEL SECURITY;
+
+-- m033: collections
+ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
