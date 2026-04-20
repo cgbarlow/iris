@@ -509,37 +509,33 @@
 					}
 				}
 
-				// 2. Set separation — inverseSq self-decay (SPEC-119-A).
-				// No fixed target: charge balance decides cluster spacing,
-				// so the layout is data-independent. Strength scales linearly
-				// with spread so the slider still controls overall spread.
-				// Gated to within a collection.
+				// 2. Set separation — inverseSq self-decay, UNGATED.
+				// Every pair of set centroids repels every other via
+				// 1/dist². Within-collection pairs are close → strong push.
+				// Cross-collection pairs are typically far → force decays to
+				// near-zero, but non-zero enough to give the "galaxy"
+				// separation between whole collections: each collection's
+				// member-subtree repels other collections' subtrees through
+				// all their set nodes. Without this ungating the collection
+				// force acts only on centroids, so collection bboxes can
+				// visually mingle even when centroids are well-spaced.
+				// Self-decay at `1/dist²` means no compounding explosion at
+				// spread=3 (unlike the pre-ADR-118 `s³`-amplified form).
 				const setCentroids = computeCentroids(nodeSetFull);
 				if (setCentroids.size > 1) {
-					const setToCol = (sid: string) => setCollectionMap.get(sid) ?? `__orphan_${sid}`;
 					applySeparation(
 						setCentroids, nodeSetFull, 50 * spread, 0, 'inverseSq',
-						(aId, bId) => setToCol(aId) === setToCol(bId),
 					);
 				}
 
-				// 3. Root-package separation — inverseSq self-decay
-				// (SPEC-119-A). Same rationale as set layer.
+				// 3. Root-package separation — inverseSq self-decay, UNGATED
+				// for the same "galaxy" effect at the package level.
 				let pkgCentroids: Map<string, Centroid> | null = null;
 				if (nodeRootPkgMap.size > 0) {
 					pkgCentroids = computeCentroids(nodeRootPkgMap);
 					if (pkgCentroids.size > 1) {
-						// Match nodeCollectionMap's orphan grouping: packages inside an
-						// orphan set group by set id (so package-level separation fires
-						// among them, same as within a real collection).
-						const pkgToCol = (pid: string) => {
-							const sid = nodeSetMap.get(pid);
-							if (!sid) return `__orphan_no_set_${pid}`;
-							return setCollectionMap.get(sid) ?? `__orphan_${sid}`;
-						};
 						applySeparation(
 							pkgCentroids, nodeRootPkgMap, 30 * spread, 0, 'inverseSq',
-							(aId, bId) => pkgToCol(aId) === pkgToCol(bId),
 						);
 					}
 				}
