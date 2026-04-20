@@ -153,6 +153,92 @@ export async function createModel(
 }
 
 /**
+ * Create a collection via the API and return the response body.
+ */
+export async function createCollection(
+	baseURL: string | undefined,
+	token: string,
+	data: { name: string; description?: string },
+): Promise<Record<string, unknown>> {
+	const origin = baseURL ?? API_BASE;
+	const res = await fetchWithRetry(`${origin}/api/collections`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			name: data.name,
+			description: data.description ?? '',
+		}),
+	});
+	if (!res.ok) {
+		throw new Error(`createCollection failed: ${res.status} ${await res.text()}`);
+	}
+	return (await res.json()) as Record<string, unknown>;
+}
+
+/**
+ * Create a set via the API and return the response body.
+ */
+export async function createSet(
+	baseURL: string | undefined,
+	token: string,
+	data: { name: string; description?: string; collection_id?: string },
+): Promise<Record<string, unknown>> {
+	const origin = baseURL ?? API_BASE;
+	const res = await fetchWithRetry(`${origin}/api/sets`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			name: data.name,
+			description: data.description ?? '',
+			collection_id: data.collection_id ?? null,
+		}),
+	});
+	if (!res.ok) {
+		throw new Error(`createSet failed: ${res.status} ${await res.text()}`);
+	}
+	return (await res.json()) as Record<string, unknown>;
+}
+
+/**
+ * Create a package via the API and return the response body.
+ */
+export async function createPackage(
+	baseURL: string | undefined,
+	token: string,
+	data: {
+		name: string;
+		set_id: string;
+		parent_package_id?: string;
+		description?: string;
+	},
+): Promise<Record<string, unknown>> {
+	const origin = baseURL ?? API_BASE;
+	const res = await fetchWithRetry(`${origin}/api/packages`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			name: data.name,
+			description: data.description ?? '',
+			set_id: data.set_id,
+			parent_package_id: data.parent_package_id ?? null,
+		}),
+	});
+	if (!res.ok) {
+		throw new Error(`createPackage failed: ${res.status} ${await res.text()}`);
+	}
+	return (await res.json()) as Record<string, unknown>;
+}
+
+/**
  * Create a relationship via the API and return the response body.
  */
 export async function createRelationship(

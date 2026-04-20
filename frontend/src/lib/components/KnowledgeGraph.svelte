@@ -343,6 +343,13 @@
 				});
 
 			graph = fg;
+			// Debug hook: expose the force-graph instance for Playwright probes and
+			// the multi-collection spread-slider regression test (SPEC-118-A).
+			// Inlined at build time via VITE_IRIS_DEBUG=1; always absent in production.
+			if (import.meta.env.VITE_IRIS_DEBUG === '1') {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				(window as any).__irisGraph = fg;
+			}
 
 			// Custom cluster force: two-level hierarchical clustering.
 			// Level 1: collection clusters — pushes entire collections apart

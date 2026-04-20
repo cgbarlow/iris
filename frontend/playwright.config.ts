@@ -36,7 +36,11 @@ export default defineConfig({
 			timeout: 15_000,
 		},
 		{
-			command: 'npm run build && npm run preview',
+			// VITE_IRIS_DEBUG is inlined at build time (Vite replaces
+			// import.meta.env.VITE_*), so it must be set on `vite build`, not
+			// preview. Enables the window.__irisGraph hook used by
+			// knowledge-graph-spread.spec.ts (SPEC-118-A).
+			command: 'VITE_IRIS_DEBUG=1 npm run build && npm run preview',
 			port: 4173,
 			reuseExistingServer: true,
 			timeout: 30_000,
