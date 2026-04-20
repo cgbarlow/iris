@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.3] - 2026-04-20
+
+### Fixed
+- **"Direct diagram links" toggle no longer collapses the knowledge graph** — turning off this visibility toggle previously removed the set→diagram edges from the force simulation entirely, not just the visual rendering, which deleted the link force (distance 120 px) that blooms each set's diagrams into a visible petal around their set node. Without that force, the galaxy-style separation between collections (ADR-119 / SPEC-119-A) collapsed into a compressed cluster near the graph centre. Fix: use force-graph's `linkVisibility` callback to hide these edges visually while keeping them in the physics — the toggle is now a pure display control (ADR-119, SPEC-119-A follow-up). Also relaxes the ADR-118 regression test's inter-collection monotonicity assertion from strict step-wise (`mid ≥ low ∧ high ≥ mid`) to endpoint-only (`high > low`) — with ungated inner-layer 1/dist² repulsion the individual step-wise comparison is noisier than the full-sweep invariant.
+
 ## [4.0.2] - 2026-04-20
 
 ### Fixed

@@ -53,12 +53,18 @@
 	));
 	let filteredEdges = $derived.by(() => {
 		const visibleNodeIds = new Set(filteredNodes.map((n) => n.id));
-		const hideDirectDiagramLinks = settings.edges['direct_diagram_links'] === false;
+		// Note: the `direct_diagram_links` toggle is handled via force-graph's
+		// linkVisibility (see setupForceGraph) rather than by filtering here.
+		// Removing set→diagram edges from the simulation would take away the
+		// link force (distance 120 px) that pulls diagrams outward into their
+		// "petal" around the set node, which is what gives each set its
+		// visible cluster and — combined with the inner-layer repulsion from
+		// SPEC-119-A — the galaxy effect across collections (ADR-119 /
+		// SPEC-119-A follow-up).
 		return edges.filter((e) =>
 			settings.edges[e.edge_type] !== false &&
 			visibleNodeIds.has(e.source as string) &&
-			visibleNodeIds.has(e.target as string) &&
-			!(hideDirectDiagramLinks && e.edge_type === 'set_membership' && diagramsWithParent.has(e.target as string))
+			visibleNodeIds.has(e.target as string)
 		);
 	});
 
@@ -119,6 +125,26 @@
 			.nodeRelSize(3)
 			.nodeVal((n: any) => {
 				return _computeNodeSize(n.node_type, settings);
+			})
+			.linkVisibility((l: any) => {
+				// Hide set→diagram edges visually when the user turns off
+				// "Direct diagram links" in the settings panel, BUT keep them
+				// in the force simulation. The set→diagram link force
+				// (distance 120 px) is what bloom-separates diagrams into
+				// per-set petals, so removing it from the force calc
+				// compresses every cluster toward the graph centre and kills
+				// the galaxy effect. Purely-visual hiding here lets users
+				// de-clutter without breaking the layout (ADR-119 /
+				// SPEC-119-A).
+				if (settings.edges['direct_diagram_links'] === false
+					&& l.edge_type === 'set_membership'
+					&& diagramsWithParent.has(
+						typeof l.target === 'object' ? l.target.id : l.target,
+					)
+				) {
+					return false;
+				}
+				return true;
 			})
 			.linkColor((l: any) => {
 				if (focusActive && focusNeighbors) {
