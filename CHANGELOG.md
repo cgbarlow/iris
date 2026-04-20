@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-04-20
+
 ### Added
 - **Multi-entity knowledge graph** — interactive force-directed graph on the dashboard showing elements, diagrams, and packages as colour-coded nodes with all relationship types (element relationships, package relationships, diagram links, diagram→element canvas refs, diagram→package refs, hierarchy containment); includes settings panel to toggle each node and edge type on/off, responsive side-by-side layout with diagram hierarchy on wide screens, and hover-to-zoom from hierarchy to graph (ADR-116)
 - **Graph settings: physics sliders and admin defaults** — label density, node spacing, size contrast, and link length sliders with real-time graph updates; admin-configurable defaults per global/collection/set scope stored in database; user overrides via localStorage with "Reset to defaults" button; cascading settings: hard-coded → admin DB → user localStorage (ADR-117)
