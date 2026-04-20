@@ -130,12 +130,16 @@ export interface LockCheckResponse {
 
 export interface SearchResult {
 	id: string;
-	result_type: 'element' | 'diagram';
+	result_type: 'element' | 'diagram' | 'package' | 'set' | 'collection';
 	name: string;
 	description: string | null;
 	type_detail: string;
 	rank: number;
 	deep_link: string;
+	set_id: string | null;
+	set_name: string | null;
+	collection_name: string | null;
+	package_name: string | null;
 }
 
 export interface SearchResponse {
@@ -158,6 +162,7 @@ export interface Comment {
 export interface Bookmark {
 	diagram_id: string | null;
 	package_id: string | null;
+	element_id: string | null;
 	created_at: string;
 }
 
@@ -350,6 +355,62 @@ export interface AIConversation {
 	mode: string | null;
 	set_name: string | null;
 	thread_id: string | null;
+}
+
+/** File upload types (ADR-115) */
+export interface FileExtractResponse {
+	filename: string;
+	content_type: string;
+	size_bytes: number;
+	extracted_text: string;
+	truncated: boolean;
+	error: string | null;
+}
+
+export interface FileContext {
+	filename: string;
+	text: string;
+}
+
+/** Knowledge graph types (ADR-116) */
+
+export interface GraphNode {
+	id: string;
+	name: string;
+	node_type: 'element' | 'diagram' | 'package';
+	type_detail: string;
+	relationship_count: number;
+}
+
+export interface GraphEdge {
+	id: string;
+	source: string;
+	target: string;
+	relationship_type: string;
+	label: string | null;
+	edge_type: string;
+}
+
+export interface GraphSettings {
+	nodes: Record<string, boolean>;
+	edges: Record<string, boolean>;
+	label_density: number;
+	node_spacing: number;
+	size_contrast: number;
+	link_length: number;
+}
+
+export interface GraphResponse {
+	nodes: GraphNode[];
+	edges: GraphEdge[];
+}
+
+export interface GraphSettingsResponse {
+	scope_type: string;
+	scope_id: string;
+	settings: GraphSettings;
+	updated_at: string | null;
+	updated_by: string | null;
 }
 
 /** @deprecated Use Element instead */

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from app.ai.client import create_ai_client
 from app.ai.context import build_multi_set_context, build_set_context
 from app.ai.models import ProviderTestResult
+from app.ai.retrieval import DirectRetrieval, get_retrieval_strategy
 
 # Re-export for router convenience
 build_context = build_set_context
@@ -130,6 +131,17 @@ async def list_providers(
         )
     rows = await cursor.fetchall()
     return [_row_to_provider(r) for r in rows]
+
+
+async def list_providers_internal(
+    db: DatabasePort,
+) -> list[dict[str, object]]:
+    """List active providers with api_key included — for internal use only (ping)."""
+    cursor = await db.execute(
+        f"{_SELECT} WHERE is_active = 1 ORDER BY is_default DESC, name ASC"
+    )
+    rows = await cursor.fetchall()
+    return [_row_to_provider_with_key(r) for r in rows]
 
 
 async def update_provider(
@@ -288,8 +300,9 @@ async def ask_question(
         msg = "No AI provider configured. Ask an admin to add a provider."
         raise ValueError(msg)
 
-    # 2. Build set context
-    context = await build_set_context(db, set_id)
+    # 2. Build set context (via retrieval strategy — ADR-111)
+    retrieval = await get_retrieval_strategy(db)
+    context = await retrieval.retrieve_context(db, question, [set_id])
 
     # 3. Build messages
     system_prompt = str(provider.get("system_prompt") or "")
@@ -423,6 +436,9 @@ async def ask_multi_set_question(
     *,
     set_ids: list[str],
     collection_id: str | None = None,
+    docref_doc_ids: list[str] | None = None,
+    file_contexts: list[dict[str, str]] | None = None,
+    diagram_ids: list[str] | None = None,
     question: str,
     user_id: str,
     provider_id: str | None = None,
@@ -440,12 +456,62 @@ async def ask_multi_set_question(
         msg = "No AI provider configured. Ask an admin to add a provider."
         raise ValueError(msg)
 
-    context = await build_multi_set_context(db, set_ids)
-    primary_set_id = set_ids[0]
+    # Build context from sets (if any).
+    # MNEMOS filters by iris_type so architecture and legislation
+    # results never interfere — safe to always use retrieval strategy.
+    context = ""
+    if set_ids:
+        retrieval = await get_retrieval_strategy(db)
+        context = await retrieval.retrieve_context(db, question, set_ids)
 
+    # Append DocRef legislation context if requested (ADR-112)
+    if docref_doc_ids:
+        try:
+            from app.extensions.service import is_extension_enabled  # noqa: PLC0415
+
+            if await is_extension_enabled(db, "docref"):
+                from app.docref.service import build_docref_context  # noqa: PLC0415
+
+                docref_ctx = await build_docref_context(db, docref_doc_ids, question=question)
+                if docref_ctx:
+                    if context:
+                        context += "\n\n---\n\n"
+                    context += "LEGISLATION REFERENCE:\n" + docref_ctx
+        except Exception:  # noqa: BLE001
+            pass  # Graceful degradation
+
+    # Append uploaded file context if provided (ADR-115)
+    if file_contexts:
+        file_parts = [f"FILE: {fc['filename']}\n{fc['text']}" for fc in file_contexts]
+        file_context_str = "\n\n---\n\n".join(file_parts)
+        if context:
+            context += "\n\n---\n\n"
+        context += "UPLOADED FILES:\n" + file_context_str
+
+    primary_set_id = set_ids[0] if set_ids else None
+
+    has_sets = bool(set_ids)
+    has_docref = bool(docref_doc_ids)
+    has_files = bool(file_contexts)
     system_prompt = str(provider.get("system_prompt") or "")
     if system_prompt:
         system_content = f"{system_prompt}\n\nContext:\n{context}"
+    elif has_sets and has_docref:
+        system_content = (
+            "You are an AI assistant helping users understand their architecture models "
+            "and related legislation. Answer questions using BOTH the architecture Set context "
+            "AND the legislation reference provided. Give equal weight to both sources.\n\nContext:\n" + context
+        )
+    elif has_docref:
+        system_content = (
+            "You are an AI assistant helping users understand NZ legislation. "
+            "Answer questions based on the provided legislation reference.\n\nContext:\n" + context
+        )
+    elif has_files and not has_sets:
+        system_content = (
+            "You are an AI assistant. Answer questions based on the uploaded file content "
+            "provided.\n\nContext:\n" + context
+        )
     else:
         system_content = (
             "You are an AI assistant helping users understand their architecture models. "

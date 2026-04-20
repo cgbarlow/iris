@@ -4,13 +4,19 @@
 	import { isAuthenticated, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
 	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
 	import { getActiveCollectionId, getActiveCollectionName } from '$lib/stores/activeCollection.svelte.js';
+	import { getAiContextCount } from '$lib/stores/aiContext.svelte.js';
+	import { startProviderPolling, stopProviderPolling } from '$lib/stores/aiProviders.svelte.js';
 	import { apiFetch } from '$lib/utils/api';
 
 	let { children } = $props();
 
 	let sidebarOpen = $state(true);
+	let aiContextCount = $derived(getAiContextCount());
 	let recycleBinCount = $state(0);
-	let sceniaEnabled = $state(false);
+	let bookmarkCount = $state(0);
+	let sceniaEnabled = $state(
+		typeof localStorage !== 'undefined' && localStorage.getItem('iris:scenia-enabled') === 'true'
+	);
 
 	async function loadRecycleBinCount() {
 		try {
@@ -21,6 +27,15 @@
 		}
 	}
 
+	async function loadBookmarkCount() {
+		try {
+			const data = await apiFetch<unknown[]>('/api/bookmarks');
+			bookmarkCount = data.length;
+		} catch {
+			bookmarkCount = 0;
+		}
+	}
+
 	async function checkSceniaEnabled() {
 		try {
 			const data = await apiFetch<{ is_enabled: boolean }>('/api/extensions/scenia');
@@ -28,15 +43,25 @@
 		} catch {
 			sceniaEnabled = false;
 		}
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('iris:scenia-enabled', String(sceniaEnabled));
+		}
 	}
 
+	// One-time init on mount — avoid re-running on every navigation or token change
+	let initialized = false;
 	$effect(() => {
-		// Re-check on auth state and page navigation
-		void page.url.pathname;
-		if (isAuthenticated()) {
-			loadRecycleBinCount();
+		if (isAuthenticated() && !initialized) {
+			initialized = true;
 			checkSceniaEnabled();
+			loadRecycleBinCount();
+			loadBookmarkCount();
+			startProviderPolling();
+		} else if (!isAuthenticated()) {
+			initialized = false;
+			stopProviderPolling();
 		}
+		return () => stopProviderPolling();
 	});
 
 	const activeSetId = $derived(getActiveSetId());
@@ -45,8 +70,8 @@
 	const activeCollectionName = $derived(getActiveCollectionName());
 
 	const navItems = [
+		{ href: '/ask', label: 'Iris AI', shortcut: 'A', icon: 'ai' },
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
-		{ href: '/ask', label: 'Ask AI', shortcut: 'A', icon: 'ai' },
 		{ href: '/collections', label: 'Collections', shortcut: 'C', icon: 'collections' },
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
 		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },
@@ -192,8 +217,24 @@
 								aria-current={(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? 'page' : undefined}
 								title="{item.label} ({item.shortcut})"
 							>
-								{@render navIcon(item.icon)}
+								{#if item.icon === 'ai'}
+									<span class="ai-icon-highlight">{@render navIcon(item.icon)}</span>
+								{:else}
+									{@render navIcon(item.icon)}
+								{/if}
 								{item.label}
+								{#if item.icon === 'ai' && aiContextCount > 0}
+									<span
+										class="ai-context-indicator"
+										aria-label="{aiContextCount} item{aiContextCount === 1 ? '' : 's'} in AI context"
+									></span>
+								{/if}
+								{#if item.icon === 'bookmarks' && bookmarkCount > 0}
+									<span
+										class="recycle-bin-indicator"
+										aria-label="{bookmarkCount} bookmark{bookmarkCount === 1 ? '' : 's'}"
+									></span>
+								{/if}
 								{#if item.icon === 'recycle-bin' && recycleBinCount > 0}
 									<span
 										class="recycle-bin-indicator"
@@ -232,7 +273,7 @@
 		{/if}
 
 		<!-- Main content landmark -->
-		<main id="main-content" class="flex-1 p-6" tabindex="-1">
+		<main id="main-content" class="flex flex-1 flex-col p-6" tabindex="-1">
 			{@render children()}
 		</main>
 	</div>
@@ -243,6 +284,12 @@
 	.header-link:hover {
 		background-color: var(--color-bg);
 	}
+	.ai-icon-highlight {
+		color: var(--color-primary);
+		display: flex;
+		align-items: center;
+	}
+	.ai-context-indicator,
 	.recycle-bin-indicator {
 		display: inline-block;
 		width: 8px;

@@ -24,13 +24,13 @@ async def list_bookmarks(
     """List current user's bookmarked diagrams and packages."""
     db = request.app.state.db_manager.main_db
     cursor = await db.execute(
-        "SELECT diagram_id, package_id, created_at FROM bookmarks "
+        "SELECT diagram_id, package_id, element_id, created_at FROM bookmarks "
         "WHERE user_id = ? ORDER BY created_at DESC",
         (current_user["id"],),
     )
     rows = await cursor.fetchall()
     return [
-        BookmarkResponse(diagram_id=r[0], package_id=r[1], created_at=r[2])
+        BookmarkResponse(diagram_id=r[0], package_id=r[1], element_id=r[2], created_at=r[3])
         for r in rows
     ]
 
@@ -134,5 +134,56 @@ async def unbookmark_package(
     await db.execute(
         "DELETE FROM bookmarks WHERE user_id = ? AND package_id = ?",
         (current_user["id"], package_id),
+    )
+    await db.commit()
+
+
+@router.post(
+    "/api/elements/{element_id}/bookmark",
+    response_model=BookmarkResponse,
+    status_code=201,
+)
+async def bookmark_element(
+    element_id: str,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> BookmarkResponse:
+    """Bookmark an element for the current user."""
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "SELECT created_at FROM bookmarks WHERE user_id = ? AND element_id = ?",
+        (current_user["id"], element_id),
+    )
+    existing = await cursor.fetchone()
+    if existing:
+        raise HTTPException(status_code=409, detail="Already bookmarked")
+
+    now = datetime.now(tz=UTC).isoformat()
+    await db.execute(
+        "INSERT INTO bookmarks (user_id, element_id, created_at) VALUES (?, ?, ?)",
+        (current_user["id"], element_id, now),
+    )
+    await db.commit()
+    return BookmarkResponse(element_id=element_id, created_at=now)
+
+
+@router.delete("/api/elements/{element_id}/bookmark", status_code=204)
+async def unbookmark_element(
+    element_id: str,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> None:
+    """Remove an element bookmark for the current user."""
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "SELECT 1 FROM bookmarks WHERE user_id = ? AND element_id = ?",
+        (current_user["id"], element_id),
+    )
+    if await cursor.fetchone() is None:
+        raise HTTPException(status_code=404, detail="Bookmark not found")
+
+    await db.execute(
+        "DELETE FROM bookmarks WHERE user_id = ? AND element_id = ?",
+        (current_user["id"], element_id),
     )
     await db.commit()

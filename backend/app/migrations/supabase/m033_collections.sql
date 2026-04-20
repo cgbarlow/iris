@@ -20,3 +20,6 @@ ALTER TABLE sets ADD COLUMN IF NOT EXISTS collection_id TEXT REFERENCES collecti
 CREATE INDEX IF NOT EXISTS idx_sets_collection ON sets(collection_id);
 
 ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS collection_id TEXT REFERENCES collections(id);
+
+-- Enable RLS (deny-all: backend postgres role bypasses, anon/authenticated denied)
+ALTER TABLE collections ENABLE ROW LEVEL SECURITY;

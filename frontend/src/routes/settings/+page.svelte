@@ -104,7 +104,7 @@
 </svelte:head>
 
 <h1 class="text-2xl font-bold" style="color: var(--color-fg)">Settings</h1>
-<p class="mt-2" style="color: var(--color-muted)">Configure your preferences.</p>
+<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure your preferences.</p>
 
 <section class="mt-6">
 	<div>

@@ -83,11 +83,38 @@ async def install(
             detail=f"Failed to install extension: {exc}",
         )
 
-    # Seed demo data for known extensions
+    # Post-install hooks for known extensions
     if extension_id == "scenia":
         from app.seed.scenia_seed import seed_scenia_data  # noqa: PLC0415
 
         await seed_scenia_data(db)
+
+    if extension_id == "mnemos":
+        from app.mnemos.setup import ensure_sdk_importable, start_container  # noqa: PLC0415
+
+        ensure_sdk_importable()
+        ok, msg = await start_container()
+        if not ok:
+            print(f"[MNEMOS] Warning: {msg}", flush=True)
+        else:
+            # Background reindex so the fresh index has data
+            import asyncio  # noqa: PLC0415
+
+            from app.mnemos.sync import background_reindex  # noqa: PLC0415
+
+            asyncio.create_task(background_reindex(db))
+
+    if extension_id == "docref":
+        from app.docref.service import refresh_document_index  # noqa: PLC0415
+
+        try:
+            refresh_result = await refresh_document_index(db)
+            print(
+                f"[DocRef] Index populated: {refresh_result['documents_found']} documents found",
+                flush=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"[DocRef] Warning: index refresh failed: {exc}", flush=True)
 
     return ExtensionResponse(**result)
 
@@ -104,7 +131,7 @@ async def uninstall(
 
     db = request.app.state.db_manager.main_db
 
-    # Clean up seed data for known extensions
+    # Pre-uninstall hooks for known extensions
     if extension_id == "scenia":
         from app.seed.scenia_seed import remove_scenia_seed_data  # noqa: PLC0415
 
@@ -115,6 +142,13 @@ async def uninstall(
                 status_code=500,
                 detail=f"Failed to clean up seed data: {exc}",
             )
+
+    if extension_id == "mnemos":
+        from app.mnemos.setup import stop_container  # noqa: PLC0415
+
+        ok, msg = await stop_container()
+        if not ok:
+            print(f"[MNEMOS] Warning during uninstall: {msg}", flush=True)
 
     removed = await uninstall_extension(db, extension_id)
     if not removed:
@@ -132,6 +166,15 @@ async def enable(
     result = await enable_extension(db, extension_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Extension not found")
+
+    # Background reindex when MNEMOS is re-enabled
+    if extension_id == "mnemos":
+        import asyncio  # noqa: PLC0415
+
+        from app.mnemos.sync import background_reindex  # noqa: PLC0415
+
+        asyncio.create_task(background_reindex(db))
+
     return ExtensionResponse(**result)
 
 

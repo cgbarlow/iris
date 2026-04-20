@@ -1,7 +1,7 @@
 {
 	"name": "frontend",
 	"private": true,
-	"version": "3.0.0",
+	"version": "4.0.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -14,6 +14,9 @@
 		"test:e2e": "playwright test --project=e2e",
 		"test:bdd": "npx bddgen && playwright test --project=bdd",
 		"test:all-e2e": "npx bddgen && playwright test",
+		"test:probe": "tsx tests/probes/spread-slider-probe.ts",
+		"test:probe:live": "tsx tests/probes/spread-slider-live.ts",
+		"test:probe:ui": "tsx tests/probes/spread-slider-ui.ts",
 		"bddgen": "bddgen",
 		"test": "vitest run"
 	},
@@ -30,6 +33,7 @@
 		"playwright-bdd": "^8.4.2",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.3.6",
+		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1",
 		"vitest": "^4.0.18"
@@ -42,6 +46,7 @@
 		"@xyflow/svelte": "^1.5.1",
 		"bits-ui": "^2.16.2",
 		"dompurify": "^3.3.1",
+		"force-graph": "^1.51.2",
 		"html-to-image": "^1.11.13",
 		"jspdf": "^4.2.0",
 		"lucide-svelte": "^0.577.0",

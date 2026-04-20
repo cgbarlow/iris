@@ -95,6 +95,7 @@ Four colour modes with WCAG-compliant contrast ratios:
 - Entity and model counts with linked navigation
 - Bookmarked models with quick access
 - Full-text search across entities and models
+- **Knowledge graph** — interactive force-directed graph (force-graph library) showing all elements and their relationships for the active set/collection, with colour-coded nodes by element type, directional edges, click-to-navigate to element detail, drag-to-rearrange, zoom/pan, and theme-aware rendering
 - Quick navigation cards for key sections
 
 ### Admin Panel
@@ -115,6 +116,7 @@ Four colour modes with WCAG-compliant contrast ratios:
 - **Collections** — optional higher-level grouping for Sets; a Set can belong to one Collection for cross-set organisation and filtering
 - **Collection-scoped filtering** — Collection dropdown on Diagrams, Elements, and Ask AI pages cascades to filter available Sets
 - **Multi-set AI context** — Ask AI supports selecting multiple Sets (with or without a Collection) as context for Q&A and diagram creation
+- **Session file upload** — Upload PDF, DOCX, XLSX, PPTX, CSV, or text files on the Ask AI Context tab as ephemeral AI context (extracted text, not stored)
 - **Sets** — top-level workspace grouping; each model and entity belongs to exactly one set (like folders, not labels)
 - **Default Set** — all existing items belong to the Default set; it cannot be deleted
 - **Set-scoped Tags** — tags are independent per set; "v1.0" in Set A is isolated from "v1.0" in Set B

@@ -37,7 +37,7 @@
 </svelte:head>
 
 <h1 class="text-2xl font-bold" style="color: var(--color-fg)">Active Locks</h1>
-<p class="mt-1" style="color: var(--color-muted)">Manage edit locks across the system.</p>
+<p class="mt-1 text-sm" style="color: var(--color-muted)">Manage edit locks across the system.</p>
 
 {#if loading}
 	<p class="mt-4" style="color: var(--color-muted)">Loading locks...</p>

@@ -69,14 +69,15 @@ async def hierarchy(
 async def list_all(
     request: Request,
     set_id: str | None = None,
+    collection_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> PackageListResponse:
-    """List packages with optional set filter and pagination."""
+    """List packages with optional set/collection filter and pagination."""
     db = request.app.state.db_manager.main_db
     items, total = await list_packages(
-        db, set_id=set_id, page=page, page_size=page_size,
+        db, set_id=set_id, collection_id=collection_id, page=page, page_size=page_size,
     )
     return PackageListResponse(
         items=[PackageResponse(**item) for item in items],

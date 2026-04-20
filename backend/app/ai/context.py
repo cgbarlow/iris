@@ -30,6 +30,7 @@ async def build_set_context(
     *,
     max_tokens: int = 8000,
     package_ids: list[str] | None = None,
+    diagram_ids: list[str] | None = None,
 ) -> str:
     """Build a structured text context string for the given Set.
 
@@ -52,7 +53,60 @@ async def build_set_context(
         header += f"{set_desc}\n"
     header += "\n"
 
-    # 2. Elements in set — elements.set_id column (no join table)
+    # 2. When packages or diagrams are selected, resolve which element IDs belong
+    #    to those scopes by extracting entityId from diagram canvas nodes (ADR-109).
+    scoped_element_ids: set[str] | None = None
+    if diagram_ids:
+        # Direct diagram ID filtering
+        diag_placeholders = ",".join("?" * len(diagram_ids))
+        cursor = await db.execute(
+            f"""
+            SELECT dv.data
+            FROM diagrams d
+            JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version
+            WHERE d.set_id = ? AND d.is_deleted = 0
+              AND d.id IN ({diag_placeholders})
+            """,  # noqa: S608
+            (set_id, *diagram_ids),
+        )
+        scoped_element_ids = set()
+        for (canvas_data_raw,) in await cursor.fetchall():
+            try:
+                canvas_data = json.loads(canvas_data_raw) if isinstance(canvas_data_raw, str) else canvas_data_raw
+                for node in (canvas_data or {}).get("nodes", []):
+                    node_data = node.get("data", {})
+                    if isinstance(node_data, dict):
+                        eid = node_data.get("entityId")
+                        if eid:
+                            scoped_element_ids.add(eid)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+    elif package_ids:
+        pkg_placeholders = ",".join("?" * len(package_ids))
+        cursor = await db.execute(
+            f"""
+            SELECT dv.data
+            FROM diagrams d
+            JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version
+            WHERE d.set_id = ? AND d.is_deleted = 0
+              AND d.parent_package_id IN ({pkg_placeholders})
+            """,  # noqa: S608
+            (set_id, *package_ids),
+        )
+        scoped_element_ids = set()
+        for (canvas_data_raw,) in await cursor.fetchall():
+            try:
+                canvas_data = json.loads(canvas_data_raw) if isinstance(canvas_data_raw, str) else canvas_data_raw
+                for node in (canvas_data or {}).get("nodes", []):
+                    node_data = node.get("data", {})
+                    if isinstance(node_data, dict):
+                        eid = node_data.get("entityId")
+                        if eid:
+                            scoped_element_ids.add(eid)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+
+    # 3. Elements in set (filtered to package elements when applicable)
     cursor = await db.execute(
         """
         SELECT e.id, e.element_type, ev.name, ev.description, ev.data
@@ -64,6 +118,8 @@ async def build_set_context(
         (set_id,),
     )
     element_rows = await cursor.fetchall()
+    if scoped_element_ids is not None:
+        element_rows = [r for r in element_rows if r[0] in scoped_element_ids]
 
     elements_lines: list[str] = []
     element_ids: set[str] = set()
@@ -93,7 +149,7 @@ async def build_set_context(
         elements_section += "(none)\n"
     elements_section += "\n"
 
-    # 3. Relationships between set elements
+    # 4. Relationships between elements (scoped to package when applicable)
     rels_lines: list[str] = []
     if element_ids:
         placeholders = ",".join("?" * len(element_ids))
@@ -124,8 +180,21 @@ async def build_set_context(
         rels_section += "(none)\n"
     rels_section += "\n"
 
-    # 4. Diagrams in set (optionally filtered by package)
-    if package_ids:
+    # 5. Diagrams in set (optionally filtered by diagram IDs or package)
+    if diagram_ids:
+        diag_placeholders = ",".join("?" * len(diagram_ids))
+        cursor = await db.execute(
+            f"""
+            SELECT m.diagram_type, mv.name, mv.description
+            FROM diagrams m
+            JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version
+            WHERE m.set_id = ? AND m.is_deleted = 0
+              AND m.id IN ({diag_placeholders})
+            ORDER BY mv.name ASC
+            """,  # noqa: S608
+            (set_id, *diagram_ids),
+        )
+    elif package_ids:
         pkg_placeholders = ",".join("?" * len(package_ids))
         cursor = await db.execute(
             f"""
@@ -192,18 +261,19 @@ async def build_multi_set_context(
     *,
     max_tokens: int = 8000,
     package_ids: list[str] | None = None,
+    diagram_ids: list[str] | None = None,
 ) -> str:
     """Build combined context from multiple Sets, dividing token budget proportionally.
 
     Each set gets an equal share of the token budget. Results are concatenated
-    with clear dividers between sets. When package_ids is provided, only
-    diagrams within those packages are included in the context.
+    with clear dividers between sets. When package_ids or diagram_ids is provided,
+    only elements, relationships, and diagrams within that scope are included.
     """
     if not set_ids:
         return "No sets selected."
 
     if len(set_ids) == 1:
-        return await build_set_context(db, set_ids[0], max_tokens=max_tokens, package_ids=package_ids)
+        return await build_set_context(db, set_ids[0], max_tokens=max_tokens, package_ids=package_ids, diagram_ids=diagram_ids)
 
     # Reserve tokens for preamble and dividers
     preamble = f"MULTI-SET CONTEXT ({len(set_ids)} sets):\n\n"
@@ -215,7 +285,7 @@ async def build_multi_set_context(
 
     sections: list[str] = []
     for sid in set_ids:
-        ctx = await build_set_context(db, sid, max_tokens=per_set_tokens, package_ids=package_ids)
+        ctx = await build_set_context(db, sid, max_tokens=per_set_tokens, package_ids=package_ids, diagram_ids=diagram_ids)
         sections.append(ctx)
 
     return preamble + "\n---\n\n".join(sections)

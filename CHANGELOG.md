@@ -7,14 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-04-20
+
 ### Added
+- **Multi-entity knowledge graph** — interactive force-directed graph on the dashboard showing elements, diagrams, and packages as colour-coded nodes with all relationship types (element relationships, package relationships, diagram links, diagram→element canvas refs, diagram→package refs, hierarchy containment); includes settings panel to toggle each node and edge type on/off, responsive side-by-side layout with diagram hierarchy on wide screens, and hover-to-zoom from hierarchy to graph (ADR-116)
+- **Graph settings: physics sliders and admin defaults** — label density, node spacing, size contrast, and link length sliders with real-time graph updates; admin-configurable defaults per global/collection/set scope stored in database; user overrides via localStorage with "Reset to defaults" button; cascading settings: hard-coded → admin DB → user localStorage (ADR-117)
+- **Graph data API** — `GET /api/graph?set_id=X` endpoint returning elements, diagrams, and packages as nodes with 6 edge types in a single optimised call, with collection-scope support; `GET/PUT /api/graph/settings` endpoints for admin-default graph settings (ADR-116, ADR-117)
+- **Diagram-level AI context scoping** — Diagram dropdown on the Ask AI Context tab filters AI context to a specific diagram and its elements, bypassing MNEMOS for precise scoped queries; dropdown populates from selected sets and follows Collection dropdown styling
+- **Session file upload for AI context** — upload files (PDF, DOCX, XLSX, PPTX, CSV, text) on the Ask AI Context tab as session-scoped AI context; text extracted server-side via stateless endpoint, held in browser state, and included alongside sets and legislation in chat requests; supports drag-and-drop, 5 MB limit, and files-only conversations (ADR-115)
+- **Advanced provider parameters** — collapsible Advanced Settings section in the AI provider edit modal exposing top_p, top_k, min_p, frequency_penalty, presence_penalty, and stop sequences; parameters are provider-aware with unsupported ones silently omitted (ADR-114)
+- **Model selector in Ask AI** — compact dropdown in the chat toolbar allowing users to choose which AI provider to use per conversation, with a new lightweight `GET /api/ai/providers/active` endpoint (ADR-114)
+- **DocRef legislation integration** — optional extension for importing NZ legislation documents from legislation.docref.nz as AI context; browse and import chunked CSVs with progress indicators, select imported legislation alongside sets and collections on the Ask AI page, with hourly background index refresh (ADR-112)
+- **MNEMOS semantic retrieval** — optional MNEMOS extension for AI-powered semantic context retrieval, replacing naive token-budget truncation with question-aware ranking across sets; managed via admin Extensions tab with graceful fallback to direct retrieval when unavailable (ADR-111)
+- **RetrievalPort abstraction** — protocol-based retrieval strategy allowing pluggable context backends; `DirectRetrieval` wraps existing `context.py`, `SemanticRetrieval` uses MNEMOS (ADR-111)
 - **Bulk DoView PPTX import** — upload multiple .pptx files in one operation via `POST /api/import/pptx/batch`, all grouped under a single set with per-file error reporting and partial success support (ADR-108)
 - **Package-level AI context** — Ask AI set selector now supports drilling down into packages within each set, constraining AI context to specific packages for more focused responses (ADR-109)
 - **Scenia cloud deployment** — Scenia roadmapping app added as a third Render Blueprint service, pulling from the external fork as a static site with CORS and cross-service URL configuration (ADR-110)
 - **Collection-scoped filtering** — clicking a collection card now filters sets, diagrams, elements, and search results across dashboard and list pages
 
+### Changed
+- **Ask AI tabbed layout** — split Ask AI page into Context and Request tabs; context selectors on first tab, expanded chat dialogue on second tab with selected dataset summary (ADR-113)
+
 ### Fixed
 - **AI discuss crash** — added missing `mode` and `thread_id` columns to `ai_conversations` table (SQLite migration m033)
+- **Knowledge graph spread slider on multi-collection views** — replaced the cubic `spread³` cluster force with a bidirectional target-distance separator, gated set- and root-package-level separation to within a single collection, and removed the inverse-spread cohesion decay; the `node_spacing` slider now behaves predictably across its full 0.2–3.0 range instead of "losing the plot" at the extremes (ADR-118)
+- **Knowledge graph orphan-set drift** — sets with no collection (e.g. the "default" set) now participate in the collection-layer force under a synthetic `__orphan_<sid>` group, so the bidirectional separator pulls them back when farther than target. Previously these nodes had no collection-layer force at all and ratcheted outward under charge repulsion each time the spread slider rose (ADR-118, SPEC-118-A)
 
 ## [3.0.0] - 2026-03-25
 

@@ -38,6 +38,12 @@ from app.migrations.m030_collections import up as m030_up
 from app.migrations.m031_extensions import up as m031_up
 from app.migrations.m032_scenia_tables import up as m032_up
 from app.migrations.m033_ai_conversations_mode import up as m033_up
+from app.migrations.m034_docref_tables import up as m034_up
+from app.migrations.m035_packages_fts import up as m035_up
+from app.migrations.m036_ai_conversations_nullable_set import up as m036_up
+from app.migrations.m037_sets_collections_fts import up as m037_up
+from app.migrations.m038_element_bookmarks import up as m038_up
+from app.migrations.m039_graph_settings import up as m039_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
@@ -103,6 +109,12 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m031_up(main)
     await m032_up(main)
     await m033_up(main)
+    await m034_up(main)
+    await m035_up(main)
+    await m036_up(main)
+    await m037_up(main)
+    await m038_up(main)
+    await m039_up(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
@@ -110,6 +122,8 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await seed_default_views(port)
     from app.themes.service import seed_default_themes
     await seed_default_themes(port)
+    from app.graph.service import seed_graph_settings_defaults
+    await seed_graph_settings_defaults(port)
 
     # Rebuild FTS search index from existing data
     await rebuild_search_index(port)

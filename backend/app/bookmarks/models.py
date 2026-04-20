@@ -10,4 +10,5 @@ class BookmarkResponse(BaseModel):
 
     diagram_id: str | None = None
     package_id: str | None = None
+    element_id: str | None = None
     created_at: str

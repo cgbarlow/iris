@@ -27,6 +27,9 @@ async def rebuild_search_index(db: DatabasePort) -> None:
     # SQLite: rebuild FTS5 tables from scratch
     await db.execute("DELETE FROM elements_fts")
     await db.execute("DELETE FROM diagrams_fts")
+    await db.execute("DELETE FROM packages_fts")
+    await db.execute("DELETE FROM sets_fts")
+    await db.execute("DELETE FROM collections_fts")
 
     cursor = await db.execute(
         "SELECT e.id, e.element_type, ev.name, ev.description "
@@ -52,6 +55,37 @@ async def rebuild_search_index(db: DatabasePort) -> None:
             "INSERT INTO diagrams_fts (diagram_id, name, diagram_type, description) "
             "VALUES (?, ?, ?, ?)",
             (row[0], row[2], row[1], row[3] or ""),
+        )
+
+    cursor = await db.execute(
+        "SELECT p.id, pv.name, pv.description "
+        "FROM packages p "
+        "JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+        "WHERE p.is_deleted = 0"
+    )
+    for row in await cursor.fetchall():
+        await db.execute(
+            "INSERT INTO packages_fts (package_id, name, description) "
+            "VALUES (?, ?, ?)",
+            (row[0], row[1], row[2] or ""),
+        )
+
+    cursor = await db.execute(
+        "SELECT id, name, description FROM sets WHERE is_deleted = 0"
+    )
+    for row in await cursor.fetchall():
+        await db.execute(
+            "INSERT INTO sets_fts (set_id, name, description) VALUES (?, ?, ?)",
+            (row[0], row[1], row[2] or ""),
+        )
+
+    cursor = await db.execute(
+        "SELECT id, name, description FROM collections WHERE is_deleted = 0"
+    )
+    for row in await cursor.fetchall():
+        await db.execute(
+            "INSERT INTO collections_fts (collection_id, name, description) VALUES (?, ?, ?)",
+            (row[0], row[1], row[2] or ""),
         )
 
     await db.commit()
@@ -137,6 +171,101 @@ async def remove_diagram_index(db: DatabasePort, diagram_id: str) -> None:
     )
 
 
+async def index_package(
+    db: DatabasePort,
+    *,
+    package_id: str,
+    name: str,
+    description: str | None,
+) -> None:
+    """Index or re-index a package (SQLite only)."""
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+
+    if isinstance(db, SupabaseAdapter):
+        return
+
+    await db.execute(
+        "DELETE FROM packages_fts WHERE package_id = ?", (package_id,),
+    )
+    await db.execute(
+        "INSERT INTO packages_fts (package_id, name, description) "
+        "VALUES (?, ?, ?)",
+        (package_id, name, description or ""),
+    )
+
+
+async def remove_package_index(db: DatabasePort, package_id: str) -> None:
+    """Remove a package from the FTS index (SQLite only)."""
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+
+    if isinstance(db, SupabaseAdapter):
+        return
+
+    await db.execute(
+        "DELETE FROM packages_fts WHERE package_id = ?", (package_id,),
+    )
+
+
+async def index_set(
+    db: DatabasePort,
+    *,
+    set_id: str,
+    name: str,
+    description: str | None,
+) -> None:
+    """Index or re-index a set (SQLite only)."""
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+
+    if isinstance(db, SupabaseAdapter):
+        return
+
+    await db.execute("DELETE FROM sets_fts WHERE set_id = ?", (set_id,))
+    await db.execute(
+        "INSERT INTO sets_fts (set_id, name, description) VALUES (?, ?, ?)",
+        (set_id, name, description or ""),
+    )
+
+
+async def remove_set_index(db: DatabasePort, set_id: str) -> None:
+    """Remove a set from the FTS index (SQLite only)."""
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+
+    if isinstance(db, SupabaseAdapter):
+        return
+
+    await db.execute("DELETE FROM sets_fts WHERE set_id = ?", (set_id,))
+
+
+async def index_collection(
+    db: DatabasePort,
+    *,
+    collection_id: str,
+    name: str,
+    description: str | None,
+) -> None:
+    """Index or re-index a collection (SQLite only)."""
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+
+    if isinstance(db, SupabaseAdapter):
+        return
+
+    await db.execute("DELETE FROM collections_fts WHERE collection_id = ?", (collection_id,))
+    await db.execute(
+        "INSERT INTO collections_fts (collection_id, name, description) VALUES (?, ?, ?)",
+        (collection_id, name, description or ""),
+    )
+
+
+async def remove_collection_index(db: DatabasePort, collection_id: str) -> None:
+    """Remove a collection from the FTS index (SQLite only)."""
+    from app.db.adapter import SupabaseAdapter  # noqa: PLC0415
+
+    if isinstance(db, SupabaseAdapter):
+        return
+
+    await db.execute("DELETE FROM collections_fts WHERE collection_id = ?", (collection_id,))
+
+
 # ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
@@ -176,29 +305,35 @@ async def _search_sqlite(
     if not safe_query:
         return results
 
+    _ELEMENT_COLS = (
+        "f.element_id, f.name, f.element_type, f.description, f.rank, "
+        "s.name, c.name, e.set_id"
+    )
+    _ELEMENT_JOINS = (
+        "FROM elements_fts f "
+        "JOIN elements e ON e.id = f.element_id "
+        "LEFT JOIN sets s ON e.set_id = s.id "
+        "LEFT JOIN collections c ON s.collection_id = c.id "
+    )
     if set_id:
         cursor = await db.execute(
-            "SELECT f.element_id, f.name, f.element_type, f.description, f.rank "
-            "FROM elements_fts f "
-            "JOIN elements e ON e.id = f.element_id "
+            f"SELECT {_ELEMENT_COLS} {_ELEMENT_JOINS}"  # noqa: S608
             "WHERE elements_fts MATCH ? AND e.set_id = ? "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, set_id, limit),
         )
     elif collection_id:
         cursor = await db.execute(
-            "SELECT f.element_id, f.name, f.element_type, f.description, f.rank "
-            "FROM elements_fts f "
-            "JOIN elements e ON e.id = f.element_id "
+            f"SELECT {_ELEMENT_COLS} {_ELEMENT_JOINS}"  # noqa: S608
             "WHERE elements_fts MATCH ? AND e.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, collection_id, limit),
         )
     else:
         cursor = await db.execute(
-            "SELECT element_id, name, element_type, description, rank "
-            "FROM elements_fts WHERE elements_fts MATCH ? "
-            "ORDER BY rank LIMIT ?",
+            f"SELECT {_ELEMENT_COLS} {_ELEMENT_JOINS}"  # noqa: S608
+            "WHERE elements_fts MATCH ? "
+            "ORDER BY f.rank LIMIT ?",
             (safe_query, limit),
         )
     element_rows = await cursor.fetchall()
@@ -211,33 +346,44 @@ async def _search_sqlite(
             "description": row[3] or None,
             "rank": float(row[4]),
             "deep_link": f"/elements/{row[0]}",
+            "set_id": row[7],
+            "set_name": row[5],
+            "collection_name": row[6],
         }
         for row in element_rows
     )
 
+    _DIAGRAM_COLS = (
+        "f.diagram_id, f.name, f.diagram_type, f.description, f.rank, "
+        "s.name, c.name, pv.name, m.set_id"
+    )
+    _DIAGRAM_JOINS = (
+        "FROM diagrams_fts f "
+        "JOIN diagrams m ON m.id = f.diagram_id "
+        "LEFT JOIN sets s ON m.set_id = s.id "
+        "LEFT JOIN collections c ON s.collection_id = c.id "
+        "LEFT JOIN packages p ON m.parent_package_id = p.id "
+        "LEFT JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+    )
     if set_id:
         cursor = await db.execute(
-            "SELECT f.diagram_id, f.name, f.diagram_type, f.description, f.rank "
-            "FROM diagrams_fts f "
-            "JOIN diagrams m ON m.id = f.diagram_id "
+            f"SELECT {_DIAGRAM_COLS} {_DIAGRAM_JOINS}"  # noqa: S608
             "WHERE diagrams_fts MATCH ? AND m.set_id = ? "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, set_id, limit),
         )
     elif collection_id:
         cursor = await db.execute(
-            "SELECT f.diagram_id, f.name, f.diagram_type, f.description, f.rank "
-            "FROM diagrams_fts f "
-            "JOIN diagrams m ON m.id = f.diagram_id "
+            f"SELECT {_DIAGRAM_COLS} {_DIAGRAM_JOINS}"  # noqa: S608
             "WHERE diagrams_fts MATCH ? AND m.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
             "ORDER BY f.rank LIMIT ?",
             (safe_query, collection_id, limit),
         )
     else:
         cursor = await db.execute(
-            "SELECT diagram_id, name, diagram_type, description, rank "
-            "FROM diagrams_fts WHERE diagrams_fts MATCH ? "
-            "ORDER BY rank LIMIT ?",
+            f"SELECT {_DIAGRAM_COLS} {_DIAGRAM_JOINS}"  # noqa: S608
+            "WHERE diagrams_fts MATCH ? "
+            "ORDER BY f.rank LIMIT ?",
             (safe_query, limit),
         )
     diagram_rows = await cursor.fetchall()
@@ -250,9 +396,126 @@ async def _search_sqlite(
             "description": row[3] or None,
             "rank": float(row[4]),
             "deep_link": f"/diagrams/{row[0]}",
+            "set_id": row[8],
+            "set_name": row[5],
+            "collection_name": row[6],
+            "package_name": row[7],
         }
         for row in diagram_rows
     )
+
+    # Packages
+    _PKG_COLS = (
+        "f.package_id, pv.name, pv.description, f.rank, "
+        "s.name, c.name, p.set_id"
+    )
+    _PKG_JOINS = (
+        "FROM packages_fts f "
+        "JOIN packages p ON p.id = f.package_id "
+        "JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+        "LEFT JOIN sets s ON p.set_id = s.id "
+        "LEFT JOIN collections c ON s.collection_id = c.id "
+    )
+    if set_id:
+        cursor = await db.execute(
+            f"SELECT {_PKG_COLS} {_PKG_JOINS}"  # noqa: S608
+            "WHERE packages_fts MATCH ? AND p.set_id = ? "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, set_id, limit),
+        )
+    elif collection_id:
+        cursor = await db.execute(
+            f"SELECT {_PKG_COLS} {_PKG_JOINS}"  # noqa: S608
+            "WHERE packages_fts MATCH ? AND p.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, collection_id, limit),
+        )
+    else:
+        cursor = await db.execute(
+            f"SELECT {_PKG_COLS} {_PKG_JOINS}"  # noqa: S608
+            "WHERE packages_fts MATCH ? "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, limit),
+        )
+    package_rows = await cursor.fetchall()
+    results.extend(
+        {
+            "id": row[0],
+            "result_type": "package",
+            "name": row[1],
+            "type_detail": "package",
+            "description": row[2] or None,
+            "rank": float(row[3]),
+            "deep_link": f"/packages/{row[0]}",
+            "set_id": row[6],
+            "set_name": row[4],
+            "collection_name": row[5],
+        }
+        for row in package_rows
+    )
+
+    # Sets
+    if not set_id:  # Don't search sets when already filtered to a specific set
+        _SET_COLS = "f.set_id, s.name, s.description, f.rank, c.id, c.name"
+        _SET_JOINS = (
+            "FROM sets_fts f "
+            "JOIN sets s ON s.id = f.set_id "
+            "LEFT JOIN collections c ON s.collection_id = c.id "
+        )
+        if collection_id:
+            cursor = await db.execute(
+                f"SELECT {_SET_COLS} {_SET_JOINS}"  # noqa: S608
+                "WHERE sets_fts MATCH ? AND s.collection_id = ? "
+                "ORDER BY f.rank LIMIT ?",
+                (safe_query, collection_id, limit),
+            )
+        else:
+            cursor = await db.execute(
+                f"SELECT {_SET_COLS} {_SET_JOINS}"  # noqa: S608
+                "WHERE sets_fts MATCH ? "
+                "ORDER BY f.rank LIMIT ?",
+                (safe_query, limit),
+            )
+        set_rows = await cursor.fetchall()
+        results.extend(
+            {
+                "id": row[0],
+                "result_type": "set",
+                "name": row[1],
+                "type_detail": "set",
+                "description": row[2] or None,
+                "rank": float(row[3]),
+                "deep_link": f"/sets",
+                "set_id": row[0],
+                "set_name": row[1],
+                "collection_name": row[5],
+            }
+            for row in set_rows
+        )
+
+    # Collections
+    if not set_id and not collection_id:
+        cursor = await db.execute(
+            "SELECT f.collection_id, c.name, c.description, f.rank "
+            "FROM collections_fts f "
+            "JOIN collections c ON c.id = f.collection_id "
+            "WHERE collections_fts MATCH ? "
+            "ORDER BY f.rank LIMIT ?",
+            (safe_query, limit),
+        )
+        collection_rows = await cursor.fetchall()
+        results.extend(
+            {
+                "id": row[0],
+                "result_type": "collection",
+                "name": row[1],
+                "type_detail": "collection",
+                "description": row[2] or None,
+                "rank": float(row[3]),
+                "deep_link": f"/collections",
+            }
+            for row in collection_rows
+        )
 
     # FTS5 rank is negative; closer to 0 = better match
     results.sort(key=lambda r: r["rank"])
@@ -276,12 +539,18 @@ async def _search_postgres(
         return results
     tsquery = " & ".join(f"{w}:*" for w in words)
 
+    _PG_ELEM = (
+        "SELECT e.id, ev.name, e.element_type, ev.description, "
+        "ts_rank(e.search_vector, to_tsquery('english', %s)) AS rank, "
+        "s.name AS set_name, col.name AS collection_name, e.set_id "
+        "FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+        "LEFT JOIN sets s ON e.set_id = s.id "
+        "LEFT JOIN collections col ON s.collection_id = col.id "
+    )
     if set_id:
         cursor = await db.execute(
-            "SELECT e.id, ev.name, e.element_type, ev.description, "
-            "ts_rank(e.search_vector, to_tsquery('english', ?)) AS rank "
-            "FROM elements e "
-            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            f"{_PG_ELEM}"  # noqa: S608
             "WHERE e.search_vector @@ to_tsquery('english', ?) AND e.set_id = ? "
             "AND e.is_deleted = FALSE "
             "ORDER BY rank DESC LIMIT ?",
@@ -289,10 +558,7 @@ async def _search_postgres(
         )
     elif collection_id:
         cursor = await db.execute(
-            "SELECT e.id, ev.name, e.element_type, ev.description, "
-            "ts_rank(e.search_vector, to_tsquery('english', ?)) AS rank "
-            "FROM elements e "
-            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            f"{_PG_ELEM}"  # noqa: S608
             "WHERE e.search_vector @@ to_tsquery('english', ?) "
             "AND e.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
             "AND e.is_deleted = FALSE "
@@ -301,10 +567,7 @@ async def _search_postgres(
         )
     else:
         cursor = await db.execute(
-            "SELECT e.id, ev.name, e.element_type, ev.description, "
-            "ts_rank(e.search_vector, to_tsquery('english', ?)) AS rank "
-            "FROM elements e "
-            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            f"{_PG_ELEM}"  # noqa: S608
             "WHERE e.search_vector @@ to_tsquery('english', ?) "
             "AND e.is_deleted = FALSE "
             "ORDER BY rank DESC LIMIT ?",
@@ -320,16 +583,27 @@ async def _search_postgres(
             "description": row[3] or None,
             "rank": float(row[4]),
             "deep_link": f"/elements/{row[0]}",
+            "set_id": row[7],
+            "set_name": row[5],
+            "collection_name": row[6],
         }
         for row in element_rows
     )
 
+    _PG_DIAG = (
+        "SELECT m.id, mv.name, m.diagram_type, mv.description, "
+        "ts_rank(m.search_vector, to_tsquery('english', %s)) AS rank, "
+        "s.name AS set_name, col.name AS collection_name, pv.name AS package_name, m.set_id "
+        "FROM diagrams m "
+        "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
+        "LEFT JOIN sets s ON m.set_id = s.id "
+        "LEFT JOIN collections col ON s.collection_id = col.id "
+        "LEFT JOIN packages p ON m.parent_package_id = p.id "
+        "LEFT JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+    )
     if set_id:
         cursor = await db.execute(
-            "SELECT m.id, mv.name, m.diagram_type, mv.description, "
-            "ts_rank(m.search_vector, to_tsquery('english', ?)) AS rank "
-            "FROM diagrams m "
-            "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
+            f"{_PG_DIAG}"  # noqa: S608
             "WHERE m.search_vector @@ to_tsquery('english', ?) AND m.set_id = ? "
             "AND m.is_deleted = FALSE "
             "ORDER BY rank DESC LIMIT ?",
@@ -337,10 +611,7 @@ async def _search_postgres(
         )
     elif collection_id:
         cursor = await db.execute(
-            "SELECT m.id, mv.name, m.diagram_type, mv.description, "
-            "ts_rank(m.search_vector, to_tsquery('english', ?)) AS rank "
-            "FROM diagrams m "
-            "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
+            f"{_PG_DIAG}"  # noqa: S608
             "WHERE m.search_vector @@ to_tsquery('english', ?) "
             "AND m.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
             "AND m.is_deleted = FALSE "
@@ -349,10 +620,7 @@ async def _search_postgres(
         )
     else:
         cursor = await db.execute(
-            "SELECT m.id, mv.name, m.diagram_type, mv.description, "
-            "ts_rank(m.search_vector, to_tsquery('english', ?)) AS rank "
-            "FROM diagrams m "
-            "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
+            f"{_PG_DIAG}"  # noqa: S608
             "WHERE m.search_vector @@ to_tsquery('english', ?) "
             "AND m.is_deleted = FALSE "
             "ORDER BY rank DESC LIMIT ?",
@@ -368,6 +636,10 @@ async def _search_postgres(
             "description": row[3] or None,
             "rank": float(row[4]),
             "deep_link": f"/diagrams/{row[0]}",
+            "set_id": row[8],
+            "set_name": row[5],
+            "collection_name": row[6],
+            "package_name": row[7],
         }
         for row in diagram_rows
     )
@@ -378,8 +650,8 @@ async def _search_postgres(
 
 
 def _escape_fts_query(query: str) -> str:
-    """Escape a user query for safe FTS5 matching."""
+    """Escape a user query for safe FTS5 prefix matching."""
     words = query.strip().split()
     if not words:
         return ""
-    return " ".join(f'"{w}"' for w in words)
+    return " ".join(f'"{w}"*' for w in words)

@@ -14,6 +14,7 @@
 		onchange: (ids: string[]) => void;
 		selectedPackageIds?: string[];
 		onpackagechange?: (ids: string[]) => void;
+		onpackages?: (pkgsBySet: Record<string, { id: string; name: string }[]>) => void;
 		label?: string;
 	}
 
@@ -23,6 +24,7 @@
 		onchange,
 		selectedPackageIds = [],
 		onpackagechange,
+		onpackages,
 		label = 'Sets',
 	}: Props = $props();
 
@@ -86,6 +88,7 @@
 			packagesBySet = { ...packagesBySet, [setId]: [] };
 		}
 		loadingPackages = new Set([...loadingPackages].filter((id) => id !== setId));
+		onpackages?.(packagesBySet);
 	}
 
 	function togglePackage(packageId: string) {
@@ -98,16 +101,15 @@
 	}
 </script>
 
-<div class="flex items-center gap-2" style="position: relative">
-	<label class="text-sm font-medium" style="color: var(--color-fg)">{label}</label>
+<div style="position: relative">
+	<label class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">{label}</label>
 	<button
 		type="button"
 		onclick={() => { open = !open; }}
-		class="rounded border px-3 py-1.5 text-left text-sm"
-		style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); min-width: 200px"
+		class="w-full truncate rounded border px-3 py-1.5 text-left text-sm"
+		style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); min-width: 200px; padding-right: 2rem; background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E&quot;); background-repeat: no-repeat; background-position: right 0.5rem center;"
 	>
 		{summaryText}
-		<span class="float-right" style="color: var(--color-muted)">{open ? '\u25B2' : '\u25BC'}</span>
 	</button>
 
 	{#if open}

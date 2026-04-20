@@ -304,7 +304,7 @@ class SupabaseAdapter:
         self._held_conn: asyncpg.Connection | None = None  # type: ignore[name-defined]
 
     # SQLite FTS virtual tables that don't exist in PostgreSQL (uses tsvector instead)
-    _FTS_TABLES = {"elements_fts", "diagrams_fts"}
+    _FTS_TABLES = {"elements_fts", "diagrams_fts", "packages_fts", "sets_fts", "collections_fts"}
 
     @contextlib.asynccontextmanager
     async def hold_connection(self) -> AsyncIterator[None]:

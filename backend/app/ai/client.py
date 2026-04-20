@@ -105,6 +105,7 @@ class OpenAICompatibleClient(AIClient):
         params_raw = provider_row.get("parameters") or "{}"
         self._params: dict[str, object] = json.loads(str(params_raw)) if isinstance(params_raw, str) else {}
         self._api_key: str | None = str(provider_row["api_key"]) if provider_row.get("api_key") else None
+        self.stream_usage: tuple[int | None, int | None] = (None, None)
 
     def _headers(self) -> dict[str, str]:
         h: dict[str, str] = {"Content-Type": "application/json"}
@@ -118,12 +119,24 @@ class OpenAICompatibleClient(AIClient):
             "messages": messages,
             "stream": stream,
         }
+        if stream:
+            payload["stream_options"] = {"include_usage": True}
         if self._params.get("temperature") is not None:
             payload["temperature"] = self._params["temperature"]
         if self._params.get("max_tokens") is not None:
             payload["max_tokens"] = self._params["max_tokens"]
         if self._params.get("top_p") is not None:
             payload["top_p"] = self._params["top_p"]
+        if self._params.get("top_k") is not None:
+            payload["top_k"] = self._params["top_k"]
+        if self._params.get("min_p") is not None:
+            payload["min_p"] = self._params["min_p"]
+        if self._params.get("frequency_penalty") is not None:
+            payload["frequency_penalty"] = self._params["frequency_penalty"]
+        if self._params.get("presence_penalty") is not None:
+            payload["presence_penalty"] = self._params["presence_penalty"]
+        if self._params.get("stop") is not None:
+            payload["stop"] = self._params["stop"]
         return payload
 
     async def _do_chat(self, messages: list[dict[str, str]]) -> tuple[str, int | None, int | None]:
@@ -145,6 +158,7 @@ class OpenAICompatibleClient(AIClient):
         return await _with_retry(self._do_chat, self._retries, messages)  # type: ignore[return-value]
 
     async def chat_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        self.stream_usage = (None, None)
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             async with client.stream(
                 "POST",
@@ -162,11 +176,15 @@ class OpenAICompatibleClient(AIClient):
                     import json
                     try:
                         chunk = json.loads(payload)
-                        delta = chunk["choices"][0].get("delta", {})
-                        content = delta.get("content")
-                        if content:
-                            yield content
-                    except (KeyError, ValueError):
+                        usage = chunk.get("usage")
+                        if usage:
+                            self.stream_usage = (usage.get("prompt_tokens"), usage.get("completion_tokens"))
+                        choices = chunk.get("choices") or []
+                        if choices:
+                            content = choices[0].get("delta", {}).get("content")
+                            if content:
+                                yield content
+                    except (KeyError, ValueError, IndexError):
                         continue
 
     async def test_connection(self) -> ProviderTestResult:
@@ -198,6 +216,7 @@ class AnthropicClient(AIClient):
         self._params: dict[str, object] = json.loads(str(params_raw)) if isinstance(params_raw, str) else {}
         self._api_key: str | None = str(provider_row["api_key"]) if provider_row.get("api_key") else None
         self._system_prompt: str | None = str(provider_row["system_prompt"]) if provider_row.get("system_prompt") else None  # noqa: E501
+        self.stream_usage: tuple[int | None, int | None] = (None, None)
 
     def _headers(self) -> dict[str, str]:
         h: dict[str, str] = {
@@ -226,6 +245,10 @@ class AnthropicClient(AIClient):
             payload["temperature"] = self._params["temperature"]
         if self._params.get("top_p") is not None:
             payload["top_p"] = self._params["top_p"]
+        if self._params.get("top_k") is not None:
+            payload["top_k"] = self._params["top_k"]
+        if self._params.get("stop") is not None:
+            payload["stop_sequences"] = self._params["stop"]
         return payload
 
     async def _do_chat(self, messages: list[dict[str, str]]) -> tuple[str, int | None, int | None]:
@@ -247,6 +270,9 @@ class AnthropicClient(AIClient):
         return await _with_retry(self._do_chat, self._retries, messages)  # type: ignore[return-value]
 
     async def chat_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        self.stream_usage = (None, None)
+        tokens_in: int | None = None
+        tokens_out: int | None = None
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             async with client.stream(
                 "POST",
@@ -261,12 +287,20 @@ class AnthropicClient(AIClient):
                     import json
                     try:
                         event = json.loads(line[6:])
-                        if event.get("type") == "content_block_delta":
+                        etype = event.get("type")
+                        if etype == "message_start":
+                            usage = event.get("message", {}).get("usage", {})
+                            tokens_in = usage.get("input_tokens")
+                        elif etype == "message_delta":
+                            usage = event.get("usage", {})
+                            tokens_out = usage.get("output_tokens")
+                        elif etype == "content_block_delta":
                             text = event.get("delta", {}).get("text")
                             if text:
                                 yield text
                     except (KeyError, ValueError):
                         continue
+        self.stream_usage = (tokens_in, tokens_out)
 
     async def test_connection(self) -> ProviderTestResult:
         start = time.monotonic()

@@ -168,7 +168,7 @@
 <div class="flex items-center justify-between">
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Recycle Bin</h1>
-		<p class="mt-2" style="color: var(--color-muted)">
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">
 			Deleted items can be restored or permanently removed.
 		</p>
 	</div>

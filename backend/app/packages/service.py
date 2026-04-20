@@ -118,6 +118,7 @@ async def list_packages(
     db: DatabasePort,
     *,
     set_id: str | None = None,
+    collection_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
@@ -128,6 +129,9 @@ async def list_packages(
     if set_id:
         where_clauses.append("p.set_id = ?")
         params.append(set_id)
+    elif collection_id:
+        where_clauses.append("p.set_id IN (SELECT id FROM sets WHERE collection_id = ?)")
+        params.append(collection_id)
 
     where_sql = " AND ".join(where_clauses)
 

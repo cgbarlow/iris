@@ -3,7 +3,7 @@
 </svelte:head>
 
 <h1 class="text-2xl font-bold" style="color: var(--color-fg)">Administration</h1>
-<p class="mt-2" style="color: var(--color-muted)">System administration and monitoring.</p>
+<p class="mt-1 text-sm" style="color: var(--color-muted)">System administration and monitoring.</p>
 
 <div class="mt-6 grid grid-cols-2 gap-4" style="max-width: 750px">
 	<a

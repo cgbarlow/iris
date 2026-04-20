@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
-	import type { Bookmark, Diagram, Package } from '$lib/types/api';
+	import type { Bookmark, Diagram, Package, IrisSet } from '$lib/types/api';
+	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import SetSelector from '$lib/components/SetSelector.svelte';
 	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
+	import { getActiveCollectionId, setActiveCollection, clearActiveCollection } from '$lib/stores/activeCollection.svelte.js';
 
 	interface ResolvedBookmark {
 		bookmark: Bookmark;
@@ -14,15 +16,35 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let currentSetId = $state(getActiveSetId());
+	let currentCollectionId = $state(getActiveCollectionId());
+	let setCollectionMap = $state<Record<string, string>>({});
+	let setCollectionNameMap = $state<Record<string, string>>({});
 
-	const filteredBookmarks = $derived(
-		currentSetId
-			? bookmarks.filter(
-					({ diagram, pkg }) =>
-						diagram?.set_id === currentSetId || pkg?.set_id === currentSetId,
-				)
-			: bookmarks,
-	);
+	const filteredBookmarks = $derived.by(() => {
+		let result = bookmarks;
+		if (currentSetId) {
+			result = result.filter(
+				({ diagram, pkg }) =>
+					diagram?.set_id === currentSetId || pkg?.set_id === currentSetId,
+			);
+		} else if (currentCollectionId) {
+			result = result.filter(({ diagram, pkg }) => {
+				const sid = diagram?.set_id ?? pkg?.set_id;
+				return sid ? setCollectionMap[sid] === currentCollectionId : false;
+			});
+		}
+		return result;
+	});
+
+	const groupedBookmarks = $derived.by(() => {
+		const groups: Record<string, ResolvedBookmark[]> = {};
+		for (const entry of filteredBookmarks) {
+			const sid = entry.diagram?.set_id ?? entry.pkg?.set_id;
+			const collectionName = sid ? (setCollectionNameMap[sid] ?? 'Uncategorised') : 'Uncategorised';
+			(groups[collectionName] ??= []).push(entry);
+		}
+		return groups;
+	});
 
 	$effect(() => {
 		loadBookmarks();
@@ -32,7 +54,22 @@
 		loading = true;
 		error = null;
 		try {
-			const bms = await apiFetch<Bookmark[]>('/api/bookmarks');
+			const [bms, setsResp] = await Promise.all([
+				apiFetch<Bookmark[]>('/api/bookmarks'),
+				apiFetch<{ items: IrisSet[] }>('/api/sets'),
+			]);
+			// Build set → collection lookups
+			const map: Record<string, string> = {};
+			const nameMap: Record<string, string> = {};
+			for (const s of setsResp.items) {
+				if (s.collection_id) {
+					map[s.id] = s.collection_id;
+					if (s.collection_name) nameMap[s.id] = s.collection_name;
+				}
+			}
+			setCollectionMap = map;
+			setCollectionNameMap = nameMap;
+
 			const resolved = await Promise.all(
 				bms.map(async (b) => {
 					if (b.diagram_id) {
@@ -73,6 +110,17 @@
 		}
 	}
 
+	function handleCollectionChange(collectionId: string) {
+		if (collectionId) {
+			setActiveCollection(collectionId, '');
+		} else {
+			clearActiveCollection();
+		}
+		currentCollectionId = collectionId;
+		currentSetId = '';
+		clearActiveSet();
+	}
+
 	function handleSetChange(setId: string, setName?: string) {
 		if (setId) {
 			setActiveSet(setId, setName ?? '');
@@ -90,9 +138,12 @@
 <div class="flex items-center justify-between">
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Bookmarks</h1>
-		<p class="mt-2" style="color: var(--color-muted)">Your bookmarked diagrams and packages.</p>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Your bookmarked diagrams and packages.</p>
 	</div>
-	<SetSelector value={currentSetId} onchange={handleSetChange} />
+	<div class="flex items-center gap-2">
+		<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
+		<SetSelector value={currentSetId} onchange={handleSetChange} />
+	</div>
 </div>
 
 <div class="mt-4" aria-live="polite">
@@ -103,47 +154,62 @@
 	{:else if bookmarks.length === 0}
 		<p style="color: var(--color-muted)">No bookmarks yet. Bookmark a diagram or package from its detail page.</p>
 	{:else if filteredBookmarks.length === 0}
-		<p style="color: var(--color-muted)">No bookmarks in this set.</p>
+		<p style="color: var(--color-muted)">No bookmarks {currentSetId ? 'in this set' : 'in this collection'}.</p>
 	{:else}
-		<ul class="flex flex-col gap-2">
-			{#each filteredBookmarks as { bookmark, diagram, pkg }}
-				<li class="flex items-center gap-3 rounded border p-3" style="border-color: var(--color-border)">
-					{#if diagram}
-						<a href="/diagrams/{diagram.id}" class="flex-1" style="color: var(--color-primary)">
-							<span class="font-medium">{diagram.name}</span>
-							<span class="ml-2 rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">{diagram.diagram_type}</span>
-							{#if diagram.description}
-								<span class="ml-2 text-sm" style="color: var(--color-muted)">{diagram.description.slice(0, 60)}{diagram.description.length > 60 ? '...' : ''}</span>
-							{/if}
-						</a>
-						<span class="text-xs" style="color: var(--color-muted)">
-							Updated {new Date(diagram.updated_at).toLocaleDateString()}
-						</span>
-					{:else if pkg}
-						<a href="/packages/{pkg.id}" class="flex-1" style="color: var(--color-primary)">
-							<span class="font-medium">{pkg.name}</span>
-							<span class="ml-2 rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">package</span>
-							{#if pkg.description}
-								<span class="ml-2 text-sm" style="color: var(--color-muted)">{pkg.description.slice(0, 60)}{pkg.description.length > 60 ? '...' : ''}</span>
-							{/if}
-						</a>
-						<span class="text-xs" style="color: var(--color-muted)">
-							Updated {new Date(pkg.updated_at).toLocaleDateString()}
-						</span>
-					{:else}
-						<span class="flex-1 text-sm" style="color: var(--color-muted)">
-							{bookmark.diagram_id ? `Diagram ${bookmark.diagram_id}` : `Package ${bookmark.package_id}`} (unavailable)
-						</span>
-					{/if}
-					<button
-						onclick={() => removeBookmark(bookmark)}
-						class="rounded px-3 py-1 text-sm"
-						style="border: 1px solid var(--color-border); color: var(--color-danger)"
-					>
-						Remove
-					</button>
-				</li>
-			{/each}
-		</ul>
+		{#each Object.entries(groupedBookmarks) as [collectionName, items]}
+			<h3 class="mt-5 mb-2 text-sm font-semibold" style="color: var(--color-muted)">{collectionName}</h3>
+			<ul class="flex flex-col gap-2">
+				{#each items as { bookmark, diagram, pkg }}
+					<li class="flex items-center gap-3 rounded border p-3" style="border-color: var(--color-border)">
+						{#if diagram}
+							<a href="/diagrams/{diagram.id}" class="flex-1" style="color: inherit">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="text-sm font-medium" style="color: var(--color-primary)">{diagram.name}</span>
+									<span class="rounded border px-2 py-0.5 text-xs" style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)">
+										diagram · {diagram.diagram_type}
+									</span>
+									{#if diagram.set_name}
+										<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+											{diagram.set_name}
+										</span>
+									{/if}
+								</div>
+								{#if diagram.description}
+									<div class="mt-1 text-xs" style="color: var(--color-muted)">{diagram.description.slice(0, 120)}{diagram.description.length > 120 ? '...' : ''}</div>
+								{/if}
+							</a>
+						{:else if pkg}
+							<a href="/packages/{pkg.id}" class="flex-1" style="color: inherit">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="text-sm font-medium" style="color: var(--color-primary)">{pkg.name}</span>
+									<span class="rounded border px-2 py-0.5 text-xs" style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)">
+										package
+									</span>
+									{#if pkg.set_name}
+										<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+											{pkg.set_name}
+										</span>
+									{/if}
+								</div>
+								{#if pkg.description}
+									<div class="mt-1 text-xs" style="color: var(--color-muted)">{pkg.description.slice(0, 120)}{pkg.description.length > 120 ? '...' : ''}</div>
+								{/if}
+							</a>
+						{:else}
+							<span class="flex-1 text-sm" style="color: var(--color-muted)">
+								{bookmark.diagram_id ? `Diagram ${bookmark.diagram_id}` : `Package ${bookmark.package_id}`} (unavailable)
+							</span>
+						{/if}
+						<button
+							onclick={() => removeBookmark(bookmark)}
+							class="rounded px-3 py-1 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-danger)"
+						>
+							Remove
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/each}
 	{/if}
 </div>
