@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.2] - 2026-04-20
+
+### Fixed
+- **Knowledge graph collections now repel each other as whole clusters** — restores the "galaxy" effect where each collection (with all its sets, packages, diagrams, and elements) acts as a cohesive mass repelling other collections through every tier of its member hierarchy. ADR-118's gating confined cross-collection separation to the centroid-level collection layer only, so collection bboxes could still visually mingle when inner clusters were wide. ADR-119's first cut kept that gating; this follow-up ungates the inner `1/dist²` layers so set- and package-level repulsion fires across collections as well as within. Self-decay at `1/dist²` and linear spread scaling keep the added cross-layer force from compounding into the pre-ADR-118 "loses the plot at spread=3" explosion (ADR-119, SPEC-119-A)
+
 ## [4.0.1] - 2026-04-20
 
 ### Fixed

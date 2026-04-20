@@ -34,8 +34,33 @@ orphan-set contract and top-level compactness is a deliberate design choice.
 | Layer | SPEC-118-A shape | SPEC-119-A shape | Strength base | Target dist | Spread applied to | Gate |
 |---|---|---|---|---|---|---|
 | **Collection** | Bidirectional, clamp `[-0.2, 1]` | **Unchanged** | `80` | `400 × spread` | `targetDist` | _ungated_ |
-| **Set** | Bidirectional, clamp `[-0.2, 1]` | **`1/dist²` self-decay, repulsion only** | `50` | n/a | `strength` → `50 × spread` | `setToCol(a) === setToCol(b)` |
-| **Root-package** | Bidirectional, clamp `[-0.2, 1]` | **`1/dist²` self-decay, repulsion only** | `30` | n/a | `strength` → `30 × spread` | `pkgToCol(a) === pkgToCol(b)` |
+| **Set** | Bidirectional, clamp `[-0.2, 1]` | **`1/dist²` self-decay, repulsion only** | `50` | n/a | `strength` → `50 × spread` | _ungated_ — see "Galaxy effect" below |
+| **Root-package** | Bidirectional, clamp `[-0.2, 1]` | **`1/dist²` self-decay, repulsion only** | `30` | n/a | `strength` → `30 × spread` | _ungated_ — see "Galaxy effect" below |
+
+### Galaxy effect (ungating cross-collection force)
+
+Set and root-package separation fire between **all** pairs of centroids,
+including pairs whose centroids belong to different collections. This is a
+deliberate departure from SPEC-118-A's gating, made safe by two changes
+ADR-119 retains:
+
+1. **Self-decay** — `1/dist²` attenuates rapidly with distance. Cross-collection
+   pairs are typically far apart, so the added force is small but non-zero.
+   Within-collection pairs are close, so the force is large and still does
+   its job.
+2. **Linear spread scaling** — there is no `s³` cubic amplification at
+   spread = 3.0, so the summed cross-layer force cannot blow up the way
+   pre-ADR-118 did.
+
+The net effect is the "cluster" or "galaxy" separation users expect: each
+collection, including all its sets, packages, diagrams, and elements,
+behaves as a loose cohesive mass that repels other collections through
+every tier of its member hierarchy — not just through its centroid. With
+the inner layers gated (as they were in the first ADR-119 draft), the
+collection-layer bidirectional force only moves the *centroid*, and
+inner-cluster bbox overlap is still possible when member clusters are
+wide. Ungating the inner layers adds the member-to-member cross-collection
+repulsion that opens the visible gaps between collection bboxes.
 
 ### `applySeparation` contract
 
@@ -82,20 +107,21 @@ applySeparation(
     colCentroids, nodeCollectionMap, 80, 400 * spread, 'bidirectional',
 );
 
-// 2. Set layer — inverseSq, spread folded into strength.
+// 2. Set layer — inverseSq, spread folded into strength, UNGATED.
 applySeparation(
-    setCentroids, nodeSetFull, 50 * spread, 0, 'inverseSq', setGate,
+    setCentroids, nodeSetFull, 50 * spread, 0, 'inverseSq',
 );
 
-// 3. Root-package layer — inverseSq, spread folded into strength.
+// 3. Root-package layer — inverseSq, spread folded into strength, UNGATED.
 applySeparation(
-    pkgCentroids, nodeRootPkgMap, 30 * spread, 0, 'inverseSq', pkgGate,
+    pkgCentroids, nodeRootPkgMap, 30 * spread, 0, 'inverseSq',
 );
 ```
 
 Passing `targetDist: 0` at the `inverseSq` call sites is a deliberate
 unused-parameter convention so the argument-position order stays uniform
-across all three calls — easier to read than overloads.
+across all three calls — easier to read than overloads. The inner layers
+omit the `sameOuterGroup` gate entirely (see "Galaxy effect" below).
 
 ### Why `1/dist²` at inner layers
 
@@ -130,17 +156,20 @@ Across the slider's range:
 
 ### What stays from SPEC-118-A
 
-- **Hierarchical gating** at the set and package layers (cross-collection
-  repulsion fires **only** at the collection layer).
-- **Orphan-set contract**: nodes whose set has no `collection_membership`
-  edge get a synthetic `__orphan_<sid>` collection-layer group so the
-  collection-layer pull-back binds them.
-- **`pkgToCol` gating**: packages inside an orphan set group by
-  `__orphan_<sid>` (shared across the set's packages, so package-layer
-  separation fires within the orphan set); unparented hierarchy nodes get
-  `__orphan_no_set_<pid>`.
+- **Collection-layer pull-back** anchors the orphan-set `__orphan_<sid>`
+  contract — nodes whose set has no `collection_membership` edge still get
+  a synthetic collection group so the collection-layer bidirectional force
+  binds them.
 - **Flat cohesion** `0.03 * alpha`.
 - **`VITE_IRIS_DEBUG` probe hook** exposing `window.__irisGraph`.
+
+### What changes from SPEC-118-A
+
+- Inner-layer gating (the `sameOuterGroup` predicates `setToCol` /
+  `pkgToCol`) is **removed** — set and root-package separation now fire
+  cross-collection as well as within-collection. See "Galaxy effect"
+  above. The orphan-set `__orphan_<sid>` synthetic group remains only at
+  the collection layer.
 
 ## Regression test
 
