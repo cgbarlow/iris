@@ -409,18 +409,29 @@
 					return centroids;
 				}
 
-				// Bidirectional target-distance separator (SPEC-118-A).
-				// dist < target → push at full strength (overlap ∈ (0, 1]).
-				// dist > target → pull at 20% strength, floor at -0.2 so the charge
-				// force still dominates at long range and layout cannot collapse.
-				// Optional sameOuterGroup predicate gates the force to within a
-				// shared outer grouping (cross-collection skipped above the
-				// collection layer) — see ADR-118.
+				// Per-layer separation force (SPEC-118-A + SPEC-119-A). Two
+				// modes share the pair loop, gating predicate, and unit-vector
+				// application — only the push scalar differs:
+				//   • 'bidirectional' (SPEC-118-A): target-distance force with
+				//     -0.2 pull-back floor past target. Used at the COLLECTION
+				//     layer — top-level compactness is a deliberate design
+				//     choice and the pull-back anchors the orphan-set
+				//     __orphan_<sid> contract.
+				//   • 'inverseSq' (SPEC-119-A): self-decaying 1/dist² pure
+				//     repulsion with no fixed target. Used at the SET and
+				//     ROOT-PACKAGE layers because cluster equilibrium radius
+				//     is data-driven — charge balance decides the spacing
+				//     and the force self-decays at long range. Removes the
+				//     density assumption baked into a fixed target distance;
+				//     works whether a set has 5 members or 500.
+				// Optional sameOuterGroup predicate gates cross-group firing
+				// (cross-collection skipped above the collection layer).
 				function applySeparation(
 					centroids: Map<string, Centroid>,
 					nodeGroupMap: Map<string, string>,
 					strength: number,
 					targetDist: number,
+					mode: 'bidirectional' | 'inverseSq',
 					sameOuterGroup?: (aId: string, bId: string) => boolean,
 				) {
 					const entries = [...centroids.entries()];
@@ -434,9 +445,14 @@
 							const dx = a.x - b.x;
 							const dy = a.y - b.y;
 							const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-							const rawOverlap = (targetDist - dist) / targetDist;
-							const overlap = Math.max(-0.2, Math.min(1, rawOverlap));
-							const push = strength * alpha * overlap;
+							let push: number;
+							if (mode === 'bidirectional') {
+								const rawOverlap = (targetDist - dist) / targetDist;
+								const overlap = Math.max(-0.2, Math.min(1, rawOverlap));
+								push = strength * alpha * overlap;
+							} else {
+								push = (strength * alpha) / (dist * dist);
+							}
 							const fx = (dx / dist) * push;
 							const fy = (dy / dist) * push;
 							for (const n of graphData.nodes) {
@@ -478,27 +494,37 @@
 					}
 				}
 
-				// 1. Collection separation — applies between all collection pairs
-				// (ungated: cross-collection separation happens only at this layer).
+				// 1. Collection separation — bidirectional target-distance
+				// (unchanged from SPEC-118-A). Fires between all collection
+				// pairs; cross-collection separation happens only at this
+				// layer. Pull-back anchors the orphan-set __orphan_<sid>
+				// contract.
 				if (nodeCollectionMap.size > 0) {
 					const colCentroids = computeCentroids(nodeCollectionMap);
 					if (colCentroids.size > 1) {
-						applySeparation(colCentroids, nodeCollectionMap, 80, 400 * spread);
+						applySeparation(
+							colCentroids, nodeCollectionMap,
+							80, 400 * spread, 'bidirectional',
+						);
 					}
 				}
 
-				// 2. Set separation — gated to within a collection. Cross-collection
-				// set separation is already handled by the collection layer above.
+				// 2. Set separation — inverseSq self-decay (SPEC-119-A).
+				// No fixed target: charge balance decides cluster spacing,
+				// so the layout is data-independent. Strength scales linearly
+				// with spread so the slider still controls overall spread.
+				// Gated to within a collection.
 				const setCentroids = computeCentroids(nodeSetFull);
 				if (setCentroids.size > 1) {
 					const setToCol = (sid: string) => setCollectionMap.get(sid) ?? `__orphan_${sid}`;
 					applySeparation(
-						setCentroids, nodeSetFull, 50, 150 * spread,
+						setCentroids, nodeSetFull, 50 * spread, 0, 'inverseSq',
 						(aId, bId) => setToCol(aId) === setToCol(bId),
 					);
 				}
 
-				// 3. Root-package separation — gated to within a collection.
+				// 3. Root-package separation — inverseSq self-decay
+				// (SPEC-119-A). Same rationale as set layer.
 				let pkgCentroids: Map<string, Centroid> | null = null;
 				if (nodeRootPkgMap.size > 0) {
 					pkgCentroids = computeCentroids(nodeRootPkgMap);
@@ -512,7 +538,7 @@
 							return setCollectionMap.get(sid) ?? `__orphan_${sid}`;
 						};
 						applySeparation(
-							pkgCentroids, nodeRootPkgMap, 30, 80 * spread,
+							pkgCentroids, nodeRootPkgMap, 30 * spread, 0, 'inverseSq',
 							(aId, bId) => pkgToCol(aId) === pkgToCol(bId),
 						);
 					}

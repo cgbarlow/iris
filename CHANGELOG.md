@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-04-20
+
+### Fixed
+- **Knowledge graph cluster collapse on large single-collection datasets** — at UAT scale (observed on "DoView Strategy Models": 11 sets × 60 packages × 639 diagrams, 711 nodes) the bidirectional target-distance separator at the set and root-package layers introduced by ADR-118 compressed all per-set diagram clusters to within ±100 px of the graph centre, because a fixed target distance of `150 × spread` px assumed a cluster density that dense data violates. Reverted the force shape at the set and root-package layers to self-decaying `1/dist²` pure repulsion — cluster equilibrium radius is now set by charge balance, so the layout adapts to whatever density the data has (5 members or 500). Collection layer keeps its bidirectional pull-back (anchors the orphan-set contract). Regression captured as a Playwright page.route fixture of the real UAT /api/graph response so the test is fast, deterministic, and CI-friendly (ADR-119, SPEC-119-A)
+
 ## [4.0.0] - 2026-04-20
 
 ### Added
