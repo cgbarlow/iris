@@ -405,25 +405,40 @@
 					return centroids;
 				}
 
-				function applySeparation(centroids: Map<string, Centroid>, nodeGroupMap: Map<string, string>, strength: number) {
+				// Bidirectional target-distance separator (SPEC-118-A).
+				// dist < target → push at full strength (overlap ∈ (0, 1]).
+				// dist > target → pull at 20% strength, floor at -0.2 so the charge
+				// force still dominates at long range and layout cannot collapse.
+				// Optional sameOuterGroup predicate gates the force to within a
+				// shared outer grouping (cross-collection skipped above the
+				// collection layer) — see ADR-118.
+				function applySeparation(
+					centroids: Map<string, Centroid>,
+					nodeGroupMap: Map<string, string>,
+					strength: number,
+					targetDist: number,
+					sameOuterGroup?: (aId: string, bId: string) => boolean,
+				) {
 					const entries = [...centroids.entries()];
-					const sep = strength * alpha;
 					for (let i = 0; i < entries.length; i++) {
 						for (let j = i + 1; j < entries.length; j++) {
-							const a = entries[i][1];
-							const b = entries[j][1];
-							let dx = a.x - b.x;
-							let dy = a.y - b.y;
-							const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-							const force = sep / dist;
-							dx *= force / dist;
-							dy *= force / dist;
 							const aId = entries[i][0];
 							const bId = entries[j][0];
+							if (sameOuterGroup && !sameOuterGroup(aId, bId)) continue;
+							const a = entries[i][1];
+							const b = entries[j][1];
+							const dx = a.x - b.x;
+							const dy = a.y - b.y;
+							const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+							const rawOverlap = (targetDist - dist) / targetDist;
+							const overlap = Math.max(-0.2, Math.min(1, rawOverlap));
+							const push = strength * alpha * overlap;
+							const fx = (dx / dist) * push;
+							const fy = (dy / dist) * push;
 							for (const n of graphData.nodes) {
 								const gid = nodeGroupMap.get(n.id);
-								if (gid === aId) { n.vx += dx; n.vy += dy; }
-								else if (gid === bId) { n.vx -= dx; n.vy -= dy; }
+								if (gid === aId) { n.vx += fx; n.vy += fy; }
+								else if (gid === bId) { n.vx -= fx; n.vy -= fy; }
 							}
 						}
 					}
@@ -459,32 +474,46 @@
 					}
 				}
 
-				// 1. Collection separation (strong — pushes entire collections apart)
-				const s3 = spread * spread * spread;
+				// 1. Collection separation — applies between all collection pairs
+				// (ungated: cross-collection separation happens only at this layer).
 				if (nodeCollectionMap.size > 0) {
 					const colCentroids = computeCentroids(nodeCollectionMap);
 					if (colCentroids.size > 1) {
-						applySeparation(colCentroids, nodeCollectionMap, 80 * s3);
+						applySeparation(colCentroids, nodeCollectionMap, 80, 400 * spread);
 					}
 				}
 
-				// 2. Set separation (moderate — pushes sets apart within/across collections)
+				// 2. Set separation — gated to within a collection. Cross-collection
+				// set separation is already handled by the collection layer above.
 				const setCentroids = computeCentroids(nodeSetFull);
 				if (setCentroids.size > 1) {
-					applySeparation(setCentroids, nodeSetFull, 50 * s3);
+					const setToCol = (sid: string) => setCollectionMap.get(sid) ?? `__orphan_${sid}`;
+					applySeparation(
+						setCentroids, nodeSetFull, 50, 150 * spread,
+						(aId, bId) => setToCol(aId) === setToCol(bId),
+					);
 				}
 
-				// 3. Root-package separation (within a set, pushes package subtrees apart)
+				// 3. Root-package separation — gated to within a collection.
 				let pkgCentroids: Map<string, Centroid> | null = null;
 				if (nodeRootPkgMap.size > 0) {
 					pkgCentroids = computeCentroids(nodeRootPkgMap);
 					if (pkgCentroids.size > 1) {
-						applySeparation(pkgCentroids, nodeRootPkgMap, 30 * s3);
+						const pkgToCol = (pid: string) => {
+							const sid = nodeSetMap.get(pid);
+							if (!sid) return `__orphan_${pid}`;
+							return setCollectionMap.get(sid) ?? `__orphan_${pid}`;
+						};
+						applySeparation(
+							pkgCentroids, nodeRootPkgMap, 30, 80 * spread,
+							(aId, bId) => pkgToCol(aId) === pkgToCol(bId),
+						);
 					}
 				}
 
-				// 4. Cohesion: pull each node toward its finest-level cluster centroid
-				const cohesion = (0.03 / Math.max(spread, 0.2)) * alpha;
+				// 4. Cohesion: pull each node toward its finest-level cluster centroid.
+				// Flat (not inverse-spread): keeps cohesion stable as spread grows.
+				const cohesion = 0.03 * alpha;
 				for (const n of graphData.nodes) {
 					// Prefer root-package cohesion, fall back to set
 					const rpid = nodeRootPkgMap.get(n.id);

@@ -88,20 +88,34 @@ second half of the "lose the plot" failure mode.
 
 ### Target-distance constants
 
-Constants are empirically chosen from the probe runs in
-`frontend/tests/probes/`. The candidate scales compared are the original
-baseline (1×) and a widened scale (3×):
+Constants are empirically chosen from probe runs against the regression-test
+seed shape (3 collections × 3 sets × 4 root packages × 3 children × 2
+grandchildren ≈ 336 hierarchy nodes). The candidate scales compared are the
+original baseline (1×) and a widened scale (3×):
 
 | Name | 1× (baseline) | 3× (widened candidate) | Chosen (ADR-118) |
 |---|---|---|---|
-| `TARGET_COLLECTION` | 400 | 1200 | **_TBD — filled in from probe run in Commit 3_** |
-| `TARGET_SET` | 150 | 450 | **_TBD_** |
-| `TARGET_PACKAGE` | 80 | 240 | **_TBD_** |
+| `TARGET_COLLECTION` | 400 | 1200 | **400 (1×)** |
+| `TARGET_SET` | 150 | 450 | **150 (1×)** |
+| `TARGET_PACKAGE` | 80 | 240 | **80 (1×)** |
 
-Selection criteria: see § Acceptance Criteria below. The chosen values are
-codified as bare numeric literals in the `applySeparation` calls — they are
-small enough and load-bearing enough that a named constant would only obscure
-the relationship to the strength coefficients.
+**Empirical justification (from `knowledge-graph-spread.spec.ts` runs):**
+
+| Variant | bbox area ratio (3.0 / 0.2) | mean inter-col ratio | Passes regression thresholds |
+|---|---|---|---|
+| Pre-ADR-118 (cubic `s³`, unbounded 1/dist²) | ≈ 6.6× | ≈ 2.4× | ✓ (but qualitative chaos — see probes) |
+| Fix + 3× targets {1200, 450, 240} | ≈ 77× | ≈ 15× | ✗ (bbox ratio blows past 50× threshold) |
+| **Fix + 1× targets {400, 150, 80}** | ≈ 9× | ≈ 20× | **✓** |
+
+3× targets over-expand the layout at the spread-slider extremes, producing
+bbox area ratios an order of magnitude larger than the 1× variant. The 1×
+variant keeps the ratio close to the baseline's level while also smoothing
+the transitional chaos reported in the UI probe — both criteria met.
+
+The chosen values are codified as bare numeric literals in the
+`applySeparation` calls — they are small enough and load-bearing enough that
+a named constant would only obscure the relationship to the strength
+coefficients.
 
 ## Probe hook (`VITE_IRIS_DEBUG`)
 
