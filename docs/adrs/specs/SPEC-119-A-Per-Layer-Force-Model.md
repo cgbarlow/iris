@@ -181,6 +181,39 @@ After a 15-second simulation settle at `spread=1.0`:
 Both assertions are relative — no absolute pixel bounds sensitive to
 verlet nondeterminism across machines.
 
+## Amendment to the SPEC-118-A regression test
+
+The SPEC-118-A multi-collection spread-slider test
+(`knowledge-graph-spread.spec.ts`, multi-collection describe block) asserts
+three invariants at `spread=3.0`. Assertion #3 originally required that
+every pair of collection bboxes be disjoint on at least one axis — a
+property that implicitly assumed **bounded** inner cluster radii (which
+the bidirectional target-distance separator at set and pkg layers
+provided). With the SPEC-119-A change to `1/dist²` self-decay at those
+inner layers, cluster radii are no longer bounded: at `spread=3.0` on the
+ADR-118 regression seed, each collection's inner hierarchy expands wide
+enough that bboxes legitimately overlap in 2D even though their centroids
+are well-separated. The bbox-disjoint invariant is no longer a reliable
+regression guard under the new model.
+
+Assertion #3 is therefore replaced with two principled centroid-geometry
+checks. The SPEC-118-A document remains immutable; the change lives in
+the test file and is tracked here:
+
+- **Max pair centroid distance at spread=3 ≥ 800 px** — the collection
+  layer must produce a visibly spread layout (catches global collapse).
+- **Min pair centroid distance at spread=3 ≥ 100 px** — no two
+  collections may coincide (catches partial collapse).
+
+Assertions #1 (`bbox area ratio bounded < 50×` across 0.2 → 3.0) and #2
+(mean inter-collection distance monotonic non-decreasing) are unchanged.
+Their invariants do not depend on inner cluster bounds — they test slider
+behaviour across the full 0.2–3.0 range, which remains valid.
+
+The SPEC-118-A orphan-set hysteresis test (assertion: orphan-set centroid
+magnitude stays within `3 × max(|collection centroid|) + 800 px`) is
+unchanged and continues to pass.
+
 ## Out of scope
 
 - Tuning the inner-layer strength constants `{50, 30}`. They carry over

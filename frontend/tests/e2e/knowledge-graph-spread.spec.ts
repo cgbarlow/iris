@@ -318,21 +318,35 @@ test.describe('Knowledge graph — multi-collection spread slider (ADR-118)', ()
 			`mean inter-collection distance at spread=3.0 should not be less than at 1.0`,
 		).toBeGreaterThanOrEqual(mid.mean_inter_col);
 
-		// #3 — no pair of collection bboxes overlap at spread=3.0.
+		// #3 — at spread=3 the collection layer must produce a spread
+		// layout (MAX pair distance ≥ 800 px) and no two collection
+		// centroids may coincide (MIN pair distance ≥ 100 px).
+		// SPEC-119-A supersedes SPEC-118-A's "bbox disjoint at spread=3"
+		// assertion: with data-independent inner layers (1/dist² self-
+		// decay), inner cluster radii are no longer bounded by the set/pkg
+		// target constants, so bboxes can legitimately overlap at max
+		// spread when clusters are dense. Instead we check centroid
+		// geometry — tolerating the simulation-time variance that makes
+		// the 3-collection triangle non-regular across runs, while still
+		// catching a genuine collection-layer collapse.
+		const pairDists: number[] = [];
 		for (let i = 0; i < high.collections.length; i++) {
 			for (let j = i + 1; j < high.collections.length; j++) {
 				const a = high.collections[i];
 				const b = high.collections[j];
-				const dx = Math.abs(a.cx - b.cx);
-				const dy = Math.abs(a.cy - b.cy);
-				const sepX = dx - (a.w + b.w) / 2;
-				const sepY = dy - (a.h + b.h) / 2;
-				expect(
-					Math.max(sepX, sepY),
-					`collection bboxes ${a.id.slice(0, 8)} and ${b.id.slice(0, 8)} must be disjoint on at least one axis at spread=3.0`,
-				).toBeGreaterThan(0);
+				pairDists.push(Math.hypot(a.cx - b.cx, a.cy - b.cy));
 			}
 		}
+		const maxPair = Math.max(...pairDists);
+		const minPair = Math.min(...pairDists);
+		expect(
+			maxPair,
+			`max collection-centroid pair distance at spread=3 must exceed 800 px — the collection layer must produce a visibly spread layout. Got ${maxPair.toFixed(0)} px (all pairs: ${pairDists.map((d) => d.toFixed(0)).join(', ')}).`,
+		).toBeGreaterThan(800);
+		expect(
+			minPair,
+			`min collection-centroid pair distance at spread=3 must exceed 100 px — no two collections may coincide. Got ${minPair.toFixed(0)} px.`,
+		).toBeGreaterThan(100);
 	});
 
 	test('orphan set (no collection) stays bounded under spread sweep', async ({
