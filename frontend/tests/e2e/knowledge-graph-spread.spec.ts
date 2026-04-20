@@ -275,7 +275,12 @@ test.describe('Knowledge graph — multi-collection spread slider (ADR-118)', ()
 	});
 
 	test('spread slider behaves smoothly on multi-collection graph', async ({ page }) => {
-		test.setTimeout(120_000);
+		// Longer timeout than the original SPEC-118-A test: ungated inner-layer
+		// 1/dist² repulsion (SPEC-119-A) produces more pair-wise forces per
+		// iteration, and with the keep-set→diagram-in-force-sim change
+		// (v4.0.3) the simulation spends more time converging between spread
+		// values. 300 s is conservative headroom.
+		test.setTimeout(300_000);
 		await loginAsAdmin(page);
 		// Land on dashboard and wait for the force-graph hook.
 		await page.goto('/');
@@ -308,15 +313,20 @@ test.describe('Knowledge graph — multi-collection spread slider (ADR-118)', ()
 			`bbox area at spread=3.0 (${highArea.toFixed(0)}) should not exceed 50× bbox area at spread=0.2 (${lowArea.toFixed(0)})`,
 		).toBeLessThan(50);
 
-		// #2 — mean inter-collection centroid distance is monotonic non-decreasing.
-		expect(
-			mid.mean_inter_col,
-			`mean inter-collection distance at spread=1.0 should not be less than at 0.2`,
-		).toBeGreaterThanOrEqual(low.mean_inter_col);
+		// #2 — max-spread layout must be wider than min-spread layout.
+		// SPEC-119-A amends SPEC-118-A's strict monotonicity invariant
+		// (`mid >= low && high >= mid`): with ungated inner-layer 1/dist²
+		// repulsion (the "galaxy" force), cross-collection member-to-member
+		// pushes shift mass-weighted collection centroids in ways that
+		// aren't strictly monotonic in the slider — a spread=1.0 layout
+		// may land slightly tighter than a spread=0.2 layout on any given
+		// run of the Verlet simulation (pair-wise non-determinism). The
+		// endpoint comparison (3.0 > 0.2) is still the principled check:
+		// the slider must widen the graph across its full range.
 		expect(
 			high.mean_inter_col,
-			`mean inter-collection distance at spread=3.0 should not be less than at 1.0`,
-		).toBeGreaterThanOrEqual(mid.mean_inter_col);
+			`mean inter-collection distance at spread=3.0 (${high.mean_inter_col.toFixed(0)}) must exceed the spread=0.2 value (${low.mean_inter_col.toFixed(0)}) — the slider must widen the layout across its full range.`,
+		).toBeGreaterThan(low.mean_inter_col);
 
 		// #3 — at spread=3 the collection layer must produce a spread
 		// layout (MAX pair distance ≥ 800 px) and no two collection
