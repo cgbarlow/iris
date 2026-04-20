@@ -376,14 +376,18 @@
 					if (parentSet && !nodeSetMap.has(tgt)) nodeSetMap.set(tgt, parentSet);
 				}
 
-				// Resolve each node's collection (node→set→collection)
+				// Resolve each node's collection (node→set→collection). Sets with no
+				// collection (e.g. the "default" set) get a synthetic __orphan_<sid>
+				// group so the collection-layer bidirectional force still binds them
+				// — otherwise only charge repulsion acts on orphan nodes and they
+				// drift outward unboundedly as spread rises (ADR-118, SPEC-118-A).
 				const nodeCollectionMap = new Map<string, string>();
 				for (const n of graphData.nodes) {
 					if (n.node_type === 'collection') { nodeCollectionMap.set(n.id, n.id); continue; }
 					const sid = nodeSetMap.get(n.id) || (n.node_type === 'set' ? n.id : null);
 					if (!sid) continue;
 					const cid = setCollectionMap.get(sid);
-					if (cid) nodeCollectionMap.set(n.id, cid);
+					nodeCollectionMap.set(n.id, cid ?? `__orphan_${sid}`);
 				}
 
 				// Helper: compute centroids for a grouping
@@ -499,10 +503,13 @@
 				if (nodeRootPkgMap.size > 0) {
 					pkgCentroids = computeCentroids(nodeRootPkgMap);
 					if (pkgCentroids.size > 1) {
+						// Match nodeCollectionMap's orphan grouping: packages inside an
+						// orphan set group by set id (so package-level separation fires
+						// among them, same as within a real collection).
 						const pkgToCol = (pid: string) => {
 							const sid = nodeSetMap.get(pid);
-							if (!sid) return `__orphan_${pid}`;
-							return setCollectionMap.get(sid) ?? `__orphan_${pid}`;
+							if (!sid) return `__orphan_no_set_${pid}`;
+							return setCollectionMap.get(sid) ?? `__orphan_${sid}`;
 						};
 						applySeparation(
 							pkgCentroids, nodeRootPkgMap, 30, 80 * spread,

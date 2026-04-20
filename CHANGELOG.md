@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **AI discuss crash** — added missing `mode` and `thread_id` columns to `ai_conversations` table (SQLite migration m033)
 - **Knowledge graph spread slider on multi-collection views** — replaced the cubic `spread³` cluster force with a bidirectional target-distance separator, gated set- and root-package-level separation to within a single collection, and removed the inverse-spread cohesion decay; the `node_spacing` slider now behaves predictably across its full 0.2–3.0 range instead of "losing the plot" at the extremes (ADR-118)
+- **Knowledge graph orphan-set drift** — sets with no collection (e.g. the "default" set) now participate in the collection-layer force under a synthetic `__orphan_<sid>` group, so the bidirectional separator pulls them back when farther than target. Previously these nodes had no collection-layer force at all and ratcheted outward under charge repulsion each time the spread slider rose (ADR-118, SPEC-118-A)
 
 ## [3.0.0] - 2026-03-25
 

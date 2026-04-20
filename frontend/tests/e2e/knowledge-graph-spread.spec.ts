@@ -29,6 +29,7 @@ type Metrics = {
 	bbox_h: number;
 	mean_inter_col: number;
 	collections: Array<{ id: string; cx: number; cy: number; w: number; h: number }>;
+	orphanCentroid: { cx: number; cy: number; count: number } | null;
 };
 
 async function setSpread(page: Page, value: number): Promise<void> {
@@ -170,11 +171,34 @@ async function readMetrics(page: Page): Promise<Metrics> {
 				? interCol.reduce((s, v) => s + v, 0) / interCol.length
 				: 0;
 
+		// Orphan-set centroid: aggregate of nodes whose resolved set has no
+		// collection_membership edge. Exercises the SPEC-118-A orphan-set
+		// contract — without the __orphan_<sid> synthetic collection grouping,
+		// these nodes have no collection-layer force and drift unboundedly.
+		let orphanSx = 0;
+		let orphanSy = 0;
+		let orphanN = 0;
+		for (const n of nodes) {
+			let sid: string | undefined;
+			if (n.node_type === 'set') sid = n.id;
+			else sid = nodeToSet.get(n.id);
+			if (!sid) continue;
+			if (setToCol.has(sid)) continue;
+			orphanSx += n.x;
+			orphanSy += n.y;
+			orphanN++;
+		}
+		const orphanCentroid =
+			orphanN > 0
+				? { cx: orphanSx / orphanN, cy: orphanSy / orphanN, count: orphanN }
+				: null;
+
 		return {
 			bbox_w: maxX - minX,
 			bbox_h: maxY - minY,
 			mean_inter_col: meanInter,
 			collections,
+			orphanCentroid,
 		};
 	})) as Metrics;
 }
@@ -225,6 +249,27 @@ test.describe('Knowledge graph — multi-collection spread slider (ADR-118)', ()
 						}
 					}
 				}
+			}
+		}
+
+		// Orphan set: no collection_id. Exercises SPEC-118-A orphan-set
+		// contract. Without the collection-layer __orphan_<sid> binding,
+		// these nodes have no counter-force against charge repulsion and
+		// drift unboundedly outward as spread rises.
+		const orphanSet = await createSet(undefined, token, {
+			name: `${TAG}-orphan-default`,
+		});
+		for (let pi = 0; pi < 4; pi++) {
+			const root = await createPackage(undefined, token, {
+				name: `${TAG}-orphan-pkg${pi}`,
+				set_id: orphanSet.id as string,
+			});
+			for (let chi = 0; chi < 2; chi++) {
+				await createPackage(undefined, token, {
+					name: `${TAG}-orphan-pkg${pi}-c${chi}`,
+					set_id: orphanSet.id as string,
+					parent_package_id: root.id as string,
+				});
 			}
 		}
 	});
@@ -288,5 +333,56 @@ test.describe('Knowledge graph — multi-collection spread slider (ADR-118)', ()
 				).toBeGreaterThan(0);
 			}
 		}
+	});
+
+	test('orphan set (no collection) stays bounded under spread sweep', async ({
+		page,
+	}) => {
+		// Regression for the orphan-set drift bug observed on
+		// feature/knowledge-graph after ADR-118 landed: a set with
+		// collection_id=NULL (the "default" set) received no collection-layer
+		// force and drifted outward unboundedly as spread oscillated. Fix:
+		// orphan sets join the collection-layer force under a synthetic
+		// __orphan_<sid> group so the bidirectional target-distance separator
+		// pulls them back when farther than target.
+		test.setTimeout(180_000);
+		await loginAsAdmin(page);
+		await page.goto('/');
+		await page.waitForFunction(
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			() => !!(window as any).__irisGraph,
+			{ timeout: 20_000 },
+		);
+		await page.waitForTimeout(SETTLE_MS);
+
+		// Up-down-up hysteresis sweep. Pre-fix the orphan set ratchets outward
+		// with each rise and fails to retract on drop; post-fix it is bound to
+		// a neighborhood of the collection cluster by the collection-layer
+		// force.
+		await setSpread(page, 3.0);
+		await setSpread(page, 0.2);
+		await setSpread(page, 3.0);
+		const m = await readMetrics(page);
+
+		expect(m.orphanCentroid, 'orphan set must be present in seed').not.toBeNull();
+		expect(m.collections.length).toBeGreaterThanOrEqual(2);
+
+		// Orphan centroid should sit within the same neighbourhood as the real
+		// collection centroids — not far outside them. Compare against the
+		// farthest collection centroid magnitude plus a verlet-noise slack. At
+		// spread=3.0 the collection-layer target is 400·3 = 1200, so a healthy
+		// orphan sits ≤ ~1.5× the outermost collection; we allow 3× + 800 for
+		// headroom while still catching the unbounded-drift regression.
+		const maxColMag = Math.max(
+			...m.collections.map((c) => Math.sqrt(c.cx * c.cx + c.cy * c.cy)),
+		);
+		const orphanMag = Math.sqrt(
+			m.orphanCentroid!.cx * m.orphanCentroid!.cx +
+				m.orphanCentroid!.cy * m.orphanCentroid!.cy,
+		);
+		expect(
+			orphanMag,
+			`orphan-set centroid magnitude (${orphanMag.toFixed(0)}) after up-down-up sweep must stay within 3× the farthest collection centroid magnitude (${maxColMag.toFixed(0)}) + 800 slack. Unbounded growth indicates the orphan set is missing collection-layer binding (SPEC-118-A).`,
+		).toBeLessThan(maxColMag * 3 + 800);
 	});
 });
