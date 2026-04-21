@@ -31,6 +31,22 @@ async def get_current_user(request: Request) -> dict[str, Any]:
     return await _get_current_user_sqlite(request, token)
 
 
+async def get_optional_user(request: Request) -> dict[str, Any] | None:
+    """Return the authenticated user if a valid token is present.
+
+    Returns None when no Authorization header is sent — the caller is
+    treated as anonymous (ADR-123 / SPEC-123-A).
+
+    A *present-but-invalid* token still raises 401. Anonymous is the
+    absence of credentials, not a signal that bad credentials should
+    be tolerated. Read endpoints use this dependency; write endpoints
+    and admin routers keep using get_current_user.
+    """
+    if not request.headers.get("Authorization"):
+        return None
+    return await get_current_user(request)
+
+
 async def _get_current_user_sqlite(
     request: Request,
     token: str,

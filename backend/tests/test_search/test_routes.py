@@ -62,10 +62,21 @@ async def _admin_headers(client: httpx.AsyncClient) -> dict[str, str]:
 class TestSearchEndpoint:
     """Verify the search API."""
 
-    async def test_search_requires_auth(
+    async def test_search_allows_anonymous(
         self, client: httpx.AsyncClient,
     ) -> None:
+        """Search is public-readable (ADR-123). Anonymous returns 200, not 401."""
         resp = await client.get("/api/search?q=test")
+        assert resp.status_code == 200
+
+    async def test_search_rejects_invalid_token(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """A *present-but-invalid* token still returns 401 (SPEC-123-A)."""
+        resp = await client.get(
+            "/api/search?q=test",
+            headers={"Authorization": "Bearer not-a-real-token"},
+        )
         assert resp.status_code == 401
 
     async def test_search_requires_query(

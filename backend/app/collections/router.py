@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response as FastAPIResponse
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.collections.models import (
     CollectionCreate,
     CollectionListResponse,
@@ -59,7 +59,7 @@ async def create(
 @router.get("", response_model=CollectionListResponse)
 async def list_all(
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> CollectionListResponse:
     """List all collections with set/diagram/element counts."""
     db = request.app.state.db_manager.main_db
@@ -71,7 +71,7 @@ async def list_all(
 async def get_one(
     collection_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> CollectionResponse:
     """Get a single collection by ID."""
     db = request.app.state.db_manager.main_db
@@ -185,7 +185,7 @@ async def get_thumbnail(
 async def list_collection_sets(
     collection_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> SetListResponse:
     """List all sets in a collection."""
     db = request.app.state.db_manager.main_db

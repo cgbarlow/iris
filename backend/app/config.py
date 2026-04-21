@@ -91,6 +91,12 @@ class AppConfig:
     rate_limit_general: int = field(
         default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_GENERAL", "1000"))
     )
+    # Anonymous AI calls (no Authorization header) get a stricter per-IP bucket
+    # to bound cost exposure on a publicly-accessible UAT deployment (ADR-123).
+    # Uses a 1 hour window; all other buckets use 60 s.
+    anon_ai_rate_limit: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_ANON_AI", "10"))
+    )
     # Deployment mode: "sqlite" (default, self-hosted) or "supabase" (Netlify/Supabase cloud)
     db_backend: str = field(
         default_factory=lambda: os.environ.get("IRIS_DB_BACKEND", "sqlite")

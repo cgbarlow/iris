@@ -178,9 +178,19 @@
 		return groups;
 	});
 
-	// Reactive to URL param changes so clicking a set/collection in the graph updates the view
+	// Reactive to URL param changes so clicking a set/collection in the graph updates the view.
+	// Counts panel ("Sets in this collection", "Packages in this set" etc.) legitimately restores
+	// the last-viewed scope from sessionStorage — the active scope is visible in the header so
+	// users can see what they're filtered to and clear it.
 	let setId = $derived(page.url.searchParams.get('set_id') || getActiveSetId() || '');
 	let collectionId = $derived(page.url.searchParams.get('collection_id') || getActiveCollectionId() || '');
+
+	// Search scope reads URL params ONLY — never sessionStorage (ADR-121, issues #16/#17).
+	// The search bar has no visible scope indicator, so a silent sessionStorage-backed filter
+	// reads as "search is broken" rather than "search is scoped". Deep-linked scoped search
+	// still works because URL params take priority identically to the counts derivation.
+	let searchSetId = $derived(page.url.searchParams.get('set_id') ?? '');
+	let searchCollectionId = $derived(page.url.searchParams.get('collection_id') ?? '');
 
 	$effect(() => {
 		// Re-run when scope changes
@@ -391,8 +401,8 @@
 		searchTypeFilter = '';
 		searchPage = 1;
 		try {
-			const setFilter = setId ? `&set_id=${setId}` : '';
-			const collectionFilter = !setId && collectionId ? `&collection_id=${collectionId}` : '';
+			const setFilter = searchSetId ? `&set_id=${searchSetId}` : '';
+			const collectionFilter = !searchSetId && searchCollectionId ? `&collection_id=${searchCollectionId}` : '';
 			const data = await apiFetch<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}&limit=200${setFilter}${collectionFilter}`);
 			searchResults = data.results;
 		} catch {

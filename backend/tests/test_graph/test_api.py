@@ -98,8 +98,17 @@ async def _create_relationship(
 
 
 class TestGraphAuth:
-    async def test_requires_auth(self, client: httpx.AsyncClient) -> None:
+    async def test_allows_anonymous(self, client: httpx.AsyncClient) -> None:
+        """Graph endpoint is public-readable (ADR-123). Anonymous returns 200."""
         resp = await client.get(f"/api/graph?set_id={DEFAULT_SET_ID}")
+        assert resp.status_code == 200
+
+    async def test_rejects_invalid_token(self, client: httpx.AsyncClient) -> None:
+        """A *present-but-invalid* token still returns 401 (SPEC-123-A)."""
+        resp = await client.get(
+            f"/api/graph?set_id={DEFAULT_SET_ID}",
+            headers={"Authorization": "Bearer not-a-real-token"},
+        )
         assert resp.status_code == 401
 
     async def test_unscoped_returns_all(self, client: httpx.AsyncClient) -> None:

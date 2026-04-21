@@ -27,6 +27,14 @@ export default defineConfig({
 			testDir: bddTestDir,
 			use: { browserName: 'chromium' },
 		},
+		{
+			// Manual project — produces user-guide screenshots on demand.
+			// Invoked via `npm run screenshots`, not part of test:e2e (SPEC-122-A).
+			name: 'screenshots',
+			testDir: 'tests/screenshots',
+			use: { browserName: 'chromium', viewport: { width: 1280, height: 720 } },
+			retries: 0,
+		},
 	],
 	webServer: [
 		{

@@ -7,6 +7,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.migrations.m012_sets import DEFAULT_SET_ID
+from app.search.service import (
+    index_set as _index_set,
+    remove_set_index as _remove_set_index,
+)
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -56,6 +60,8 @@ async def create_set(
         (set_id, name, description, now, created_by, now, collection_id),
     )
     await db.commit()
+
+    await _index_set(db, set_id=set_id, name=name, description=description)
 
     return {
         "id": set_id,
@@ -223,6 +229,8 @@ async def update_set(
         )
     await db.commit()
 
+    await _index_set(db, set_id=set_id, name=name, description=description)
+
     return await get_set(db, set_id)
 
 
@@ -269,6 +277,9 @@ async def soft_delete_set(
         (now, set_id),
     )
     await db.commit()
+
+    await _remove_set_index(db, set_id)
+
     return None
 
 

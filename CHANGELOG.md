@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-04-21
+
+### Added
+- **User guide at `/guide`** — hand-written Markdown documentation with a left-hand navigation bar covering Getting Started, Dashboard, Collections & Sets, Packages & Diagrams, Knowledge Graph, Search, Ask AI, Bookmarks, and Admin. Markdown rendered through `marked` + DOMPurify (protocol #7). Screenshots generated on demand via `npm run screenshots` (new Playwright project) and served from `static/guide/` so the deployed app has them without rebuilding. Nav entry added to AppShell for both anonymous and authenticated users (ADR-122, SPEC-122-A, closes #15).
+- **Anonymous read-only mode** — visitors can now browse every collection, set, package, diagram, element, knowledge graph, and run searches without signing in. Ask AI is also available to anonymous callers with a stricter per-IP rate limit (default 10 requests/hour, env `IRIS_RATE_LIMIT_ANON_AI`). Writes and admin routes remain authenticated. Backend gains a `get_optional_user` dependency; frontend `+layout.svelte` no longer redirects unauthenticated users to `/login`, with a new `admin/+layout.svelte` gate preserving admin privacy. A "Sign in" button replaces "Sign out" in the header when anonymous (ADR-123, SPEC-123-A, closes #18).
+
+### Fixed
+- **Dashboard search silently filtered by a stale set id** — typing "msd" on the dashboard at `/` with no visible filter returned zero results when a previously-viewed set id was cached in sessionStorage. The counts panel legitimately restored the last set (visible in the header), but the search bar does not display its scope, so a remembered filter read as "search is broken". Fix: split `searchSetId`/`searchCollectionId` deriveds that read URL params only; counts panel unchanged. Deep-linked scoped search via `?set_id=…` still works (ADR-121, closes #16 and #17).
+- **Packages, sets, and collections were not indexed for search on create/update/delete** — only the startup `rebuild_search_index` populated their FTS5 tables, so any entity created or imported after the server started was invisible to search until the next restart. This is the deeper root cause behind "search is broken" on UAT where "NZ Ministry of Social Development (MSD) DoView Strategy Diagram" (a package) is expected to match `msd`. Fix: added per-operation `index_package`/`index_set`/`index_collection` and `remove_*_index` calls in all three services, mirroring the existing elements/diagrams pattern. Bug surfaced the first time newly-created entities failed to appear in search — no reindex needed for existing data because startup rebuild still runs.
+
 ## [4.0.4] - 2026-04-21
 
 ### Fixed
