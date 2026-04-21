@@ -14,6 +14,10 @@ DEFAULTS = {
     "session_timeout_minutes": "15",
     "gallery_thumbnail_mode": "svg",
     "debug_ai": "0",
+    # Admin-posted system-wide banner text (ADR-124). Empty = no banner.
+    # Rendered as plain text at the top of every page via
+    # SystemBanner.svelte; admins edit it on /admin/settings.
+    "notification_banner_message": "",
 }
 
 
