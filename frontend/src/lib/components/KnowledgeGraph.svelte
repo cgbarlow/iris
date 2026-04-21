@@ -314,10 +314,13 @@
 						}
 					}
 
-					// Progressive labels with overlap suppression.
-					// Higher-precedence tiers (collection > set > package > diagram > element)
-					// suppress lower-precedence labels that would overlap.
-					// Same-tier labels never suppress each other.
+					// Progressive labels with overlap suppression. Higher-
+					// precedence tiers (collection > set > package > diagram >
+					// element) suppress lower-precedence labels that would
+					// overlap, AND same-tier labels suppress each other —
+					// within a tier, nodes are drawn sorted by
+					// relationship_count descending, so higher-relationship
+					// labels win the space when two would collide.
 					const labelled = new Set(hlId ? [hlId] : []);
 					const drawnBoxes: { x: number; y: number; w: number; h: number; tier: number }[] = [];
 					ctx.textAlign = 'center';
@@ -349,9 +352,12 @@
 							const lx = n.x - tw / 2;
 							const ly = n.y - th / 2;
 
-							// Check overlap with higher-precedence labels only
+							// Check overlap against every already-drawn label —
+							// both higher-precedence tiers AND earlier-drawn
+							// same-tier labels. Same-tier draw order is
+							// highest-relationship-first (see .sort above) so
+							// the most-connected label keeps its space.
 							const overlaps = drawnBoxes.some((b) =>
-								b.tier < ti &&
 								lx < b.x + b.w && lx + tw > b.x &&
 								ly < b.y + b.h && ly + th > b.y
 							);
@@ -520,57 +526,80 @@
 					}
 				}
 
-				// 1. Collection separation — bidirectional target-distance
-				// (unchanged from SPEC-118-A). Fires between all collection
-				// pairs; cross-collection separation happens only at this
-				// layer. Pull-back anchors the orphan-set __orphan_<sid>
-				// contract.
-				if (nodeCollectionMap.size > 0) {
-					const colCentroids = computeCentroids(nodeCollectionMap);
-					if (colCentroids.size > 1) {
-						applySeparation(
-							colCentroids, nodeCollectionMap,
-							80, 400 * spread, 'bidirectional',
-						);
-					}
-				}
+				// Layer radii for per-galaxy radial ordering (SPEC-120-A).
+				// Each node is pulled toward its layer's target radius from
+				// its governing collection centroid, enforcing
+				// collection < set < package < diagram < element as a radial
+				// invariant rather than an emergent property of link tuning.
+				// Constants are a simple arithmetic progression; global
+				// scaling is via link_length × node_spacing so the existing
+				// sliders keep full control of the visible layout.
+				const LAYER_RADIUS: Record<string, number> = {
+					collection: 0,
+					set: 120,
+					package: 240,
+					diagram: 360,
+					element: 480,
+				};
+				const linkLen = settings.link_length ?? 1.0;
+				const radiusScale = linkLen * spread;
+				const R_TOTAL = 480 * radiusScale;
 
-				// 2. Set separation — inverseSq self-decay, UNGATED.
-				// Every pair of set centroids repels every other via
-				// 1/dist². Within-collection pairs are close → strong push.
-				// Cross-collection pairs are typically far → force decays to
-				// near-zero, but non-zero enough to give the "galaxy"
-				// separation between whole collections: each collection's
-				// member-subtree repels other collections' subtrees through
-				// all their set nodes. Without this ungating the collection
-				// force acts only on centroids, so collection bboxes can
-				// visually mingle even when centroids are well-spaced.
-				// Self-decay at `1/dist²` means no compounding explosion at
-				// spread=3 (unlike the pre-ADR-118 `s³`-amplified form).
-				const setCentroids = computeCentroids(nodeSetFull);
-				if (setCentroids.size > 1) {
+				// 1. Collection separation — bidirectional, but with a
+				// radius-aware target distance (2 × R_total + padding) so
+				// inter-galaxy spacing tracks actual galaxy extent rather
+				// than a fixed constant. Replaces SPEC-119-A's centroid-only
+				// fixed-target call. Pull-back (-0.2 floor inside
+				// applySeparation) anchors the orphan-set __orphan_<sid>
+				// contract.
+				const colCentroids =
+					nodeCollectionMap.size > 0
+						? computeCentroids(nodeCollectionMap)
+						: new Map<string, Centroid>();
+				if (colCentroids.size > 1) {
+					const padding = 100 * radiusScale;
+					const targetDist = 2 * R_TOTAL + padding;
 					applySeparation(
-						setCentroids, nodeSetFull, 50 * spread, 0, 'inverseSq',
+						colCentroids, nodeCollectionMap,
+						80, targetDist, 'bidirectional',
 					);
 				}
 
-				// 3. Root-package separation — inverseSq self-decay, UNGATED
-				// for the same "galaxy" effect at the package level.
-				let pkgCentroids: Map<string, Centroid> | null = null;
-				if (nodeRootPkgMap.size > 0) {
-					pkgCentroids = computeCentroids(nodeRootPkgMap);
-					if (pkgCentroids.size > 1) {
-						applySeparation(
-							pkgCentroids, nodeRootPkgMap, 30 * spread, 0, 'inverseSq',
-						);
-					}
+				// 2. Per-galaxy radial layer force (SPEC-120-A).
+				// Each node is pulled toward its layer's target radius from
+				// its own collection centroid. This enforces the hierarchy
+				// ordering directionally — packages cannot visually escape
+				// their children because they are mass-pulled to a smaller
+				// target radius than diagrams. Intra-layer angular position
+				// is still shaped by link + charge + cohesion.
+				const radialStrength = 0.15 * alpha;
+				for (const n of graphData.nodes) {
+					const cid = nodeCollectionMap.get(n.id);
+					if (!cid) continue;
+					const targetR = (LAYER_RADIUS[n.node_type] ?? 0) * radiusScale;
+					if (targetR === 0) continue;
+					const col = colCentroids.get(cid);
+					if (!col) continue;
+					const dx = (n.x || 0) - col.x;
+					const dy = (n.y || 0) - col.y;
+					const r = Math.sqrt(dx * dx + dy * dy) || 1;
+					const delta = targetR - r;
+					const push = radialStrength * delta;
+					n.vx += (dx / r) * push;
+					n.vy += (dy / r) * push;
 				}
 
-				// 4. Cohesion: pull each node toward its finest-level cluster centroid.
-				// Flat (not inverse-spread): keeps cohesion stable as spread grows.
+				// 3. Cohesion: pull each node toward its finest-level cluster
+				// centroid. Flat (not inverse-spread) — keeps cohesion stable
+				// as spread grows. Unchanged from SPEC-119-A. Provides the
+				// angular pull that clusters a set's children together; the
+				// radial force (above) supplies the perpendicular radius
+				// constraint.
+				const setCentroids = computeCentroids(nodeSetFull);
+				const pkgCentroids: Map<string, Centroid> | null =
+					nodeRootPkgMap.size > 0 ? computeCentroids(nodeRootPkgMap) : null;
 				const cohesion = 0.03 * alpha;
 				for (const n of graphData.nodes) {
-					// Prefer root-package cohesion, fall back to set
 					const rpid = nodeRootPkgMap.get(n.id);
 					if (rpid && pkgCentroids && pkgCentroids.size > 1) {
 						const c = pkgCentroids.get(rpid);

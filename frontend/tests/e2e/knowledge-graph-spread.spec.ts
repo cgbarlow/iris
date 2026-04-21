@@ -305,13 +305,21 @@ test.describe('Knowledge graph — multi-collection spread slider (ADR-118)', ()
 		// Must have seeded at least two collections.
 		expect(high.collections.length).toBeGreaterThanOrEqual(2);
 
-		// #1 — bbox stays bounded 0.2 → 3.0 (ratio < 50×).
+		// #1 — bbox stays bounded 0.2 → 3.0. SPEC-120-A amends SPEC-118-A's
+		// 50× ratio: the radial layer force now scales each galaxy's
+		// target radii with spread (R_total = 480 × link_length × spread),
+		// so both galaxy extent AND inter-centroid distance grow linearly.
+		// Area grows as (3.0/0.2)² = 225× in principle; add headroom for
+		// galaxy-shape anisotropy → bound at 300×. This still catches the
+		// original regression (unbounded explosion from cubic amplification
+		// at spread=3.0 produced ~1000×+ ratios pre-ADR-118) while tolerating
+		// the principled linear-in-spread growth introduced by ADR-120.
 		const lowArea = Math.max(low.bbox_w * low.bbox_h, 1);
 		const highArea = high.bbox_w * high.bbox_h;
 		expect(
 			highArea / lowArea,
-			`bbox area at spread=3.0 (${highArea.toFixed(0)}) should not exceed 50× bbox area at spread=0.2 (${lowArea.toFixed(0)})`,
-		).toBeLessThan(50);
+			`bbox area at spread=3.0 (${highArea.toFixed(0)}) should not exceed 300× bbox area at spread=0.2 (${lowArea.toFixed(0)})`,
+		).toBeLessThan(300);
 
 		// #2 — max-spread layout must be wider than min-spread layout.
 		// SPEC-119-A amends SPEC-118-A's strict monotonicity invariant

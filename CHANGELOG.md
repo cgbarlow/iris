@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.4] - 2026-04-21
+
+### Fixed
+- **Knowledge graph radial hierarchy ordering** — on UAT-scale single-collection data (711 nodes, 11 sets × 60 packages × 639 diagrams) packages were consistently settling *outside* their own diagrams (mean package-radius ≈ 170–190 px vs mean diagram-radius ≈ 140–150 px; 0/11 sets radially ordered correctly), inverting the expected `collection → set → package → diagram → element` visual flow. Root cause: every diagram has both a set_membership edge (distance 120) and a hierarchy edge (distance 25); the N short hierarchy links collectively yanked each package outward through its own children. Fix: per-galaxy radial layer force (`d3.forceRadial`-style inline loop) pinning each node type to a prescribed radius from its collection centroid — Collection=0, Set=120, Package=240, Diagram=360, Element=480, all scaled by `link_length × node_spacing`. Inter-galaxy separation is now radius-aware (`target = 2·R_total + padding`) instead of centroid-only `1/dist²`. The SPEC-119-A inner-layer `1/dist²` calls at the set and root-package layers are superseded (ADR-120, SPEC-120-A).
+- **Same-tier label overlap** — two labels at the same hierarchy tier (e.g. two packages, two diagrams) could visually overlap because the label overlap-suppression loop only compared against higher-precedence tiers (`b.tier < ti`). Now compares against every already-drawn label; same-tier draw order is sorted by `relationship_count` descending, so the most-connected label wins the space.
+
 ## [4.0.3] - 2026-04-20
 
 ### Fixed
