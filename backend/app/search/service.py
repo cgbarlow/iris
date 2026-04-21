@@ -644,6 +644,126 @@ async def _search_postgres(
         for row in diagram_rows
     )
 
+    # Packages (ADR-125 — parity with SQLite).
+    # Ranks are merged with elements + diagrams at the end.
+    _PG_PKG = (
+        "SELECT p.id, pv.name, pv.description, "
+        "ts_rank(p.search_vector, to_tsquery('english', %s)) AS rank, "
+        "s.name AS set_name, col.name AS collection_name, p.set_id "
+        "FROM packages p "
+        "JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
+        "LEFT JOIN sets s ON p.set_id = s.id "
+        "LEFT JOIN collections col ON s.collection_id = col.id "
+    )
+    if set_id:
+        cursor = await db.execute(
+            f"{_PG_PKG}"  # noqa: S608
+            "WHERE p.search_vector @@ to_tsquery('english', ?) AND p.set_id = ? "
+            "AND p.is_deleted = FALSE "
+            "ORDER BY rank DESC LIMIT ?",
+            (tsquery, tsquery, set_id, limit),
+        )
+    elif collection_id:
+        cursor = await db.execute(
+            f"{_PG_PKG}"  # noqa: S608
+            "WHERE p.search_vector @@ to_tsquery('english', ?) "
+            "AND p.set_id IN (SELECT id FROM sets WHERE collection_id = ?) "
+            "AND p.is_deleted = FALSE "
+            "ORDER BY rank DESC LIMIT ?",
+            (tsquery, tsquery, collection_id, limit),
+        )
+    else:
+        cursor = await db.execute(
+            f"{_PG_PKG}"  # noqa: S608
+            "WHERE p.search_vector @@ to_tsquery('english', ?) "
+            "AND p.is_deleted = FALSE "
+            "ORDER BY rank DESC LIMIT ?",
+            (tsquery, tsquery, limit),
+        )
+    package_rows = await cursor.fetchall()
+    results.extend(
+        {
+            "id": row[0],
+            "result_type": "package",
+            "name": row[1],
+            "type_detail": "package",
+            "description": row[2] or None,
+            "rank": float(row[3]),
+            "deep_link": f"/packages/{row[0]}",
+            "set_id": row[6],
+            "set_name": row[4],
+            "collection_name": row[5],
+        }
+        for row in package_rows
+    )
+
+    # Sets (ADR-125). Skipped when already scoped to a specific set.
+    if not set_id:
+        _PG_SET = (
+            "SELECT s.id, s.name, s.description, "
+            "ts_rank(s.search_vector, to_tsquery('english', %s)) AS rank, "
+            "col.id AS collection_id, col.name AS collection_name "
+            "FROM sets s "
+            "LEFT JOIN collections col ON s.collection_id = col.id "
+        )
+        if collection_id:
+            cursor = await db.execute(
+                f"{_PG_SET}"  # noqa: S608
+                "WHERE s.search_vector @@ to_tsquery('english', ?) "
+                "AND s.collection_id = ? AND s.is_deleted = FALSE "
+                "ORDER BY rank DESC LIMIT ?",
+                (tsquery, tsquery, collection_id, limit),
+            )
+        else:
+            cursor = await db.execute(
+                f"{_PG_SET}"  # noqa: S608
+                "WHERE s.search_vector @@ to_tsquery('english', ?) "
+                "AND s.is_deleted = FALSE "
+                "ORDER BY rank DESC LIMIT ?",
+                (tsquery, tsquery, limit),
+            )
+        set_rows = await cursor.fetchall()
+        results.extend(
+            {
+                "id": row[0],
+                "result_type": "set",
+                "name": row[1],
+                "type_detail": "set",
+                "description": row[2] or None,
+                "rank": float(row[3]),
+                "deep_link": "/sets",
+                "set_id": row[0],
+                "set_name": row[1],
+                "collection_name": row[5],
+            }
+            for row in set_rows
+        )
+
+    # Collections (ADR-125). Skipped when scoped to a set or collection.
+    if not set_id and not collection_id:
+        cursor = await db.execute(
+            "SELECT c.id, c.name, c.description, "
+            "ts_rank(c.search_vector, to_tsquery('english', %s)) AS rank "
+            "FROM collections c "
+            "WHERE c.search_vector @@ to_tsquery('english', ?) "
+            "AND c.is_deleted = FALSE "
+            "ORDER BY rank DESC LIMIT ?",
+            (tsquery, tsquery, limit),
+        )
+        collection_rows = await cursor.fetchall()
+        results.extend(
+            {
+                "id": row[0],
+                "result_type": "collection",
+                "name": row[1],
+                "type_detail": "collection",
+                "description": row[2] or None,
+                "rank": float(row[3]),
+                "deep_link": "/collections",
+            }
+            for row in collection_rows
+        )
+
     # PostgreSQL ts_rank is positive; higher = better match
     results.sort(key=lambda r: r["rank"], reverse=True)
     return results[:limit]
