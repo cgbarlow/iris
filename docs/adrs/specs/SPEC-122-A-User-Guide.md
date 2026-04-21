@@ -17,17 +17,39 @@ from `frontend/static/guide/`.
 ## Routes
 
 ```
-/guide                       → redirects to /guide/getting-started
-/guide/getting-started       → first section
+/guide                         → redirects to /guide/getting-started
+/guide/getting-started         → first section
 /guide/dashboard
 /guide/collections-sets
 /guide/packages-diagrams
+/guide/canvas-editing          (added v4.2.0)
+/guide/notations               (added v4.2.0)
+/guide/comments                (added v4.2.0)
 /guide/knowledge-graph
 /guide/search
 /guide/ask-ai
 /guide/bookmarks
-/guide/admin
+/guide/imports-data            (added v4.2.0)
+/guide/roadmap-scenia          (added v4.2.0)
+/guide/themes-accessibility    (added v4.2.0)
+/guide/keyboard-shortcuts      (added v4.1.3)
+/guide/admin                   (now "Admin & Permissions")
 ```
+
+**Amendment history** — the section list has grown twice since this
+spec's original approval:
+
+- **v4.1.3**: `keyboard-shortcuts` added as a dedicated section when
+  the `/help` route was merged into the guide and deleted.
+- **v4.2.0**: six new sections (`canvas-editing`, `notations`,
+  `comments`, `imports-data`, `roadmap-scenia`,
+  `themes-accessibility`) added so anonymous visitors can discover
+  signed-in-only capabilities, and the existing nine sections
+  expanded with deeper content. Sign-in-only material is called out
+  inline with a `> **Sign in to use this.**` blockquote rather than
+  being hidden from anonymous visitors — matches the ADR-123
+  philosophy that the guide serves as a product marketing surface as
+  well as a reference.
 
 Implemented as:
 
