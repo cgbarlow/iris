@@ -16,6 +16,12 @@
 	// guard in /admin/+layout.svelte.
 	const publicRoutes = ['/login'];
 	const isPublicRoute = $derived(publicRoutes.includes(page.url.pathname));
+
+	// Open Graph / Twitter metadata lives in src/app.html (ADR-126) —
+	// adapter-static ships a single fallback HTML that social scrapers
+	// read without running JS, so <svelte:head> tags here wouldn't be
+	// visible to them. The tags in app.html are templated at build time
+	// via %sveltekit.env.PUBLIC_SITE_URL% and work for every route.
 </script>
 
 <ModeWatcher />

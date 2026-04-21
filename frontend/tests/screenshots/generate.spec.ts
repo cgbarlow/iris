@@ -39,6 +39,13 @@ const SHOTS = [
 	{ name: 'ask-ai', url: '/ask' },
 	{ name: 'bookmarks', url: '/bookmarks' },
 	{ name: 'admin', url: '/admin/users' },
+	// Added v4.2.0 for the expanded guide (SPEC-122-A amendment).
+	{ name: 'imports', url: '/import' },
+	{ name: 'recycle-bin', url: '/recycle-bin' },
+	{ name: 'admin-banner', url: '/admin/settings' },
+	{ name: 'admin-users', url: '/admin/users' },
+	{ name: 'admin-audit', url: '/admin/audit' },
+	{ name: 'admin-locks', url: '/admin/locks' },
 ];
 
 test.describe.configure({ mode: 'serial', timeout: 60_000 });

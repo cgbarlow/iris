@@ -3,6 +3,32 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<!--
+			Open Graph + Twitter Card metadata (ADR-126). These tags must live
+			in app.html (not in a <svelte:head> block) because Iris ships as
+			a static SPA (adapter-static / fallback: 'index.html'); social
+			scrapers like LinkedIn / Slack / Teams / WhatsApp do not execute
+			JS, so they only ever see what's in the shell HTML. Tags are
+			pre-templated at build time via %sveltekit.env.PUBLIC_SITE_URL%
+			— set PUBLIC_SITE_URL in the deploy environment (e.g.
+			`https://iris-uat.chrisbarlow.nz`); falls back to a relative path
+			when unset so local dev still has a coherent preview.
+		-->
+		<meta name="description" content="Browse, search, and explore a living architecture knowledge graph: collections, sets, packages, diagrams, elements, and the relationships between them — with an AI assistant on hand." />
+
+		<meta property="og:title" content="Iris — Integrated Repository for Information & Systems" />
+		<meta property="og:description" content="Browse, search, and explore a living architecture knowledge graph: collections, sets, packages, diagrams, elements, and the relationships between them — with an AI assistant on hand." />
+		<meta property="og:image" content="%sveltekit.env.PUBLIC_SITE_URL%/iris-preview.png" />
+		<meta property="og:url" content="%sveltekit.env.PUBLIC_SITE_URL%" />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Iris" />
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Iris — Integrated Repository for Information & Systems" />
+		<meta name="twitter:description" content="Browse, search, and explore a living architecture knowledge graph: collections, sets, packages, diagrams, elements, and the relationships between them — with an AI assistant on hand." />
+		<meta name="twitter:image" content="%sveltekit.env.PUBLIC_SITE_URL%/iris-preview.png" />
+
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

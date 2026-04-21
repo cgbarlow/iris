@@ -1,33 +1,83 @@
 # Knowledge Graph
 
-The knowledge graph visualises every entity and relationship in your current scope as an interactive force-directed layout.
+The knowledge graph visualises every entity and relationship in the current scope as an interactive force-directed layout. It's embedded on the dashboard and is the primary discovery surface for how content is connected.
 
 ![Knowledge graph](/guide/knowledge-graph.png)
 
-## Hierarchy flow
+## Nodes, edges, colours
 
-Nodes are laid out in concentric bands around their governing collection centre:
+Every node is an entity; every edge is a relationship. Node colours:
 
-- **Collection** at the centre
-- **Sets** in a close ring
-- **Packages** further out
-- **Diagrams** further still
-- **Elements** at the outer edge
+- 🔴 **Collection** (single centre of each galaxy)
+- 🟣 **Set**
+- 🟠 **Package**
+- 🟢 **Diagram**
+- 🔵 **Element** (hidden by default at dashboard scope; toggle on in settings)
 
-This layer ordering is enforced by a radial force so it stays consistent even at UAT scale (hundreds of diagrams). See ADR-120 / SPEC-120-A for details.
+Edge types:
 
-## Spread slider
+- Solid thick — *collection → set*, *set → package*, *set → diagram*
+- Solid thin — parent / child within package hierarchy
+- Dashed — *diagram → diagram* navigation links
 
-The `Spread` slider controls the overall scale. At low spread (0.2) galaxies are compact; at high spread (3.0) they fan wide and individual clusters become easier to read.
+## Hierarchy flow (radial force)
 
-## Label density
+Nodes are laid out in concentric bands around their governing collection centroid (ADR-120 / SPEC-120-A):
 
-The `Labels` slider controls how many labels are drawn at each zoom level. Higher values draw more labels at the cost of overlap.
+1. **Collection** at the centre.
+2. **Sets** in a close ring.
+3. **Packages** further out.
+4. **Diagrams** further still.
+5. **Elements** at the outer edge (when visible).
 
-## Hover focus
+This layer ordering is enforced by a radial physics force so `collection → set → package → diagram → element` holds visually even at UAT scale (hundreds of diagrams per set). Multi-collection views show multiple galaxies with radius-aware collision so clusters don't overlap.
 
-Hover any node for 400 ms — Iris dims all unrelated nodes and highlights the hovered node's immediate neighbours. Move off the node to restore full visibility.
+## Interaction
 
-## Direct diagram links
+- **Drag a node** to reposition it. Released nodes re-settle under physics.
+- **Scroll / pinch** — zoom the viewport.
+- **Click and drag empty space** — pan the viewport.
+- **Click a node** — navigate to that entity's detail page. Read-only users stay on detail; signed-in users land in edit mode if they have permission.
+- **Hover a node** for 400 ms — triggers **focus-fade**: unrelated nodes dim to 10 % opacity so you can follow that node's relationships visually. Move off to restore.
 
-By default, every set draws a link to every diagram and element within it. This creates visible "petals" of children around each set. Turn this toggle off in the settings panel to de-clutter the view without changing the physics — the underlying forces still run.
+Zoom to fit: **Fit** button, top-right of the graph area. Reset: **Reset** button.
+
+## Settings panel
+
+A gear icon (top-right of the graph area) opens the settings panel with four sliders and two toggle groups:
+
+### Sliders
+
+- **Spread** (0.2–3.0×) — overall scale. Low values produce a compact galaxy; high values fan wide and make individual clusters easier to read.
+- **Labels** (1–50, default 10) — max labels per zoom tier. Higher values draw more labels at the cost of overlap.
+- **Contrast** (0.0–3.0×) — node-size difference between hierarchy levels. 0 = uniform sizes; 1 = default; higher exaggerates collections and suppresses elements.
+- **Link length** (0.5–2.0×) — multiplier on every link's target distance. Affects the radial band widths.
+
+### Visibility toggles
+
+- **Node types** — toggle Collections / Sets / Packages / Diagrams / Elements on or off. Useful: at dashboard scope, turn off Elements to prevent thousands of nodes rendering.
+- **Edge types** — toggle Collection → Set, Set → Package, Set → Diagram (a.k.a. "direct diagram links"), Package → Diagram, Diagram → Diagram. Useful: turn off **Direct diagram links** to de-clutter when every set has hundreds of diagrams.
+
+### Persistence
+
+> **User-local** overrides live in `localStorage` per browser, per scope (global / per-collection / per-set). They survive across sessions on the same device.
+>
+> **Admins can also save a setting as the default** for their scope (**Save as default** button). Defaults cascade: global → collection-specific → set-specific. User overrides always win over admin defaults.
+
+### Reset
+
+**Reset to defaults** button reverts the user's `localStorage` override so admin defaults take over.
+
+## Full screen
+
+A maximise icon sits in the top-right of the graph area. Click to expand the graph to fill the browser viewport; press `Escape` or the exit button to return.
+
+## Performance notes
+
+Iris uses a custom radial-layer force (ADR-120) instead of raw d3-force's repulsion. This makes the layout deterministic enough for reliable screenshots and fast enough for sets with hundreds of members. For truly massive datasets (tens of thousands of elements), turn Elements off; the physics stays responsive.
+
+## Next steps
+
+- [Search](search) — when you know the name, search is faster than visual exploration.
+- [Dashboard](dashboard) — the default surface that embeds this graph.
+- [Admin & Permissions](admin) — setting graph defaults for your team.

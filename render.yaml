@@ -20,6 +20,14 @@ services:
         sync: false
       - key: VITE_SCENIA_URL
         sync: false
+      # Absolute base URL for this deployment — used by Open Graph /
+      # Twitter meta tags so social preview images are served with a
+      # full URL (ADR-126). Example: `https://iris-uat.chrisbarlow.nz`.
+      # Interpolated into src/app.html at build time via
+      # %sveltekit.env.PUBLIC_SITE_URL%. Must be set per environment
+      # in the Render dashboard (sync: false).
+      - key: PUBLIC_SITE_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*

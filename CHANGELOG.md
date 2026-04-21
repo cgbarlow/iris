@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-04-21
+
+### Added
+- **Comprehensive user guide (`/guide`).** The guide has been expanded from 10 thin sections to 16 deep sections covering every user-facing capability — not just the read-only surface. Six new sections: **Canvas Editing** (lock UI, edit-mode, add/link element, connect mode, undo/redo, save, fullscreen); **Notations** (Simple / Component / UML / ArchiMate / C4 / Sequence / DoView / Roadmap reference); **Comments** (per-diagram and per-element threads); **Imports & Data** (Sparx EA, PowerPoint, DocRef legislation, recycle bin, version history & rollback); **Roadmap (Scenia)**; **Themes & Accessibility** (theme switching, per-element theming, WCAG 2.2 AA). Existing nine sections were rewritten with deeper detail. Sign-in-only material is called out inline with a "Sign in to use this" blockquote — anonymous visitors can discover every feature Iris offers even before authenticating (SPEC-122-A amended).
+- **Social preview card when Iris URLs are shared.** Pasting an Iris URL into LinkedIn, Slack, Teams, WhatsApp, or any platform that reads Open Graph / Twitter Card metadata now renders a rich card: the user's dashboard screenshot at `frontend/static/iris-preview.png`, the title *Iris — Integrated Repository for Information & Systems*, and a short description. Metadata lives in `src/app.html` (not `<svelte:head>`) because Iris is a static SPA and social scrapers don't execute JS; tags are templated at build time via `%sveltekit.env.PUBLIC_SITE_URL%` so the same build works for every deploy. Declared in `render.yaml` as `PUBLIC_SITE_URL`, `sync: false` (ADR-126).
+- **Eye favicon.** The favicon has been replaced from the default Svelte logo to a hand-written eye SVG (almond shape + blue iris + dark pupil + white catch-light) reflecting the Iris name. Single-file change under `frontend/src/lib/assets/favicon.svg`.
+
+### Changed
+- Screenshot generator (`frontend/tests/screenshots/generate.spec.ts`) now produces six new shots (`imports.png`, `recycle-bin.png`, `admin-banner.png`, `admin-users.png`, `admin-audit.png`, `admin-locks.png`) alongside the existing ten. Re-run via `npm run screenshots` whenever the UI changes meaningfully.
+
+### Deploy notes
+- Set the new `PUBLIC_SITE_URL` environment variable in the Render frontend service for each environment (e.g. `https://iris-uat.chrisbarlow.nz`). Without it, social-preview URLs resolve as relative paths, which work on some platforms but not all.
+
 ## [4.1.3] - 2026-04-21
 
 ### Fixed
