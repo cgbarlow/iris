@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-04-21
+
+### Fixed
+- **Search parity on Supabase** — on the Supabase/PostgreSQL backend (production/UAT), the search endpoint only queried `elements` and `diagrams` — packages/sets/collections had no `search_vector` columns and no trigger functions, so admin-created packages like "NZ Ministry of Social Development (MSD) DoView Strategy Diagram" were invisible to search even though they existed in the database. Additionally, the existing `BEFORE INSERT OR UPDATE` triggers on `elements`/`diagrams` read from `*_versions` tables at trigger time, but services insert the version row *after* the parent row — so the parent's `search_vector` was empty on initial create and only populated on subsequent updates. Fix ships in two pieces (ADR-125):
+  - **New migration `m040_search_all_entities.sql`** — adds `search_vector` columns + GIN indexes + trigger functions for `packages`, `sets`, `collections`. Adds chain-triggers on `element_versions`, `diagram_versions`, `package_versions` that re-fire the parent's BEFORE trigger after the version row is committed, closing the INSERT-ordering gap. Backfills every existing row in all five entity tables.
+  - **`_search_postgres` extended** — now queries all five entity types to match `_search_sqlite` feature-for-feature. Scope filters (set/collection) apply uniformly; deep links point to `/packages/<id>`, `/sets`, `/collections` consistently with the SQLite path.
+- Requires manual application of `m040` to the UAT Supabase instance (via Supabase SQL Editor or `scripts/supabase-migrate.sh`) — Render does not run migrations automatically.
+
 ## [4.1.1] - 2026-04-21
 
 ### Added
