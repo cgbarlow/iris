@@ -50,24 +50,10 @@ test.describe('Dashboard', () => {
 		await expect(page.getByText('Dashboard Test Entity').first()).toBeVisible();
 	});
 
-	test('Quick nav cards link to correct pages', async ({ page }) => {
-		await loginAsAdmin(page);
-
-		const main = page.locator('main');
-
-		// The Quick Navigation section has links to Models, Entities, and Help
-		const quickNav = main.getByRole('heading', { name: 'Quick Navigation' });
-		await expect(quickNav).toBeVisible({ timeout: 15_000 });
-
-		const modelsLink = main.getByRole('link', { name: 'Models' }).filter({ hasText: 'Models' });
-		await expect(modelsLink.first()).toHaveAttribute('href', '/models');
-
-		const entitiesLink = main.getByRole('link', { name: 'Entities' }).filter({ hasText: 'Entities' });
-		await expect(entitiesLink.first()).toHaveAttribute('href', '/entities');
-
-		const helpLink = main.getByRole('link', { name: 'Help' }).filter({ hasText: 'Help' });
-		await expect(helpLink.first()).toHaveAttribute('href', '/help');
-	});
+	// The old dashboard "Quick Navigation" section (Models / Entities / Help)
+	// is no longer part of the UI — replaced by the knowledge graph + counts
+	// panel in v4.x. Test removed; the left-sidebar navigation is covered by
+	// navigation.spec.ts.
 
 	test('Dashboard loads without errors after login', async ({ page }) => {
 		await loginAsAdmin(page);

@@ -71,7 +71,9 @@
 	const activeCollectionName = $derived(getActiveCollectionName());
 
 	// Menu items that every visitor (including anonymous) can use (ADR-123).
-	// Guide (ADR-122 / SPEC-122-A) is a new public documentation route.
+	// User Guide lives in the header — see "User Guide" link next to
+	// "Sign in"/"Sign out". Kept out of the sidebar to avoid duplicating a
+	// cross-cutting docs link alongside the content-area navigation.
 	const publicNavItems = [
 		{ href: '/ask', label: 'Iris AI', shortcut: 'A', icon: 'ai' },
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
@@ -79,7 +81,6 @@
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
 		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },
 		{ href: '/elements', label: 'Elements', shortcut: 'E', icon: 'elements' },
-		{ href: '/guide', label: 'Guide', shortcut: 'G', icon: 'guide' },
 	];
 
 	// Menu items that only make sense with a persisted user identity —
@@ -185,11 +186,11 @@
 
 		<div class="flex items-center gap-4">
 			<a
-				href="/help"
+				href="/guide"
 				class="header-link rounded px-3 py-1 text-sm transition-colors"
 				style="color: var(--color-fg)"
 			>
-				Help
+				User Guide
 			</a>
 			{#if isAuthenticated()}
 				<button

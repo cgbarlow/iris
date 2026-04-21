@@ -91,17 +91,20 @@ test.describe('Navigation', () => {
 		await expect(page.getByRole('heading', { name: 'User Management' })).toBeVisible();
 	});
 
-	test('Help link works', async ({ page }) => {
+	test('User Guide link works', async ({ page }) => {
 		await loginAsAdmin(page);
 
-		// The Help link is in the header
-		const helpLink = page.getByRole('link', { name: 'Help' }).first();
-		await expect(helpLink).toBeVisible();
-		await helpLink.click();
+		// User Guide lives in the header (replaced /help in v4.1.3 — the
+		// keyboard shortcuts reference is now a section of the guide).
+		const guideLink = page.getByRole('link', { name: 'User Guide' }).first();
+		await expect(guideLink).toBeVisible();
+		await guideLink.click();
 
-		await page.waitForURL('/help');
-		await expect(page.getByRole('heading', { name: 'Help' })).toBeVisible();
-		await expect(page.getByText('Keyboard Shortcuts')).toBeVisible();
+		await page.waitForURL('/guide/**');
+		await expect(page.getByRole('heading', { name: 'Getting Started' })).toBeVisible();
+		// Keyboard Shortcuts is accessible via the in-guide nav bar.
+		await page.getByRole('link', { name: 'Keyboard Shortcuts' }).click();
+		await expect(page.getByRole('heading', { name: 'Keyboard Shortcuts' })).toBeVisible();
 	});
 
 	test('Admin sees Settings link in header', async ({ page }) => {
@@ -114,9 +117,9 @@ test.describe('Navigation', () => {
 		await expect(settingsLink).toBeVisible();
 		await expect(settingsLink).toHaveAttribute('href', '/admin/settings');
 
-		// Settings link should appear before Help link in the header
-		const helpLink = header.getByRole('link', { name: 'Help' });
-		await expect(helpLink).toBeVisible();
+		// Settings link should appear before User Guide link in the header
+		const guideLink = header.getByRole('link', { name: 'User Guide' });
+		await expect(guideLink).toBeVisible();
 
 		// Click the Settings link and verify navigation
 		await settingsLink.click();
@@ -130,8 +133,8 @@ test.describe('Navigation', () => {
 
 		const header = page.locator('header');
 
-		// Help link should still be visible (available to all users)
-		await expect(header.getByRole('link', { name: 'Help' })).toBeVisible();
+		// User Guide link should still be visible (available to all users)
+		await expect(header.getByRole('link', { name: 'User Guide' })).toBeVisible();
 
 		// Admin Settings link should NOT be visible for non-admin users
 		await expect(header.getByRole('link', { name: 'Admin Settings' })).not.toBeVisible();
