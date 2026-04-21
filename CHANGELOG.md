@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-04-21
+
+### Added
+- **System notification banner** — admins can post a system-wide message from Admin → Settings that renders as a sticky top strip on every page for every visitor (anonymous included). Dismissible per-message per-browser-session; a new admin-posted message re-appears even if the previous one was dismissed. Reuses the existing `settings` key-value table under `notification_banner_message`; the admin write path is the existing admin-gated `PUT /api/settings/{key}` (DRY). A focused public `GET /api/notifications/banner` lets anonymous visitors see the message without auth. Plain-text only — no HTML, no Markdown, Svelte's default `{expression}` escaping is the XSS defence (ADR-124, SPEC-124-A).
+
+### Fixed
+- **Cleaner AI provider error messages** — the previous "LLM provider error" 502s surfaced the raw `httpx` error including the provider URL (e.g. "Server error '502 Bad Gateway' for url 'https://api.agentics.org.nz/...'"). New `app/ai/error_mapper.py` classifies provider exceptions (timeout, network/connect, 429 rate-limit, 401/403 auth, 5xx upstream, 4xx client, generic) and returns a concise user-facing message. Stack traces still go to server logs for operators. Applies to both `POST /api/ai/ask` / `POST /api/ai/sets/{id}/ask` and the admin "Test" button on each provider. Raw URLs never leak to users (regression-tested).
+
+### Notes
+- The AI provider health badge (red/green dot in the model picker) already exists in `SetQA.svelte` via the `_run_ping_check` infrastructure from earlier releases — no change needed. The system banner is the right channel for admins to explain a known outage.
+
 ## [4.1.0] - 2026-04-21
 
 ### Added

@@ -25,6 +25,7 @@
 	let sessionTimeout = $state(15);
 	let thumbnailMode = $state('svg');
 	let debugAi = $state(false);
+	let notificationBanner = $state('');
 
 	$effect(() => {
 		loadSettings();
@@ -38,6 +39,7 @@
 				if (s.key === 'session_timeout_minutes') sessionTimeout = Number(s.value) || 15;
 				if (s.key === 'gallery_thumbnail_mode') thumbnailMode = s.value;
 				if (s.key === 'debug_ai') debugAi = s.value === '1';
+				if (s.key === 'notification_banner_message') notificationBanner = s.value;
 			}
 		} catch {
 			error = 'Failed to load settings';
@@ -91,6 +93,12 @@
 			await saveSetting('session_timeout_minutes', String(timeout));
 			await saveSetting('gallery_thumbnail_mode', thumbnailMode);
 			await saveSetting('debug_ai', debugAi ? '1' : '0');
+			// Banner saved without DOMPurify since it renders as plain text
+			// via Svelte's default {expression} escaping (ADR-124).
+			await apiFetch('/api/settings/notification_banner_message', {
+				method: 'PUT',
+				body: JSON.stringify({ value: notificationBanner }),
+			});
 			success = 'Settings saved successfully';
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to save settings';
@@ -163,6 +171,30 @@
 					</label>
 				</div>
 			</fieldset>
+		</div>
+
+		<div class="rounded border p-4" style="border-color: var(--color-border)">
+			<h2 class="text-lg font-medium" style="color: var(--color-fg)">System Notification Banner</h2>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">
+				Posts a message to every Iris user, including anonymous visitors. Shown at the top of every page until cleared. Empty to hide (ADR-124).
+			</p>
+			<div class="mt-3">
+				<label for="notification-banner" class="text-sm" style="color: var(--color-fg)">
+					Banner message
+				</label>
+				<textarea
+					id="notification-banner"
+					bind:value={notificationBanner}
+					rows="3"
+					placeholder="e.g. AI provider being worked on — temporarily unavailable."
+					maxlength="500"
+					class="mt-1 block w-full rounded border px-3 py-2 text-sm"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+				></textarea>
+				<p class="mt-1 text-xs" style="color: var(--color-muted)">
+					Plain text only; no HTML or Markdown. Empty to clear.
+				</p>
+			</div>
 		</div>
 
 		<div class="rounded border p-4" style="border-color: var(--color-border)">

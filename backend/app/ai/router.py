@@ -52,6 +52,7 @@ from app.ai.models import (
 )
 from app.ai import service
 from app.ai.creation import create_diagrams_from_ai
+from app.ai.error_mapper import map_provider_error
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -372,7 +373,7 @@ async def ask_question(
     except Exception as exc:  # noqa: BLE001
         import logging
         logging.getLogger("app.ai").exception("LLM provider error in ask_question")
-        raise HTTPException(status_code=502, detail=f"LLM provider error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=map_provider_error(exc)) from exc
 
     return QAResponse(
         answer=result["answer"],  # type: ignore[arg-type]
@@ -567,7 +568,7 @@ async def ask_multi_set(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         logging.getLogger("app.ai").exception("LLM provider error in ask_multi_set")
-        raise HTTPException(status_code=502, detail=f"LLM provider error: {exc}") from exc
+        raise HTTPException(status_code=502, detail=map_provider_error(exc)) from exc
 
     return QAResponse(
         answer=result["answer"],  # type: ignore[arg-type]

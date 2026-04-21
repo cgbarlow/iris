@@ -194,7 +194,8 @@ class OpenAICompatibleClient(AIClient):
             latency = int((time.monotonic() - start) * 1000)
             return ProviderTestResult(ok=True, latency_ms=latency)
         except Exception as exc:  # noqa: BLE001
-            return ProviderTestResult(ok=False, error=str(exc))
+            from app.ai.error_mapper import map_provider_error  # noqa: PLC0415
+            return ProviderTestResult(ok=False, error=map_provider_error(exc))
 
 
 class AnthropicClient(AIClient):
@@ -309,7 +310,8 @@ class AnthropicClient(AIClient):
             latency = int((time.monotonic() - start) * 1000)
             return ProviderTestResult(ok=True, latency_ms=latency)
         except Exception as exc:  # noqa: BLE001
-            return ProviderTestResult(ok=False, error=str(exc))
+            from app.ai.error_mapper import map_provider_error  # noqa: PLC0415
+            return ProviderTestResult(ok=False, error=map_provider_error(exc))
 
 
 def create_ai_client(provider_row: dict[str, object]) -> AIClient:

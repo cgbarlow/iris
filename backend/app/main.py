@@ -39,6 +39,7 @@ from app.relationships.router import router as relationships_router
 from app.search.router import router as search_router
 from app.collections.router import router as collections_router
 from app.sets.router import router as sets_router
+from app.notifications.router import router as notifications_router
 from app.settings.router import router as settings_router
 from app.startup import initialize_databases
 from app.users.router import router as users_router
@@ -149,6 +150,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(search_router)
     app.include_router(audit_router)
     app.include_router(settings_router)
+    app.include_router(notifications_router)
     app.include_router(admin_thumbnails_router)
     app.include_router(import_router)
     app.include_router(import_pptx_router)

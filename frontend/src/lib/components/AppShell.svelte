@@ -7,6 +7,7 @@
 	import { getAiContextCount } from '$lib/stores/aiContext.svelte.js';
 	import { startProviderPolling, stopProviderPolling } from '$lib/stores/aiProviders.svelte.js';
 	import { apiFetch } from '$lib/utils/api';
+	import SystemBanner from '$lib/components/SystemBanner.svelte';
 
 	let { children } = $props();
 
@@ -153,6 +154,10 @@
 <div class="flex min-h-screen flex-col">
 	<!-- Skip link per WCAG 2.4.1 -->
 	<a href="#main-content" class="skip-link">Skip to main content</a>
+
+	<!-- Admin-posted system notification banner (ADR-124). Shown to every
+	     visitor including anonymous; dismissible per message per session. -->
+	<SystemBanner />
 
 	<!-- Header / Banner landmark -->
 	<header
