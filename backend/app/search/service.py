@@ -541,7 +541,7 @@ async def _search_postgres(
 
     _PG_ELEM = (
         "SELECT e.id, ev.name, e.element_type, ev.description, "
-        "ts_rank(e.search_vector, to_tsquery('english', %s)) AS rank, "
+        "ts_rank(e.search_vector, to_tsquery('english', ?)) AS rank, "
         "s.name AS set_name, col.name AS collection_name, e.set_id "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
@@ -592,7 +592,7 @@ async def _search_postgres(
 
     _PG_DIAG = (
         "SELECT m.id, mv.name, m.diagram_type, mv.description, "
-        "ts_rank(m.search_vector, to_tsquery('english', %s)) AS rank, "
+        "ts_rank(m.search_vector, to_tsquery('english', ?)) AS rank, "
         "s.name AS set_name, col.name AS collection_name, pv.name AS package_name, m.set_id "
         "FROM diagrams m "
         "JOIN diagram_versions mv ON m.id = mv.diagram_id AND m.current_version = mv.version "
@@ -648,7 +648,7 @@ async def _search_postgres(
     # Ranks are merged with elements + diagrams at the end.
     _PG_PKG = (
         "SELECT p.id, pv.name, pv.description, "
-        "ts_rank(p.search_vector, to_tsquery('english', %s)) AS rank, "
+        "ts_rank(p.search_vector, to_tsquery('english', ?)) AS rank, "
         "s.name AS set_name, col.name AS collection_name, p.set_id "
         "FROM packages p "
         "JOIN package_versions pv ON p.id = pv.package_id AND p.current_version = pv.version "
@@ -701,7 +701,7 @@ async def _search_postgres(
     if not set_id:
         _PG_SET = (
             "SELECT s.id, s.name, s.description, "
-            "ts_rank(s.search_vector, to_tsquery('english', %s)) AS rank, "
+            "ts_rank(s.search_vector, to_tsquery('english', ?)) AS rank, "
             "col.id AS collection_id, col.name AS collection_name "
             "FROM sets s "
             "LEFT JOIN collections col ON s.collection_id = col.id "
@@ -743,7 +743,7 @@ async def _search_postgres(
     if not set_id and not collection_id:
         cursor = await db.execute(
             "SELECT c.id, c.name, c.description, "
-            "ts_rank(c.search_vector, to_tsquery('english', %s)) AS rank "
+            "ts_rank(c.search_vector, to_tsquery('english', ?)) AS rank "
             "FROM collections c "
             "WHERE c.search_vector @@ to_tsquery('english', ?) "
             "AND c.is_deleted = FALSE "

@@ -15,6 +15,7 @@ import knowledgeGraph from './knowledge-graph.md?raw';
 import search from './search.md?raw';
 import askAi from './ask-ai.md?raw';
 import bookmarks from './bookmarks.md?raw';
+import keyboardShortcuts from './keyboard-shortcuts.md?raw';
 import admin from './admin.md?raw';
 
 export interface GuideSection {
@@ -32,6 +33,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
 	{ slug: 'search', title: 'Search', markdown: search },
 	{ slug: 'ask-ai', title: 'Ask AI', markdown: askAi },
 	{ slug: 'bookmarks', title: 'Bookmarks', markdown: bookmarks },
+	{ slug: 'keyboard-shortcuts', title: 'Keyboard Shortcuts', markdown: keyboardShortcuts },
 	{ slug: 'admin', title: 'Admin', markdown: admin },
 ];
 

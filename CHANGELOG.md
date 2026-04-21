@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.3] - 2026-04-21
+
+### Fixed
+- **Supabase search SQL placeholder bug — this is the actual reason search returned zero results on UAT.** `_search_postgres` used `%s` (psycopg-style) inside the `ts_rank(...)` subexpression of every SELECT while the rest of the query used `?` (SQLite-style). The Iris DB adapter converts `?` to asyncpg's `$N` but leaves `%s` as literal text, so queries sent to Postgres had an un-bound `%s` token — Postgres either errored or the query silently returned nothing. Converted all five entity queries (elements, diagrams, packages, sets, collections) to consistent `?` placeholders. Placeholder/parameter counts now match exactly. This complements v4.1.2's schema migration (which was necessary but not sufficient — the schema was right, the Python call site was broken).
+- Verify on UAT: typing `msd` on the dashboard should now return the MSD package + related diagrams. No re-migration needed; v4.1.2's `m040` still applies.
+
+### Changed
+- **User Guide moved to the header; keyboard shortcuts merged in; `/help` route deleted.** The "Guide" sidebar entry has been replaced by a "User Guide" link in the header (replacing the old "Help" link) so docs sit consistently with the other session-level actions (Sign in/Sign out, theme). The Keyboard Shortcuts section previously on `/help` is now a section of the User Guide (`/guide/keyboard-shortcuts`), expanded with the full sidebar shortcut list. The old `/help` route has been removed; any bookmarks pointing there should be updated to `/guide`.
+
 ## [4.1.2] - 2026-04-21
 
 ### Fixed
