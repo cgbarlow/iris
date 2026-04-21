@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { isAuthenticated, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
+	import { isAuthenticated, isAnonymous, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
 	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
 	import { getActiveCollectionId, getActiveCollectionName } from '$lib/stores/activeCollection.svelte.js';
 	import { getAiContextCount } from '$lib/stores/aiContext.svelte.js';
@@ -69,18 +69,30 @@
 	const activeCollectionId = $derived(getActiveCollectionId());
 	const activeCollectionName = $derived(getActiveCollectionName());
 
-	const navItems = [
+	// Menu items that every visitor (including anonymous) can use (ADR-123).
+	// Guide (ADR-122 / SPEC-122-A) is a new public documentation route.
+	const publicNavItems = [
 		{ href: '/ask', label: 'Iris AI', shortcut: 'A', icon: 'ai' },
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
 		{ href: '/collections', label: 'Collections', shortcut: 'C', icon: 'collections' },
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
 		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },
 		{ href: '/elements', label: 'Elements', shortcut: 'E', icon: 'elements' },
+		{ href: '/guide', label: 'Guide', shortcut: 'G', icon: 'guide' },
+	];
+
+	// Menu items that only make sense with a persisted user identity —
+	// hidden when anonymous (per-user bookmarks, write-only tools).
+	const authedNavItems = [
 		{ href: '/bookmarks', label: 'Bookmarks', shortcut: 'B', icon: 'bookmarks' },
 		{ href: '/import', label: 'Import', shortcut: 'I', icon: 'import' },
 		{ href: '/recycle-bin', label: 'Recycle Bin', shortcut: 'R', icon: 'recycle-bin' },
 		{ href: '/settings', label: 'Settings', shortcut: 'S', icon: 'settings' },
 	];
+
+	const navItems = $derived(
+		isAnonymous() ? publicNavItems : [...publicNavItems, ...authedNavItems],
+	);
 
 	const adminItems = [
 		{ href: '/admin/users', label: 'Users', shortcut: 'U', icon: 'users' },
@@ -112,6 +124,8 @@
 			<path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/>
 		{:else if icon === 'bookmarks'}
 			<path d="M184,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.24,6.78L128,193.43l59.77,37.35A8,8,0,0,0,200,224V48A16,16,0,0,0,184,32Zm0,177.57-51.77-32.35a8,8,0,0,0-8.48,0L72,209.57V48H184Z"/>
+		{:else if icon === 'guide'}
+			<path d="M208,24H72A32,32,0,0,0,40,56V224a8,8,0,0,0,8,8H192a8,8,0,0,0,0-16H56a16,16,0,0,1,16-16H208a8,8,0,0,0,8-8V32A8,8,0,0,0,208,24Zm-8,160H72a31.82,31.82,0,0,0-16,4.29V56A16,16,0,0,1,72,40H200Z"/>
 		{:else if icon === 'recycle-bin'}
 			<path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/>
 		{:else if icon === 'settings'}
@@ -180,6 +194,14 @@
 				>
 					Sign out ({getCurrentUser()?.username})
 				</button>
+			{:else}
+				<a
+					href="/login"
+					class="header-link rounded px-3 py-1 text-sm transition-colors"
+					style="color: var(--color-primary)"
+				>
+					Sign in
+				</a>
 			{/if}
 		</div>
 	</header>

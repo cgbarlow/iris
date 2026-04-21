@@ -88,12 +88,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     # Audit middleware per SPEC-007-A (innermost — runs after auth resolves)
     app.add_middleware(AuditMiddleware)
 
-    # Rate limiting middleware per SPEC-005-B
+    # Rate limiting middleware per SPEC-005-B + ADR-123 (anon_ai bucket)
     app.add_middleware(
         RateLimitMiddleware,
         login=config.rate_limit_login,
         refresh=config.rate_limit_refresh,
         general=config.rate_limit_general,
+        anon_ai=config.anon_ai_rate_limit,
     )
 
     # CORS middleware per SPEC-004-A

@@ -105,6 +105,12 @@ export function isAuthenticated(): boolean {
 	return accessToken !== null;
 }
 
+/** True when no access token is present — the caller is browsing anonymously.
+ *  Used by components to hide write UI (ADR-123). */
+export function isAnonymous(): boolean {
+	return accessToken === null;
+}
+
 export function setAuth(tokens: AuthTokens, user: User): void {
 	accessToken = tokens.access_token;
 	refreshToken = tokens.refresh_token ?? null;

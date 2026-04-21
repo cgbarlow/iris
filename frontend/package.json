@@ -1,7 +1,7 @@
 {
 	"name": "frontend",
 	"private": true,
-	"version": "4.0.4",
+	"version": "4.1.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -17,6 +17,7 @@
 		"test:probe": "tsx tests/probes/spread-slider-probe.ts",
 		"test:probe:live": "tsx tests/probes/spread-slider-live.ts",
 		"test:probe:ui": "tsx tests/probes/spread-slider-ui.ts",
+		"screenshots": "playwright test --project=screenshots",
 		"bddgen": "bddgen",
 		"test": "vitest run"
 	},

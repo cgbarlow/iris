@@ -8,6 +8,10 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.migrations.m012_sets import DEFAULT_SET_ID
+from app.search.service import (
+    index_package as _index_package,
+    remove_package_index as _remove_package_index,
+)
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -59,6 +63,13 @@ async def create_package(
         (package_id, name, description, change_summary, now, created_by, metadata_json),
     )
     await db.commit()
+
+    await _index_package(
+        db,
+        package_id=package_id,
+        name=name,
+        description=description,
+    )
 
     return {
         "id": package_id,
@@ -215,6 +226,13 @@ async def update_package(
     )
     await db.commit()
 
+    await _index_package(
+        db,
+        package_id=package_id,
+        name=name,
+        description=description,
+    )
+
     return {"current_version": new_version, "updated_at": now}
 
 
@@ -256,6 +274,9 @@ async def soft_delete_package(
         (package_id, new_version, ver_row[0], ver_row[1], now, deleted_by),
     )
     await db.commit()
+
+    await _remove_package_index(db, package_id)
+
     return True
 
 

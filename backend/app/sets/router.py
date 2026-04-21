@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response as FastAPIResponse
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.sets.models import (
     SetCreate,
     SetForceDeleteResponse,
@@ -61,7 +61,7 @@ async def create(
 @router.get("", response_model=SetListResponse)
 async def list_all(
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
     collection_id: str | None = Query(default=None),  # noqa: B008
 ) -> SetListResponse:
     """List all sets with model/entity counts, optionally filtered by collection."""
@@ -74,7 +74,7 @@ async def list_all(
 async def get_one(
     set_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> SetResponse:
     """Get a single set by ID."""
     db = request.app.state.db_manager.main_db
@@ -209,7 +209,7 @@ async def get_thumbnail(
 async def get_tags(
     set_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[str]:
     """Get all unique tags within a set."""
     db = request.app.state.db_manager.main_db

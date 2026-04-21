@@ -136,3 +136,79 @@ class TestRateLimitIsolation:
         # Health should still work
         resp = await client.get("/health")
         assert resp.status_code == 200
+
+
+@pytest.fixture
+def anon_ai_app_config(tmp_path: Path) -> AppConfig:
+    """Config with a tiny anon_ai bucket so we can exercise it quickly."""
+    return AppConfig(
+        debug=True,
+        cors_origins=["http://localhost:5173"],
+        database=DatabaseConfig(data_dir=str(tmp_path / "data")),
+        auth=AuthConfig(
+            jwt_secret="test-secret-key-that-is-at-least-32-bytes-long-for-hs256",
+            argon2_time_cost=1,
+            argon2_memory_cost=8192,
+            argon2_parallelism=1,
+        ),
+        rate_limit_login=200,
+        rate_limit_refresh=200,
+        rate_limit_general=2000,
+        anon_ai_rate_limit=3,
+    )
+
+
+@pytest.fixture
+async def anon_ai_client(
+    anon_ai_app_config: AppConfig,
+) -> AsyncIterator[httpx.AsyncClient]:
+    application = create_app(anon_ai_app_config)
+    db_manager = DatabaseManager(anon_ai_app_config)
+    await initialize_databases(db_manager)
+    application.state.db_manager = db_manager
+    transport = httpx.ASGITransport(app=application)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as c:
+        yield c
+    await db_manager.close()
+
+
+class TestAnonAIRateLimit:
+    """Anonymous AI calls use a distinct, stricter bucket (ADR-123, SPEC-123-A)."""
+
+    async def test_anonymous_ai_allowed_under_limit(
+        self, anon_ai_client: httpx.AsyncClient,
+    ) -> None:
+        # Three calls at the limit → none should return 429. The endpoint
+        # may return other statuses (404 if no provider, 4xx for bad body),
+        # but 429 is the signal we care about here.
+        for _ in range(3):
+            resp = await anon_ai_client.post(
+                "/api/ai/ask", json={"question": "hello", "set_ids": []},
+            )
+            assert resp.status_code != 429
+
+    async def test_anonymous_ai_blocked_over_limit(
+        self, anon_ai_client: httpx.AsyncClient,
+    ) -> None:
+        for _ in range(3):
+            await anon_ai_client.post(
+                "/api/ai/ask", json={"question": "hello", "set_ids": []},
+            )
+        resp = await anon_ai_client.post(
+            "/api/ai/ask", json={"question": "hello", "set_ids": []},
+        )
+        assert resp.status_code == 429
+
+    async def test_anonymous_ai_bucket_does_not_affect_general(
+        self, anon_ai_client: httpx.AsyncClient,
+    ) -> None:
+        # Exhaust the anon_ai bucket
+        for _ in range(4):
+            await anon_ai_client.post(
+                "/api/ai/ask", json={"question": "hello", "set_ids": []},
+            )
+        # General (non-AI) read endpoint should still be fine
+        resp = await anon_ai_client.get("/api/collections")
+        assert resp.status_code != 429

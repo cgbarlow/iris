@@ -72,8 +72,17 @@ async def _viewer_headers(client: httpx.AsyncClient, admin_headers: dict[str, st
 
 
 class TestGetGraphSettings:
-    async def test_requires_auth(self, client: httpx.AsyncClient) -> None:
+    async def test_allows_anonymous(self, client: httpx.AsyncClient) -> None:
+        """Graph settings GET is public-readable (ADR-123). Anonymous returns 200."""
         resp = await client.get("/api/graph/settings")
+        assert resp.status_code == 200
+
+    async def test_rejects_invalid_token(self, client: httpx.AsyncClient) -> None:
+        """A *present-but-invalid* token still returns 401 (SPEC-123-A)."""
+        resp = await client.get(
+            "/api/graph/settings",
+            headers={"Authorization": "Bearer not-a-real-token"},
+        )
         assert resp.status_code == 401
 
     async def test_returns_seeded_defaults(self, client: httpx.AsyncClient) -> None:

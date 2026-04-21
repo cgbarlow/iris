@@ -6,6 +6,11 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.search.service import (
+    index_collection as _index_collection,
+    remove_collection_index as _remove_collection_index,
+)
+
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
 
@@ -50,6 +55,10 @@ async def create_collection(
         (collection_id, name, description, now, created_by, now),
     )
     await db.commit()
+
+    await _index_collection(
+        db, collection_id=collection_id, name=name, description=description,
+    )
 
     return {
         "id": collection_id,
@@ -219,6 +228,10 @@ async def update_collection(
         )
     await db.commit()
 
+    await _index_collection(
+        db, collection_id=collection_id, name=name, description=description,
+    )
+
     return await get_collection(db, collection_id)
 
 
@@ -252,6 +265,9 @@ async def soft_delete_collection(
         (now, collection_id),
     )
     await db.commit()
+
+    await _remove_collection_index(db, collection_id)
+
     return None
 
 

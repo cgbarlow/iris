@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_optional_user
 from app.search.models import SearchResponse, SearchResult
 from app.search.service import search
 
@@ -20,7 +20,7 @@ async def search_endpoint(
     limit: int = Query(default=50, ge=1, le=200),
     set_id: str | None = Query(default=None),
     collection_id: str | None = Query(default=None),
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> SearchResponse:
     """Search elements and diagrams by text query."""
     db = request.app.state.db_manager.main_db

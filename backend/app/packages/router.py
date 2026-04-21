@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.packages.models import (
     PackageCreate,
     PackageHierarchyNode,
@@ -57,7 +57,7 @@ async def hierarchy(
     request: Request,
     root_id: str | None = None,
     set_id: str | None = None,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[PackageHierarchyNode]:
     """Get the package hierarchy tree."""
     db = request.app.state.db_manager.main_db
@@ -72,7 +72,7 @@ async def list_all(
     collection_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> PackageListResponse:
     """List packages with optional set/collection filter and pagination."""
     db = request.app.state.db_manager.main_db
@@ -91,7 +91,7 @@ async def list_all(
 async def get_descendant_count(
     package_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> dict[str, int]:
     """Get counts of descendant packages and diagrams."""
     db = request.app.state.db_manager.main_db
@@ -105,7 +105,7 @@ async def get_descendant_count(
 async def get_one(
     package_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> PackageResponse:
     """Get a single package by ID."""
     db = request.app.state.db_manager.main_db
@@ -185,7 +185,7 @@ async def delete(
 async def get_ancestors(
     package_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Get ancestor chain for breadcrumb navigation (root first)."""
     db = request.app.state.db_manager.main_db
@@ -196,7 +196,7 @@ async def get_ancestors(
 async def get_children(
     package_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Get direct children of a package."""
     db = request.app.state.db_manager.main_db
@@ -232,7 +232,7 @@ async def set_parent(
 async def get_versions(
     package_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[PackageVersionResponse]:
     """Get all versions of a package."""
     db = request.app.state.db_manager.main_db

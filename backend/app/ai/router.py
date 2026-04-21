@@ -33,7 +33,7 @@ async def _is_ai_debug(db: object) -> bool:
     except Exception:  # noqa: BLE001
         return False
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.ai.models import (
     ActiveProviderResponse,
     ApplyCreationRequest,
@@ -144,9 +144,9 @@ async def create_provider(
 @router.get("/providers/active", response_model=list[ActiveProviderResponse])
 async def list_active_providers(
     request: Request,
-    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[ActiveProviderResponse]:
-    """List active AI providers (id, name, model, type). Any authenticated user."""
+    """List active AI providers (id, name, model, type). Public — anonymous callers use this to discover available models."""
     db = request.app.state.db_manager.main_db
     cursor = await db.execute(
         "SELECT id, name, model, provider_type, base_url, is_default FROM ai_providers WHERE is_active = 1 ORDER BY name",
@@ -346,20 +346,25 @@ async def ask_question(
     body: QARequest,
     request: Request,
     stream: bool = Query(False),
-    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> Any:
-    """Ask a question about a Set. Returns QAResponse or SSE stream."""
+    """Ask a question about a Set. Returns QAResponse or SSE stream.
+
+    Anonymous callers are allowed (ADR-123) — the rate-limit middleware
+    applies the stricter anon_ai bucket to unauthenticated requests.
+    """
     db = request.app.state.db_manager.main_db
+    user_id = current_user["id"] if current_user else "anonymous"
 
     if stream:
-        return await _ask_streaming(db, set_id=set_id, body=body, user_id=current_user["id"])
+        return await _ask_streaming(db, set_id=set_id, body=body, user_id=user_id)
 
     try:
         result = await service.ask_question(
             db,
             set_id=set_id,
             question=body.question,
-            user_id=current_user["id"],
+            user_id=user_id,
             provider_id=body.provider_id,
         )
     except ValueError as exc:
@@ -526,20 +531,25 @@ async def ask_multi_set(
     body: MultiSetQARequest,
     request: Request,
     stream: bool = Query(False),
-    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> Any:
-    """Ask a question across multiple Sets. Returns QAResponse or SSE stream."""
+    """Ask a question across multiple Sets. Returns QAResponse or SSE stream.
+
+    Anonymous callers are allowed (ADR-123) — the rate-limit middleware
+    applies the stricter anon_ai bucket to unauthenticated requests.
+    """
     if not body.set_ids and not body.docref_doc_ids and not body.file_contexts:
         raise HTTPException(
             status_code=400,
             detail="At least one set, legislation document, or file must be provided",
         )
     db = request.app.state.db_manager.main_db
+    user_id = current_user["id"] if current_user else "anonymous"
 
     if stream:
         return await _ask_multi_set_streaming(
             db, set_ids=body.set_ids, collection_id=body.collection_id,
-            body=body, user_id=current_user["id"],
+            body=body, user_id=user_id,
         )
 
     try:
@@ -550,7 +560,7 @@ async def ask_multi_set(
             docref_doc_ids=body.docref_doc_ids,
             file_contexts=[{"filename": fc.filename, "text": fc.text} for fc in body.file_contexts] if body.file_contexts else None,
             question=body.question,
-            user_id=current_user["id"],
+            user_id=user_id,
             provider_id=body.provider_id,
         )
     except ValueError as exc:

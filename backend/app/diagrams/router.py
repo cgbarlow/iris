@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response as FastAPIResponse
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.diagrams.models import (
     DiagramCreate,
     DiagramHierarchyNode,
@@ -85,7 +85,7 @@ async def hierarchy(
     request: Request,
     root_id: str | None = None,
     set_id: str | None = None,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[DiagramHierarchyNode]:
     """Get the diagram hierarchy tree."""
     db = request.app.state.db_manager.main_db
@@ -118,7 +118,7 @@ async def list_all(
     collection_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> DiagramListResponse:
     """List diagrams with optional type/notation/set/collection filter and pagination."""
     db = request.app.state.db_manager.main_db
@@ -138,7 +138,7 @@ async def list_all(
 async def get_one(
     diagram_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> DiagramResponse:
     """Get a single diagram by ID."""
     db = request.app.state.db_manager.main_db
@@ -219,7 +219,7 @@ async def delete(
 async def get_diagram_ancestors_route(
     diagram_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Get ancestor chain for breadcrumb navigation (root first)."""
     db = request.app.state.db_manager.main_db
@@ -230,7 +230,7 @@ async def get_diagram_ancestors_route(
 async def get_diagram_children_route(
     diagram_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[dict[str, Any]]:
     """Get direct children of a diagram."""
     db = request.app.state.db_manager.main_db
@@ -266,7 +266,7 @@ async def set_parent(
 async def get_versions(
     diagram_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[DiagramVersionResponse]:
     """Get all versions of a diagram."""
     db = request.app.state.db_manager.main_db
@@ -379,7 +379,7 @@ async def remove_tag(
 async def get_diagram_relationships(
     diagram_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> dict[str, Any]:
     """Get all relationships for a diagram: element-to-element and diagram links."""
     from app.package_relationships.service import list_all_relationships_for_diagram

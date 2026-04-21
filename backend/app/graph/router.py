@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.graph.models import GraphResponse, GraphSettingsResponse, GraphSettingsUpdate
 from app.graph.service import (
     get_graph_data,
@@ -28,7 +28,7 @@ async def get_graph(
     request: Request,
     set_id: str | None = None,
     collection_id: str | None = None,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> GraphResponse:
     """Return knowledge graph data. Scoped to set, collection, or full repository."""
     db = request.app.state.db_manager.main_db
@@ -43,7 +43,7 @@ async def get_graph_settings_endpoint(
     request: Request,
     set_id: str | None = None,
     collection_id: str | None = None,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> GraphSettingsResponse:
     """Return cascaded admin-default graph settings."""
     db = request.app.state.db_manager.main_db

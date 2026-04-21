@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.elements.models import (
     ElementCreate,
     ElementListResponse,
@@ -63,7 +63,7 @@ async def list_all(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> ElementListResponse:
     """List elements with optional type/set/collection/notation/search filter and pagination."""
     db = request.app.state.db_manager.main_db
@@ -82,7 +82,7 @@ async def list_all(
 async def list_all_tags(
     request: Request,
     set_id: str | None = None,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[str]:
     """List all unique tags from elements and diagrams, optionally scoped by set."""
     db = request.app.state.db_manager.main_db
@@ -115,7 +115,7 @@ async def list_all_tags(
 async def get_one(
     element_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> ElementResponse:
     """Get a single element by ID."""
     db = request.app.state.db_manager.main_db
@@ -238,7 +238,7 @@ async def delete(
 async def get_versions(
     element_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[ElementVersionResponse]:
     """Get all versions of an element."""
     db = request.app.state.db_manager.main_db
@@ -256,7 +256,7 @@ async def get_version(
     element_id: str,
     version: int,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> ElementVersionResponse:
     """Get a specific version of an element."""
     db = request.app.state.db_manager.main_db
@@ -270,7 +270,7 @@ async def get_version(
 async def get_element_diagrams(
     element_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[dict[str, str]]:
     """Get diagrams that reference this element."""
     db = request.app.state.db_manager.main_db
@@ -300,7 +300,7 @@ async def get_element_diagrams(
 async def get_element_stats(
     element_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> dict[str, int]:
     """Get statistics for an element (relationship count, diagram usage count)."""
     db = request.app.state.db_manager.main_db
