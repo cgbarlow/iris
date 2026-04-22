@@ -33,7 +33,7 @@ This guide covers deploying Iris as a static SvelteKit frontend, a Scenia React 
 
 ## Step 2 — Run the PostgreSQL migrations
 
-All 35 migration files are in `backend/app/migrations/supabase/` (m001–m035). They are idempotent and safe to re-run.
+All 40 migration files are in `backend/app/migrations/supabase/` (m001–m040). They are idempotent and safe to re-run.
 
 ### Option A: Script (recommended)
 
@@ -57,11 +57,17 @@ If you have `psql` installed locally, run all migrations in one command using th
 
 ### What the migrations do
 
-- **m001–m026**: Core schema (tables, indexes, FTS triggers, seed data)
+- **m001–m026**: Core schema (tables, indexes, FTS triggers for elements/diagrams, seed data)
 - **m027**: `profiles` table + trigger that auto-creates a profile row when Supabase Auth creates a user (no manual inserts needed)
 - **m028**: DoView notation, diagram types, mappings, and theme (seed data)
 - **m029**: `ai_creation_prompts` table + 4 seeded layered prompts
-- **m030**: Row Level Security on all 34 tables (see [Verifying Row Level Security](#verifying-row-level-security))
+- **m030**: Row Level Security on core tables (see [Verifying Row Level Security](#verifying-row-level-security))
+- **m031–m034**: Schema patches (`ai_conversations` mode/thread_id, sequence order, collections table, extensions registry)
+- **m035**: Scenia tables (strategies / programmes / initiatives / …) — optional, used only when the Scenia extension is enabled
+- **m036–m037**: Scenia timestamp columns + `ai_conversations.set_id` nullable
+- **m038**: Collections RLS policies
+- **m039**: `graph_settings` table (admin defaults for knowledge-graph physics)
+- **m040**: Search parity with SQLite — `search_vector` + GIN + triggers for packages/sets/collections, chain-triggers fixing INSERT-ordering on elements/diagrams (ADR-125)
 
 ---
 
@@ -145,51 +151,83 @@ Create three services manually in the Render Dashboard:
 
 ## Step 5 — Set environment variables in Render
 
+Each Render service has its own **Environment → Environment Variables** tab. All values below are `sync: false` in `render.yaml` — they are secrets per-deployment and must be entered manually (or pasted from a password manager). The screenshots are from a live UAT deployment and show the complete set.
+
 ### Frontend (iris-frontend)
+
+![iris-frontend env vars in the Render dashboard](./assets/deployment/render-iris-frontend-envs.png)
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `VITE_DB_BACKEND` | `supabase` | Enables Supabase deployment mode |
-| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key |
-| `VITE_API_BASE_URL` | `https://iris-api.onrender.com` | URL of the iris-api web service |
-| `VITE_SCENIA_URL` | `https://scenia.onrender.com` | URL of the Scenia static site |
+| `PUBLIC_SITE_URL` | `https://iris-uat.chrisbarlow.nz` | Absolute base URL of this deployment. Interpolated into `src/app.html` at build time as `%sveltekit.env.PUBLIC_SITE_URL%` so Open Graph / Twitter Card `og:image` / `og:url` resolve to absolute URLs that LinkedIn / Slack / Teams / WhatsApp scrape correctly (ADR-126). Must match the custom domain or Render URL exactly; no trailing slash. |
+| `VITE_API_BASE_URL` | `https://iris-api-gtb3.onrender.com` | URL of the **iris-api** web service (use its Render-assigned `*.onrender.com` URL or your custom domain for the API). `apiFetch` prefixes every request with this. |
+| `VITE_DB_BACKEND` | `supabase` | Enables Supabase deployment mode. The frontend imports `@supabase/supabase-js` and the Supabase login flow only when this is `supabase`. |
+| `VITE_SCENIA_URL` | `https://scenia-uat.chrisbarlow.nz` | URL of the **scenia** static site (custom domain or `*.onrender.com`). Used by `openScenia()` to open the roadmapping app in a new tab with the JWT + API URL as query params. |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase **publishable** key. Embedded in the frontend bundle at build time — safe because RLS (m030) denies direct table access to this key. |
+| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL. Used by the Supabase JS SDK for the login flow. |
 
-> **Security note:** `VITE_*` variables are embedded in the frontend bundle at build time and visible to users. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. RLS (m030) prevents the publishable key from accessing any table data directly.
+> **Security note:** `VITE_*` and `PUBLIC_*` variables are embedded in the built HTML and JS bundles and visible to anyone loading the page. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. The service-role secret key belongs on the backend only.
 
 ### Scenia (scenia)
 
+![scenia env vars in the Render dashboard](./assets/deployment/render-scenia-envs.png)
+
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `VITE_API_BASE_URL` | `https://iris-api.onrender.com` | URL of the iris-api web service |
+| `VITE_API_BASE_URL` | `https://iris-api-gtb3.onrender.com` | URL of the iris-api web service — same value as on the frontend service. |
 
 > Scenia receives auth tokens at runtime via URL query parameters from the Iris frontend (see `openScenia()` in `frontend/src/lib/scenia/config.ts`). No Supabase keys are needed at build time.
 
 ### Backend (iris-api)
 
+![iris-api env vars in the Render dashboard](./assets/deployment/render-iris-api-envs.png)
+
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `IRIS_DB_BACKEND` | `supabase` | Enables Supabase deployment mode |
-| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL |
-| `SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key |
-| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Supabase secret key (backend only) |
-| `SUPABASE_DB_URL` | `postgresql://...` | Transaction pooler connection string |
-| `SUPABASE_JWT_SECRET` | `your-jwt-secret` | JWT secret from Supabase settings |
-| `IRIS_CORS_ORIGINS` | `https://iris-frontend.onrender.com,https://scenia.onrender.com` | Frontend + Scenia URLs (for CORS) |
+| `IRIS_CORS_ORIGINS` | `https://iris-uat.chrisbarlow.nz,https://scenia-uat.chrisbarlow.nz` | Comma-separated list of allowed CORS origins — your frontend URL plus the Scenia URL. Both Iris and Scenia make cross-origin calls to this API. Include `https://`; do not include trailing slashes. |
+| `IRIS_DB_BACKEND` | `supabase` | Enables Supabase deployment mode. Without this, the backend opens a local SQLite file. |
+| `IRIS_DEBUG` | `false` | `true` switches the FastAPI app into debug mode (richer error pages, reloader in dev). Leave as `false` on production deployments. |
+| `SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key. Same value as `VITE_SUPABASE_ANON_KEY` on the frontend. |
+| `SUPABASE_DB_URL` | `postgresql://postgres:PASSWORD@aws-0-xx-xx-x.pooler.supabase.com:6543/postgres?sslmode=require` | Transaction pooler connection string (port **6543**, not 5432). Runtime app connections only — migrations use the direct-connection URL on port 5432 (see Step 2). |
+| `SUPABASE_JWT_SECRET` | `your-jwt-secret` | JWT secret from Supabase **Settings → API Keys → JWT Settings**. The backend uses this to verify tokens issued by Supabase Auth. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Supabase **secret** key — backend only. Grants RLS-bypassing access. **Never** expose this in the frontend bundle. |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL. Same value as `VITE_SUPABASE_URL`. |
 
-> Set `IRIS_CORS_ORIGINS` to your frontend and Scenia Render URLs, comma-separated. Scenia makes cross-origin API calls to the backend.
+### Optional backend rate-limit overrides
+
+Default rate limits are defined in `backend/app/config.py`. Override only if you need to deviate from the defaults — otherwise leave these unset on Render.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `IRIS_RATE_LIMIT_LOGIN` | `10` | Failed-login attempts allowed per IP per 60-second sliding window. |
+| `IRIS_RATE_LIMIT_REFRESH` | `30` | Token refresh requests per IP per 60 seconds. |
+| `IRIS_RATE_LIMIT_GENERAL` | `1000` | All other API calls per IP per 60 seconds. |
+| `IRIS_RATE_LIMIT_ANON_AI` | `10` | Anonymous Ask AI requests per IP per **60-minute** window (ADR-123). Separate bucket from `GENERAL` so unauthenticated AI usage is bounded without throttling signed-in users. |
+
+### Custom domains (optional)
+
+If you're using custom domains (as per the UAT deployment — `iris-uat.chrisbarlow.nz`, `scenia-uat.chrisbarlow.nz`, `iris-api-gtb3.onrender.com`):
+
+1. In each Render service → **Settings → Custom Domains**, add your hostname and follow the CNAME / ALIAS instructions.
+2. Update the env vars above to reference your custom domain instead of the `*.onrender.com` default (the frontend's `VITE_API_BASE_URL`, `VITE_SCENIA_URL`, `PUBLIC_SITE_URL`, and the backend's `IRIS_CORS_ORIGINS`).
+3. Redeploy each service so the new values bake into the build.
+
+> The `iris-api` service normally keeps its `*.onrender.com` URL — there's little upside to exposing the backend under a custom domain, and CORS handling stays simpler with a stable Render URL.
 
 ---
 
 ## Step 6 — Verify the deployment
 
-1. Visit your frontend Render URL — you should see the Iris login page.
-2. Log in with the admin credentials created in Step 3.
-3. Create a model, add entities — verify CRUD operations work.
+1. **Anonymous read-only load.** Visit your frontend URL in an incognito window. The Iris dashboard should render immediately (no login redirect) — ADR-123 / SPEC-123-A behaviour. The sidebar should show: Iris AI, Dashboard, Collections, Sets, Diagrams, Elements, Settings. The header should show **User Guide** and **Sign in** links.
+2. **Sign in.** Click **Sign in**, enter the admin credentials from Step 3. Sidebar should now include Bookmarks / Import / Recycle Bin and the Admin submenu.
+3. **CRUD smoke.** Create a collection, add a set, add a package, add a diagram, edit the diagram canvas — verify write operations work.
+4. **Search.** Type a term that should match something you just created — confirm non-empty results (ADR-121 + ADR-125 behaviour).
+5. **Ask AI.** Open `/ask`, pick the default provider, send a test question — confirm streaming response.
+6. **Social preview.** Paste the frontend URL into Slack or a [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) — confirm the preview card renders with the dashboard screenshot (ADR-126). If the image doesn't show, `PUBLIC_SITE_URL` is probably missing from the frontend service.
 
 ### Verify CORS
 
-If API calls fail with CORS errors, check that `IRIS_CORS_ORIGINS` on the backend service matches your frontend URL exactly (including `https://`).
+If API calls fail with CORS errors (browser console: "Access-Control-Allow-Origin missing"), check that `IRIS_CORS_ORIGINS` on the backend service lists **every** frontend origin exactly — `https://`, no trailing slash, comma-separated if multiple. The most common miss is forgetting to include the Scenia URL when the Scenia extension is enabled.
 
 ---
 
@@ -307,8 +345,28 @@ The backend may be cold-starting. Wait 30–60 seconds and retry. Check Render l
 
 **`Supabase not configured` error**
 
-One or more `SUPABASE_*` environment variables is missing. Check all variables in the Render Dashboard for both services.
+One or more `SUPABASE_*` environment variables is missing. Check all variables in the Render Dashboard for the **iris-api** service against the full list in Step 5 — the backend needs all seven Supabase-related vars plus `IRIS_DB_BACKEND=supabase`.
 
 **Database connection errors**
 
-Ensure `SUPABASE_DB_URL` uses the **Transaction pooler** URL (port 6543), not the direct connection (port 5432). The pooler is required for connection management.
+Ensure `SUPABASE_DB_URL` uses the **Transaction pooler** URL (port 6543), not the direct connection (port 5432). The pooler is required for connection management. Migrations in Step 2 use the direct-connection URL (port 5432) — don't mix them up.
+
+**Social preview card doesn't show an image**
+
+`PUBLIC_SITE_URL` is missing or wrong on the **iris-frontend** service. The variable is interpolated at build time, so after setting it you must trigger a rebuild (Render → Manual Deploy, or push any commit). Use the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) to re-scrape the URL once fixed; Slack / Teams cache aggressively and may need a new unique URL (e.g. `?v=2`) to refresh.
+
+**Search returns nothing on UAT**
+
+Check that `m040_search_all_entities.sql` has been applied — run the verification query from [Verifying Row Level Security](#verifying-row-level-security) but adapted:
+
+```sql
+SELECT tablename, column_name FROM information_schema.columns
+WHERE table_schema = 'public' AND column_name = 'search_vector'
+ORDER BY tablename;
+```
+
+You should see `search_vector` columns on `collections`, `diagrams`, `elements`, `packages`, and `sets`. If any are missing, re-run the migration (ADR-125).
+
+**Anonymous Ask AI is rejecting every request**
+
+`IRIS_RATE_LIMIT_ANON_AI` defaults to 10 requests per IP per hour. If a test harness is hammering the endpoint behind a shared NAT, bump the value on the **iris-api** service. Rate limits are per Render instance memory — restarting the service resets every bucket.
