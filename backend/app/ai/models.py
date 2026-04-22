@@ -98,6 +98,7 @@ class QARequest(BaseModel):
     provider_id: str | None = None
     mode: str | None = None        # 'creation' for diagram creation mode
     notation: str | None = None    # notation to use in creation mode (e.g. 'doview')
+    diagram_type: str | None = None  # diagram type for non-DoView creation (ADR-132)
     history: list[dict[str, str]] | None = None  # prior conversation turns for multi-turn creation
     thread_id: str | None = None   # groups messages in a conversation thread
 
@@ -125,6 +126,7 @@ class MultiSetQARequest(BaseModel):
     provider_id: str | None = None
     mode: str | None = None
     notation: str | None = None
+    diagram_type: str | None = None  # ADR-132
     history: list[dict[str, str]] | None = None
     thread_id: str | None = None
 

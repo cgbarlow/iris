@@ -79,6 +79,25 @@ async def build_creation_system_prompt(
             parts.append(row[0])
 
     result = "\n\n".join(parts)
+
+    # Preamble: when both notation and diagram_type are present, make the
+    # user's UI selection explicit so the AI does not re-ask for information
+    # it already has (ADR-132). Also remind the AI to use attached context.
+    if diagram_type:
+        preamble = (
+            f"## User selection (already confirmed in UI)\n\n"
+            f"- Notation: **{notation}**\n"
+            f"- Diagram type: **{diagram_type}**\n\n"
+            "Do NOT ask the user to re-confirm the notation or the diagram "
+            "type — they are already fixed.\n\n"
+            "If the Set context or attached documents below describe the "
+            "subject matter, treat them as the primary source and do not "
+            "ask the user to describe what is already in them. Proceed to "
+            "propose structure (Stage 1) based on that material, then "
+            "confirm with the user.\n"
+        )
+        result = f"{preamble}\n{result}"
+
     print(f"[AI_CREATION] Built system prompt: {len(parts)} layers, {len(result)} chars", flush=True)
     return result
 
@@ -223,7 +242,80 @@ async def create_diagrams_from_ai(
             )
 
     await db.commit()
+
+    # Phase 3: convert sequence diagrams to the specialised render shape
+    # (ADR-132). The generic `{nodes, edges}` canvas format is not rendered by
+    # the sequence-diagram page — it expects `{participants, messages,
+    # activations}` per frontend/src/lib/canvas/sequence/types.ts. Translate
+    # in-place while preserving the original nodes/edges so the materialised
+    # elements/relationships keep their UI linkage.
+    for diagram_id, canvas_data, diag_def in zip(
+        diagram_ids, canvas_data_list, diagrams_def
+    ):
+        if diag_def.get("diagram_type") != "sequence":
+            continue
+        seq_data = _nodes_edges_to_sequence(canvas_data)
+        # Merge (don't replace) so the page can still fall back to nodes/edges
+        # for downstream tooling that expects the generic shape.
+        merged = {**canvas_data, **seq_data}
+        await db.execute(
+            "UPDATE diagram_versions SET data = ? WHERE diagram_id = ? AND version = 1",
+            (json.dumps(merged), diagram_id),
+        )
+
+    await db.commit()
     return diagram_ids
+
+
+_SEQUENCE_PARTICIPANT_TYPE_MAP = {
+    # Simple / UML element types that commonly appear in sequence diagrams.
+    "actor": "actor",
+    "person": "actor",
+    "component": "component",
+    "component_uml": "component",
+    "class": "component",
+    "object": "component",
+    "interface": "service",
+    "interface_uml": "service",
+    "service": "service",
+    "container": "service",
+}
+
+
+def _nodes_edges_to_sequence(canvas_data: dict) -> dict:
+    """Translate `{nodes, edges}` into `{participants, messages, activations}`.
+
+    Participant ordering follows node declaration order — the AI prompt places
+    lifelines left-to-right in node order, so we preserve that.
+    """
+    participants: list[dict] = []
+    for node in canvas_data.get("nodes", []):
+        node_data = node.get("data", {})
+        entity_type = node_data.get("entityType") or node.get("type") or "actor"
+        participants.append({
+            "id": node.get("id", ""),
+            "name": node_data.get("label", ""),
+            "type": _SEQUENCE_PARTICIPANT_TYPE_MAP.get(entity_type, "component"),
+            "entityId": node_data.get("entityId"),
+        })
+
+    messages: list[dict] = []
+    for order, edge in enumerate(canvas_data.get("edges", [])):
+        edge_data = edge.get("data", {})
+        messages.append({
+            "id": edge.get("id", f"msg-{order}"),
+            "from": edge.get("source", ""),
+            "to": edge.get("target", ""),
+            "label": edge_data.get("label") or edge.get("id", ""),
+            "type": "sync",
+            "order": order,
+        })
+
+    return {
+        "participants": participants,
+        "messages": messages,
+        "activations": [],
+    }
 
 
 def _build_canvas_nodes(ai_nodes: list[dict]) -> list[dict]:

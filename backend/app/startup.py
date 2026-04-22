@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.audit.service import verify_audit_chain
+from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.migrations.m001_roles_users import up as m001_up
 from app.migrations.m002_entities_relationships_models import up as m002_up
 from app.migrations.m003_audit_log import up as m003_up
@@ -44,9 +45,10 @@ from app.migrations.m036_ai_conversations_nullable_set import up as m036_up
 from app.migrations.m037_sets_collections_fts import up as m037_up
 from app.migrations.m038_element_bookmarks import up as m038_up
 from app.migrations.m039_graph_settings import up as m039_up
+from app.migrations.m040_expanded_ai_creation_prompts import up as m040_up
 from app.migrations.seed import seed_roles_and_permissions
-from app.diagrams.thumbnail import regenerate_all_thumbnails
 from app.search.service import rebuild_search_index
+from app.seed.creation_prompts import seed_creation_prompts
 from app.seed.example_models import seed_example_models
 from app.settings.service import seed_defaults
 
@@ -115,6 +117,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m037_up(main)
     await m038_up(main)
     await m039_up(main)
+    await m040_up(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
@@ -135,6 +138,10 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await seed_roles_and_permissions(port)
     await seed_defaults(port)
     await seed_example_models(port)
+    # Bring AI creation prompts to the latest canonical content on every start
+    # (ADR-132): admin edits are overwritten, matching the pattern used for
+    # DoView-era prompts.
+    await seed_creation_prompts(port)
 
     # Audit database migration and chain verification
     await m003_up(audit)
@@ -168,6 +175,15 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     await seed_defaults(port)
     await seed_default_themes(port)
     await seed_default_views(port)
+    # Bring AI creation prompts to the latest canonical content (ADR-132).
+    # The m041 Supabase migration seeds the initial rows externally via psql;
+    # this call keeps prompt_text fresh on each app restart without a new
+    # migration per tweak.
+    try:
+        await seed_creation_prompts(port)
+    except Exception as exc:  # noqa: BLE001
+        # Soft failure — don't block startup if the table isn't ready yet.
+        print(f"[AI_CREATION] seed_creation_prompts skipped on Supabase: {exc}", flush=True)
 
     # Run lightweight schema patches that don't require dollar-quoting (safe for asyncpg).
     # m031: add mode and thread_id columns to ai_conversations if missing.
@@ -203,10 +219,10 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
                 f"UPDATE {_table} SET {_col} = REPLACE({_col}::text, '_', 'T')"  # noqa: S608
             )
             await port.execute(
-                f"ALTER TABLE {_table} ALTER COLUMN {_col} TYPE TIMESTAMPTZ "  # noqa: S608
+                f"ALTER TABLE {_table} ALTER COLUMN {_col} TYPE TIMESTAMPTZ "
                 f"USING {_col}::TIMESTAMPTZ"
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass  # Table may not exist yet (scenia extension not installed)
     await port.commit()
 

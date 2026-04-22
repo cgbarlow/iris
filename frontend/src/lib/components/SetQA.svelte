@@ -20,8 +20,15 @@
 
 	let { setIds, collectionId, packageIds, diagramIds, docrefDocIds, fileContexts }: Props = $props();
 
-	// Primary set ID for backwards compatibility (history, diagram creation)
+	// Primary set ID for backwards compatibility (history, diagram creation).
+	// History/conversation loads use whatever is selected (empty → no history).
 	const setId = $derived(setIds[0] || '');
+	// Apply target: the backend apply endpoint requires a concrete set_id in
+	// the path, but the ask flow supports zero-set mode. Fall back to the
+	// always-present Default Set so AI-generated diagrams have a landing place
+	// when the user has no Set pinned.
+	const DEFAULT_SET_ID = '00000000-0000-0000-0000-000000000001';
+	const applyTargetSetId = $derived(setIds[0] || DEFAULT_SET_ID);
 
 	type ConvEntry = {
 		id: string;
@@ -35,13 +42,58 @@
 		isCreation?: boolean;
 	};
 
-	// Creation mode state
+	// Creation mode state (ADR-132 — notation + optional diagram_type selector)
+	type CreationCatalogueItem = {
+		notation: string;
+		notation_label: string;
+		diagram_type: string | null;
+		diagram_type_label: string | null;
+		requires_diagram_type: boolean;
+	};
 	let creationMode = $state(false);
-	let selectedNotation = $state('doview');
+	let selectedNotation = $state('');
+	let selectedDiagramType = $state('');
+	let creationCatalogue = $state<CreationCatalogueItem[]>([]);
+	let catalogueLoaded = $state(false);
 	let pendingDiagrams = $state<object | null>(null);
 	let applyingDiagrams = $state(false);
 	// Multi-turn creation conversation history
 	let creationHistory = $state<{ role: string; content: string }[]>([]);
+
+	// Unique notations for the first dropdown (preserves registry order)
+	const notationOptions = $derived.by<CreationCatalogueItem[]>(() => {
+		const seen = new Set<string>();
+		const out: CreationCatalogueItem[] = [];
+		for (const item of creationCatalogue) {
+			if (!seen.has(item.notation)) {
+				seen.add(item.notation);
+				out.push(item);
+			}
+		}
+		return out;
+	});
+
+	// Diagram types valid for the currently-selected notation
+	const diagramTypeOptions = $derived(
+		creationCatalogue.filter(
+			(i) => i.notation === selectedNotation && i.diagram_type !== null,
+		),
+	);
+
+	const requiresDiagramType = $derived(
+		notationOptions.find((n) => n.notation === selectedNotation)?.requires_diagram_type ?? false,
+	);
+
+	const canSubmitCreation = $derived(
+		!creationMode || (!!selectedNotation && (!requiresDiagramType || !!selectedDiagramType)),
+	);
+
+	function notationLabel(id: string): string {
+		return notationOptions.find((n) => n.notation === id)?.notation_label ?? id;
+	}
+	function diagramTypeLabel(id: string): string {
+		return diagramTypeOptions.find((d) => d.diagram_type === id)?.diagram_type_label ?? id;
+	}
 
 	let conversations = $state<ConvEntry[]>([]);
 	let question = $state('');
@@ -100,6 +152,29 @@
 		}
 	});
 
+	// ADR-132: load the creation catalogue once so the notation + diagram-type
+	// selectors are registry-driven rather than hardcoded.
+	$effect(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				const data = await apiFetch<{ items: CreationCatalogueItem[] }>(
+					'/api/registry/creation-catalogue',
+				);
+				if (!cancelled) {
+					creationCatalogue = data.items ?? [];
+				}
+			} catch {
+				// Leave catalogue empty; UI will show a friendly empty-state hint.
+			} finally {
+				if (!cancelled) catalogueLoaded = true;
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
+
 	function scrollToBottom() {
 		if (chatContainer) {
 			chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -130,18 +205,26 @@ function promptForLocation() {
 		showLocationPicker = true;
 	}
 
-	async function applyCreationDiagrams(packageId: string | null = null) {
+	// Set ID chosen inside the location picker (when user changes context there).
+	// Takes precedence over applyTargetSetId during the apply call.
+	let pickedTargetSetId = $state<string | null>(null);
+
+	async function applyCreationDiagrams(
+		packageId: string | null = null,
+		targetSetId: string | null = null,
+	) {
 		if (!pendingDiagrams || applyingDiagrams) return;
 		showLocationPicker = false;
 		applyingDiagrams = true;
 		error = null;
 		const diagramsToApply = pendingDiagrams;
 		pendingDiagrams = null;  // Clear immediately to prevent duplicate prompts
+		const resolvedSetId = targetSetId || pickedTargetSetId || applyTargetSetId;
 		try {
 			const body: Record<string, unknown> = { diagrams_json: JSON.stringify(diagramsToApply) };
 			if (packageId) body.package_id = packageId;
 			const result = await apiFetch<{ diagram_ids: string[]; primary_diagram_id: string | null }>(
-				`/api/ai/sets/${setId}/create-diagram/apply`,
+				`/api/ai/sets/${resolvedSetId}/create-diagram/apply`,
 				{
 					method: 'POST',
 					body: JSON.stringify(body),
@@ -239,7 +322,7 @@ function promptForLocation() {
 					...(token ? { Authorization: `Bearer ${token}` } : {}),
 				},
 				body: JSON.stringify(creationMode
-					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, diagram_ids: diagramIds?.length ? diagramIds : null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, mode: 'creation', notation: selectedNotation, history: creationHistory, thread_id: currentThreadId }
+					? { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, diagram_ids: diagramIds?.length ? diagramIds : null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, mode: 'creation', notation: selectedNotation, diagram_type: selectedNotation === 'doview' ? null : (selectedDiagramType || null), history: creationHistory, thread_id: currentThreadId }
 					: { set_ids: setIds, collection_id: collectionId || null, package_ids: packageIds || null, diagram_ids: diagramIds?.length ? diagramIds : null, docref_doc_ids: docrefDocIds?.length ? docrefDocIds : null, file_contexts: fileContexts?.length ? fileContexts : null, question: q, provider_id: selectedProviderId || undefined, thread_id: currentThreadId }
 				),
 				signal: abortController.signal,
@@ -574,12 +657,33 @@ function promptForLocation() {
 			</button>
 			{#if creationMode}
 				<select
+					aria-label="Diagram notation"
 					bind:value={selectedNotation}
-					class="rounded border px-2 py-1.5 text-sm"
+					onchange={() => { selectedDiagramType = ''; }}
+					disabled={!catalogueLoaded || notationOptions.length === 0}
+					class="rounded border px-2 py-1.5 text-sm disabled:opacity-50"
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 				>
-					<option value="doview">DoView</option>
+					<option value="" disabled>
+						{catalogueLoaded ? 'Select notation…' : 'Loading…'}
+					</option>
+					{#each notationOptions as n (n.notation)}
+						<option value={n.notation}>{n.notation_label}</option>
+					{/each}
 				</select>
+				{#if selectedNotation && requiresDiagramType}
+					<select
+						aria-label="Diagram type"
+						bind:value={selectedDiagramType}
+						class="rounded border px-2 py-1.5 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					>
+						<option value="" disabled>Select diagram type…</option>
+						{#each diagramTypeOptions as d (d.diagram_type)}
+							<option value={d.diagram_type}>{d.diagram_type_label}</option>
+						{/each}
+					</select>
+				{/if}
 			{/if}
 			{#if conversations.length > 0}
 				<button
@@ -787,10 +891,13 @@ function promptForLocation() {
 	<PackagePicker
 		open={showLocationPicker}
 		title="Select location for diagrams"
-		subtitle="Click a package to select it, then click OK. Or create a new package."
-		setId={setId}
-		onselect={(pkg) => {
+		subtitle="Choose a Collection (optional), Set, and Package for the generated diagrams."
+		allowContextChange={true}
+		initialSetId={setIds[0]}
+		initialCollectionId={collectionId}
+		onselect={(pkg, ctx) => {
 			selectedPackageId = pkg.id;
+			pickedTargetSetId = ctx?.setId ?? null;
 			locationChosen = true;
 			showLocationPicker = false;
 			if (pendingSendMessage) {
@@ -799,7 +906,7 @@ function promptForLocation() {
 				pendingSendMessage = '';
 				ask();
 			} else if (pendingDiagrams) {
-				applyCreationDiagrams(pkg.id);
+				applyCreationDiagrams(pkg.id, ctx?.setId ?? null);
 			}
 		}}
 		oncancel={() => {
@@ -827,7 +934,15 @@ function promptForLocation() {
 			bind:this={qaInput}
 			bind:value={question}
 			onkeydown={handleKeydown}
-			placeholder={creationMode ? `Describe what you'd like a ${selectedNotation === 'doview' ? 'DoView' : selectedNotation} diagram of...` : 'Ask a question...'}
+			placeholder={creationMode
+				? (selectedNotation
+					? (requiresDiagramType && selectedDiagramType
+						? `Describe what you'd like a ${notationLabel(selectedNotation)} ${diagramTypeLabel(selectedDiagramType)} diagram of…`
+						: (requiresDiagramType
+							? `Select a diagram type above to begin…`
+							: `Describe what you'd like a ${notationLabel(selectedNotation)} diagram of…`))
+					: 'Select a diagram notation above to begin…')
+				: 'Ask a question...'}
 			rows="2"
 			maxlength="4000"
 			disabled={asking}
@@ -846,7 +961,10 @@ function promptForLocation() {
 		{:else}
 			<button
 				onclick={ask}
-				disabled={!question.trim()}
+				disabled={!question.trim() || !canSubmitCreation}
+				title={!canSubmitCreation
+					? (selectedNotation ? 'Select a diagram type first' : 'Select a notation first')
+					: undefined}
 				class="self-end rounded px-4 py-2 text-sm text-white disabled:opacity-50"
 				style="background-color: var(--color-primary)"
 			>

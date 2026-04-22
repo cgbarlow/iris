@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-04-22
+
+### Added
+- **AI "Create Diagram" extended beyond DoView to four more notations (ADR-132).** The layered-prompt framework built for DoView (ADR-094) has been scaled out: AI-assisted creation now supports Simple (component, roadmap, free-form), UML (sequence, class), ArchiMate (process), and C4 (deployment) — seven new notation × diagram-type bundles in addition to DoView's outcomes_map and overview. The notation dropdown in the Ask-AI "Create Diagram" tab is now registry-driven (no pre-selected default — user picks from DoView, Simple, UML, ArchiMate, or C4). A second diagram-type dropdown appears for non-DoView notations, populated from `GET /api/registry/creation-catalogue`. DoView's creation flow is unchanged — its own Stage 0–3 prompt still drives outcomes_map/overview branching internally. Eleven new prompt rows are seeded via SQLite migration `m040` and Supabase migration `m041`; existing DoView rows are untouched. See SPEC-132-A (prompt authoring) and SPEC-132-B (selector UI contract).
+- **Location picker now lets you pick Collection → Set → Package** when generating AI diagrams without a pinned Set. Closes a pre-existing gap where `POST /api/ai/sets//create-diagram/apply` 404'd when no Set was selected on the `/ask` page.
+- **UML sequence diagrams materialise correctly.** AI-generated `{nodes, edges}` for `diagram_type=sequence` are translated in `create_diagrams_from_ai` into the `{participants, messages, activations}` shape the dedicated sequence renderer expects, so the canvas populates on first paint.
+
+### Changed
+- Creation-mode system prompt now prepends a "User selection" preamble when both notation and diagram_type are known, and each non-DoView notation prompt skips Stage 0 when sufficient context (Set content, attached files, docref, prior chat) is present — reduces redundant "which diagram type?" / "describe the system" rounds.
+
 ## [4.2.1] - 2026-04-22
 
 ### Fixed

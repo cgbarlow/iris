@@ -5,16 +5,29 @@
 	 * Click to select a package node, then OK to confirm. Supports creating new child packages.
 	 */
 	import { apiFetch } from '$lib/utils/api';
-	import type { DiagramHierarchyNode, Package } from '$lib/types/api';
+	import type { DiagramHierarchyNode, IrisCollection, IrisSet, Package } from '$lib/types/api';
+
+	interface PickerContext {
+		setId: string;
+		collectionId: string | null;
+	}
 
 	interface Props {
 		open: boolean;
-		onselect: (pkg: Package) => void;
+		/** Fires on OK. `ctx` is only populated when `allowContextChange` is true. */
+		onselect: (pkg: Package, ctx?: PickerContext) => void;
 		oncancel: () => void;
 		excludePackageId?: string;
+		/** Scope the package tree to this Set. Ignored when `allowContextChange` is true
+		 *  (use `initialSetId` instead — the picker owns the Set selection in that mode). */
 		setId?: string;
 		title?: string;
 		subtitle?: string;
+		/** When true, render Collection → Set → Package dropdowns inside the dialog so
+		 *  the user can choose the target context before the package tree loads. */
+		allowContextChange?: boolean;
+		initialSetId?: string;
+		initialCollectionId?: string;
 	}
 
 	let {
@@ -25,7 +38,28 @@
 		setId,
 		title = 'Select Package',
 		subtitle = 'Click a package to select it, then click OK.',
+		allowContextChange = false,
+		initialSetId,
+		initialCollectionId,
 	}: Props = $props();
+
+	// Context-change mode: the picker owns Collection/Set selection internally.
+	// These are seeded from props each time the dialog opens (see the open-effect
+	// below) rather than at component construction, so prop changes between
+	// openings are respected.
+	let currentCollectionId = $state<string | null>(null);
+	let currentSetId = $state<string>('');
+	let allCollections = $state<IrisCollection[]>([]);
+	let allSets = $state<IrisSet[]>([]);
+	let contextLoaded = $state(false);
+
+	// Effective set for hierarchy loading and package creation.
+	const effectiveSetId = $derived(allowContextChange ? currentSetId : (setId ?? ''));
+	const filteredSets = $derived(
+		currentCollectionId
+			? allSets.filter((s) => s.collection_id === currentCollectionId)
+			: allSets,
+	);
 
 	let hierarchy = $state<DiagramHierarchyNode[]>([]);
 	let search = $state('');
@@ -50,24 +84,73 @@
 			newPkgName = '';
 			newPkgError = null;
 			expandedIds = new Set<string>();
+			// Reset context from props on each open so stale state doesn't leak
+			// across openings of the same dialog instance.
+			currentCollectionId = initialCollectionId ?? null;
+			currentSetId = initialSetId ?? setId ?? '';
 			dialogEl.showModal();
-			loadHierarchy();
+			if (allowContextChange) {
+				loadContextOptions();
+			} else {
+				loadHierarchy();
+			}
 		} else if (!open && dialogEl?.open) {
 			dialogEl.close();
 		}
 	});
 
+	// Reactively reload the hierarchy when the effective Set changes (either
+	// via prop update or, in context-change mode, via the Set dropdown).
+	$effect(() => {
+		if (open && effectiveSetId) {
+			loadHierarchy();
+		} else if (open && allowContextChange && !effectiveSetId) {
+			hierarchy = [];
+		}
+	});
+
+	async function loadContextOptions() {
+		try {
+			const [collections, sets] = await Promise.all([
+				apiFetch<{ items: IrisCollection[] }>('/api/collections'),
+				apiFetch<{ items: IrisSet[] }>('/api/sets'),
+			]);
+			allCollections = collections.items ?? [];
+			allSets = sets.items ?? [];
+		} catch {
+			allCollections = [];
+			allSets = [];
+		}
+		contextLoaded = true;
+	}
+
 	async function loadHierarchy() {
 		loading = true;
 		try {
-			const url = setId
-				? `/api/diagrams/hierarchy?set_id=${encodeURIComponent(setId)}`
+			const url = effectiveSetId
+				? `/api/diagrams/hierarchy?set_id=${encodeURIComponent(effectiveSetId)}`
 				: '/api/diagrams/hierarchy';
 			hierarchy = await apiFetch<DiagramHierarchyNode[]>(url);
 		} catch {
 			hierarchy = [];
 		}
 		loading = false;
+	}
+
+	function onCollectionChange() {
+		// If the newly-selected collection doesn't contain the currently-chosen
+		// Set, clear the Set so the user picks one that belongs to it.
+		if (currentSetId && !filteredSets.find((s) => s.id === currentSetId)) {
+			currentSetId = '';
+			selectedId = null;
+			selectedName = '';
+		}
+	}
+
+	function onSetChange() {
+		// Changing the target Set invalidates any selected package in the old Set.
+		selectedId = null;
+		selectedName = '';
 	}
 
 	function matchesSearch(node: DiagramHierarchyNode): boolean {
@@ -92,7 +175,12 @@
 	function confirmSelection() {
 		if (!selectedId) return;
 		// Construct a minimal Package object for the callback
-		onselect({ id: selectedId, name: selectedName } as Package);
+		const pkg = { id: selectedId, name: selectedName } as Package;
+		if (allowContextChange) {
+			onselect(pkg, { setId: effectiveSetId, collectionId: currentCollectionId });
+		} else {
+			onselect(pkg);
+		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -118,7 +206,7 @@
 		try {
 			const body: Record<string, unknown> = { name };
 			if (selectedId) body.parent_package_id = selectedId;
-			if (setId) body.set_id = setId;
+			if (effectiveSetId) body.set_id = effectiveSetId;
 			const created = await apiFetch<Package>('/api/packages', {
 				method: 'POST',
 				body: JSON.stringify(body),
@@ -199,6 +287,41 @@
 		<h2 id="package-picker-title" class="text-lg font-bold">{title}</h2>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">{subtitle}</p>
 
+		{#if allowContextChange}
+			<div class="mt-3 flex flex-col gap-2">
+				<label class="flex items-center gap-2 text-sm">
+					<span class="w-20" style="color: var(--color-muted)">Collection:</span>
+					<select
+						bind:value={currentCollectionId}
+						onchange={onCollectionChange}
+						class="flex-1 rounded border px-2 py-1.5 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					>
+						<option value={null}>— Any collection —</option>
+						{#each allCollections as c (c.id)}
+							<option value={c.id}>{c.name}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex items-center gap-2 text-sm">
+					<span class="w-20" style="color: var(--color-muted)">Set:</span>
+					<select
+						bind:value={currentSetId}
+						onchange={onSetChange}
+						class="flex-1 rounded border px-2 py-1.5 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					>
+						<option value="" disabled>
+							{contextLoaded ? 'Select a Set…' : 'Loading…'}
+						</option>
+						{#each filteredSets as s (s.id)}
+							<option value={s.id}>{s.name}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+		{/if}
+
 		<div class="mt-3">
 			<label for="package-picker-search" class="sr-only">Search hierarchy</label>
 			<input
@@ -215,6 +338,8 @@
 		<div class="mt-3" style="max-height: 280px; overflow-y: auto">
 			{#if loading}
 				<p class="text-sm" style="color: var(--color-muted)">Loading hierarchy...</p>
+			{:else if allowContextChange && !effectiveSetId}
+				<p class="text-sm" style="color: var(--color-muted)">Select a Set above to see its packages.</p>
 			{:else if hierarchy.length === 0}
 				<p class="text-sm" style="color: var(--color-muted)">No packages found in this set.</p>
 			{:else}
