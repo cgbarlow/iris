@@ -13,4 +13,4 @@ requires-python = ">=3.12"
 # Phase 8: mcp
 # backend/ stays independent for now — it has an established uv workflow and
 # no current need to be in the workspace; can be folded in later if desirable.
-members = ["iris-client", "cli"]
+members = ["iris-client", "cli", "mcp"]
