@@ -80,11 +80,22 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         config = get_config()
 
     app = FastAPI(
-        title="Iris",
-        description="Integrated Repository for Information & Systems",
+        title="Iris API",
+        description=(
+            "Integrated Repository for Information & Systems.\n\n"
+            "Authenticate with a JWT (browser login) or a Personal Access Token "
+            "(ADR-127 / see `/api/users/me/tokens`). Many read endpoints allow "
+            "anonymous access (ADR-123). Rate-limit buckets are split by auth "
+            "type (ADR-129).\n\n"
+            "Breaking changes ship as `-v2` paths alongside deprecated originals; "
+            "additive changes are made freely. See docs/api.md."
+        ),
         version="0.1.0",
-        docs_url="/docs" if config.debug else None,
-        redoc_url="/redoc" if config.debug else None,
+        # ADR-129: OpenAPI is always on at /api/docs so agents and SDK tools
+        # can introspect the schema in every environment, not just debug.
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
         lifespan=lifespan,
     )
     app.state.config = config

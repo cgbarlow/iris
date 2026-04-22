@@ -82,13 +82,16 @@ class TestFileExtractEndpoint:
         assert resp.status_code == 413
 
     @pytest.mark.anyio
-    async def test_extract_requires_auth(self, client: httpx.AsyncClient) -> None:
+    async def test_extract_allows_anonymous(self, client: httpx.AsyncClient) -> None:
+        # Per ADR-129: parity with other AI endpoints — anonymous callers
+        # can extract files, subject to the anon_ai rate-limit bucket.
         content = b"Hello"
         resp = await client.post(
             "/api/ai/files/extract",
             files={"file": ("test.txt", content, "text/plain")},
         )
-        assert resp.status_code == 401
+        assert resp.status_code == 200
+        assert resp.json()["extracted_text"] == "Hello"
 
     @pytest.mark.anyio
     async def test_extract_handles_binary_error(self, client: httpx.AsyncClient) -> None:

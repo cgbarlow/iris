@@ -74,9 +74,13 @@ def _require_admin(current_user: dict[str, Any]) -> None:
 @router.post("/files/extract", response_model=FileExtractResponse)
 async def extract_file(
     file: UploadFile,
-    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> FileExtractResponse:
-    """Extract text from an uploaded file for AI context. Session-scoped, no storage."""
+    """Extract text from an uploaded file for AI context. Session-scoped, no storage.
+
+    Auth is optional (ADR-129): anonymous callers are subject to the `anon_ai`
+    rate-limit bucket (ADR-123), matching the other AI endpoints.
+    """
     content = await file.read()
     if len(content) > _MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File exceeds 5 MB limit")

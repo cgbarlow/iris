@@ -38,13 +38,18 @@ class TestAppFactory:
 
     def test_creates_app(self, app_config: AppConfig) -> None:
         application = create_app(app_config)
-        assert application.title == "Iris"
+        assert application.title == "Iris API"
 
-    def test_docs_enabled_in_debug(self, app_config: AppConfig) -> None:
+    def test_docs_served_under_api_prefix(self, app_config: AppConfig) -> None:
+        # ADR-129: OpenAPI docs are always on at /api/docs so agents and
+        # SDK tooling can introspect the schema in every environment.
         application = create_app(app_config)
-        assert application.docs_url == "/docs"
+        assert application.docs_url == "/api/docs"
+        assert application.openapi_url == "/api/openapi.json"
 
-    def test_docs_disabled_in_production(self, tmp_path: Path) -> None:
+    def test_docs_always_on_in_production(self, tmp_path: Path) -> None:
+        # ADR-129: the previous debug-gated behaviour is replaced by
+        # always-on public docs.
         config = AppConfig(
             debug=False,
             database=DatabaseConfig(data_dir=str(tmp_path / "data")),
@@ -53,7 +58,7 @@ class TestAppFactory:
             ),
         )
         application = create_app(config)
-        assert application.docs_url is None
+        assert application.docs_url == "/api/docs"
 
 
 class TestHealthEndpoint:
