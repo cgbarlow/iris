@@ -1,0 +1,16 @@
+[project]
+name = "iris-workspace"
+version = "0.0.0"
+description = "Iris monorepo — workspace root for iris-client, iris-cli, iris-mcp"
+requires-python = ">=3.12"
+
+# Root project has no runtime dependencies; each workspace member owns its own.
+
+[tool.uv.workspace]
+# Members are added in the phase each package is introduced (ADR-132 / SPEC-132-A).
+# Phase 2: iris-client
+# Phase 7: cli
+# Phase 8: mcp
+# backend/ stays independent for now — it has an established uv workflow and
+# no current need to be in the workspace; can be folded in later if desirable.
+members = ["iris-client"]
