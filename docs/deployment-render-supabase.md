@@ -151,47 +151,41 @@ Create three services manually in the Render Dashboard:
 
 ## Step 5 — Set environment variables in Render
 
-Each Render service has its own **Environment → Environment Variables** tab. All values below are `sync: false` in `render.yaml` — they are secrets per-deployment and must be entered manually (or pasted from a password manager). The screenshots are from a live UAT deployment and show the complete set.
+Each Render service has its own **Environment → Environment Variables** tab. All values below are `sync: false` in `render.yaml` — they are secrets per-deployment and must be entered manually (or pasted from a password manager).
 
 ### Frontend (iris-frontend)
 
-![iris-frontend env vars in the Render dashboard](./assets/deployment/render-iris-frontend-envs.png)
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `PUBLIC_SITE_URL` | `https://iris-uat.chrisbarlow.nz` | Absolute base URL of this deployment. Interpolated into `src/app.html` at build time as `%sveltekit.env.PUBLIC_SITE_URL%` so Open Graph / Twitter Card `og:image` / `og:url` resolve to absolute URLs that LinkedIn / Slack / Teams / WhatsApp scrape correctly (ADR-126). Must match the custom domain or Render URL exactly; no trailing slash. |
-| `VITE_API_BASE_URL` | `https://iris-api-gtb3.onrender.com` | URL of the **iris-api** web service (use its Render-assigned `*.onrender.com` URL or your custom domain for the API). `apiFetch` prefixes every request with this. |
+| Variable | Example value | Description |
+|----------|---------------|-------------|
+| `PUBLIC_SITE_URL` | `https://<your-frontend-domain>` | Absolute base URL of this deployment. Interpolated into `src/app.html` at build time as `%sveltekit.env.PUBLIC_SITE_URL%` so Open Graph / Twitter Card `og:image` / `og:url` resolve to absolute URLs that LinkedIn / Slack / Teams / WhatsApp scrape correctly (ADR-126). Must match the custom domain or Render URL exactly; no trailing slash. |
+| `VITE_API_BASE_URL` | `https://<your-api-service>.onrender.com` | URL of the **iris-api** web service (use its Render-assigned `*.onrender.com` URL or your custom domain for the API). `apiFetch` prefixes every request with this. |
 | `VITE_DB_BACKEND` | `supabase` | Enables Supabase deployment mode. The frontend imports `@supabase/supabase-js` and the Supabase login flow only when this is `supabase`. |
-| `VITE_SCENIA_URL` | `https://scenia-uat.chrisbarlow.nz` | URL of the **scenia** static site (custom domain or `*.onrender.com`). Used by `openScenia()` to open the roadmapping app in a new tab with the JWT + API URL as query params. |
+| `VITE_SCENIA_URL` | `https://<your-scenia-service>.onrender.com` | URL of the **scenia** static site (custom domain or `*.onrender.com`). Used by `openScenia()` to open the roadmapping app in a new tab with the JWT + API URL as query params. |
 | `VITE_SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase **publishable** key. Embedded in the frontend bundle at build time — safe because RLS (m030) denies direct table access to this key. |
-| `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL. Used by the Supabase JS SDK for the login flow. |
+| `VITE_SUPABASE_URL` | `https://<project-id>.supabase.co` | Supabase project URL. Used by the Supabase JS SDK for the login flow. |
 
 > **Security note:** `VITE_*` and `PUBLIC_*` variables are embedded in the built HTML and JS bundles and visible to anyone loading the page. Use the **publishable** key (not the secret key) for `VITE_SUPABASE_ANON_KEY`. The service-role secret key belongs on the backend only.
 
 ### Scenia (scenia)
 
-![scenia env vars in the Render dashboard](./assets/deployment/render-scenia-envs.png)
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `VITE_API_BASE_URL` | `https://iris-api-gtb3.onrender.com` | URL of the iris-api web service — same value as on the frontend service. |
+| Variable | Example value | Description |
+|----------|---------------|-------------|
+| `VITE_API_BASE_URL` | `https://<your-api-service>.onrender.com` | URL of the iris-api web service — same value as on the frontend service. |
 
 > Scenia receives auth tokens at runtime via URL query parameters from the Iris frontend (see `openScenia()` in `frontend/src/lib/scenia/config.ts`). No Supabase keys are needed at build time.
 
 ### Backend (iris-api)
 
-![iris-api env vars in the Render dashboard](./assets/deployment/render-iris-api-envs.png)
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `IRIS_CORS_ORIGINS` | `https://iris-uat.chrisbarlow.nz,https://scenia-uat.chrisbarlow.nz` | Comma-separated list of allowed CORS origins — your frontend URL plus the Scenia URL. Both Iris and Scenia make cross-origin calls to this API. Include `https://`; do not include trailing slashes. |
+| Variable | Example value | Description |
+|----------|---------------|-------------|
+| `IRIS_CORS_ORIGINS` | `https://<your-frontend-domain>,https://<your-scenia-domain>` | Comma-separated list of allowed CORS origins — your frontend URL plus the Scenia URL. Both Iris and Scenia make cross-origin calls to this API. Include `https://`; do not include trailing slashes. |
 | `IRIS_DB_BACKEND` | `supabase` | Enables Supabase deployment mode. Without this, the backend opens a local SQLite file. |
 | `IRIS_DEBUG` | `false` | `true` switches the FastAPI app into debug mode (richer error pages, reloader in dev). Leave as `false` on production deployments. |
 | `SUPABASE_ANON_KEY` | `sb_publishable_...` | Supabase publishable key. Same value as `VITE_SUPABASE_ANON_KEY` on the frontend. |
 | `SUPABASE_DB_URL` | `postgresql://postgres:PASSWORD@aws-0-xx-xx-x.pooler.supabase.com:6543/postgres?sslmode=require` | Transaction pooler connection string (port **6543**, not 5432). Runtime app connections only — migrations use the direct-connection URL on port 5432 (see Step 2). |
 | `SUPABASE_JWT_SECRET` | `your-jwt-secret` | JWT secret from Supabase **Settings → API Keys → JWT Settings**. The backend uses this to verify tokens issued by Supabase Auth. |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Supabase **secret** key — backend only. Grants RLS-bypassing access. **Never** expose this in the frontend bundle. |
-| `SUPABASE_URL` | `https://xxxx.supabase.co` | Supabase project URL. Same value as `VITE_SUPABASE_URL`. |
+| `SUPABASE_URL` | `https://<project-id>.supabase.co` | Supabase project URL. Same value as `VITE_SUPABASE_URL`. |
 
 ### Optional backend rate-limit overrides
 
@@ -206,13 +200,13 @@ Default rate limits are defined in `backend/app/config.py`. Override only if you
 
 ### Custom domains (optional)
 
-If you're using custom domains (as per the UAT deployment — `iris-uat.chrisbarlow.nz`, `scenia-uat.chrisbarlow.nz`, `iris-api-gtb3.onrender.com`):
+If you want branded hostnames for the frontend and Scenia rather than the Render-assigned `*.onrender.com` URLs:
 
 1. In each Render service → **Settings → Custom Domains**, add your hostname and follow the CNAME / ALIAS instructions.
 2. Update the env vars above to reference your custom domain instead of the `*.onrender.com` default (the frontend's `VITE_API_BASE_URL`, `VITE_SCENIA_URL`, `PUBLIC_SITE_URL`, and the backend's `IRIS_CORS_ORIGINS`).
 3. Redeploy each service so the new values bake into the build.
 
-> The `iris-api` service normally keeps its `*.onrender.com` URL — there's little upside to exposing the backend under a custom domain, and CORS handling stays simpler with a stable Render URL.
+> The `iris-api` service can usually keep its `*.onrender.com` URL — there's little upside to exposing the backend under a custom domain, and CORS handling stays simpler with a stable Render URL.
 
 ---
 
@@ -355,7 +349,7 @@ Ensure `SUPABASE_DB_URL` uses the **Transaction pooler** URL (port 6543), not th
 
 `PUBLIC_SITE_URL` is missing or wrong on the **iris-frontend** service. The variable is interpolated at build time, so after setting it you must trigger a rebuild (Render → Manual Deploy, or push any commit). Use the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) to re-scrape the URL once fixed; Slack / Teams cache aggressively and may need a new unique URL (e.g. `?v=2`) to refresh.
 
-**Search returns nothing on UAT**
+**Search returns nothing**
 
 Check that `m040_search_all_entities.sql` has been applied — run the verification query from [Verifying Row Level Security](#verifying-row-level-security) but adapted:
 
