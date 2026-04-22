@@ -43,7 +43,10 @@ class TestBearerHeader:
         self, pat_client: IrisClient, respx_mock: respx.Router,
     ) -> None:
         route = respx_mock.get("http://iris.test/api/auth/me").mock(
-            return_value=httpx.Response(200, json={"username": "alice", "role": "Architect"}),
+            return_value=httpx.Response(
+                200,
+                json={"id": "u1", "username": "alice", "role": "Architect"},
+            ),
         )
         await pat_client.whoami()
         request = route.calls.last.request
@@ -54,7 +57,10 @@ class TestBearerHeader:
         self, anon_client: IrisClient, respx_mock: respx.Router,
     ) -> None:
         route = respx_mock.get("http://iris.test/api/auth/me").mock(
-            return_value=httpx.Response(200, json={}),
+            return_value=httpx.Response(
+                200,
+                json={"id": "u-anon", "username": "anon", "role": "Viewer"},
+            ),
         )
         await anon_client.whoami()
         request = route.calls.last.request
