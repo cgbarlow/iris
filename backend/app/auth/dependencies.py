@@ -2,33 +2,56 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 from jose import JWTError
 
 from app.auth.service import decode_access_token
 
-if TYPE_CHECKING:
-    from app.config import AuthConfig
-
 
 async def get_current_user(request: Request) -> dict[str, Any]:
-    """Extract and validate the current user from JWT bearer token.
+    """Extract and validate the current user from a Bearer credential.
 
-    SQLite mode: decodes Iris-issued JWT, checks users table.
-    Supabase mode: decodes Supabase-issued JWT, checks profiles table.
+    Recognises two token families on the same header:
+
+    - **PAT** (ADR-127 / SPEC-127-A) — prefix ``iris_pat_``. Argon2id-verified
+      against the ``personal_access_tokens`` table. Routes to the PAT
+      validator before falling into the JWT branches.
+    - **JWT** — the existing Iris-issued (SQLite mode) or Supabase-issued
+      (Supabase mode) access token. Unchanged.
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     token = auth_header[len("Bearer "):]
+
+    if token.startswith("iris_pat_"):
+        return await _get_current_user_pat(request, token)
+
     config = request.app.state.config
 
     if config.db_backend == "supabase":
         return await _get_current_user_supabase(request, token)
     return await _get_current_user_sqlite(request, token)
+
+
+async def _get_current_user_pat(request: Request, token: str) -> dict[str, Any]:
+    """Validate a PAT bearer value against ``personal_access_tokens``.
+
+    See ADR-127 and SPEC-127-A. The validator returns the same user dict
+    shape as the JWT path (``id``, ``username``, ``role``, ``jti``) plus
+    ``auth_type="pat"`` so downstream code can distinguish if needed.
+    """
+    from app.tokens.service import verify_pat  # noqa: PLC0415 — avoid import cycle at module load
+
+    db = request.app.state.db_manager.main_db
+    hasher = request.app.state.pat_hasher
+    user = await verify_pat(db, token, hasher)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid or revoked token")
+    return user
 
 
 async def get_optional_user(request: Request) -> dict[str, Any] | None:
@@ -85,7 +108,11 @@ async def _get_current_user_supabase(
     token: str,
 ) -> dict[str, Any]:
     """Validate Supabase JWT and check profiles table (Supabase mode)."""
-    from app.auth.supabase_service import decode_supabase_jwt, fetch_jwks, get_profile  # noqa: PLC0415
+    from app.auth.supabase_service import (  # noqa: PLC0415
+        decode_supabase_jwt,
+        fetch_jwks,
+        get_profile,
+    )
 
     config = request.app.state.config
     if config.supabase is None:

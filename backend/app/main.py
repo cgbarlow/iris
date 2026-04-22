@@ -13,6 +13,7 @@ from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.batch.router import router as batch_router
 from app.bookmarks.router import router as bookmarks_router
+from app.collections.router import router as collections_router
 from app.comments.router import router as comments_router
 from app.config import AppConfig, get_config
 from app.database import DatabaseManager
@@ -20,30 +21,31 @@ from app.diagrams.registry_router import router as registry_router
 from app.diagrams.router import admin_router as admin_thumbnails_router
 from app.diagrams.router import diagram_rel_router
 from app.diagrams.router import router as diagrams_router
+from app.docref.router import router as docref_router
+from app.elements.router import router as elements_router
+from app.extensions.router import router as extensions_router
+from app.graph.router import router as graph_router
+from app.import_pptx.router import router as import_pptx_router
+from app.import_sparx.router import router as import_router
 from app.locks.router import admin_router as admin_locks_router
 from app.locks.router import router as locks_router
-from app.elements.router import router as elements_router
-from app.docref.router import router as docref_router
-from app.graph.router import router as graph_router
-from app.extensions.router import router as extensions_router
-from app.import_pptx.router import router as import_pptx_router
-from app.mnemos.router import router as mnemos_router
-from app.scenia.router import router as scenia_router
-from app.import_sparx.router import router as import_router
 from app.middleware.audit import AuditMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.mnemos.router import router as mnemos_router
+from app.notifications.router import router as notifications_router
 from app.package_relationships.router import router as package_relationships_router
 from app.packages.router import router as packages_router
 from app.recycle_bin.router import router as recycle_bin_router
 from app.relationships.router import router as relationships_router
+from app.scenia.router import router as scenia_router
 from app.search.router import router as search_router
-from app.collections.router import router as collections_router
 from app.sets.router import router as sets_router
-from app.notifications.router import router as notifications_router
 from app.settings.router import router as settings_router
 from app.startup import initialize_databases
-from app.users.router import router as users_router
 from app.themes.router import router as themes_router
+from app.tokens.router import router as tokens_router
+from app.tokens.service import create_pat_hasher
+from app.users.router import router as users_router
 from app.views.router import router as views_router
 
 if TYPE_CHECKING:
@@ -85,17 +87,23 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.config = config
+    # Shared Argon2id hasher for PAT secret verification (ADR-127 / SPEC-127-A).
+    # Built once per process so the tuned cost parameters are consistent
+    # across every auth-dependency call.
+    app.state.pat_hasher = create_pat_hasher(config.auth)
 
     # Audit middleware per SPEC-007-A (innermost — runs after auth resolves)
     app.add_middleware(AuditMiddleware)
 
-    # Rate limiting middleware per SPEC-005-B + ADR-123 (anon_ai bucket)
+    # Rate limiting middleware per SPEC-005-B + ADR-123 + ADR-127 + ADR-129.
     app.add_middleware(
         RateLimitMiddleware,
         login=config.rate_limit_login,
         refresh=config.rate_limit_refresh,
         general=config.rate_limit_general,
         anon_ai=config.anon_ai_rate_limit,
+        pat=config.rate_limit_pat,
+        anon=config.rate_limit_anon,
     )
 
     # CORS middleware per SPEC-004-A
@@ -170,6 +178,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(docref_router)
     app.include_router(scenia_router)
     app.include_router(graph_router)
+    app.include_router(tokens_router)
 
     return app
 

@@ -97,6 +97,16 @@ class AppConfig:
     anon_ai_rate_limit: int = field(
         default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_ANON_AI", "10"))
     )
+    # PAT-authenticated calls (Authorization: Bearer iris_pat_...) — ADR-127.
+    # Tuned higher than general JWT because programmatic callers (CLI, MCP,
+    # agents) naturally burst but are bounded per-user by PAT ownership.
+    rate_limit_pat: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_PAT", "60"))
+    )
+    # Anonymous non-AI calls (ADR-129) — read endpoints opened up by ADR-123.
+    rate_limit_anon: int = field(
+        default_factory=lambda: int(os.environ.get("IRIS_RATE_LIMIT_ANON", "30"))
+    )
     # Deployment mode: "sqlite" (default, self-hosted) or "supabase" (Netlify/Supabase cloud)
     db_backend: str = field(
         default_factory=lambda: os.environ.get("IRIS_DB_BACKEND", "sqlite")

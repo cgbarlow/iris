@@ -48,29 +48,43 @@ def _get_client_ip(request: Request) -> str:
 def _get_rate_category(request: Request) -> str:
     """Categorize a request for rate limiting.
 
-    Anonymous AI calls (no Authorization header on /api/ai/*) use the
-    stricter `anon_ai` bucket (ADR-123, SPEC-123-A) — bounds cost
-    exposure on a publicly-readable deployment without affecting other
-    endpoints or authenticated AI calls.
+    Buckets (ADR-123, ADR-127, ADR-129):
+
+    - ``login`` — POST /api/auth/login
+    - ``refresh`` — POST /api/auth/refresh
+    - ``anon_ai`` — anonymous calls on /api/ai/* (stricter, 1h window)
+    - ``pat`` — PAT-authenticated calls (Authorization: Bearer iris_pat_...)
+    - ``anon`` — other anonymous calls (no Authorization header)
+    - ``general`` — JWT-authenticated (or other Bearer) calls
+
+    Buckets are independent: exhausting one never blocks another.
     """
     path = request.url.path
     if path == "/api/auth/login":
         return "login"
     if path == "/api/auth/refresh":
         return "refresh"
-    if path.startswith("/api/ai/") and not request.headers.get("Authorization"):
+    auth = request.headers.get("Authorization", "")
+    is_anon = not auth
+    if path.startswith("/api/ai/") and is_anon:
         return "anon_ai"
+    if auth.startswith("Bearer iris_pat_"):
+        return "pat"
+    if is_anon:
+        return "anon"
     return "general"
 
 
 # Windows per category. Anonymous AI uses 1 hour so the small bucket
 # (default 10 requests) smooths over bursty interactive use on UAT
-# without regenerating every minute.
+# without regenerating every minute. All other buckets use a 60 s window.
 _CATEGORY_WINDOWS: dict[str, int] = {
     "login": 60,
     "refresh": 60,
     "general": 60,
     "anon_ai": 3600,
+    "pat": 60,
+    "anon": 60,
 }
 
 
@@ -85,6 +99,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "refresh": kwargs.get("refresh", 30),
             "general": kwargs.get("general", 100),
             "anon_ai": kwargs.get("anon_ai", 10),
+            "pat": kwargs.get("pat", 60),
+            "anon": kwargs.get("anon", 30),
         }
 
     async def dispatch(
