@@ -23,6 +23,7 @@ from app.diagrams.router import diagram_rel_router
 from app.diagrams.router import router as diagrams_router
 from app.docref.router import router as docref_router
 from app.elements.router import router as elements_router
+from app.export.router import router as export_router
 from app.extensions.router import router as extensions_router
 from app.graph.router import router as graph_router
 from app.import_pptx.router import router as import_pptx_router
@@ -179,6 +180,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(scenia_router)
     app.include_router(graph_router)
     app.include_router(tokens_router)
+    app.include_router(export_router)
 
     return app
 
