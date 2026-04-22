@@ -74,6 +74,11 @@
 	// User Guide lives in the header — see "User Guide" link next to
 	// "Sign in"/"Sign out". Kept out of the sidebar to avoid duplicating a
 	// cross-cutting docs link alongside the content-area navigation.
+	//
+	// Settings is intentionally in the public set — its theme, default
+	// notation, and visual-toggle preferences are all localStorage-backed
+	// and meaningful to anonymous visitors. The password-change form
+	// inside the page hides itself when anonymous.
 	const publicNavItems = [
 		{ href: '/ask', label: 'Iris AI', shortcut: 'A', icon: 'ai' },
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
@@ -81,6 +86,7 @@
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
 		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },
 		{ href: '/elements', label: 'Elements', shortcut: 'E', icon: 'elements' },
+		{ href: '/settings', label: 'Settings', shortcut: 'S', icon: 'settings' },
 	];
 
 	// Menu items that only make sense with a persisted user identity —
@@ -89,7 +95,6 @@
 		{ href: '/bookmarks', label: 'Bookmarks', shortcut: 'B', icon: 'bookmarks' },
 		{ href: '/import', label: 'Import', shortcut: 'I', icon: 'import' },
 		{ href: '/recycle-bin', label: 'Recycle Bin', shortcut: 'R', icon: 'recycle-bin' },
-		{ href: '/settings', label: 'Settings', shortcut: 'S', icon: 'settings' },
 	];
 
 	const navItems = $derived(

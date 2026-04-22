@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-04-22
+
+### Fixed
+- **Settings now visible in the sidebar for anonymous visitors.** The Theme, Default Notation, and Visual Toggles sections of `/settings` are all localStorage-backed and meaningful to everyone — no reason to hide them behind sign-in. Moved `/settings` from the authenticated-only nav list to the public nav list; the page itself hides the Change Password form for anonymous users (no account to change a password on). Every signed-in role including **Viewer** has always had access to `/settings`; this fix extends that to anonymous browsing so theme and notation preferences can be set without creating an account.
+
 ## [4.2.0] - 2026-04-21
 
 ### Added
