@@ -2,6 +2,7 @@
 	import { mode, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { isAuthenticated } from '$lib/stores/auth.svelte.js';
 	import { getDefaultNotation, setDefaultNotation } from '$lib/stores/defaultNotation.svelte';
 	import { getShowElementCount, setShowElementCount } from '$lib/stores/showElementCount.svelte';
 
@@ -158,6 +159,12 @@
 	</label>
 </section>
 
+{#if isAuthenticated()}
+<!-- The preference sections above (Theme / Default Notation / Visual
+     Toggles) are localStorage-backed and work for anonymous visitors;
+     only the password form is gated behind sign-in, hidden here rather
+     than on the nav so the sidebar "Settings" link stays visible to
+     everyone. -->
 <section class="mt-6">
 	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Change Password</h2>
 	<p class="mt-1 text-sm" style="color: var(--color-muted)">Update your account password.</p>
@@ -221,3 +228,4 @@
 		</button>
 	</form>
 </section>
+{/if}
