@@ -12,6 +12,9 @@ Iris follows a **repository-first architecture** (ADR-003): entities are first-c
 iris/
   backend/       Python/FastAPI API server
   frontend/      SvelteKit/Svelte 5 single-page application
+  iris-client/   Shared async Python HTTP client (ADR-132)
+  cli/           `iris` command-line tool (ADR-130)
+  mcp/           `iris-mcp` stdio MCP server for AI agents (ADR-131)
   docs/          ADRs, specs, protocols, and compliance documents
   render.yaml    Render Blueprint (optional cloud deployment)
 ```
@@ -177,6 +180,81 @@ The first extension integrates [Scenia](https://github.com/waylonkenning/Scenia)
 
 To install: navigate to **Admin > Settings > Extensions** and click **Install** on the Scenia card.
 
+## Agentic AI, CLI, and public API
+
+Issue #21 exposes the same capabilities across three surfaces so
+humans, scripts, and AI agents can all use Iris as a first-class
+resource.
+
+### Public HTTP API
+
+Full OpenAPI docs live at **`/api/docs`** (Swagger UI) and
+**`/api/openapi.json`** in every environment. Authenticate with a JWT
+(browser login) or a **Personal Access Token** (`iris_pat_…`,
+ADR-127). Many read endpoints accept anonymous callers (ADR-123).
+
+```sh
+# Mint a PAT for programmatic use:
+curl -X POST https://iris.example.com/api/users/me/tokens \
+  -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" \
+  -d '{"name": "my laptop"}'
+
+# Use it:
+curl https://iris.example.com/api/search?q=payment \
+  -H "Authorization: Bearer iris_pat_..."
+
+# Headless export (JSON + Markdown supported):
+curl "https://iris.example.com/api/export/diagrams/<id>?format=markdown" \
+  -H "Authorization: Bearer iris_pat_..." -o overview.md
+```
+
+See [`docs/api.md`](docs/api.md) for the full reference, rate-limit
+buckets, and the unversioned-path deprecation policy.
+
+### Command-line interface
+
+```sh
+uv tool install --from ./cli iris-cli
+iris login --url https://iris.example.com
+iris search "payment"
+iris diagrams list
+iris export set <id> --format markdown -o notes.md
+iris ask "Summarise the onboarding flow" --set default --stream
+```
+
+Config order: flag → env (`IRIS_URL`, `IRIS_TOKEN`) →
+`~/.config/iris/config.toml` → anonymous defaults. `--json` on any
+command emits machine-parsable output. See
+[`cli/README.md`](cli/README.md) and [ADR-130](docs/adrs/ADR-130-CLI-Architecture.md).
+
+### MCP server for AI agents
+
+```sh
+uv tool install --from ./mcp iris-mcp
+```
+
+Drop into Claude Desktop / Claude Code / Cursor:
+
+```json
+{
+  "mcpServers": {
+    "iris": {
+      "command": "uvx",
+      "args": ["iris-mcp"],
+      "env": {
+        "IRIS_URL": "https://iris.example.com",
+        "IRIS_TOKEN": "iris_pat_..."
+      }
+    }
+  }
+}
+```
+
+Exposes ~19 tools (search, list/get for every entity, export, ask-AI,
+apply-diagram-creation, conversations) plus `iris://` resource URIs
+for JSON export bundles. See [`mcp/README.md`](mcp/README.md) and
+[ADR-131](docs/adrs/ADR-131-MCP-Server-Architecture.md).
+
 ## Getting Started
 
 ### Prerequisites
@@ -277,8 +355,11 @@ npm run test:all-e2e
 |----------|---------|
 | `docs/north-star.md` | Vision, principles, and success criteria |
 | `docs/protocols.md` | 12 non-negotiable development protocols |
-| `docs/adrs/` | 85+ Architecture Decision Records |
-| `docs/adrs/specs/` | 97+ implementation specifications |
+| `docs/api.md` | Public HTTP API reference — auth, rate limits, deprecation policy |
+| `docs/cli.md` | `iris` command-line reference |
+| `docs/mcp.md` | `iris-mcp` MCP server for AI agents |
+| `docs/adrs/` | 130+ Architecture Decision Records |
+| `docs/adrs/specs/` | 100+ implementation specifications |
 | `docs/deployment-render-supabase.md` | Render + Supabase deployment guide |
 | `docs/ROADMAP.md` | Future enhancements and semantic search roadmap |
 | `docs/nz-itsm-control-mapping.md` | NZISM control compliance tracking |
