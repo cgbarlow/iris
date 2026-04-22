@@ -30,10 +30,12 @@ async def _is_ai_debug(db: object) -> bool:
         )
         row = await cursor.fetchone()
         return row is not None and row[0] == "1"
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
-from app.auth.dependencies import get_current_user, get_optional_user
+from app.ai import service
+from app.ai.creation import create_diagrams_from_ai
+from app.ai.error_mapper import map_provider_error
 from app.ai.models import (
     ActiveProviderResponse,
     ApplyCreationRequest,
@@ -42,17 +44,15 @@ from app.ai.models import (
     CreationPromptResponse,
     CreationPromptUpdate,
     FileExtractResponse,
+    MultiSetQARequest,
     ProviderCreate,
     ProviderResponse,
     ProviderTestResult,
     ProviderUpdate,
-    MultiSetQARequest,
     QARequest,
     QAResponse,
 )
-from app.ai import service
-from app.ai.creation import create_diagrams_from_ai
-from app.ai.error_mapper import map_provider_error
+from app.auth.dependencies import get_current_user, get_optional_user
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -179,13 +179,13 @@ async def _run_ping_check(db_manager: Any) -> None:
                 client = create_ai_client(p)
                 result = await asyncio.wait_for(client.test_connection(), timeout=5.0)
                 return (str(p["id"]), result.ok)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return (str(p["id"]), False)
 
         results = await asyncio.gather(*[_ping_one(p) for p in providers])
         _ping_cache = dict(results)
         _ping_cache_time = time.monotonic()
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
 
 
@@ -370,7 +370,7 @@ async def ask_question(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         import logging
         logging.getLogger("app.ai").exception("LLM provider error in ask_question")
         raise HTTPException(status_code=502, detail=map_provider_error(exc)) from exc
@@ -398,7 +398,7 @@ async def _ask_streaming(
     async def _generate() -> AsyncGenerator[str, None]:
         try:
             print(f"[AI_ASK] mode={body.mode} notation={body.notation} question={body.question[:100]}", flush=True)
-            ai_debug = await _is_ai_debug(db)  # noqa: F841
+            ai_debug = await _is_ai_debug(db)
 
             # Resolve provider
             if body.provider_id:
@@ -416,12 +416,18 @@ async def _ask_streaming(
 
             if body.mode == "creation":
                 from app.ai.creation import build_creation_system_prompt
+                creation_notation = body.notation or "doview"
+                # DoView owns its diagram_type branching inside its prompt, so
+                # we never pass a diagram_type for doview (ADR-132).
+                creation_diagram_type = (
+                    None if creation_notation == "doview" else body.diagram_type
+                )
                 creation_prompt = await build_creation_system_prompt(
                     db,
-                    notation=body.notation or "doview",
-                    diagram_type=None,
+                    notation=creation_notation,
+                    diagram_type=creation_diagram_type,
                 )
-                system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content in the user's Set. This is BACKGROUND REFERENCE ONLY. The user decides what the DoView is about — do NOT assume the DoView topic matches the Set content. If the user says they want a DoView about X, make it about X regardless of what is in the Set.\n\n{context}"
+                system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content in the user's Set. This is BACKGROUND REFERENCE ONLY. The user decides what the diagram is about — do NOT assume the topic matches the Set content. If the user says they want a diagram about X, make it about X regardless of what is in the Set.\n\n{context}"
             else:
                 system_prompt = str(provider.get("system_prompt") or "")
                 if system_prompt:
@@ -433,10 +439,15 @@ async def _ask_streaming(
                     )
 
             if body.mode == "creation":
-                messages: list[dict[str, str]] = [
-                    {"role": "system", "content": system_content},
-                    {"role": "assistant", "content": "Describe in a couple of lines or less what you want a DoView of."},
-                ]
+                # Preserve the shipped DoView opener verbatim; for other
+                # notations let Stage 0 of the notation prompt drive its own
+                # first question (ADR-132).
+                messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
+                if creation_notation == "doview" and not body.history:
+                    messages.append({
+                        "role": "assistant",
+                        "content": "Describe in a couple of lines or less what you want a DoView of.",
+                    })
                 if body.history:
                     messages.extend(body.history)
                 messages.append({"role": "user", "content": body.question})
@@ -512,7 +523,7 @@ async def _ask_streaming(
             if exc.errno == 32:  # Broken pipe
                 return
             yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
 
     return StreamingResponse(
@@ -566,7 +577,7 @@ async def ask_multi_set(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logging.getLogger("app.ai").exception("LLM provider error in ask_multi_set")
         raise HTTPException(status_code=502, detail=map_provider_error(exc)) from exc
 
@@ -630,7 +641,7 @@ async def _ask_multi_set_streaming(
                             if context:
                                 context += "\n\n---\n\n"
                             context += "LEGISLATION REFERENCE:\n" + docref_ctx
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass  # Graceful degradation
 
             # Append uploaded file context if provided (ADR-115)
@@ -645,12 +656,16 @@ async def _ask_multi_set_streaming(
 
             if body.mode == "creation":
                 from app.ai.creation import build_creation_system_prompt
+                creation_notation = body.notation or "doview"
+                creation_diagram_type = (
+                    None if creation_notation == "doview" else body.diagram_type
+                )
                 creation_prompt = await build_creation_system_prompt(
                     db,
-                    notation=body.notation or "doview",
-                    diagram_type=None,
+                    notation=creation_notation,
+                    diagram_type=creation_diagram_type,
                 )
-                system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content from the user's Sets. This is BACKGROUND REFERENCE ONLY. The user decides what the DoView is about — do NOT assume the DoView topic matches the Set content. If the user says they want a DoView about X, make it about X regardless of what is in the Sets.\n\n{context}"
+                system_content = f"{creation_prompt}\n\n## Set Context (background only)\n\nBelow is existing content from the user's Sets. This is BACKGROUND REFERENCE ONLY. The user decides what the diagram is about — do NOT assume the topic matches the Set content. If the user says they want a diagram about X, make it about X regardless of what is in the Sets.\n\n{context}"
             else:
                 system_prompt = str(provider.get("system_prompt") or "")
                 has_sets = bool(set_ids)
@@ -681,10 +696,15 @@ async def _ask_multi_set_streaming(
                     )
 
             if body.mode == "creation":
-                messages: list[dict[str, str]] = [
-                    {"role": "system", "content": system_content},
-                    {"role": "assistant", "content": "Describe in a couple of lines or less what you want a DoView of."},
-                ]
+                # Preserve the shipped DoView opener verbatim; for other
+                # notations let Stage 0 of the notation prompt drive its own
+                # first question (ADR-132).
+                messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
+                if creation_notation == "doview" and not body.history:
+                    messages.append({
+                        "role": "assistant",
+                        "content": "Describe in a couple of lines or less what you want a DoView of.",
+                    })
                 if body.history:
                     messages.extend(body.history)
                 messages.append({"role": "user", "content": body.question})
@@ -745,7 +765,7 @@ async def _ask_multi_set_streaming(
 
         except (BrokenPipeError, ConnectionResetError):
             return
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             yield "data: " + json.dumps({"error": str(exc)}) + "\n\n"
 
     return StreamingResponse(

@@ -13,6 +13,7 @@ from app.diagrams.registry_models import (
     NotationUpdateRequest,
 )
 from app.diagrams.registry_service import (
+    list_creation_catalogue,
     list_diagram_types,
     list_notations,
     update_diagram_notation,
@@ -41,6 +42,17 @@ async def get_notations(
     db = request.app.state.db_manager.main_db
     items = await list_notations(db)
     return [NotationResponse(**item) for item in items]
+
+
+@router.get("/creation-catalogue")
+async def get_creation_catalogue(
+    request: Request,
+    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> dict[str, Any]:
+    """List notation + diagram_type pairs AI diagram creation can produce (ADR-132)."""
+    db = request.app.state.db_manager.main_db
+    items = await list_creation_catalogue(db)
+    return {"items": items}
 
 
 @router.put("/diagrams/{diagram_id}/notation")

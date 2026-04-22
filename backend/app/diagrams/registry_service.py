@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import aiosqlite
     from app.db.adapter import DatabasePort
 
 
@@ -92,6 +91,82 @@ async def validate_type_notation(
         (diagram_type_id, notation_id),
     )
     return await cursor.fetchone() is not None
+
+
+async def list_creation_catalogue(db: DatabasePort) -> list[dict]:
+    """Return the (notation, diagram_type) pairs AI creation can produce (ADR-132).
+
+    A pair is creatable when:
+      - the pair exists in diagram_type_notations as the default for that
+        diagram type, and both sides are active; AND
+      - an active `notation`-layer prompt exists for the notation; AND
+      - either the notation is `doview` (DoView's own prompt branches
+        internally on diagram_type), or an active `diagram_type`-layer
+        prompt exists for the diagram type.
+
+    DoView's multiple default pairs are collapsed into one entry with
+    `diagram_type=None` and `requires_diagram_type=False` so the frontend
+    hides the diagram-type selector for DoView (preserving ADR-094 UX).
+
+    Empty-catalogue fallback: if no active prompts exist at all (greenfield
+    install before migrations run), returns a synthesised DoView entry so
+    the UI does not appear broken.
+    """
+    cursor = await db.execute(
+        "SELECT DISTINCT "
+        "  n.id, n.name, dt.id, dt.name, n.display_order, dt.display_order "
+        "FROM diagram_type_notations dtn "
+        "JOIN notations n ON dtn.notation_id = n.id "
+        "JOIN diagram_types dt ON dtn.diagram_type_id = dt.id "
+        "WHERE dtn.is_default = 1 AND n.is_active = 1 AND dt.is_active = 1 "
+        "  AND EXISTS ("
+        "    SELECT 1 FROM ai_creation_prompts "
+        "    WHERE layer = 'notation' AND notation = n.id AND is_active = 1"
+        "  ) "
+        "  AND ("
+        "    n.id = 'doview' OR EXISTS ("
+        "      SELECT 1 FROM ai_creation_prompts "
+        "      WHERE layer = 'diagram_type' AND diagram_type = dt.id AND is_active = 1"
+        "    )"
+        "  ) "
+        "ORDER BY n.display_order, dt.display_order"
+    )
+    rows = await cursor.fetchall()
+
+    if not rows:
+        # Greenfield fallback — never leave the UI empty.
+        return [{
+            "notation": "doview",
+            "notation_label": "DoView",
+            "diagram_type": None,
+            "diagram_type_label": None,
+            "requires_diagram_type": False,
+        }]
+
+    items: list[dict] = []
+    doview_seen = False
+    for r in rows:
+        notation_id, notation_label, dt_id, dt_label, _n_order, _dt_order = r
+        if notation_id == "doview":
+            if doview_seen:
+                continue  # collapse multiple doview rows into one
+            doview_seen = True
+            items.append({
+                "notation": "doview",
+                "notation_label": notation_label,
+                "diagram_type": None,
+                "diagram_type_label": None,
+                "requires_diagram_type": False,
+            })
+        else:
+            items.append({
+                "notation": notation_id,
+                "notation_label": notation_label,
+                "diagram_type": dt_id,
+                "diagram_type_label": dt_label,
+                "requires_diagram_type": True,
+            })
+    return items
 
 
 async def update_diagram_notation(
