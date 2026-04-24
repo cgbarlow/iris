@@ -4,6 +4,8 @@
 
 Iris is a web-based architectural modelling tool for creating, managing, and versioning architectural entities, relationships, and models. It supports Simple View, UML, ArchiMate, and sequence diagram notations with full keyboard accessibility and WCAG 2.2 Level AA compliance.
 
+![Iris](iris.png)
+
 ## Architecture
 
 Iris follows a **repository-first architecture** (ADR-003): entities are first-class citizens stored in a versioned repository. Diagrams are projections of entity data, not the source of truth.
