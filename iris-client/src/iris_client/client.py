@@ -278,7 +278,9 @@ class IrisClient:
         if collection_id:
             params["collection_id"] = collection_id
         response = await self._request("GET", "/api/sets", params=params)
-        return [IrisSet.model_validate(r) for r in response.json()]
+        payload = response.json()
+        items = payload["items"] if isinstance(payload, dict) and "items" in payload else payload
+        return [IrisSet.model_validate(r) for r in items]
 
     async def get_set(self, set_id: str) -> IrisSet:
         response = await self._request("GET", f"/api/sets/{set_id}")

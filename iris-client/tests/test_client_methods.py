@@ -97,6 +97,46 @@ class TestDiagrams:
         assert diagram.id == "d1"
 
 
+class TestSets:
+    @pytest.mark.asyncio
+    async def test_list_sets_handles_items_wrapper(
+        self, pat_client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        # /api/sets returns SetListResponse: {"items": [...]}.
+        # Regression: previously list_sets iterated the dict keys,
+        # producing the cryptic "Input should be a valid dictionary
+        # or instance of IrisSet, input_value='items'" error.
+        respx_mock.get(f"{BASE}/api/sets").mock(
+            return_value=httpx.Response(200, json={
+                "items": [{
+                    "id": "s1", "name": "Default", "current_version": 1,
+                    "created_at": "2026-01-01", "updated_at": "2026-01-01",
+                }],
+                "total": 1,
+            }),
+        )
+
+        sets = await pat_client.list_sets()
+
+        assert len(sets) == 1
+        assert sets[0].name == "Default"
+
+    @pytest.mark.asyncio
+    async def test_list_sets_handles_bare_list(
+        self, pat_client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/sets").mock(
+            return_value=httpx.Response(200, json=[{
+                "id": "s1", "name": "Default", "current_version": 1,
+                "created_at": "2026-01-01", "updated_at": "2026-01-01",
+            }]),
+        )
+
+        sets = await pat_client.list_sets()
+
+        assert len(sets) == 1
+
+
 class TestTokenManagement:
     @pytest.mark.asyncio
     async def test_create_token_round_trip(
