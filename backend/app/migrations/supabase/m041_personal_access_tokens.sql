@@ -23,11 +23,15 @@ ALTER TABLE personal_access_tokens ENABLE ROW LEVEL SECURITY;
 -- prefix lookup at auth time (service role bypasses RLS), so anonymous
 -- PAT verification works without the caller being authenticated against
 -- Supabase.
-CREATE POLICY IF NOT EXISTS pat_owner_select ON personal_access_tokens
+DROP POLICY IF EXISTS pat_owner_select ON personal_access_tokens;
+CREATE POLICY pat_owner_select ON personal_access_tokens
   FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS pat_owner_insert ON personal_access_tokens
+DROP POLICY IF EXISTS pat_owner_insert ON personal_access_tokens;
+CREATE POLICY pat_owner_insert ON personal_access_tokens
   FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS pat_owner_update ON personal_access_tokens
+DROP POLICY IF EXISTS pat_owner_update ON personal_access_tokens;
+CREATE POLICY pat_owner_update ON personal_access_tokens
   FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS pat_owner_delete ON personal_access_tokens
+DROP POLICY IF EXISTS pat_owner_delete ON personal_access_tokens;
+CREATE POLICY pat_owner_delete ON personal_access_tokens
   FOR DELETE USING (user_id = auth.uid());
