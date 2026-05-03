@@ -9,16 +9,31 @@ from __future__ import annotations
 
 from typing import Any
 
+from importlib.metadata import PackageNotFoundError, version
+
 from iris_client import IrisClient
 from mcp import types
 from mcp.server import Server
 
 from iris_mcp import resources as iris_resources
 from iris_mcp import tools as iris_tools
+from iris_mcp.branding import iris_icon
+
+
+def _package_version() -> str | None:
+    try:
+        return version("iris-mcp")
+    except PackageNotFoundError:
+        return None
 
 
 def build_server(client: IrisClient) -> Server:
-    server: Server = Server("iris-mcp")
+    server: Server = Server(
+        "iris-mcp",
+        version=_package_version(),
+        website_url="https://github.com/cgbarlow/iris",
+        icons=[iris_icon()],
+    )
 
     @server.list_tools()
     async def _list_tools() -> list[types.Tool]:
