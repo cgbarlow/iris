@@ -68,7 +68,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     docref_task = asyncio.create_task(start_docref_refresh_loop(app))
 
-    yield
+    # ADR-133: enter the MCP session manager's run() if /mcp was mounted.
+    # This initializes the StreamableHTTP task group; without it, every
+    # /mcp request fails with "Task group is not initialized."
+    mcp_session_run = getattr(app.state, "mcp_session_run", None)
+    if mcp_session_run is not None:
+        async with mcp_session_run:
+            yield
+    else:
+        yield
 
     docref_task.cancel()
     await db_manager.close()
@@ -192,6 +200,10 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(graph_router)
     app.include_router(tokens_router)
     app.include_router(export_router)
+
+    # ADR-133: optional remote MCP at /mcp. No-op if iris-mcp isn't installed.
+    from app.mcp_route import attach_mcp
+    attach_mcp(app)
 
     return app
 

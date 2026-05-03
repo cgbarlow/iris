@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **iris-mcp** (ADR-131): stdio Model Context Protocol server for AI
   agents. Installable into Claude Desktop / Claude Code / Cursor via a
   three-line config block. Exposes ~19 tools and `iris://` resources.
+- **Remote MCP transport** (ADR-133): iris-mcp now also runs as a
+  Streamable-HTTP server mounted on the iris backend at `/mcp`. End
+  users add iris to Claude Desktop / Cursor by pasting the URL into
+  the connector UI — no Python, no uv, no git, no JSON config edit.
+  Stdio transport (ADR-131) remains the option for offline/local use.
 
 ### Changed
 - `POST /api/ai/files/extract` no longer requires a JWT — it now uses
