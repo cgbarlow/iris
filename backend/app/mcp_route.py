@@ -56,6 +56,26 @@ def attach_mcp(app: FastAPI) -> None:
     # Stash the run() context so the app's lifespan can enter it.
     app.state.mcp_session_run = session_manager.run()
 
+    # Serve the Iris eye favicon at /favicon.ico and /favicon.svg so MCP
+    # clients that don't yet read `serverInfo.icons` (most do not as of
+    # 2026-Q2) can still fall back to fetching the host's favicon.
+    from fastapi.responses import Response
+    from iris_mcp.branding import ICON_SVG
+
+    async def _favicon_svg() -> Response:
+        return Response(content=ICON_SVG, media_type="image/svg+xml")
+
+    app.add_api_route(
+        "/favicon.svg", _favicon_svg, methods=["GET"], include_in_schema=False,
+    )
+    # /favicon.ico — return the SVG with image/svg+xml. Browsers and
+    # well-behaved clients accept SVG under .ico; the alternative is a
+    # raster .ico file, which adds tooling and doesn't materially
+    # improve compatibility for the agent clients that matter here.
+    app.add_api_route(
+        "/favicon.ico", _favicon_svg, methods=["GET"], include_in_schema=False,
+    )
+
     async def mcp_asgi_app(
         scope: dict[str, Any],
         receive: "Callable[[], Awaitable[dict[str, Any]]]",
