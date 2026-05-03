@@ -7,10 +7,10 @@ requires-python = ">=3.12"
 # Root project has no runtime dependencies; each workspace member owns its own.
 
 [tool.uv.workspace]
-# Members are added in the phase each package is introduced (ADR-132 / SPEC-132-A).
-# Phase 2: iris-client
-# Phase 7: cli (added)
-# Phase 8: mcp
-# backend/ stays independent for now — it has an established uv workflow and
-# no current need to be in the workspace; can be folded in later if desirable.
-members = ["iris-client", "cli", "mcp"]
+# cli and mcp pull `iris-client` via a path source (`{ path = "../iris-client" }`)
+# so the same dependency line works in dev *and* when uvx clones the repo for
+# `git+...#subdirectory={cli,mcp}`. Listing iris-client as a workspace member
+# would force `workspace = true`, which uvx can't resolve outside the workspace.
+# iris-client is still pulled into the workspace .venv as a transitive dep.
+# backend/ stays independent — it has its own established uv workflow.
+members = ["cli", "mcp"]

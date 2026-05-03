@@ -26,7 +26,9 @@ dev = [
 iris = "iris_cli.main:app"
 
 [tool.uv.sources]
-iris-client = { workspace = true }
+# Path-relative so this resolves both in the uv workspace (dev) and when
+# the whole repo is cloned by `uvx --from git+...#subdirectory=cli`.
+iris-client = { path = "../iris-client" }
 
 [build-system]
 requires = ["hatchling"]
