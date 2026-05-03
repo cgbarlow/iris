@@ -30,6 +30,23 @@ _current_client: ContextVar["IrisClient | None"] = ContextVar(
 )
 
 
+def extract_bearer(headers: list[tuple[bytes, bytes]]) -> str | None:
+    """Pull a Bearer token out of an ASGI scope's headers list.
+
+    Used by every iris-mcp HTTP integration (embedded mount in the
+    backend, standalone http_main service, future transports). One
+    place to fix bugs related to header parsing.
+    """
+    for name, value in headers:
+        if name.lower() == b"authorization":
+            text = value.decode("latin-1")
+            prefix = "Bearer "
+            if text.startswith(prefix):
+                return text[len(prefix) :].strip() or None
+            return None
+    return None
+
+
 def get_current_client() -> "IrisClient":
     """Return the IrisClient bound to the current MCP request.
 

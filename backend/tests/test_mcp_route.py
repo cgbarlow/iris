@@ -24,7 +24,11 @@ iris_mcp = pytest.importorskip("iris_mcp", reason="iris-mcp not installed")
 
 
 @pytest.fixture
-def app(tmp_path: Path) -> FastAPI:
+def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+    # ADR-134: embedded /mcp mount is opt-in. Tests assert it works
+    # when explicitly enabled; production defaults to off.
+    monkeypatch.setenv("IRIS_EMBEDDED_MCP", "1")
+
     from app.config import AppConfig, AuthConfig, DatabaseConfig
     from app.main import create_app
 
@@ -43,7 +47,11 @@ def app(tmp_path: Path) -> FastAPI:
 
 
 @pytest.fixture
-async def client(tmp_path: Path) -> AsyncIterator[httpx.AsyncClient]:
+async def client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> AsyncIterator[httpx.AsyncClient]:
+    monkeypatch.setenv("IRIS_EMBEDDED_MCP", "1")
+
     from app.config import AppConfig, AuthConfig, DatabaseConfig
     from app.database import DatabaseManager
     from app.main import create_app

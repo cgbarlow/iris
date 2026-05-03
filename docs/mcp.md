@@ -10,13 +10,14 @@ that suits the client.
 This is the easiest path for end users. **No Python, no uv, no git, no
 local install.**
 
-ADR-133 mounts iris-mcp on the iris backend at **`/mcp`** as a
-Streamable-HTTP MCP server. To add it to Claude Desktop:
+iris-mcp runs as its own Render web service (ADR-134) — a
+Streamable-HTTP MCP server that proxies the iris backend. To add it
+to Claude Desktop:
 
 1. Open Claude Desktop → **Settings → Connectors → Add custom connector**.
 2. Name: `iris`.
-3. Remote MCP server URL: `https://iris-uat.chrisbarlow.nz/mcp`
-   (or your iris deployment's hostname + `/mcp`).
+3. Remote MCP server URL: `https://iris-mcp-gtb3.onrender.com/mcp/`
+   (or your iris-mcp deployment's hostname + `/mcp/`).
 4. Optional: paste a PAT (`iris_pat_…`) for authenticated access.
    Without it, you get the same anonymous read-only + AI scope as the
    web frontend.

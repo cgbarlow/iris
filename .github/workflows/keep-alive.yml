@@ -20,15 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Wake the iris-api UAT backend
+      - name: Wake the iris-api and iris-mcp UAT services
         run: |
           set -euo pipefail
-          URL='https://iris-api-gtb3.onrender.com/favicon.ico'
-          # Retry once if the first hit catches a cold start mid-spinup.
-          for attempt in 1 2; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$URL" || echo 000)
-            echo "attempt $attempt: HTTP $code"
-            if [ "$code" = "200" ]; then exit 0; fi
-            [ "$attempt" = "1" ] && sleep 30
+          URLS=(
+            'https://iris-api-gtb3.onrender.com/favicon.ico'
+            'https://iris-mcp-gtb3.onrender.com/'  # ADR-134; update suffix when Render assigns it
+          )
+          for url in "${URLS[@]}"; do
+            for attempt in 1 2; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$url" || echo 000)
+              echo "$url attempt $attempt: HTTP $code"
+              if [ "$code" = "200" ]; then break; fi
+              [ "$attempt" = "1" ] && sleep 30
+            done
+            [ "$code" = "200" ] || echo "::warning::$url did not return 200 (last: $code)"
           done
-          echo "::warning::iris-api did not return 200 after 2 attempts (last: $code)"

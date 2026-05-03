@@ -74,3 +74,19 @@ services:
         sync: false
       - key: IRIS_DEBUG
         value: "false"
+
+  # --- MCP server: standalone Streamable-HTTP MCP for AI agents ---
+  # ADR-134: split out of iris-api so the API doesn't carry the MCP SDK
+  # in resident memory (free dyno is 512 MB; embedded mount OOM'd).
+  - type: web
+    name: iris-mcp
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: mcp/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: IRIS_API_URL
+        # Render-assigned URL of the iris-api service above. Update if
+        # iris-api ever moves to a custom domain.
+        value: https://iris-api-gtb3.onrender.com

@@ -45,6 +45,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   users add iris to Claude Desktop / Cursor by pasting the URL into
   the connector UI — no Python, no uv, no git, no JSON config edit.
   Stdio transport (ADR-131) remains the option for offline/local use.
+- **iris-mcp standalone service** (ADR-134): the production MCP
+  endpoint runs as its own Render web service alongside the iris
+  backend. Splits the MCP SDK's memory footprint off the iris-api
+  dyno (which OOM'd on the 512 MB free tier when MCP was embedded).
+  The embedded mount stays in the codebase, opt-in via
+  `IRIS_EMBEDDED_MCP=1` for one-process local dev. Bare `/mcp`
+  requests no longer 307-redirect to `/mcp/` — some MCP clients drop
+  POST bodies on chase, fixed by a path-normalising middleware.
 
 ### Changed
 - `POST /api/ai/files/extract` no longer requires a JWT — it now uses
