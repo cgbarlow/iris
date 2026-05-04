@@ -32,6 +32,10 @@ def app_config(tmp_path: Path) -> AppConfig:
         rate_limit_login=3,
         rate_limit_refresh=5,
         rate_limit_general=10,
+        # ADR-129: anonymous requests without an Authorization header get
+        # the `anon` bucket (split out from `general`). Tune it low here so
+        # existing /health tests still exercise the rate-limit guard.
+        rate_limit_anon=10,
     )
 
 

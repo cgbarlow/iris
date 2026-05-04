@@ -1,0 +1,38 @@
+name: keep-alive
+
+# Pings the iris UAT backend every 10 minutes so Render's free-tier
+# spin-down doesn't bite users mid-flow (notably during MCP connector
+# adds in Claude Desktop, which doesn't retry on the cold-start 503).
+#
+# /favicon.ico is the lightest endpoint that still goes through the
+# FastAPI app, so it warms the dyno without touching the database.
+#
+# GitHub auto-disables scheduled workflows on repos with no activity
+# for 60 days — you'll get an email warning first.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # every 10 minutes (UTC); GitHub may delay by a few min
+  workflow_dispatch:        # allow manual trigger from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wake the iris-api and iris-mcp UAT services
+        run: |
+          set -euo pipefail
+          URLS=(
+            'https://iris-api-gtb3.onrender.com/favicon.ico'
+            'https://iris-mcp-gtb3.onrender.com/info'  # ADR-134; update suffix when Render assigns it
+          )
+          for url in "${URLS[@]}"; do
+            for attempt in 1 2; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 "$url" || echo 000)
+              echo "$url attempt $attempt: HTTP $code"
+              if [ "$code" = "200" ]; then break; fi
+              [ "$attempt" = "1" ] && sleep 30
+            done
+            [ "$code" = "200" ] || echo "::warning::$url did not return 200 (last: $code)"
+          done

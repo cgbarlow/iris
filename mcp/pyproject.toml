@@ -1,0 +1,69 @@
+[project]
+name = "iris-mcp"
+version = "0.1.0"
+description = "Stdio MCP server for Iris (ADR-131)"
+requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "iris-client",
+  "mcp>=1.2",
+  "httpx>=0.28",
+  "pydantic>=2.9",
+  # iris_mcp.http_main builds a FastAPI app for the standalone service
+  # (ADR-134). The stdio entry point in __main__.py doesn't need it,
+  # but we keep one install path for both transports.
+  "fastapi>=0.110",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "respx>=0.22",
+  "ruff>=0.6",
+  "mypy>=1.11",
+]
+
+[project.scripts]
+iris-mcp = "iris_mcp.__main__:run_sync"
+
+[tool.uv.sources]
+# Path-relative so this resolves both in the uv workspace (dev) and when
+# the whole repo is cloned by `uvx --from git+...#subdirectory=mcp`.
+iris-client = { path = "../iris-client" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/iris_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+# The MCP SDK's decorators are not fully typed; enforcing strict mode on
+# our server wiring produces false positives that noqa-wise don't help.
+# We keep strict=true on iris-client (the real library) and lightly-typed
+# here (the glue layer).
+python_version = "3.12"
+strict = false
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["mcp.*"]
+ignore_missing_imports = true

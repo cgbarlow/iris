@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-05-04
+
+Major release: iris becomes agent-friendly. Three coordinated surfaces
+— a stable HTTP API with Personal Access Tokens, a CLI, and an MCP
+server — let humans and AI agents drive iris with the same auth,
+search, browse, ask, and export capabilities the web frontend uses.
+See [ADR-127](docs/adrs/ADR-127-Personal-Access-Tokens.md) through
+[ADR-134](docs/adrs/ADR-134-MCP-Standalone-Service.md) for full
+design rationale.
+
+### Added
+- **Personal Access Tokens** (ADR-127). New `/api/users/me/tokens` mgmt
+  endpoints let any authenticated user mint long-lived revocable
+  `iris_pat_…` bearer tokens for CLI / MCP / agent use. Tokens inherit
+  the creating user's role, are Argon2id-hashed, and the plaintext
+  value is returned exactly once. Authorisation goes through the same
+  `Authorization: Bearer …` header the frontend uses — the auth
+  dependency routes `iris_pat_` tokens through a new PAT validator and
+  leaves the JWT code path unchanged.
+- **Server-side export** (ADR-128). New `/api/export/*` endpoints
+  produce JSON or Markdown bundles for diagrams, elements, packages,
+  sets, and collections. Anonymous-friendly (ADR-123 parity), subject
+  to a 10,000-element cap per bundle. Complements ADR-039 — client-side
+  visual export in the browser is unchanged.
+- **Public OpenAPI docs** (ADR-129). `/api/docs` (Swagger UI) and
+  `/api/openapi.json` are now served in every environment, not just
+  debug mode. `docs/api.md` describes the auth model, rate-limit
+  buckets, and the unversioned-path + `-v2` deprecation policy.
+- **Per-auth-type rate-limit buckets**. Middleware now splits traffic
+  into `login` / `refresh` / `anon` / `anon_ai` / `pat` / `general` and
+  tunes each independently so a busy CLI user can't starve browser
+  traffic and vice versa. Configurable via `IRIS_RATE_LIMIT_*` env vars.
+- **iris-client** (ADR-132): shared async Python client library under
+  `iris-client/`. Typed methods for every v1 endpoint plus an SSE
+  streaming helper for `ask`.
+- **iris-cli** (ADR-130): Python command-line tool (`iris`) for read-
+  only + AI operations. `iris login`, `iris search`, `iris diagrams
+  get`, `iris export diagram|set|… --format json|markdown`, `iris ask
+  --stream`, etc. Installable via `uv tool install` from the repo;
+  config in `~/.config/iris/config.toml` (0600).
+- **iris-mcp** (ADR-131): stdio Model Context Protocol server for AI
+  agents. Installable into Claude Desktop / Claude Code / Cursor via a
+  three-line config block. Exposes ~19 tools and `iris://` resources.
+- **Remote MCP transport** (ADR-133): iris-mcp now also runs as a
+  Streamable-HTTP server mounted on the iris backend at `/mcp`. End
+  users add iris to Claude Desktop / Cursor by pasting the URL into
+  the connector UI — no Python, no uv, no git, no JSON config edit.
+  Stdio transport (ADR-131) remains the option for offline/local use.
+- **iris-mcp standalone service** (ADR-134): the production MCP
+  endpoint runs as its own Render web service alongside the iris
+  backend. Splits the MCP SDK's memory footprint off the iris-api
+  dyno (which OOM'd on the 512 MB free tier when MCP was embedded).
+  The embedded mount stays in the codebase, opt-in via
+  `IRIS_EMBEDDED_MCP=1` for one-process local dev. Bare `/mcp`
+  requests no longer 307-redirect to `/mcp/` — some MCP clients drop
+  POST bodies on chase, fixed by a path-normalising middleware.
+
+### Changed
+- `POST /api/ai/files/extract` no longer requires a JWT — it now uses
+  `get_optional_user`, matching the other AI endpoints under ADR-123.
+  Anonymous callers are subject to the existing `anon_ai` rate-limit
+  bucket.
+- Root `pyproject.toml` declares a uv workspace with members
+  `iris-client`, `cli`, `mcp`. Backend stays outside the workspace for
+  now.
+
+### Deploy notes
+- No new env vars required to run; optional tuning via
+  `IRIS_RATE_LIMIT_PAT` (default 60/min) and `IRIS_RATE_LIMIT_ANON`
+  (default 30/min).
+- Supabase deployments pick up the new `personal_access_tokens` table
+  automatically via `m042_personal_access_tokens.sql` (idempotent; RLS
+  enabled, owner-only policies).
+
 ## [4.3.0] - 2026-04-22
 
 ### Added
