@@ -90,6 +90,15 @@
 			{ value: 'system_context', label: 'System Context' },
 			{ value: 'container', label: 'Container' },
 		],
+		bpmn: [
+			{ value: 'process', label: 'Process' },
+			{ value: 'collaboration', label: 'Collaboration' },
+			{ value: 'choreography', label: 'Choreography' },
+			{ value: 'free_form', label: 'Free Form' },
+		],
+		markdown: [
+			{ value: 'text', label: 'Text Document' },
+		],
 	};
 
 	/** Diagram types filtered by the selected notation. */
@@ -176,7 +185,7 @@
 		style="background-color: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border); min-width: 360px"
 	>
 		<h2 id="diagram-dialog-title" class="text-lg font-bold">
-			{mode === 'create' ? 'Create Diagram' : 'Edit Diagram'}
+			{mode === 'create' ? 'Create' : 'Edit'}
 		</h2>
 
 		<form onsubmit={handleSubmit} class="mt-4 flex flex-col gap-4">

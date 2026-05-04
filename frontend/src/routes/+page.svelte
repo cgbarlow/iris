@@ -93,6 +93,10 @@
 	let reorderMode = $state(false);
 	let showCreateMenu = $state(false);
 	let showCreateDiagramDialog = $state(false);
+	/** Initial notation pre-set on the Create dialog when opened from the
+	 * View submenu (issue #26 — "Diagram" opens with notation cleared,
+	 * "Text" opens with notation='markdown'). */
+	let createInitialNotation = $state<string | undefined>(undefined);
 	let showCreatePackageDialog = $state(false);
 	let newPackageName = $state('');
 	let newPackageDescription = $state('');
@@ -629,8 +633,11 @@
 							{#if showCreateMenu}
 								<!-- svelte-ignore a11y_no_static_element_interactions -->
 								<div style="position: fixed; inset: 0; z-index: 9" onclick={() => (showCreateMenu = false)}></div>
-								<div style="position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; min-width: 120px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden">
-									<button onclick={() => { showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Diagram</button>
+								<!-- Issue #26: "Diagram" entry replaced with a "View" submenu offering Diagram and Text. -->
+								<div style="position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; min-width: 140px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden">
+									<div class="px-3 pt-2 pb-1 text-xs" style="color: var(--color-muted); font-weight: 600">View</div>
+									<button onclick={() => { createInitialNotation = undefined; showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Diagram</button>
+									<button onclick={() => { createInitialNotation = 'markdown'; showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Text</button>
 									<button onclick={() => { showCreatePackageDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; border-top: 1px solid var(--color-border); cursor: pointer">Package</button>
 								</div>
 							{/if}
@@ -1003,8 +1010,9 @@
 <DiagramDialog
 	open={showCreateDiagramDialog}
 	mode="create"
+	initialNotation={createInitialNotation}
 	onsave={handleCreateDiagram}
-	oncancel={() => (showCreateDiagramDialog = false)}
+	oncancel={() => { showCreateDiagramDialog = false; createInitialNotation = undefined; }}
 />
 
 {#if showCreatePackageDialog}

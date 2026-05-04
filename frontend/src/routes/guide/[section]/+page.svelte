@@ -1,19 +1,21 @@
 <script lang="ts">
+	/**
+	 * User Guide section page.
+	 *
+	 * Markdown rendering is delegated to the shared `MarkdownView` component
+	 * (introduced for issue #26 / ADR-137). This page now does only:
+	 *   - section resolution by slug (with fallback to Getting Started)
+	 *   - <svelte:head> title
+	 *
+	 * The marked + DOMPurify pipeline is no longer duplicated here — see
+	 * `$lib/components/MarkdownView.svelte`.
+	 */
 	import { page } from '$app/state';
-	import { marked } from 'marked';
-	import DOMPurify from 'dompurify';
 	import { GUIDE_BY_SLUG, DEFAULT_SECTION } from '$lib/guide';
+	import MarkdownView from '$lib/components/MarkdownView.svelte';
 
-	// Resolve section by slug; fall back to Getting Started if the URL
-	// points at a section that doesn't exist rather than 404'ing.
 	const section = $derived(
 		GUIDE_BY_SLUG[page.params.section] ?? GUIDE_BY_SLUG[DEFAULT_SECTION],
-	);
-
-	// Render markdown through DOMPurify before {@html} per protocol #7.
-	// `marked.parse` is sync when given a string with async: false (default).
-	const html = $derived(
-		DOMPurify.sanitize(marked.parse(section.markdown) as string),
 	);
 </script>
 
@@ -21,6 +23,4 @@
 	<title>{section.title} — Iris User Guide</title>
 </svelte:head>
 
-<!-- Content is Iris-controlled markdown sanitised via DOMPurify (protocol #7). -->
-<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-{@html html}
+<MarkdownView source={section.markdown} />

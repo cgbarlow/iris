@@ -9,6 +9,9 @@
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
 	import UnifiedCanvas from '$lib/canvas/UnifiedCanvas.svelte';
 	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
+	import TextCanvas from '$lib/canvas/text/TextCanvas.svelte';
+	import MarkdownToc from '$lib/components/MarkdownToc.svelte';
+	import type { TocHeading } from '$lib/components/MarkdownView.svelte';
 	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
 	import ParticipantDialog from '$lib/canvas/sequence/ParticipantDialog.svelte';
 	import MessageDialog from '$lib/canvas/sequence/MessageDialog.svelte';
@@ -452,6 +455,9 @@
 	/** Determine which canvas component to render based on diagram notation/type. */
 	const canvasType = $derived.by(() => {
 		if (!diagram) return 'simple';
+		// Text-class diagrams (issue #26 / ADR-137): markdown notation swaps
+		// the canvas for a TextCanvas (rendered markdown + edit-mode source).
+		if (diagram.notation === 'markdown' || diagram.diagram_type === 'text') return 'text';
 		if (diagram.diagram_type === 'sequence') return 'sequence';
 		// Use notation from registry (ADR-079)
 		const n = diagram.notation ?? 'simple';
@@ -459,9 +465,15 @@
 		if (n === 'archimate') return 'archimate';
 		if (n === 'c4') return 'c4';
 		if (n === 'doview') return 'doview';
+		if (n === 'bpmn') return 'bpmn';
 		if (n === 'scenia') return 'simple';
 		return 'simple';
 	});
+
+	/** Markdown source for Text-class diagrams; lives at diagram.data.content. */
+	let markdownContent = $derived((diagram?.data?.content as string | undefined) ?? '');
+	let textHeadings = $state<TocHeading[]>([]);
+	let showTocDrawer = $state(false);
 
 	/** Notation for UnifiedCanvas context. */
 	const notation = $derived<NotationType>(
@@ -2752,6 +2764,25 @@
 								</div>
 							</div>
 						</FocusView>
+					{:else if canvasType === 'text'}
+					<!-- Issue #26 / ADR-137: Text diagrams render markdown view/edit instead of a canvas. -->
+					<div class="flex gap-4">
+						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+							<TextCanvas
+								content={markdownContent}
+								editing={editing}
+								oncontentchange={(c) => {
+									if (diagram) {
+										diagram.data = { ...(diagram.data ?? {}), content: c };
+									}
+								}}
+								onheadings={(h) => (textHeadings = h)}
+							/>
+						</div>
+						{#if !editing && showTocDrawer}
+							<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
+						{/if}
+					</div>
 					{:else}
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">

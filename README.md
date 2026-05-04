@@ -2,7 +2,7 @@
 
 **Integrated Repository for Information & Systems**
 
-Iris is a web-based architectural modelling tool for creating, managing, and versioning architectural entities, relationships, and models. It supports Simple View, UML, ArchiMate, and sequence diagram notations with full keyboard accessibility and WCAG 2.2 Level AA compliance.
+Iris is a web-based architectural modelling tool for creating, managing, and versioning architectural entities, relationships, and models. It supports Simple View, UML, ArchiMate, C4, DoView, BPMN 2.0, and Markdown text notations with full keyboard accessibility and WCAG 2.2 Level AA compliance.
 
 ![Iris](iris.png)
 
@@ -57,6 +57,8 @@ The default self-hosted mode requires no external services. The optional Render 
 | **Simple View** | Component, Service, Interface, Package, Actor, Database, Queue, Note, Boundary | Uses, Depends On, Composes, Implements, Contains, Note Link, Self Loop |
 | **UML** | Class, Object, Use Case, State, Activity, Deployment | Association, Aggregation, Composition, Dependency, Realization, Generalization |
 | **ArchiMate** | 11 types across Business, Application, Technology layers | Serving, Composition, Aggregation, Assignment, Realization, Access, Influence, Triggering |
+| **BPMN 2.0** | 14 base types across Activities, Events, Gateways, Swimlanes, Data, Artifacts (full BPMN 2.0 §7.4 catalogue via discriminator fields) | Sequence Flow (default + conditional), Message Flow, Association, Data Association |
+| **Markdown (Text)** | Markdown source rendered as a document; `iris://diagram/<id>` and `iris://element/<id>` links navigate in-app | TOC drawer with depth-indented headings; cross-links to and from regular diagrams |
 | **Sequence** | Participants with lifelines | Sync, Async, Reply messages with activation boxes |
 
 ### Keyboard Accessibility

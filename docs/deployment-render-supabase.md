@@ -33,7 +33,7 @@ This guide covers deploying Iris as a static SvelteKit frontend, a Scenia React 
 
 ## Step 2 — Run the PostgreSQL migrations
 
-All 40 migration files are in `backend/app/migrations/supabase/` (m001–m040). They are idempotent and safe to re-run.
+All migration files are in `backend/app/migrations/supabase/` (m001–m043). They are idempotent and safe to re-run.
 
 ### Option A: Script (recommended)
 
@@ -68,6 +68,9 @@ If you have `psql` installed locally, run all migrations in one command using th
 - **m038**: Collections RLS policies
 - **m039**: `graph_settings` table (admin defaults for knowledge-graph physics)
 - **m040**: Search parity with SQLite — `search_vector` + GIN + triggers for packages/sets/collections, chain-triggers fixing INSERT-ordering on elements/diagrams (ADR-125)
+- **m041**: Expanded AI creation prompts (ADR-132)
+- **m042**: Personal Access Tokens (ADR-127)
+- **m043**: DocRef legislation tables — required for the Iris AI Legislation feature on Supabase deployments (ADR-135, issue #24)
 
 ---
 
