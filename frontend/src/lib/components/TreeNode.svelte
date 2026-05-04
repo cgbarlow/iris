@@ -207,7 +207,12 @@
 				{:else if indicatorType === 'hollow'}
 					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--hollow" aria-hidden="true"></span>
 				{/if}
-				<span class="tree-node__name">{node.name}</span>
+				<!-- Issue #26: text-class diagrams render their label in the muted colour
+					 to visually distinguish them from "true" diagrams. -->
+				<span
+					class="tree-node__name"
+					class:tree-node__name--text={node.diagram_type === 'text'}
+				>{node.name}</span>
 			</a>
 			{#if onaddcontext && onremovecontext && contextItemIds}
 				{#if contextItemIds.has(node.id)}
@@ -359,6 +364,9 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.tree-node__name--text {
+		color: var(--color-muted);
 	}
 	.tree-node__type {
 		font-size: 0.7rem;
