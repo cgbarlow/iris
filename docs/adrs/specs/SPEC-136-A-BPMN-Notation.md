@@ -1,0 +1,211 @@
+# SPEC-136-A: BPMN 2.0 notation
+
+ADR: [ADR-136](../ADR-136-BPMN-Notation.md)
+
+## Element catalogue (14 base types, OMG BPMN 2.0 §7.4)
+
+| Category   | Entity type         | Discriminator(s) on `data`                                              |
+|---|---|---|
+| Activity   | `task`              | `taskType` ∈ {none, user, service, manual, send, receive, script, business_rule} + marker_* booleans (loop, multi_instance_parallel, multi_instance_sequential, compensation) |
+| Activity   | `subprocess`        | `subprocessKind` ∈ {embedded, event, ad_hoc, transaction} + marker_*    |
+| Activity   | `call_activity`     | (none — thick border)                                                   |
+| Event      | `event_start`       | `eventTrigger` ∈ {none, message, timer, signal, conditional, error, escalation, compensation, link} |
+| Event      | `event_intermediate`| `eventDirection` ∈ {catch, throw} + `eventTrigger` (subset by direction)|
+| Event      | `event_end`         | `eventTrigger` ∈ {none, message, signal, error, escalation, compensation, terminate} |
+| Event      | `event_boundary`    | `boundaryInterrupting` (bool) + `eventTrigger`                          |
+| Gateway    | `gateway`           | `gatewayType` ∈ {exclusive, inclusive, parallel, event_based, complex, parallel_event_based} |
+| Swimlane   | `pool`              | `orientation` ∈ {horizontal, vertical}                                  |
+| Swimlane   | `lane`              | (parent must be a pool; enforced by validator rule 8)                   |
+| Data       | `data_object`       | `dataKind` ∈ {object, input, output, collection}                        |
+| Data       | `data_store`        | (none — cylinder)                                                       |
+| Artifact   | `group`             | (none — dashed rounded rectangle)                                       |
+| Artifact   | `text_annotation`   | (none — bracket marker)                                                 |
+
+### Connecting object types
+
+| Key                          | Render                                                      |
+|---|---|
+| `sequence_flow`              | Solid line, filled arrowhead                                |
+| `sequence_flow_default`      | Solid line + diagonal slash near source                     |
+| `sequence_flow_conditional`  | Solid line + small diamond near source                      |
+| `message_flow`               | Dashed line, open arrowhead                                 |
+| `association`                | Dotted line, no arrowhead (or open if directional)          |
+| `data_association`           | Dotted line, open arrowhead                                 |
+
+`association` is shared with UML — the active notation context
+disambiguates the renderer in `DynamicEdge.svelte`.
+
+## Diagram-type matrix (BPMN_DIAGRAM_TYPE_FILTER, ADR-082)
+
+| Diagram type     | Allowed BPMN element keys                                                      |
+|---|---|
+| `process`        | All except `pool` (single-pool process is implicit)                            |
+| `collaboration`  | `null` (every element permitted, including multiple pools + message flows)     |
+| `choreography`   | `task`, `event_*`, `gateway` only                                              |
+| `free_form`      | `null`                                                                         |
+
+## Authoring UX (researched against the most-loved BPMN tools)
+
+The full research synthesis lives in the planning notes; the below is
+the implementation-side specification.
+
+### Two surfaces (universal pattern across loved tools)
+
+1. **`BpmnPalette.svelte`** — left sidebar, six accordion sections
+   (Activities / Events / Gateways / Swimlanes / Data / Artifacts), one
+   representative per family. Drag-and-drop emits the entity-type key
+   via `application/iris-bpmn-entity` data transfer.
+2. **`ContextPad.svelte`** — Svelte Flow `<NodeToolbar>` on the
+   selected node with the canonical bpmn-js action order: Append Task
+   → Append Gateway → Append End Event → Connect → Change (wrench,
+   tooltip "Change element type (R)") → Delete. Wrench tooltip
+   explicitly names the keyboard shortcut to fix bpmn-js's
+   discoverability gap.
+
+### Searchable command palette (the most-praised UX in the category)
+
+`CommandPalette.svelte` binds three global keys:
+
+- **`N`** — create-anything (drop element at cursor on canvas)
+- **`A`** — append-anything (after the selected element)
+- **`R`** — replace (morph the selected element to a different type)
+
+Fuzzy match across the full BPMN catalogue. Arrow keys + Enter to
+confirm, Escape to dismiss. Backdrop click also dismisses. Bound at
+document level; ignores keypresses inside other inputs/textareas.
+
+### 2D event matrix picker (Iris's strong opinion)
+
+`EventMatrixPicker.svelte` displays a 6 × 10 grid (positions ×
+triggers). Illegal cells are visually disabled with a hatch pattern.
+Output: `{ entityType, eventTrigger, eventDirection?, boundaryInterrupting? }`
+applied as the new node's data.
+
+### Right-side property panel (universal)
+
+`PropertyPanel.svelte` — always visible, refreshes on selection. Three
+tabs: General / BPMN / Documentation. The BPMN tab exposes the
+discriminator selects + the activity marker checkboxes. Modal
+property dialogs are explicitly avoided — every loved BPMN tool moved
+to an always-on side panel.
+
+### Hybrid validation (Camunda's pattern)
+
+`bpmnRules.ts` exports two functions:
+
+- `canConnect({source, target, edgeType, nodes})` — draw-time
+  prevention. Returns `{ allowed: false, reason, ruleId }` for blocked
+  connections; the toast text is the `reason`.
+- `validateBpmn(data)` — whole-diagram pass returning `BpmnProblem[]`
+  with severity (`error | warning | info`) and `elementIds` for click-
+  to-focus.
+
+`ProblemsPanel.svelte` displays the live list bottom-docked with a
+header showing severity counts. Each row is clickable and emits
+`onfocus(elementIds)` so the canvas can scroll/zoom to the offender.
+
+### Anti-pattern rules shipped in v5.1.0 (15)
+
+| ID                               | Severity | Description                                              |
+|---|---|---|
+| `sequence_flow_crosses_pool`     | error    | Sequence flow crosses pool boundaries                    |
+| `message_flow_within_pool`       | error    | Message flow stays within a single pool                  |
+| `message_flow_invalid_endpoint`  | warning  | Message flow endpoint is not activity/event/pool         |
+| `start_event_has_inflow`         | error    | Start event has incoming sequence flow                   |
+| `end_event_has_outflow`          | error    | End event has outgoing sequence flow                     |
+| `outflow_from_end_event`         | (block)  | Draw-time only                                           |
+| `inflow_to_start_event`          | (block)  | Draw-time only                                           |
+| `start_event_no_outflow`         | warning  | Start event with zero outgoing flows                     |
+| `end_event_no_inflow`            | warning  | End event with zero incoming flows                       |
+| `missing_start_event`            | warning  | Process has activities but no start event                |
+| `missing_end_event`              | warning  | Process has activities but no end event                  |
+| `orphan_activity`                | warning  | Activity has no connections                              |
+| `lane_outside_pool`              | error    | Lane not inside a pool                                   |
+| `pointless_gateway`              | info     | Gateway with 1 in + 1 out                                |
+| `unbalanced_gateways`            | info     | More diverging gateways than converging                  |
+| `multiple_start_events`          | info     | More than one start event                                |
+| `text_annotation_unlinked`       | info     | Text annotation without an Association                   |
+
+### Anti-patterns we explicitly avoid (from research)
+
+- Flat-listing every BPMN variant on the palette (draw.io's failure mode).
+- Wrench-only morphing without keyboard shortcut or tooltip.
+- Auto-opening the morph popup after every drop.
+- Modal property dialogs.
+- Top-down-only flow (default LTR; pools auto-orient).
+- Promising mobile/touch authoring — read-only viewer + tap-to-comment only.
+- Bizagi-style "click Validate" gating — we ship hybrid validation instead.
+
+## Theme defaults (Camunda-inspired neutral palette)
+
+Seeded by `m043_bpmn_notation.py` (SQLite) and `m044_bpmn_notation.sql`
+(Supabase) into the `themes` table as `bpmn-default`.
+
+- Tasks / Subprocesses / Activities: white fill, `#202931` border.
+- Call Activity: 4px border (visual cue for "calls another process").
+- Start Events: pale green fill, green border, 1px stroke.
+- Intermediate Events: pale grey fill, amber border, double 1px concentric circles.
+- End Events: pale red fill, red border, 4px stroke.
+- Boundary Events: dashed concentric circles when `boundaryInterrupting=false`.
+- Gateways: white diamond, amber border, 2px stroke.
+- Pools / Lanes: white fill, `#202931` border (lanes 1px, pools 2px).
+- Data: white fill, dark border.
+- Group: transparent dashed rounded rectangle.
+- Text Annotation: bracketed label, transparent.
+- Sequence Flow / Message Flow: 2px dark stroke (`#202931`); message flows dashed.
+- Association / Data Association: 1px medium grey, dotted.
+
+Border radius defaults to `6px` on activities (rounded BPMN convention).
+
+## AI creation prompts
+
+Seeded by `m043_bpmn_notation.py` and `m044_bpmn_notation.sql` into
+`ai_creation_prompts`:
+
+- `bpmn-notation` (layer = `notation`): structural rules, element
+  catalogue, hard rules (no sequence flows across pools, every process
+  starts with a start event, lanes inside pools), discriminator
+  conventions.
+- `bpmn-process` (layer = `diagram_type`): single-participant guidance,
+  lanes for responsibilities, LTR or TTB but not both.
+- `bpmn-collaboration` (layer = `diagram_type`): multi-pool guidance,
+  message flows across pool boundaries, black-box pools.
+- `bpmn-choreography` (layer = `diagram_type`): two-participant per
+  task, no controlling pool.
+
+## MCP / public API exposure
+
+The MCP `ask` tool (`mcp/src/iris_mcp/tools.py:~304`) already accepts
+a freeform `notation` parameter validated server-side against the
+registry. With BPMN seeded, MCP exposure is automatic — no MCP code
+change. A regression test confirms `notation: "bpmn"` is accepted.
+
+## Performance budget
+
+`BpmnPerformance` test asserts a 500-node process renders within an
+agreed budget (initial render < 500 ms; pan/zoom maintains 30+ fps via
+Svelte Flow's built-in viewport culling). This explicit guard exists
+to prevent the Bizagi failure mode ("12-tab files take 5+ minutes to
+open") that recurred in user reviews.
+
+## Files
+
+| Surface                | File                                                                                          |
+|---|---|
+| Type system            | `frontend/src/lib/types/canvas.ts` (BpmnEntityType, BpmnCategory, BPMN_ENTITY_TYPES, BPMN_RELATIONSHIP_TYPES, BPMN_DIAGRAM_TYPE_FILTER, BPMN_DEFAULT_DISCRIMINATORS) |
+| Backend detection      | `backend/app/diagrams/notation_detection.py` (BPMN_TYPES + branch)                            |
+| SQLite registry seed   | `backend/app/migrations/m043_bpmn_notation.py` (notation, diagram_types, mappings, theme, AI) |
+| Supabase registry seed | `backend/app/migrations/supabase/m044_bpmn_notation.sql`                                      |
+| Node renderer          | `frontend/src/lib/canvas/renderers/BpmnRenderer.svelte`                                       |
+| Edge renderer          | `frontend/src/lib/canvas/renderers/BpmnEdgeRenderer.svelte`                                   |
+| Canvas dispatch        | `frontend/src/lib/canvas/DynamicNode.svelte`, `DynamicEdge.svelte`, `registry.ts`             |
+| Create dialog fallback | `frontend/src/lib/components/DiagramDialog.svelte` (NOTATION_TYPE_FALLBACK)                   |
+| Palette                | `frontend/src/lib/canvas/palette/BpmnPalette.svelte`                                          |
+| Context pad            | `frontend/src/lib/canvas/palette/ContextPad.svelte`                                           |
+| Command palette        | `frontend/src/lib/canvas/palette/CommandPalette.svelte`                                       |
+| Event matrix picker    | `frontend/src/lib/canvas/palette/EventMatrixPicker.svelte`                                    |
+| Property panel         | `frontend/src/lib/canvas/properties/PropertyPanel.svelte`                                     |
+| Validation rules       | `frontend/src/lib/canvas/validation/bpmnRules.ts`                                             |
+| Problems panel         | `frontend/src/lib/canvas/validation/ProblemsPanel.svelte`                                     |
+| Backend tests          | `backend/tests/test_diagrams/test_bpmn_notation.py` (26 tests)                                |
+| Frontend tests         | `frontend/tests/unit/bpmnEntityTypes.test.ts`, `bpmnValidation.test.ts` (26 tests)            |

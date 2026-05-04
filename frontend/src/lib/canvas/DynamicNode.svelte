@@ -21,6 +21,7 @@
 	import ArchimateRenderer from './renderers/ArchimateRenderer.svelte';
 	import C4Renderer from './renderers/C4Renderer.svelte';
 	import DoviewRenderer from './renderers/DoviewRenderer.svelte';
+	import BpmnRenderer from './renderers/BpmnRenderer.svelte';
 	import BaseNode from './BaseNode.svelte';
 
 	interface Props {
@@ -76,6 +77,17 @@
 		'outcome_box', 'final_outcome', 'overview_tile', 'source_reference',
 	]);
 
+	/** BPMN 2.0 type keys (ADR-136) — base entity types; variant rendering is
+	 * driven by `data` discriminator fields read inside BpmnRenderer. */
+	const BPMN_TYPES = new Set([
+		'task', 'subprocess', 'call_activity',
+		'event_start', 'event_intermediate', 'event_end', 'event_boundary',
+		'gateway',
+		'pool', 'lane',
+		'data_object', 'data_store',
+		'group', 'text_annotation',
+	]);
+
 	/** ArchiMate type keys that should use ArchimateRenderer. */
 	const ARCHIMATE_TYPES = new Set([
 		'business_actor', 'business_role', 'business_process', 'business_service',
@@ -113,6 +125,8 @@
 	<ModelRefNode data={effectiveData} {selected} />
 {:else if notation === 'doview' || DOVIEW_TYPES.has(effectiveData.entityType)}
 	<DoviewRenderer data={effectiveData} {selected} />
+{:else if notation === 'bpmn' || BPMN_TYPES.has(effectiveData.entityType)}
+	<BpmnRenderer data={effectiveData} {selected} />
 {:else if !isUniversal && ARCHIMATE_TYPES.has(effectiveData.entityType)}
 	<ArchimateRenderer data={effectiveData} {selected} />
 {:else if notation === 'uml' || (!isUniversal && UML_TYPES.has(effectiveData.entityType))}

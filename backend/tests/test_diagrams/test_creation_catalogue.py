@@ -146,11 +146,11 @@ class TestCreationCatalogueEndpoint:
 
     @pytest.mark.anyio
     async def test_total_count_after_seed(self, client: httpx.AsyncClient) -> None:
-        """After expansion seed: 1 DoView + 7 expanded bundles = 8 catalogue entries."""
+        """After expansion seed: 1 DoView + 7 expanded bundles + 2 BPMN bundles = 10 catalogue entries."""
         headers = await _auth_headers(client)
         resp = await client.get("/api/registry/creation-catalogue", headers=headers)
         items = resp.json()["items"]
-        assert len(items) == 8, (
-            f"Expected 8 creation-catalogue entries "
-            f"(1 DoView + 7 expanded bundles), got {len(items)}"
+        assert len(items) == 10, (
+            f"Expected 10 creation-catalogue entries "
+            f"(1 DoView + 7 expanded bundles + 2 BPMN bundles), got {len(items)}"
         )

@@ -47,6 +47,8 @@ from app.migrations.m038_element_bookmarks import up as m038_up
 from app.migrations.m039_graph_settings import up as m039_up
 from app.migrations.m040_expanded_ai_creation_prompts import up as m040_up
 from app.migrations.m041_personal_access_tokens import up as m041_up
+from app.migrations.m043_bpmn_notation import up as m043_up
+from app.migrations.m044_text_diagram_class import up as m044_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -120,6 +122,8 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m039_up(main)
     await m040_up(main)
     await m041_up(main)
+    await m043_up(main)
+    await m044_up(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

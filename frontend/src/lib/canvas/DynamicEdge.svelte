@@ -17,6 +17,7 @@
 	import ArchimateEdgeRenderer from './renderers/ArchimateEdgeRenderer.svelte';
 	import C4EdgeRenderer from './renderers/C4EdgeRenderer.svelte';
 	import DoviewEdgeRenderer from './renderers/DoviewEdgeRenderer.svelte';
+	import BpmnEdgeRenderer from './renderers/BpmnEdgeRenderer.svelte';
 	import IrisBaseEdge from './BaseEdge.svelte';
 
 	let props: EdgeProps = $props();
@@ -39,6 +40,13 @@
 	/** DoView edge relationship types. */
 	const DOVIEW_TYPES = new Set(['causal_link']);
 
+	/** BPMN 2.0 edge relationship types (ADR-136). Note `association` is shared
+	 * with UML — the disambiguator is the active notation. */
+	const BPMN_TYPES = new Set([
+		'sequence_flow', 'sequence_flow_default', 'sequence_flow_conditional',
+		'message_flow', 'data_association',
+	]);
+
 	/** ArchiMate edge relationship types. */
 	const ARCHIMATE_TYPES = new Set([
 		'serving', 'flow', 'triggering', 'access', 'influence',
@@ -53,6 +61,8 @@
 	<NoteLinkEdge {...props} />
 {:else if notation === 'doview' || DOVIEW_TYPES.has(edgeType)}
 	<DoviewEdgeRenderer {...props} />
+{:else if notation === 'bpmn' || BPMN_TYPES.has(edgeType)}
+	<BpmnEdgeRenderer {...props} />
 {:else if notation === 'uml' || UML_TYPES.has(edgeType)}
 	<UmlEdgeRenderer {...props} />
 {:else if notation === 'c4' || C4_TYPES.has(edgeType)}

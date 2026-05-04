@@ -49,6 +49,21 @@ DOVIEW_TYPES: frozenset[str] = frozenset({
     "outcome_box", "final_outcome", "overview_tile", "source_reference",
 })
 
+BPMN_TYPES: frozenset[str] = frozenset({
+    # Activities
+    "task", "subprocess", "call_activity",
+    # Events (base types — variants live on data.eventTrigger / eventDirection / boundaryInterrupting)
+    "event_start", "event_intermediate", "event_end", "event_boundary",
+    # Gateway (variants live on data.gatewayType)
+    "gateway",
+    # Swimlanes
+    "pool", "lane",
+    # Data
+    "data_object", "data_store",
+    # Artifacts
+    "group", "text_annotation",
+})
+
 UNIVERSAL_TYPES: frozenset[str] = frozenset({
     "note", "boundary", "modelref",
 })
@@ -80,5 +95,7 @@ def detect_notations(data: dict) -> list[str]:
             notations.add("simple")
         elif entity_type in DOVIEW_TYPES:
             notations.add("doview")
+        elif entity_type in BPMN_TYPES:
+            notations.add("bpmn")
 
     return sorted(notations)

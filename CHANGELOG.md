@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-05-04
+
+Two new notations and a bug fix that unblocked the Iris AI Legislation
+feature on Supabase deployments. See
+[ADR-135](docs/adrs/ADR-135-DocRef-Supabase-Migration-Parity.md)
+through
+[ADR-137](docs/adrs/ADR-137-Text-Diagram-Subclass-And-Shared-Markdown-Renderer.md)
+for design rationale.
+
+### Added
+
+- **BPMN 2.0 notation** (ADR-136, issue #25). Full BPMN 2.0 §7.4
+  element catalogue exposed across canvas, palette, MCP, and AI
+  creation. 14 base entity types with discriminator fields on `data`
+  (taskType, gatewayType, eventTrigger, eventDirection,
+  boundaryInterrupting, subprocessKind, dataKind) cover every legal
+  variant without bloating the registry. Adds `collaboration` and
+  `choreography` diagram types; the existing `process` type gains
+  BPMN as a non-default option (existing process diagrams unaffected).
+- **BPMN authoring UX** (ADR-136 §UX). Six-section accordion palette,
+  on-element context pad with discoverable wrench tooltip, searchable
+  command palette bound to `N` (create-anything), `A` (append-anything),
+  `R` (replace), 2D event matrix picker (Iris's strong opinion — no
+  surveyed BPMN tool gets this right), always-on right-side property
+  panel, and hybrid validation (silent draw-time prevention + persistent
+  Problems panel) covering 15 well-known BPMN anti-patterns.
+- **Text diagram subclass** (ADR-137, issue #26). Text is a Diagram
+  with `diagram_type='text'` and `notation='markdown'`; the markdown
+  source lives in `diagrams.data.content`. View mode renders the
+  markdown; edit mode shows the source. TOC drawer mirrors the
+  Comments tray pattern with depth-indented headings. Hierarchy menu
+  gains a "View" submenu (Diagram / Text). Cross-links use the
+  `iris://` URL scheme (`[label](iris://diagram/<id>)` /
+  `iris://element/<id>`); diagram refs that target a Text document
+  render in muted grey.
+- **Shared MarkdownView component** (ADR-137). The `marked` +
+  `DOMPurify` pipeline extracted into
+  `frontend/src/lib/components/MarkdownView.svelte` and adopted by both
+  the User Guide and the new Text canvas — DRY consolidation per
+  protocol #13. URL scheme allowlist (`http`, `https`, `mailto`,
+  `iris`) belt-and-braces against javascript:/data:/file: smuggling.
+
+### Fixed
+
+- **DocRef "Failed to load documents" on Supabase deployments**
+  (ADR-135, issue #24). The `docref_documents` and `docref_chunks`
+  tables existed only as a SQLite Python migration and were never
+  ported to the Supabase SQL set, so the Iris AI Legislation feature
+  failed on render-supabase-uat with a Postgres "relation does not
+  exist" error surfaced as "Failed to load documents". Adds
+  `m043_docref_tables.sql` mirroring the SQLite schema (TIMESTAMPTZ
+  for dates, RLS enabled, admin-write/all-read policies). Static
+  parser test enforces ongoing parity so this can't regress silently.
+
+### Docs
+
+- ADR-135 / SPEC-135-A — DocRef Supabase migration parity rule.
+- ADR-136 / SPEC-136-A — BPMN 2.0 notation including UX recommendations
+  researched against the most-loved BPMN tools (bpmn-js, Camunda
+  Modeler, Bizagi, Lucidchart).
+- ADR-137 / SPEC-137-A — Text diagram subclass and shared markdown
+  renderer.
+- `docs/deployment-render-supabase.md` — migration list extended to
+  m041–m043; DocRef migration explicitly called out.
+
+## [5.0.1] - 2026-05-04
+
+### Fixed
+- **iris-cli `login` against Supabase-mode backends.** The CLI was
+  POSTing to `/api/auth/login`, which is intentionally 404'd in
+  Supabase deployment mode (auth flows through Supabase Auth). The
+  command now accepts `--token <PAT>` to skip the username/password
+  flow entirely — mint a PAT externally (curl + Supabase JWT, or the
+  upcoming frontend Settings → API Tokens page) and hand it to the
+  CLI. Without `--token` against a Supabase backend, the command
+  exits with an actionable error pointing to the `--token` workaround
+  rather than the cryptic 404 detail.
+
+### Docs
+- `docs/cli.md` — `iris login --url` requires the **iris-api backend
+  service**, not the frontend or iris-mcp host. Spelled this out plus
+  the SQLite-vs-Supabase deployment-mode split, with a curl recipe
+  for minting a PAT in Supabase mode.
+
 ## [5.0.0] - 2026-05-04
 
 Major release: iris becomes agent-friendly. Three coordinated surfaces
