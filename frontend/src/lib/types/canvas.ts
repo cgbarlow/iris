@@ -3,7 +3,7 @@
 import type { Node, Edge } from '@xyflow/svelte';
 
 /** Diagram notation type — determines how elements render on canvas. */
-export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4' | 'doview' | 'scenia';
+export type NotationType = 'simple' | 'uml' | 'archimate' | 'c4' | 'doview' | 'scenia' | 'bpmn';
 
 /** Simple View entity types (6 domain + 2 universal = 8 total). */
 export type SimpleEntityType =
@@ -170,9 +170,21 @@ export const SIMPLE_ENTITY_TYPES: EntityTypeInfo[] = [
 	{ key: 'boundary', label: 'Boundary', icon: '▧', description: 'A visual grouping boundary' },
 ];
 
-/** Relationship type display metadata. */
+/** Relationship type display metadata. Key union spans every notation's
+ * relationship types so the catalogue arrays don't need `as unknown as` casts. */
 export interface RelationshipTypeInfo {
-	key: SimpleRelationshipType | UmlRelationshipType | ArchimateRelationshipType;
+	key:
+		| SimpleRelationshipType
+		| UmlRelationshipType
+		| ArchimateRelationshipType
+		| 'c4_relationship'
+		| 'causal_link'
+		| 'sequence_flow'
+		| 'sequence_flow_default'
+		| 'sequence_flow_conditional'
+		| 'message_flow'
+		| 'association'
+		| 'data_association';
 	label: string;
 	description: string;
 }
@@ -489,4 +501,169 @@ export const DOVIEW_DIAGRAM_TYPE_FILTER: Record<string, string[] | null> = {
 	outcomes_map: ['outcome_box', 'final_outcome', 'source_reference'],
 	overview:     ['final_outcome', 'overview_tile'],
 	free_form:    null,
+};
+
+// ── BPMN 2.0 notation types (ADR-136) ────────────────────────────────────────
+
+/** BPMN 2.0 element category — mirrors OMG BPMN spec §7.4 grouping.
+ *
+ * Used by the palette to group entity types into accordion sections,
+ * analogous to how ArchiMate uses `layer`. */
+export type BpmnCategory =
+	| 'activity'
+	| 'event'
+	| 'gateway'
+	| 'swimlane'
+	| 'data'
+	| 'artifact';
+
+/** BPMN entity types. Discriminator fields on `data` (taskType, eventTrigger,
+ * eventDirection, boundaryInterrupting, gatewayType, subprocessKind, dataKind)
+ * select the inner shape marker; the renderer reads them to draw the right
+ * variant. */
+export type BpmnEntityType =
+	// Activities
+	| 'task'
+	| 'subprocess'
+	| 'call_activity'
+	// Events
+	| 'event_start'
+	| 'event_intermediate'
+	| 'event_end'
+	| 'event_boundary'
+	// Gateway
+	| 'gateway'
+	// Swimlanes
+	| 'pool'
+	| 'lane'
+	// Data
+	| 'data_object'
+	| 'data_store'
+	// Artifacts
+	| 'group'
+	| 'text_annotation';
+
+/** BPMN connecting object types. */
+export type BpmnRelationshipType =
+	| 'sequence_flow'
+	| 'sequence_flow_default'
+	| 'sequence_flow_conditional'
+	| 'message_flow'
+	| 'association'
+	| 'data_association';
+
+/** BPMN task marker — `data.taskType` discriminator on `task` entities. */
+export type BpmnTaskType =
+	| 'none'
+	| 'user'
+	| 'service'
+	| 'manual'
+	| 'send'
+	| 'receive'
+	| 'script'
+	| 'business_rule';
+
+/** BPMN gateway inner marker — `data.gatewayType` discriminator. */
+export type BpmnGatewayType =
+	| 'exclusive'
+	| 'inclusive'
+	| 'parallel'
+	| 'event_based'
+	| 'complex'
+	| 'parallel_event_based';
+
+/** BPMN event trigger — `data.eventTrigger` discriminator. The legal set
+ * depends on the event position (start/intermediate/end/boundary); the
+ * EventMatrixPicker enforces this. */
+export type BpmnEventTrigger =
+	| 'none'
+	| 'message'
+	| 'timer'
+	| 'signal'
+	| 'conditional'
+	| 'error'
+	| 'escalation'
+	| 'compensation'
+	| 'link'
+	| 'terminate';
+
+/** Direction for intermediate events — `data.eventDirection` discriminator. */
+export type BpmnEventDirection = 'catch' | 'throw';
+
+/** BPMN subprocess kind — `data.subprocessKind` discriminator on subprocess. */
+export type BpmnSubprocessKind = 'embedded' | 'event' | 'ad_hoc' | 'transaction';
+
+/** BPMN data variant — `data.dataKind` discriminator on data_object. */
+export type BpmnDataKind = 'object' | 'input' | 'output' | 'collection';
+
+/** BPMN entity type display metadata. */
+export interface BpmnEntityTypeInfo {
+	key: BpmnEntityType;
+	label: string;
+	icon: string;
+	category: BpmnCategory;
+	description: string;
+}
+
+/** All BPMN entity types with display metadata, grouped by category for
+ * the palette accordion. Order within each category is the palette order. */
+export const BPMN_ENTITY_TYPES: BpmnEntityTypeInfo[] = [
+	/* ── Activities ── */
+	{ key: 'task',          label: 'Task',          icon: '▭', category: 'activity', description: 'A unit of work — set data.taskType for User/Service/Manual/Send/Receive/Script/Business Rule markers' },
+	{ key: 'subprocess',    label: 'Subprocess',    icon: '▣', category: 'activity', description: 'Compound activity — set data.subprocessKind for Embedded/Event/Ad-hoc/Transaction' },
+	{ key: 'call_activity', label: 'Call Activity', icon: '▦', category: 'activity', description: 'Call to a globally-defined task or process (thick border)' },
+	/* ── Events ── */
+	{ key: 'event_start',        label: 'Start Event',        icon: '◯', category: 'event', description: 'Process start — set data.eventTrigger for none/message/timer/signal/conditional/error/escalation/compensation' },
+	{ key: 'event_intermediate', label: 'Intermediate Event', icon: '◎', category: 'event', description: 'Mid-process event — set data.eventDirection (catch|throw) and data.eventTrigger' },
+	{ key: 'event_end',          label: 'End Event',          icon: '⬤', category: 'event', description: 'Process end — set data.eventTrigger for none/message/signal/error/escalation/compensation/terminate' },
+	{ key: 'event_boundary',     label: 'Boundary Event',     icon: '⊙', category: 'event', description: 'Attached to an activity — set data.boundaryInterrupting (true=solid, false=dashed) and data.eventTrigger' },
+	/* ── Gateways ── */
+	{ key: 'gateway', label: 'Gateway', icon: '◇', category: 'gateway', description: 'Branch/merge — set data.gatewayType for Exclusive/Inclusive/Parallel/Event-Based/Complex/Parallel-Event-Based' },
+	/* ── Swimlanes ── */
+	{ key: 'pool', label: 'Pool', icon: '▬', category: 'swimlane', description: 'Process participant container' },
+	{ key: 'lane', label: 'Lane', icon: '▤', category: 'swimlane', description: 'Role/responsibility partition within a Pool' },
+	/* ── Data ── */
+	{ key: 'data_object', label: 'Data Object', icon: '▱', category: 'data', description: 'Data referenced by activities — set data.dataKind for Object/Input/Output/Collection' },
+	{ key: 'data_store',  label: 'Data Store',  icon: '◰', category: 'data', description: 'Persistent data store (cylinder)' },
+	/* ── Artifacts ── */
+	{ key: 'group',           label: 'Group',           icon: '▢', category: 'artifact', description: 'Visual grouping (dashed rounded rectangle, no semantic effect)' },
+	{ key: 'text_annotation', label: 'Text Annotation', icon: '✎', category: 'artifact', description: 'Free-text comment attached via Association' },
+];
+
+/** All BPMN connecting object types with display metadata. */
+export const BPMN_RELATIONSHIP_TYPES: RelationshipTypeInfo[] = [
+	{ key: 'sequence_flow',             label: 'Sequence Flow',             description: 'Order of activities within a process (solid arrow)' },
+	{ key: 'sequence_flow_default',     label: 'Default Sequence Flow',     description: 'Default branch from a gateway (solid with backslash)' },
+	{ key: 'sequence_flow_conditional', label: 'Conditional Sequence Flow', description: 'Conditional outflow from a task (solid with diamond)' },
+	{ key: 'message_flow',              label: 'Message Flow',              description: 'Communication across pools (dashed arrow)' },
+	{ key: 'association',               label: 'Association',               description: 'Link an artifact to a flow object (dotted line)' },
+	{ key: 'data_association',          label: 'Data Association',          description: 'Link data to an activity (dotted arrow)' },
+];
+
+/** BPMN diagram-type → allowed element type keys (ADR-082). null = no filtering. */
+export const BPMN_DIAGRAM_TYPE_FILTER: Record<string, string[] | null> = {
+	process:       ['task', 'subprocess', 'call_activity', 'event_start', 'event_intermediate', 'event_end', 'event_boundary', 'gateway', 'lane', 'data_object', 'data_store', 'group', 'text_annotation'],
+	collaboration: null, // collaborations may use every BPMN element including pools + message flows
+	choreography:  ['task', 'event_start', 'event_intermediate', 'event_end', 'gateway'],
+	free_form:     null,
+};
+
+/** Default-by-discriminator presets so the palette can drop sane initial
+ * shapes (e.g. `task` defaults to taskType='none'). The PropertyPanel and
+ * EventMatrixPicker overwrite these. */
+export const BPMN_DEFAULT_DISCRIMINATORS: Record<BpmnEntityType, Record<string, unknown>> = {
+	task:               { taskType: 'none' },
+	subprocess:         { subprocessKind: 'embedded' },
+	call_activity:      {},
+	event_start:        { eventTrigger: 'none' },
+	event_intermediate: { eventDirection: 'catch', eventTrigger: 'message' },
+	event_end:          { eventTrigger: 'none' },
+	event_boundary:     { boundaryInterrupting: true, eventTrigger: 'timer' },
+	gateway:            { gatewayType: 'exclusive' },
+	pool:               { orientation: 'horizontal' },
+	lane:               {},
+	data_object:        { dataKind: 'object' },
+	data_store:         {},
+	group:              {},
+	text_annotation:    {},
 };

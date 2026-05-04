@@ -43,6 +43,13 @@ const ALL_NODE_TYPE_KEYS = [
 	'container_instance',
 	// DoView
 	'outcome_box', 'final_outcome', 'overview_tile', 'source_reference',
+	// BPMN 2.0 (ADR-136)
+	'task', 'subprocess', 'call_activity',
+	'event_start', 'event_intermediate', 'event_end', 'event_boundary',
+	'gateway',
+	'pool', 'lane',
+	'data_object', 'data_store',
+	'group', 'text_annotation',
 ] as const;
 
 /** All edge type keys across all notations. */
@@ -61,6 +68,10 @@ const ALL_EDGE_TYPE_KEYS = [
 	'c4_relationship',
 	// DoView
 	'causal_link',
+	// BPMN 2.0
+	'sequence_flow', 'sequence_flow_default', 'sequence_flow_conditional',
+	'message_flow', 'data_association',
+	// (`association` is reused with UML — same key.)
 ] as const;
 
 /** Unified node type registry — ALL types map to DynamicNode. */

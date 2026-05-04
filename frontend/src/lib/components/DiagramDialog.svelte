@@ -90,6 +90,12 @@
 			{ value: 'system_context', label: 'System Context' },
 			{ value: 'container', label: 'Container' },
 		],
+		bpmn: [
+			{ value: 'process', label: 'Process' },
+			{ value: 'collaboration', label: 'Collaboration' },
+			{ value: 'choreography', label: 'Choreography' },
+			{ value: 'free_form', label: 'Free Form' },
+		],
 	};
 
 	/** Diagram types filtered by the selected notation. */
