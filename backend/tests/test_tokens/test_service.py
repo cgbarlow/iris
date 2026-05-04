@@ -14,7 +14,7 @@ import pytest
 
 from app.config import AuthConfig
 from app.migrations.m001_roles_users import up as m001_up
-from app.migrations.m040_personal_access_tokens import up as m040_up
+from app.migrations.m041_personal_access_tokens import up as m041_up
 from app.tokens.service import (
     PAT_PREFIX,
     create_pat_hasher,
@@ -41,7 +41,7 @@ def hasher() -> object:
 async def seeded_db(main_db: aiosqlite.Connection) -> aiosqlite.Connection:
     """Apply the user + PAT migrations, seed roles, insert one active user."""
     await m001_up(main_db)
-    await m040_up(main_db)
+    await m041_up(main_db)
     # Roles are an FK target for users.role — seed the minimum set.
     for role_id in ("Admin", "Architect", "Reviewer", "Viewer"):
         await main_db.execute(

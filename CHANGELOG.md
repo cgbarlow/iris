@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-05-04
+
+Major release: iris becomes agent-friendly. Three coordinated surfaces
+— a stable HTTP API with Personal Access Tokens, a CLI, and an MCP
+server — let humans and AI agents drive iris with the same auth,
+search, browse, ask, and export capabilities the web frontend uses.
+See [ADR-127](docs/adrs/ADR-127-Personal-Access-Tokens.md) through
+[ADR-134](docs/adrs/ADR-134-MCP-Standalone-Service.md) for full
+design rationale.
+
 ### Added
 - **Personal Access Tokens** (ADR-127). New `/api/users/me/tokens` mgmt
   endpoints let any authenticated user mint long-lived revocable
@@ -68,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IRIS_RATE_LIMIT_PAT` (default 60/min) and `IRIS_RATE_LIMIT_ANON`
   (default 30/min).
 - Supabase deployments pick up the new `personal_access_tokens` table
-  automatically via `m041_personal_access_tokens.sql` (idempotent; RLS
+  automatically via `m042_personal_access_tokens.sql` (idempotent; RLS
   enabled, owner-only policies).
 
 ## [4.2.1] - 2026-04-22

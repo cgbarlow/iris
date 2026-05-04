@@ -1,4 +1,4 @@
-"""Migration 040: Personal Access Tokens (ADR-127, SPEC-127-A).
+"""Migration 041: Personal Access Tokens (ADR-127, SPEC-127-A).
 
 Adds the `personal_access_tokens` table used by iris-cli, iris-mcp, and
 agent callers for long-lived authentication. Secrets are stored as
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import aiosqlite
 
-MIGRATION_ID = "m040_personal_access_tokens"
+MIGRATION_ID = "m041_personal_access_tokens"
 
 
 async def up(db: aiosqlite.Connection) -> None:
