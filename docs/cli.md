@@ -13,6 +13,15 @@ uv tool install --from ./cli iris-cli
 uv tool install "git+https://github.com/cgbarlow/iris#subdirectory=cli"
 ```
 
+If this is your first `uv tool install` on this machine, uv will warn
+that `~/.local/bin` isn't on `PATH`. One-time fix that future-proofs
+every tool you install via uv:
+
+```sh
+uv tool update-shell
+exec $SHELL -l   # reload shell so the new PATH takes effect
+```
+
 ## First login
 
 ```sh
