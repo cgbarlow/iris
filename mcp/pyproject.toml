@@ -10,6 +10,10 @@ dependencies = [
   "mcp>=1.2",
   "httpx>=0.28",
   "pydantic>=2.9",
+  # iris_mcp.http_main builds a FastAPI app for the standalone service
+  # (ADR-134). The stdio entry point in __main__.py doesn't need it,
+  # but we keep one install path for both transports.
+  "fastapi>=0.110",
 ]
 
 [project.optional-dependencies]

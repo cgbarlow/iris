@@ -16,8 +16,9 @@ to Claude Desktop:
 
 1. Open Claude Desktop → **Settings → Connectors → Add custom connector**.
 2. Name: `iris`.
-3. Remote MCP server URL: `https://iris-mcp-gtb3.onrender.com/mcp/`
-   (or your iris-mcp deployment's hostname + `/mcp/`).
+3. Remote MCP server URL: `https://iris-mcp-gtb3.onrender.com`
+   (or your iris-mcp deployment's bare hostname — the standalone
+   service is MCP-only, so the protocol lives at `/`, not `/mcp`).
 4. Optional: paste a PAT (`iris_pat_…`) for authenticated access.
    Without it, you get the same anonymous read-only + AI scope as the
    web frontend.

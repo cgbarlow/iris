@@ -29,15 +29,17 @@ class TestCreateApp:
             create_app()
 
 
-class TestRootRoute:
-    def test_root_returns_service_identity(
+class TestInfoRoute:
+    def test_info_returns_service_identity(
         self, app_with_backend: TestClient,
     ) -> None:
-        resp = app_with_backend.get("/")
+        # /info is the human/health endpoint. NOT "/" — MCP claims that
+        # path for session resumption per Streamable HTTP.
+        resp = app_with_backend.get("/info")
         assert resp.status_code == 200
         data = resp.json()
         assert data["service"] == "iris-mcp"
-        assert data["endpoint"] == "/mcp/"
+        assert data["endpoint"] == "/"
         assert data["backend"] == "http://iris-backend.test"
 
 
@@ -45,6 +47,7 @@ class TestFavicon:
     def test_favicon_ico_returns_iris_eye_svg(
         self, app_with_backend: TestClient,
     ) -> None:
+        # Registered before the root mount so it isn't swallowed.
         resp = app_with_backend.get("/favicon.ico")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "image/svg+xml"
@@ -59,15 +62,16 @@ class TestFavicon:
         assert resp.content.startswith(b"<svg")
 
 
-class TestMcpPathNormalisation:
-    def test_bare_mcp_does_not_307(self, app_with_backend: TestClient) -> None:
-        """ADR-134 / SPEC-134-A: bare /mcp must not 307 — some clients drop POST body on redirect."""
-        # Send a POST without any body — we don't care about the MCP
-        # response correctness here, only that the path normalisation
-        # middleware sent us straight to the mount instead of 307'ing.
+class TestRootMount:
+    def test_post_root_does_not_307(self, app_with_backend: TestClient) -> None:
+        """ADR-134 follow-up: MCP is mounted at /, so the user pastes the bare
+        service URL. No /mcp suffix means no slash-redirect to chase."""
         resp = app_with_backend.post(
-            "/mcp",
+            "/",
             headers={"accept": "application/json, text/event-stream"},
             follow_redirects=False,
         )
-        assert resp.status_code != 307, "bare /mcp must not redirect"
+        assert resp.status_code != 307, "POST / must not redirect"
+        # Response is a real MCP error/result, not a 405 from FastAPI —
+        # confirms the ASGI mount is the one handling it.
+        assert resp.status_code != 405

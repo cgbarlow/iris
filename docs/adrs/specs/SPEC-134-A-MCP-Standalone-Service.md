@@ -14,9 +14,14 @@ Endpoints:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` `GET` `DELETE` | `/mcp/` (and bare `/mcp`) | MCP Streamable HTTP (mounted ASGI sub-app) |
+| `POST` `GET` `DELETE` | `/` (bare hostname) | MCP Streamable HTTP (root mount) |
 | `GET` | `/favicon.{ico,svg}` | The Iris eye favicon (same SVG as ADR-133) |
-| `GET` | `/` | `{"service": "iris-mcp", "endpoint": "/mcp/", "backend": "..."}` for human + ping |
+| `GET` | `/info` | `{"service": "iris-mcp", "endpoint": "/", "backend": "..."}` for humans / health |
+
+The standalone service is MCP-only, so the protocol lives at the root
+rather than at `/mcp`. The `/info` route is at a non-conflicting path
+because Streamable HTTP itself uses `GET /` for session resumption
+and streaming notifications.
 
 ## Configuration
 
@@ -25,13 +30,15 @@ Endpoints:
 | `IRIS_API_URL` | yes | Backend URL the service proxies through, e.g. `https://iris-api-gtb3.onrender.com`. Service refuses to start if unset. |
 | `PORT` | (Render sets) | Listen port |
 
-## 307 fix (applies to both standalone and embedded paths)
+## 307 fix (embedded path only)
 
-The previous embedded mount served `/mcp` (no trailing slash) as a
-307 redirect to `/mcp/` because FastAPI's `redirect_slashes` is on by
-default. Some MCP clients drop the POST body when chasing 307s. Fix:
-a tiny middleware that rewrites `/mcp` → `/mcp/` in the ASGI scope
-before routing — surgical, no global redirect-policy change.
+The standalone service mounts MCP at `/` so there's no slash-redirect
+to chase. The embedded mount on the iris backend keeps `/mcp` as its
+namespace (it shares the host with `/api/*`); FastAPI's default
+`redirect_slashes` would 307 bare `/mcp` to `/mcp/`, and some MCP
+clients drop POST bodies on a 307. Fix in the embedded path only: a
+tiny middleware that rewrites `/mcp` → `/mcp/` in the ASGI scope
+before routing.
 
 ## DRY
 
@@ -71,16 +78,16 @@ uvicorn, and runs `iris_mcp.http_main:create_app`.
 
 - `mcp/tests/test_http_main.py`:
   1. `create_app()` raises if `IRIS_API_URL` is unset.
-  2. `GET /` returns service identity JSON.
-  3. `GET /favicon.ico` returns the SVG.
-  4. The 307-normalising middleware rewrites bare `/mcp` to `/mcp/`
-     in the scope before routing.
+  2. `GET /info` returns service identity JSON.
+  3. `GET /favicon.{ico,svg}` returns the SVG (and isn't swallowed
+     by the root mount — order matters in the FastAPI app).
+  4. `POST /` is handled by the MCP mount, not 307'd, not 405'd.
 
 ## Acceptance
 
 - Render dashboard shows two healthy services: `iris-api` and
   `iris-mcp`. Both stay under their 512 MB allocations.
-- `https://iris-mcp-<suffix>.onrender.com/mcp/` returns a valid MCP
+- `https://iris-mcp-<suffix>.onrender.com` (bare) returns a valid MCP
   `initialize` response with `serverInfo.icons` populated.
 - Adding the URL to Claude Desktop's connector UI works.
 - `iris-api` is no longer carrying the MCP SDK in resident memory

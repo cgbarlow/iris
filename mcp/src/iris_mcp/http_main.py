@@ -61,18 +61,24 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # SPEC-134-A: avoid the 307 redirect on bare /mcp (some clients
-    # drop POST bodies when chasing redirects). Path-rewrite in
-    # middleware is surgical — safer than disabling redirect_slashes
-    # globally.
-    @app.middleware("http")
-    async def _normalize_mcp_path(
-        request: Any, call_next: "Callable[[Any], Awaitable[Any]]",
-    ) -> Any:
-        if request.scope["path"] == "/mcp":
-            request.scope["path"] = "/mcp/"
-            request.scope["raw_path"] = b"/mcp/"
-        return await call_next(request)
+    # Favicons must be added before the root mount, otherwise the
+    # /favicon.* paths get swallowed by the catch-all ASGI app.
+    @app.get("/favicon.ico", include_in_schema=False)
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def _favicon() -> Response:
+        return Response(content=ICON_SVG, media_type="image/svg+xml")
+
+    @app.get("/info", include_in_schema=False)
+    async def _info() -> dict[str, Any]:
+        # Service identity for humans / health checks. NOT at "/" —
+        # MCP Streamable HTTP uses GET / for session resumption and
+        # streaming notifications, so any non-MCP response there
+        # would clash with the protocol.
+        return {
+            "service": "iris-mcp",
+            "endpoint": "/",
+            "backend": iris_url,
+        }
 
     async def mcp_asgi(
         scope: dict[str, Any],
@@ -85,20 +91,11 @@ def create_app() -> FastAPI:
         async with IrisClient(url=iris_url, token=token) as client, bind_client(client):
             await session_manager.handle_request(scope, receive, send)
 
-    app.mount("/mcp", mcp_asgi)
-
-    @app.get("/favicon.ico", include_in_schema=False)
-    @app.get("/favicon.svg", include_in_schema=False)
-    async def _favicon() -> Response:
-        return Response(content=ICON_SVG, media_type="image/svg+xml")
-
-    @app.get("/", include_in_schema=False)
-    async def _root() -> dict[str, Any]:
-        return {
-            "service": "iris-mcp",
-            "endpoint": "/mcp/",
-            "backend": iris_url,
-        }
+    # ADR-134 follow-up: the standalone service exists solely to be
+    # MCP, so mount at the root rather than at /mcp. Users paste the
+    # bare service URL into Claude Desktop. No path-normalising
+    # middleware needed — root mount handles every path.
+    app.mount("/", mcp_asgi)
 
     logger.info("iris-mcp configured (backend=%s)", iris_url)
     return app
