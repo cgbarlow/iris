@@ -24,16 +24,50 @@ exec $SHELL -l   # reload shell so the new PATH takes effect
 
 ## First login
 
+The URL must be the **iris-api backend service** — the host that
+serves `/api/*`. **Not** the SvelteKit frontend (which serves the SPA
+shell at every path) and **not** the iris-mcp service (which speaks
+MCP, not REST). For the UAT deployment this is
+`https://iris-api-gtb3.onrender.com`; self-hosted, it's whatever host
+your `iris-api` Render/Docker/uvicorn service is on.
+
+### SQLite-mode backend (local dev, single-tenant self-host)
+
 ```sh
-iris login --url https://iris.example.com
+iris login --url https://iris-api.example.com
 # Prompts for username + password, creates a PAT, saves
 # { url, token } to ~/.config/iris/config.toml (mode 0600).
 ```
 
-Alternatively, export env vars:
+### Supabase-mode backend (UAT, multi-tenant prod)
+
+In Supabase deployment mode the backend's `/api/auth/login` is
+disabled — auth is handled by Supabase Auth. Mint a PAT externally
+and pass it to the CLI with `--token`:
 
 ```sh
-export IRIS_URL=https://iris.example.com
+# 1) Sign in via the frontend (https://iris-uat.chrisbarlow.nz)
+#    and copy the Supabase JWT from your browser's local storage.
+# 2) Mint a PAT with that JWT:
+curl -X POST https://iris-api-gtb3.onrender.com/api/users/me/tokens \
+  -H "Authorization: Bearer <supabase-jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"iris-cli"}'
+# -> { "token": "iris_pat_...", ... }   # shown ONCE
+#
+# 3) Hand the PAT to the CLI — no API call, just persists config:
+iris login --url https://iris-api-gtb3.onrender.com --token iris_pat_...
+```
+
+(A frontend Settings → API Tokens page that mints PATs without the
+curl detour is on the roadmap.)
+
+### Env vars
+
+Same rule — backend host:
+
+```sh
+export IRIS_URL=https://iris-api-gtb3.onrender.com
 export IRIS_TOKEN=iris_pat_...
 ```
 

@@ -140,3 +140,44 @@ class TestLoginCommand:
         assert code == 0
         saved = (tmp_path / "iris" / "config.toml").read_text()  # type: ignore[operator]
         assert 'token = "iris_pat_ab_secret"' in saved
+
+    def test_login_with_token_flag_skips_api_call(
+        self, respx_mock: respx.Router, tmp_path: object,
+        monkeypatch: object,
+    ) -> None:
+        """Supabase-mode path: --token <PAT> just persists config, no /auth/login call."""
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))  # type: ignore[attr-defined]
+        # Deliberately mock NOTHING — if the CLI attempts an API call,
+        # respx will raise on the unmatched request and the test fails.
+
+        code, out, _ = _invoke(
+            "login",
+            "--url", BASE,
+            "--token", "iris_pat_xy_secret",
+        )
+        assert code == 0, out
+        saved = (tmp_path / "iris" / "config.toml").read_text()  # type: ignore[operator]
+        assert 'token = "iris_pat_xy_secret"' in saved
+        assert f'url = "{BASE}"' in saved
+
+    def test_login_supabase_mode_404_gives_actionable_error(
+        self, respx_mock: respx.Router, tmp_path: object,
+        monkeypatch: object,
+    ) -> None:
+        """Hitting /api/auth/login on a Supabase backend should fail loudly with --token guidance."""
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))  # type: ignore[attr-defined]
+        respx_mock.post(f"{BASE}/api/auth/login").mock(
+            return_value=httpx.Response(404, json={
+                "detail": (
+                    "This endpoint is not available in Supabase deployment "
+                    "mode. Use Supabase Auth for authentication."
+                ),
+            }),
+        )
+
+        code, _out, _ = _invoke(
+            "login",
+            "--username", "alice",
+            "--password", "pw",
+        )
+        assert code == 1  # exit code 1 per actionable-error path

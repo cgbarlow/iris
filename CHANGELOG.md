@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-05-04
+
+### Fixed
+- **iris-cli `login` against Supabase-mode backends.** The CLI was
+  POSTing to `/api/auth/login`, which is intentionally 404'd in
+  Supabase deployment mode (auth flows through Supabase Auth). The
+  command now accepts `--token <PAT>` to skip the username/password
+  flow entirely — mint a PAT externally (curl + Supabase JWT, or the
+  upcoming frontend Settings → API Tokens page) and hand it to the
+  CLI. Without `--token` against a Supabase backend, the command
+  exits with an actionable error pointing to the `--token` workaround
+  rather than the cryptic 404 detail.
+
+### Docs
+- `docs/cli.md` — `iris login --url` requires the **iris-api backend
+  service**, not the frontend or iris-mcp host. Spelled this out plus
+  the SQLite-vs-Supabase deployment-mode split, with a curl recipe
+  for minting a PAT in Supabase mode.
+
 ## [5.0.0] - 2026-05-04
 
 Major release: iris becomes agent-friendly. Three coordinated surfaces

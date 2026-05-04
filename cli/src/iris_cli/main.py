@@ -16,7 +16,7 @@ from typing import Any
 
 import httpx
 import typer
-from iris_client import IrisAuthError, IrisClient, IrisClientError
+from iris_client import IrisAuthError, IrisClient, IrisClientError, IrisHTTPError
 
 from iris_cli import config as cfg
 from iris_cli import output
@@ -107,9 +107,39 @@ def login(
     token_name: str | None = typer.Option(
         None, "--token-name", help="Label for the stored PAT.",
     ),
+    token: str | None = typer.Option(
+        None, "--token",
+        help=(
+            "Use an existing PAT instead of minting a new one. Required for "
+            "Supabase-deployment backends, where /api/auth/login is disabled "
+            "and PATs must be minted via Supabase Auth + POST "
+            "/api/users/me/tokens."
+        ),
+    ),
 ) -> None:
-    """Log in with username+password, mint a PAT, and save it to ~/.config/iris/config.toml."""
+    """Log in and save credentials to ~/.config/iris/config.toml.
+
+    Two paths:
+
+    1. SQLite-mode backend (default): username + password ->
+       /api/auth/login -> mint a new PAT -> store it. Pass --username
+       / --password or be prompted.
+
+    2. Supabase-mode backend (UAT, prod): /api/auth/login is disabled;
+       auth is handled by Supabase. Mint a PAT externally (via the
+       frontend or curl with a Supabase JWT) and pass it here as
+       --token. The CLI just saves { url, token } to disk -- no API
+       call.
+    """
     final_url = url or state.url or cfg.DEFAULT_URL
+
+    if token:
+        # Path 2: caller already has a PAT. Just persist it; no API call.
+        saved_to = cfg.save(final_url, token)
+        typer.echo(f"Saved PAT to {saved_to}")
+        return
+
+    # Path 1: SQLite-mode interactive flow.
     user = username or typer.prompt("Username")
     pw = password or getpass.getpass("Password: ")
     name = token_name or f"iris-cli@{socket.gethostname()}"
@@ -122,7 +152,19 @@ def login(
                 pat = await auth_c.create_token(name)
         return cfg.save(final_url, pat.token)
 
-    saved_to = _run(_do())
+    try:
+        saved_to = _run(_do())
+    except IrisHTTPError as exc:
+        if exc.status_code == 404 and "Supabase" in (exc.detail or ""):
+            output.print_error(
+                "This backend runs in Supabase deployment mode — "
+                "/api/auth/login is disabled. Mint a PAT externally "
+                "(via the frontend or curl + a Supabase JWT) and re-run:\n\n"
+                f"  iris login --url {final_url} --token iris_pat_…",
+            )
+            raise typer.Exit(code=1) from exc
+        raise
+
     typer.echo(f"Logged in. PAT stored at {saved_to}")
 
 
