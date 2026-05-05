@@ -42,10 +42,10 @@ Every search result has an **Add to AI context** button. Clicking it stages that
 
 - `/collections` — filter the collection list by name.
 - `/sets` — filter sets; includes the parent collection name as search text.
-- `/diagrams` — filter diagrams by name, description, or type.
+- `/views` — filter views (diagrams + text) by name, description, or type.
 - `/elements` — filter elements by name, element type, or tag.
-- `/packages/[id]` — search **within** a package's tree (elements and sub-diagrams).
-- `/diagrams/[id]` — search within the diagram's side-tree.
+- `/packages/[id]` — search **within** a package's tree (elements and sub-views).
+- `/views/[id]` — search within the view's side-tree.
 
 ## Tips
 

@@ -321,7 +321,7 @@
 			});
 			showCreateChildDiagramDialog = false;
 			await loadHierarchyTree();
-			await goto(`/diagrams/${created.id}`);
+			await goto(`/views/${created.id}`);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create child diagram';
 		}

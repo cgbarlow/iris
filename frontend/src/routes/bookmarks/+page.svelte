@@ -162,7 +162,7 @@
 				{#each items as { bookmark, diagram, pkg }}
 					<li class="flex items-center gap-3 rounded border p-3" style="border-color: var(--color-border)">
 						{#if diagram}
-							<a href="/diagrams/{diagram.id}" class="flex-1" style="color: inherit">
+							<a href="/views/{diagram.id}" class="flex-1" style="color: inherit">
 								<div class="flex flex-wrap items-center gap-2">
 									<span class="text-sm font-medium" style="color: var(--color-primary)">{diagram.name}</span>
 									<span class="rounded border px-2 py-0.5 text-xs" style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)">

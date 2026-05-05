@@ -97,7 +97,7 @@
 			{ value: 'free_form', label: 'Free Form' },
 		],
 		markdown: [
-			{ value: 'text', label: 'Text Document' },
+			{ value: 'text', label: 'Text' },
 		],
 	};
 
@@ -210,7 +210,7 @@
 			</div>
 
 			<div>
-				<label for="diagram-type" class="block text-sm font-medium">Diagram Type</label>
+				<label for="diagram-type" class="block text-sm font-medium">View Type</label>
 				{#if mode === 'create'}
 					<select
 						id="diagram-type"

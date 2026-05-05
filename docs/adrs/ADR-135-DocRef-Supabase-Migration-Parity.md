@@ -1,6 +1,6 @@
 # ADR-135: DocRef Supabase migration parity
 
-Status: Accepted (2026-05-04)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issue #27)
 
 ## Context
 
@@ -106,3 +106,42 @@ smoke tests rather than the unit suite.
   first opt-in extension; this ADR fills its Supabase gap.
 - [SPEC-135-A](specs/SPEC-135-A-DocRef-Supabase-Migration.md) — schema
   reference and verification steps.
+
+## Amendment 2026-05-05 — fire-and-forget import (issue #27)
+
+UAT against render-supabase-uat surfaced a second bug stacked on top of
+the original schema problem: even after the tables existed, importing a
+real document (e.g. the Social Security Act) reliably surfaced
+**"Import failed"** in the frontend, while the backend continued and
+the import actually completed a few seconds later. The user could
+refresh the screen and see the document marked imported.
+
+The root cause is the synchronous import pipeline in
+`app/docref/service.py::import_document` — it downloads a CSV
+(potentially many MB), then issues one INSERT per chunk inside the
+request thread. On Render's Postgres path each round-trip is on the
+order of 10–30 ms; a few thousand chunks crosses Render's edge
+request-timeout (~100s). The edge closes the connection, the frontend
+catches a network/HTTP error and sets `error = 'Import failed'` — but
+the asyncio task on the backend keeps going, commits the rows, and
+flips status to `imported`.
+
+**Decision:** make the import endpoint fire-and-forget.
+
+- A new `start_import_document` service method sets the row's status to
+  `importing` synchronously and returns immediately.
+- The router (`app/docref/router.py`) launches the actual download and
+  insert via `asyncio.create_task` and returns **HTTP 202** with the
+  `importing` status.
+- The frontend (`DocRefSelector.svelte`) polls `/api/docref/documents`
+  every ~3 s while any document is in `importing` state and stops
+  polling once everything settles. It also applies an optimistic local
+  status flip so the spinner shows the moment the user clicks.
+
+This matches the existing background-task pattern used for MNEMOS
+reindex and DocRef index refresh (`asyncio.create_task` from
+`extensions/router.py`) — no new infrastructure, no Celery/Redis.
+
+The synchronous `import_document` function is preserved for tests and
+direct backend invocation; only the HTTP route now delegates to it via
+a background task.

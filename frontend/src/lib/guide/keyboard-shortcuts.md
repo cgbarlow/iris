@@ -25,7 +25,7 @@ Every item in the left sidebar has a single-letter shortcut shown on hover. Pres
 | `H` | Dashboard (Home) |
 | `C` | Collections |
 | `T` | Sets |
-| `M` | Diagrams (Models) |
+| `M` | Views (Diagrams + Text) |
 | `E` | Elements |
 | `G` | User Guide |
 | `B` | Bookmarks (signed-in only) |

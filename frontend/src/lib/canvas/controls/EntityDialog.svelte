@@ -294,6 +294,7 @@
 					<NotationPills
 						value={selectedNotation}
 						onchange={(n) => { selectedNotation = n; handleNotationChange(); }}
+						notations={['simple', 'uml', 'archimate', 'c4', 'bpmn', 'doview']}
 					/>
 				</div>
 			{/if}

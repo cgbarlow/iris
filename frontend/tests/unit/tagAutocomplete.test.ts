@@ -77,7 +77,7 @@ describe('Element page passes suggestions to TagInput', () => {
 
 describe('Diagram page passes suggestions to TagInput', () => {
 	const diagramPageSrc = readFileSync(
-		resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte'),
+		resolve(__dirname, '../../src/routes/views/[id]/+page.svelte'),
 		'utf-8',
 	);
 

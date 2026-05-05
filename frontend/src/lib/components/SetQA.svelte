@@ -231,7 +231,7 @@ function promptForLocation() {
 				}
 			);
 			if (result.primary_diagram_id) {
-				goto(`/diagrams/${result.primary_diagram_id}`);
+				goto(`/views/${result.primary_diagram_id}`);
 			}
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create diagrams';

@@ -2,21 +2,31 @@
   interface Props {
     value: string;
     onchange: (notation: string) => void;
+    /** Restrict the visible pills (default: all). EntityDialog excludes 'markdown' since text views have no entities. */
+    notations?: string[];
   }
 
-  let { value, onchange }: Props = $props();
+  let { value, onchange, notations }: Props = $props();
 
-  const NOTATIONS = [
+  const ALL_NOTATIONS = [
     { key: 'simple', label: 'Simple' },
     { key: 'uml', label: 'UML' },
     { key: 'archimate', label: 'ArchiMate' },
     { key: 'c4', label: 'C4' },
+    { key: 'bpmn', label: 'BPMN' },
     { key: 'doview', label: 'DoView' },
+    { key: 'markdown', label: 'Markdown' },
   ];
+
+  const visible = $derived(
+    notations && notations.length > 0
+      ? ALL_NOTATIONS.filter((n) => notations.includes(n.key))
+      : ALL_NOTATIONS
+  );
 </script>
 
 <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Notation">
-  {#each NOTATIONS as n}
+  {#each visible as n}
     <button
       type="button"
       role="radio"
