@@ -1,6 +1,6 @@
 # ADR-136: BPMN 2.0 notation
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33, #37)
 
 ## Context
 
@@ -217,3 +217,77 @@ The deeper UX gap — the BPMN authoring surfaces (`BpmnPalette` /
 `PropertyPanel` / `ProblemsPanel`) that exist on disk but are not
 mounted into the canvas — is tracked separately for v5.2.0
 (see issue #34). v5.1.2 is the last v5.1.x patch.
+
+## Amendment 2026-05-05 — UX surface integration (issue #37, v5.2.0)
+
+The six BPMN authoring surfaces designed in this ADR (palette, context
+pad, command palette, event matrix picker, property panel, problems
+panel) were built as standalone components in v5.1.0 but never wired
+into the canvas. Confirmed pre-v5.2.0 by `grep -rn 'BpmnPalette|
+ContextPad|CommandPalette|EventMatrixPicker|PropertyPanel|
+ProblemsPanel' src/routes/ src/lib/canvas/UnifiedCanvas.svelte`
+returning zero hits.
+
+This amendment records the **integration decisions** — no new design,
+just how the existing components plug into the existing canvas.
+
+### Where each surface mounts
+
+| Surface | Mount site | Why there |
+|---|---|---|
+| `BpmnPalette` | New `BpmnAuthoringShell` left column | Self-contained 220px aside; sits next to UnifiedCanvas. |
+| `ContextPad` | Inside `BpmnRenderer` when `selected` | Already wraps `<NodeToolbar>`, which auto-anchors via xyflow's per-node context. Placing it in the renderer is the only way it can read that context. |
+| `CommandPalette` | Page-level modal mounted by the shell | Modal dialog (top: 20%); needs its `open`/`mode` driven externally so the same instance handles N (create), A (append) and R (replace). |
+| `EventMatrixPicker` | Page-level modal mounted by the shell | Same shape as CommandPalette; opened either by the create flow on `event_*` keys or the context-pad/command-palette replace flow. |
+| `PropertyPanel` | New `BpmnAuthoringShell` right column | Always-on per spec; replaces the conditional `ElementEditPanel` / `NodeStylePanel` / `LinkedDiagramPanel` stack for BPMN views only. |
+| `ProblemsPanel` | New `BpmnAuthoringShell` bottom dock | Below the canvas; reactive to `validateBpmn(data)` so it updates as nodes/edges change. |
+
+### Wiring decisions
+
+1. **Action callback path for ContextPad** — the shell sets a Svelte
+   context value `bpmnContextPadAction` (via UnifiedCanvas's
+   `setContext`). BpmnRenderer reads it with `getContext`. Avoids
+   prop-drilling through UnifiedCanvas → DynamicNode → BpmnRenderer
+   for a callback only one renderer needs.
+2. **canConnect surfacing** — wired through xyflow's
+   `isValidConnection` prop on `<SvelteFlow>`. The shell's handler
+   maps the verdict's `reason` into a fixed-position toast
+   (`BpmnToast`) so the user sees *why* a connection was blocked.
+3. **Drag-drop from palette** — `BpmnPalette` already emits
+   `application/iris-bpmn-entity` on drag start. UnifiedCanvas
+   adds `ondrop` + `ondragover` handlers on its outer div, uses
+   `useSvelteFlow().screenToFlowPosition` to convert the cursor
+   coordinate into flow coordinates, and emits `ondropentity(key,
+   pos)`. The shell makes a node from that.
+4. **N / A / R hotkeys** — moved out of `CommandPalette`'s self-
+   binding (`bindShortcuts={false}`) and lifted into a
+   `<svelte:window onkeydown>` inside the shell. Reason: the palette
+   is mounted globally on every BPMN view, but the hotkeys must NOT
+   fire on non-BPMN views. The shell-level handler also gates them on
+   `notation === 'bpmn'`.
+5. **Toast** — new `BpmnToast` component (~50 lines, no library —
+   single consumer). Two-way bindable `message` prop; auto-clears.
+6. **SvelteFlowProvider wrap** — required to use `useSvelteFlow()` at
+   the UnifiedCanvas script level (above the `<SvelteFlow>` instance)
+   so the drop handler has access to `screenToFlowPosition`. The
+   provider wraps the whole template and is benign for non-drop usage.
+
+### Why a new shell component instead of inlining into the views detail page
+
+The detail page is already 3.2k lines after the v5.1.x renames. The
+3-column layout + 6 surface mounts + hotkey relay + drop handling
+would add ~350 more lines across an already-busy file. A shared
+`BpmnAuthoringShell.svelte` keeps the BPMN concern in one file and
+reduces the page-level surgery to a single `{:else if notation ===
+'bpmn'}` branch — easier to review, easier to remove if BPMN ever gets
+extracted into its own route.
+
+### Regression guard
+
+`frontend/tests/unit/bpmnCanvasIntegration.test.ts` (16 tests)
+asserts: shell file exists, shell imports the five direct surfaces
+plus `BpmnToast`, shell mounts each one, the page imports + mounts
+the shell behind the BPMN guard, UnifiedCanvas declares the three new
+hook props and wires them, and BpmnRenderer mounts ContextPad and
+reads the context handler. Same static-parser style as the v5.1.1 /
+v5.1.2 coverage tests.

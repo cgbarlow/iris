@@ -242,3 +242,63 @@ every notation key registered in `NOTATION_TYPE_FALLBACK` appears in
 the pill list. This catches the exact regression that produced
 issue #27 — adding a notation to the registry without surfacing it in
 the picker.
+
+## Amendment 2026-05-05 — BPMN canvas UX integration map (issue #37, v5.2.0)
+
+Per the ADR-136 v5.2.0 amendment, the six BPMN UX surfaces are now
+mounted into the canvas via a new `BpmnAuthoringShell` wrapper. This
+table is the surface-by-surface integration record — file paths,
+state read/written, callback wiring.
+
+### Integration map
+
+| Surface | Mounts in | Reads | Writes (callback) | Notes |
+|---|---|---|---|---|
+| `BpmnPalette` | `BpmnAuthoringShell` left aside (220px) | `initialOpen` (default `'activity'`) | `onselect(key)` → shell creates a node via `makeBpmnNode(key)` at `findOpenPosition()` | Drag-start emits `application/iris-bpmn-entity` on `dataTransfer`; drop is handled by UnifiedCanvas. |
+| `ContextPad` | Inside `BpmnRenderer` when `selected` | `nodeId` (renderer prop), `visible` (= `selected`) | `onaction(action, nodeId)` → bridged via `getContext('bpmnContextPadAction')` to the shell's `handleContextPadAction` | Wraps `<NodeToolbar position={Position.Right} offset={8}>` — auto-anchors to the node and follows pan/zoom. |
+| `CommandPalette` | `BpmnAuthoringShell` page-level modal | `open` + `mode` (bound by shell), `bindShortcuts={false}` | `onpick(entry, mode)` → shell handles `create` / `append` / `replace` (replace mutates the existing node's `type` + `data.entityType` + `data.data` to the new BPMN_DEFAULT_DISCRIMINATORS) | Self-binding disabled because the same instance serves all three modes; the shell drives `mode` from N / A / R hotkeys. |
+| `EventMatrixPicker` | `BpmnAuthoringShell` page-level modal | `open` (bound by shell) | `onpick(variant)` → shell creates an event node populated with `eventTrigger` + (maybe) `eventDirection` + (maybe) `boundaryInterrupting` | Opens automatically when an `event_*` entity is created via palette/drop/command; uses `pendingDropPosition` to remember the click site. |
+| `PropertyPanel` | `BpmnAuthoringShell` right aside (280px) | `selection: PropertyPanelData \| null` derived from `selectedEditNodeId` + `canvasNodes` | `onchange(id, patch)` → shell maps `label` / `description` to top-level `data` and the rest to inner `data.data` (discriminators) | Always mounted for BPMN views (not gated on selection); shows an empty state when nothing's selected. Replaces the existing `ElementEditPanel` / `NodeStylePanel` / `LinkedDiagramPanel` stack for BPMN only. |
+| `ProblemsPanel` | `BpmnAuthoringShell` bottom dock (80–200px) | `data: BpmnDiagramData` derived from `canvasNodes` + `canvasEdges` | `onfocus(elementIds[])` → shell sets `selectedEditNodeId` to the first id (canvas highlights via existing selection wiring) | Re-runs `validateBpmn(data)` reactively whenever nodes/edges mutate. |
+| `BpmnToast` (new) | `BpmnAuthoringShell` fixed-position bottom-centre | `message` (bound by shell) | Self-clears after 3.5s; bindable so the shell can also clear/refresh | Surface for `canConnect` rejection reasons. ~50 lines, single-purpose, no new dep. |
+
+### UnifiedCanvas hook props
+
+| Prop | Type | Wired by | Used for |
+|---|---|---|---|
+| `onbeforeconnect` | `(c: Edge \| Connection) => boolean` | Shell's `handleBeforeConnect` | `<SvelteFlow isValidConnection={onbeforeconnect}>` — blocks the edge at draw-time when `canConnect` returns `{allowed: false}` and surfaces the reason via toast. |
+| `ondropentity` | `(key: string, pos: { x: number; y: number }) => void` | Shell's `handleDropEntity` | Receives the palette drop after `useSvelteFlow().screenToFlowPosition` converts the cursor. Shell creates a BPMN node at the projected position. |
+| `oncontextpadaction` | `(action: string, nodeId: string) => void` | Shell's `handleContextPadAction` | `setContext('bpmnContextPadAction', oncontextpadaction)` — BpmnRenderer's `<ContextPad onaction={…}>` calls back via this Svelte context. |
+
+### BpmnRenderer additions
+
+- New `id?: string` prop (xyflow auto-passes node ids to custom node components — only Iris's renderer interface didn't declare it).
+- `import ContextPad from '$lib/canvas/palette/ContextPad.svelte'`.
+- `const onContextPadAction = getContext<(action, nodeId) => void>('bpmnContextPadAction')`.
+- Mount: `<ContextPad nodeId={id} visible={selected} onaction={(a, n) => onContextPadAction?.(a, n)} />` placed alongside the `<Handle>` elements at the top of the renderer template — visible only when `selected`, anchored by the inner `<NodeToolbar>`.
+
+### Layout decisions
+
+- `SvelteFlowProvider` wraps UnifiedCanvas's whole template so the script-level `useSvelteFlow()` call has a store to read.
+- `BpmnAuthoringShell` is a CSS-grid 3-column layout (220px / 1fr / 280px) with a flex-row + bottom problems dock. `height: calc(100vh - 230px)` to match the existing canvas-area sizing.
+- Hotkeys (N / A / R) are gated by `notation === 'bpmn'` and standard input-target guards (`INPUT` / `TEXTAREA` / `isContentEditable`).
+
+### Files added in v5.2.0
+
+| File | Lines | Purpose |
+|---|---|---|
+| `frontend/src/lib/canvas/bpmn/BpmnAuthoringShell.svelte` | ~430 | The shell itself. |
+| `frontend/src/lib/canvas/bpmn/BpmnToast.svelte` | ~80 | The fixed-position toast. |
+| `frontend/tests/unit/bpmnCanvasIntegration.test.ts` | ~135 | Static-parser regression guard (16 tests). |
+
+### Files modified in v5.2.0
+
+| File | Change |
+|---|---|
+| `frontend/src/lib/canvas/UnifiedCanvas.svelte` | Wrapped in `<SvelteFlowProvider>`; added 3 hook props (`onbeforeconnect`, `ondropentity`, `oncontextpadaction`); wired `isValidConnection` + `ondrop`/`ondragover`; `setContext('bpmnContextPadAction', …)`. |
+| `frontend/src/lib/canvas/renderers/BpmnRenderer.svelte` | Added `id?: string` prop; mounts `<ContextPad>` when selected; reads action handler from `getContext('bpmnContextPadAction')`. |
+| `frontend/src/routes/views/[id]/+page.svelte` | New `{:else if notation === 'bpmn'}` branch in the editing canvas-area chain that mounts `<BpmnAuthoringShell>` instead of the generic UnifiedCanvas + right-panel layout. |
+| `docs/adrs/ADR-136-BPMN-Notation.md` | Amendment with integration decisions. |
+| `docs/adrs/specs/SPEC-136-A-BPMN-Notation.md` | This integration map. |
+| `CHANGELOG.md` | New `[5.2.0]` section. |
+| `frontend/package.json` + `package-lock.json` | Version bump 5.1.2 → 5.2.0. |

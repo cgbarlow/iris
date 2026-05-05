@@ -5,8 +5,9 @@
 	 * Supports both edit and browse modes.
 	 */
 	import { setContext } from 'svelte';
-	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
+	import { SvelteFlow, SvelteFlowProvider, Controls, Background, useSvelteFlow } from '@xyflow/svelte';
 	import { ConnectionMode } from '@xyflow/system';
+	import type { Connection, Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 
 	import { unifiedNodeTypes, unifiedEdgeTypes } from './registry';
@@ -34,6 +35,17 @@
 		onnodedragstart?: () => void;
 		ontogglemode?: () => void;
 		panX?: number;
+		/** v5.2.0 (issue #37): BPMN connection guard. Return false to block the
+		 *  connection at draw-time. Wire to bpmnRules.canConnect at the page
+		 *  level. xyflow's IsValidConnection signature accepts `Edge | Connection`. */
+		onbeforeconnect?: (c: Edge | Connection) => boolean;
+		/** v5.2.0 (issue #37): the canvas drop target receives a palette item
+		 *  via the `application/iris-bpmn-entity` MIME type. Position is in
+		 *  SvelteFlow coordinates so the page can drop a node at the cursor. */
+		ondropentity?: (entityKey: string, position: { x: number; y: number }) => void;
+		/** v5.2.0 (issue #37): forwarded to BpmnRenderer via setContext so the
+		 *  ContextPad inside a selected BPMN node can call back to the page. */
+		oncontextpadaction?: (action: string, nodeId: string) => void;
 	}
 
 	let {
@@ -54,11 +66,37 @@
 		onnodedragstart,
 		ontogglemode,
 		panX = 0,
+		onbeforeconnect,
+		ondropentity,
+		oncontextpadaction,
 	}: Props = $props();
 
 	// Set notation context for DynamicNode/DynamicEdge to read
 	setContext('notation', notation);
 	setContext('preferredThemeId', preferredThemeId);
+	// v5.2.0 (issue #37): expose the ContextPad action handler to BpmnRenderer
+	// via Svelte context so it can fire actions back to the page without a
+	// renderer-level prop hop.
+	setContext('bpmnContextPadAction', oncontextpadaction);
+
+	const flow = useSvelteFlow();
+
+	function handleDragOver(e: DragEvent) {
+		// Required for the browser to fire `drop` — the default behaviour
+		// rejects the drop entirely.
+		if (e.dataTransfer?.types.includes('application/iris-bpmn-entity')) {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'copy';
+		}
+	}
+
+	function handleDrop(e: DragEvent) {
+		const key = e.dataTransfer?.getData('application/iris-bpmn-entity');
+		if (!key) return;
+		e.preventDefault();
+		const position = flow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+		ondropentity?.(key, position);
+	}
 
 	let announcer: CanvasAnnouncer | undefined = $state();
 	let keyboardHandler: KeyboardHandler | undefined = $state();
@@ -226,6 +264,11 @@
 	}
 </script>
 
+<!-- v5.2.0 (issue #37): wrap in SvelteFlowProvider so the script-level
+	 useSvelteFlow() call (used by handleDrop's screenToFlowPosition) has a
+	 store to read. Required because the drop handler lives on the OUTER div,
+	 above <SvelteFlow>'s own implicit provider. -->
+<SvelteFlowProvider>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
 	class="model-canvas{browseMode ? ' model-canvas--browse' : ''}"
@@ -233,6 +276,8 @@
 	aria-label="{notationLabel} diagram canvas{browseMode ? ' — browse mode (read-only)' : ''}{connectMode ? ' — connect mode active' : ''}"
 	aria-roledescription="interactive diagram{browseMode ? ', read-only' : ''}"
 	onkeydown={browseMode ? undefined : handleKeydown}
+	ondragover={browseMode ? undefined : handleDragOver}
+	ondrop={browseMode ? undefined : handleDrop}
 >
 	{#if browseMode}
 		<SvelteFlow
@@ -270,6 +315,7 @@
 			onpaneclick={handlePaneClick}
 			onreconnect={handleReconnect}
 			onnodedragstart={() => onnodedragstart?.()}
+			isValidConnection={onbeforeconnect}
 			proOptions={{ hideAttribution: true }}
 			defaultEdgeOptions={{ type: defaultEdgeType }}
 			nodesDraggable={true}
@@ -336,3 +382,4 @@
 
 	<CanvasAnnouncer bind:this={announcer} />
 </div>
+</SvelteFlowProvider>
