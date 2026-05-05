@@ -7,11 +7,13 @@
 		ARCHIMATE_ENTITY_TYPES,
 		C4_ENTITY_TYPES,
 		DOVIEW_ENTITY_TYPES,
+		BPMN_ENTITY_TYPES,
 		SIMPLE_DIAGRAM_TYPE_FILTER,
 		UML_DIAGRAM_TYPE_FILTER,
 		ARCHIMATE_DIAGRAM_TYPE_LAYERS,
 		C4_DIAGRAM_TYPE_LEVELS,
 		DOVIEW_DIAGRAM_TYPE_FILTER,
+		BPMN_DIAGRAM_TYPE_FILTER,
 		type SimpleEntityType,
 		type NotationType,
 	} from '$lib/types/canvas';
@@ -143,6 +145,17 @@
 					filteredDoview = filteredDoview.filter((t) => allowed.includes(t.key));
 				}
 				types = filteredDoview.map((t) => ({ key: t.key as string, label: t.label, icon: t.icon }));
+				break;
+			}
+			case 'bpmn': {
+				/* Issue #33: previously fell through to `default:` and rendered Simple
+				   types (Actor / Boundary / Component / …) on a BPMN view. */
+				let filteredBpmn = BPMN_ENTITY_TYPES;
+				if (!showAllTypes && diagramType && BPMN_DIAGRAM_TYPE_FILTER[diagramType] !== undefined && BPMN_DIAGRAM_TYPE_FILTER[diagramType] !== null) {
+					const allowed = BPMN_DIAGRAM_TYPE_FILTER[diagramType]!;
+					filteredBpmn = filteredBpmn.filter((t) => allowed.includes(t.key));
+				}
+				types = filteredBpmn.map((t) => ({ key: t.key as string, label: t.label, icon: t.icon }));
 				break;
 			}
 			default: {

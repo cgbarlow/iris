@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.2] - 2026-05-05
+
+UAT follow-ups against the v5.1.1 deployment — four contained bug
+fixes against the Text class, Hierarchy controls, and BPMN dialog.
+The deeper BPMN UX integration gap (BpmnPalette / ContextPad /
+CommandPalette / EventMatrixPicker / PropertyPanel / ProblemsPanel
+exist on disk but are not mounted into the canvas) is tracked
+separately for v5.2.0; v5.1.2 is the last v5.1.x patch.
+
+### Fixed
+
+- **Hierarchy panel dropdowns clipped under the AppShell**
+  (ADR-137 amendment, issue #30). `HierarchyControls` previously
+  anchored both menus with `absolute right-0`. On the Dashboard
+  hierarchy panel — which sits flush-left against the AppShell —
+  the right-anchored menu extended *leftwards* off the panel and
+  ended up under the AppShell nav. Switched to `absolute left-0`
+  on both menus so they extend rightwards from the button. Coverage
+  test prevents regression.
+- **Tab in markdown editor moved focus instead of indenting**
+  (ADR-137 amendment, issue #31). `TextCanvas`'s `<textarea>` had
+  no `keydown` handler. Tab now intercepts and inserts a literal `\t`
+  at the selection; `Shift+Tab` outdents (strips a leading `\t` or up
+  to four spaces). Esc-then-Tab still moves focus normally so
+  WCAG 2.1.2 (No Keyboard Trap) is preserved; the affordance is
+  documented in the placeholder text.
+- **Text view browse mode showed "Start Building" instead of
+  rendered markdown** (ADR-137 amendment, issue #32). The v5.1.1
+  `{:else if canvasType === 'text'}` branch existed only inside the
+  `{#if editing}` block. Browse mode for Text views fell through to
+  the empty-canvas branch (Text views legitimately have zero canvas
+  nodes) and rendered the canvas "Start Building" prompt. Added a
+  parallel browse-mode Text branch *before* the empty-canvas check,
+  mounting `<TextCanvas editing={false}>` so MarkdownView fires.
+  Empty Text views show a text-specific "This text view is empty —
+  Start Writing" prompt that mirrors the canvas equivalent.
+- **EntityDialog showed Simple-notation entity types on BPMN views**
+  (ADR-136 amendment, issue #33). The dialog's notation switch had
+  cases for UML / ArchiMate / C4 / DoView and a Simple `default:` —
+  no `case 'bpmn':`. Clicking *Add Element* on a BPMN view silently
+  presented Actor / Boundary / Component / Note / Service. Added the
+  missing case using `BPMN_ENTITY_TYPES` + `BPMN_DIAGRAM_TYPE_FILTER`
+  (mirrors the UML / DoView branches in the same file). New coverage
+  test asserts every notation key in `NotationPills.ALL_NOTATIONS`
+  has a matching switch case in `EntityDialog`, so this regression
+  class can't recur.
+
+### Docs
+
+- ADR-136 amendment — EntityDialog BPMN case (issue #33). Notes the
+  v5.1.0 oversight pattern (registry shipped, picker dialog lagged)
+  and how the new coverage test closes the loop alongside the
+  v5.1.1 NotationPills coverage test.
+- ADR-137 amendment — three v5.1.2 follow-ups (issues #30, #31, #32).
+  Includes the design-intent quote from #32 ("a single Canvas tab
+  whose behaviour switches by notation; the type-of-diagram label
+  remains authoritative").
+
+### Verification
+
+- Frontend: 786/787 vitest specs pass (the one pre-existing failure —
+  `importIdempotency > displays diagrams skipped count` — also fails
+  against the unmodified baseline).
+- 4 new vitest specs added (15 tests total) — `hierarchyControlsAlignment`,
+  `textCanvasTabKey`, `textViewBrowseRender`, `entityDialogBpmn`.
+- Backend: 48/48 in scope-affected tests pass (docref + text + bpmn).
+- `svelte-check`: 164 errors (= unchanged baseline, no new errors
+  introduced).
+
 ## [5.1.1] - 2026-05-05
 
 UAT follow-ups (issue #27) for the v5.1.0 release. The user-facing
