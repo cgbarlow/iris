@@ -81,8 +81,17 @@ export interface RenderedMarkdown {
 export function renderMarkdown(source: string, textDiagramIds?: Set<string>): RenderedMarkdown {
 	const raw = marked.parse(source, { async: false }) as string;
 
+	// Issue #32 reopen: User Guide images use absolute paths (e.g.
+	// `/guide/dashboard.png`) — those have no scheme so the original
+	// scheme-only regex stripped the src. Now accepts the four allowed
+	// schemes PLUS absolute (`/`) and relative (`./`, `../`) paths.
+	// Path-only refs cannot carry `javascript:` or `data:` payloads
+	// (no scheme to begin with). The post-walk `urlIsAllowed` is the
+	// defence-in-depth layer for anchors. Tests in
+	// markdownImageAllowlist.test.ts assert javascript:/data:/file:
+	// remain stripped.
 	const safe = DOMPurify.sanitize(raw, {
-		ALLOWED_URI_REGEXP: /^(?:https?|mailto|iris):/i,
+		ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|iris):|\/|\.{1,2}\/)/i,
 	});
 
 	if (typeof document === 'undefined') {
@@ -91,6 +100,18 @@ export function renderMarkdown(source: string, textDiagramIds?: Set<string>): Re
 
 	const tpl = document.createElement('template');
 	tpl.innerHTML = safe;
+
+	// Issue #32 reopen / protocol #7: DOMPurify allows `data:` URIs on
+	// img/audio/video src by default for legitimate inline-image use,
+	// even when ALLOWED_URI_REGEXP excludes them. We don't ship inline
+	// data: images and they're a tracking/exfil vector — strip any img
+	// src that fails the same scheme/path allowlist used for anchors.
+	for (const img of tpl.content.querySelectorAll('img')) {
+		const src = img.getAttribute('src') ?? '';
+		if (!urlIsAllowed(src)) {
+			img.removeAttribute('src');
+		}
+	}
 
 	const links: ExtractedLink[] = [];
 	for (const a of tpl.content.querySelectorAll('a')) {

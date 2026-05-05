@@ -11,7 +11,10 @@
 	 * page already has the right layout for a 300px right drawer matching
 	 * CommentsPanel — TextCanvas just emits the heading list).
 	 */
-	import MarkdownView, { type TocHeading } from '$lib/components/MarkdownView.svelte';
+	import MarkdownView from '$lib/components/MarkdownView.svelte';
+	import type { TocHeading } from '$lib/components/markdownHelpers';
+	import MarkdownEditorToolbar from '$lib/canvas/text/MarkdownEditorToolbar.svelte';
+	import { wrapSelection, applyOp } from '$lib/canvas/text/markdownEditorToolbarHelpers';
 
 	interface Props {
 		/** Markdown source — read from diagram.data.content. */
@@ -58,6 +61,36 @@
 	function handleKeydown(e: KeyboardEvent) {
 		const ta = e.currentTarget as HTMLTextAreaElement;
 
+		// Issue #32 reopen: Ctrl/Cmd+B / +I / +K = bold / italic / link.
+		// Mirrors the toolbar buttons; keeps source-of-truth markdown.
+		if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+			const k = e.key.toLowerCase();
+			if (k === 'b') {
+				e.preventDefault();
+				const op = wrapSelection(ta, '**', '**');
+				applyOp(ta, op);
+				content = op.value;
+				oncontentchange?.(op.value);
+				return;
+			}
+			if (k === 'i') {
+				e.preventDefault();
+				const op = wrapSelection(ta, '*', '*');
+				applyOp(ta, op);
+				content = op.value;
+				oncontentchange?.(op.value);
+				return;
+			}
+			if (k === 'k') {
+				e.preventDefault();
+				const op = wrapSelection(ta, '[', '](url)');
+				applyOp(ta, op);
+				content = op.value;
+				oncontentchange?.(op.value);
+				return;
+			}
+		}
+
 		if (e.key === 'Escape') {
 			tabTrapEnabled = false;
 			return;
@@ -100,6 +133,10 @@
 
 <div class="text-canvas" data-mode={editing ? 'edit' : 'view'}>
 	{#if editing}
+		<MarkdownEditorToolbar
+			textareaEl={textareaEl}
+			onchange={(v) => { content = v; oncontentchange?.(v); }}
+		/>
 		<textarea
 			bind:this={textareaEl}
 			class="text-canvas__editor"
