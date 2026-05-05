@@ -1,6 +1,6 @@
 # ADR-136: BPMN 2.0 notation
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33, #37)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33, #37, #37-reopen)
 
 ## Context
 
@@ -291,3 +291,69 @@ the shell behind the BPMN guard, UnifiedCanvas declares the three new
 hook props and wires them, and BpmnRenderer mounts ContextPad and
 reads the context handler. Same static-parser style as the v5.1.1 /
 v5.1.2 coverage tests.
+
+## Amendment 2026-05-05 — v5.3.1 hot-fix (issue #37 reopen)
+
+UAT against v5.2.0 / v5.3.0 surfaced a critical regression: every
+canvas — not just BPMN — crashed on load with
+
+> Uncaught Error: To call useStore outside of `<SvelteFlow />` you
+> need to wrap your component in a `<SvelteFlowProvider />`
+
+### Root cause
+
+v5.2.0 added `useSvelteFlow()` at the script level of
+`UnifiedCanvas` to power the BPMN palette drag-drop's coordinate
+projection (`flow.screenToFlowPosition`). xyflow's hook reads
+context via `getContext` AT CALL TIME. v5.2.0 *also* wrapped
+UnifiedCanvas's own template in `<SvelteFlowProvider>` to satisfy
+the hook — but Svelte's component lifecycle runs the script BEFORE
+the template mounts. So the hook ran with no provider above it and
+threw on every canvas mount, regardless of notation. Caught only in
+runtime UAT, not in `svelte-check` (which doesn't execute the hook).
+
+### Fix
+
+Extract a thin `CanvasDropArea` component (`src/lib/canvas/CanvasDropArea.svelte`)
+that owns the drop handlers AND calls `useSvelteFlow()` from its own
+script. Mount it inside the existing `<SvelteFlowProvider>` so its
+initialisation runs AFTER the provider sets up:
+
+```
+<SvelteFlowProvider>
+  <CanvasDropArea ondropentity={…}>
+    <div class="model-canvas">
+      <SvelteFlow ... />
+    </div>
+  </CanvasDropArea>
+</SvelteFlowProvider>
+```
+
+CanvasDropArea uses `display: contents` on its wrapper so the
+existing canvas layout is unchanged.
+
+### Regression guard
+
+`bpmnCanvasIntegration.test.ts` adds:
+
+```ts
+it('UnifiedCanvas does NOT call useSvelteFlow at script level (v5.3.1 regression guard)', () => {
+  expect(src).not.toMatch(/^\s*const\s+\w+\s*=\s*useSvelteFlow/m);
+  expect(src).not.toMatch(/import[\s\S]*?useSvelteFlow[\s\S]*?from\s+['"]@xyflow\/svelte['"]/);
+});
+```
+
+Catches exactly the v5.2.0 mistake — calling the hook from
+UnifiedCanvas's script (where the provider in the same template
+isn't yet mounted). Future drop-handler / flow-coord code must live
+in a child of `<SvelteFlowProvider>` or use `CanvasDropArea` as the
+established pattern.
+
+### Why this wasn't caught earlier
+
+- `svelte-check`: runs the type system, not the runtime; the hook's
+  return type is correct so type-check passed.
+- The vitest integration test in v5.2.0 was static-parser style,
+  asserting `useSvelteFlow` was *called* but not in what context.
+  v5.3.1 tightens the assertion to *forbid* the call at script level
+  in UnifiedCanvas — the right shape of regression guard.

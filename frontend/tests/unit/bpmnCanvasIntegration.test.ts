@@ -102,14 +102,35 @@ describe('UnifiedCanvas exposes the BPMN integration hooks', () => {
 		expect(src).toMatch(/isValidConnection=/);
 	});
 
-	it('hooks ondrop + ondragover for the palette drag-drop MIME', () => {
-		expect(src).toMatch(/ondragover=/);
-		expect(src).toMatch(/ondrop=/);
-		expect(src).toMatch(/application\/iris-bpmn-entity/);
+	it('forwards the palette drag-drop through CanvasDropArea (v5.3.1: hook moved out of UnifiedCanvas script)', () => {
+		expect(src).toMatch(/import\s+CanvasDropArea\b/);
+		expect(src).toMatch(/<CanvasDropArea\b[\s\S]*?ondropentity=/);
+		// CanvasDropArea must be a child of SvelteFlowProvider so its
+		// useSvelteFlow() call lands inside the provider.
+		const slice = src.match(/<SvelteFlowProvider[\s\S]*?<CanvasDropArea/);
+		expect(slice).toBeTruthy();
+	});
+
+	it('CanvasDropArea handles the palette MIME and calls useSvelteFlow inside SvelteFlowProvider', () => {
+		const drop = readFileSync(
+			resolve(ROOT, 'src/lib/canvas/CanvasDropArea.svelte'),
+			'utf-8',
+		);
+		expect(drop).toMatch(/useSvelteFlow/);
+		expect(drop).toMatch(/application\/iris-bpmn-entity/);
+		expect(drop).toMatch(/screenToFlowPosition/);
 	});
 
 	it('shares the ContextPad action handler via setContext so BpmnRenderer can call it', () => {
 		expect(src).toMatch(/setContext\(['"]bpmnContextPadAction['"]/);
+	});
+
+	it('UnifiedCanvas does NOT call useSvelteFlow at script level (v5.3.1 regression guard)', () => {
+		// useSvelteFlow at script level executes before the
+		// SvelteFlowProvider in the same component's template — that's
+		// the v5.2.0 bug that broke every canvas (issue #37 reopen).
+		expect(src).not.toMatch(/^\s*const\s+\w+\s*=\s*useSvelteFlow/m);
+		expect(src).not.toMatch(/import[\s\S]*?useSvelteFlow[\s\S]*?from\s+['"]@xyflow\/svelte['"]/);
 	});
 });
 
