@@ -8,6 +8,7 @@
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
 	import UnifiedCanvas from '$lib/canvas/UnifiedCanvas.svelte';
+	import BpmnAuthoringShell from '$lib/canvas/bpmn/BpmnAuthoringShell.svelte';
 	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
 	import TextCanvas from '$lib/canvas/text/TextCanvas.svelte';
 	import MarkdownToc from '$lib/components/MarkdownToc.svelte';
@@ -2834,6 +2835,21 @@
 							<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
 						{/if}
 					</div>
+					{:else if notation === 'bpmn'}
+					<!-- v5.2.0 (issue #37): BPMN authoring shell — palette / canvas /
+						 property panel + bottom problems dock + canConnect toast.
+						 Replaces the generic right-panel stack on BPMN views in edit mode. -->
+					<BpmnAuthoringShell
+						{notation}
+						{preferredThemeId}
+						bind:canvasNodes
+						bind:canvasEdges
+						bind:selectedEditNodeId
+						{history}
+						oncanvasdirty={() => (canvasDirty = true)}
+						onnodeselect={handleNodeSelect}
+						onedgeselect={handleEdgeSelect}
+					/>
 					{:else}
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">

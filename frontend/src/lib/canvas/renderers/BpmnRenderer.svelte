@@ -15,13 +15,23 @@
 	import type { CanvasNodeData, NotationType } from '$lib/types/canvas';
 	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
 	import { nodeOverrideStyle, titleFontStyle } from '$lib/canvas/utils/visualStyles';
+	import ContextPad from '$lib/canvas/palette/ContextPad.svelte';
 
 	interface Props {
+		/** Node id — xyflow auto-passes this to custom node components. Used by
+		 *  the v5.2.0 (issue #37) ContextPad mount so it can call back to the
+		 *  page-level handler with the right nodeId. */
+		id?: string;
 		data: CanvasNodeData;
 		selected?: boolean;
 	}
 
-	let { data, selected = false }: Props = $props();
+	let { id = '', data, selected = false }: Props = $props();
+
+	/** v5.2.0 (issue #37): the page sets this via UnifiedCanvas's
+	 *  setContext('bpmnContextPadAction', …). When undefined the pad still
+	 *  renders but actions are no-ops. */
+	const onContextPadAction = getContext<(action: string, nodeId: string) => void>('bpmnContextPadAction');
 
 	const notation = getContext<NotationType>('notation') ?? 'bpmn';
 	const rendering = $derived(getThemeRendering(notation));
@@ -88,6 +98,14 @@
 <!-- Source/target handles common to every BPMN node -->
 <Handle type="target" position={Position.Left} />
 <Handle type="source" position={Position.Right} />
+
+<!-- v5.2.0 (issue #37): on-element context pad. Already wraps <NodeToolbar>
+	 so it auto-anchors to this node and follows pan/zoom. -->
+<ContextPad
+	nodeId={id}
+	visible={selected}
+	onaction={(action, nodeId) => onContextPadAction?.(action, nodeId)}
+/>
 
 {#if isActivity}
 	<div
