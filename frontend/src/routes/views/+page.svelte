@@ -11,6 +11,7 @@
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import SetSelector from '$lib/components/SetSelector.svelte';
@@ -30,6 +31,8 @@
 	let tagFilter = $state('');
 	let availableTags = $state<string[]>([]);
 	let templateFilter = $state(false);
+	let showDiagrams = $state(true);
+	let showText = $state(true);
 	let showCreateDialog = $state(false);
 	let showCreatePackageDialog = $state(false);
 	let newPackageName = $state('');
@@ -128,9 +131,9 @@
 				if (e.status === 429) {
 					error = 'The server is busy right now. Please wait a moment and try again.';
 				} else if (e.status === 401 || e.status === 403) {
-					error = 'You need to log in to view diagrams.';
+					error = 'You need to log in to view this content.';
 				} else {
-					error = 'Something went wrong loading diagrams. Please try again.';
+					error = 'Something went wrong loading views. Please try again.';
 				}
 			} else {
 				error = 'Unable to connect to the server. Please check your connection and try again.';
@@ -182,9 +185,9 @@
 				body: JSON.stringify(body),
 			});
 			showCreateDialog = false;
-			await goto(`/diagrams/${created.id}`);
+			await goto(`/views/${created.id}`);
 		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'Failed to create diagram';
+			error = e instanceof ApiError ? e.message : 'Failed to create view';
 		}
 	}
 
@@ -341,6 +344,9 @@
 	const filteredModels = $derived(
 		models
 			.filter((m) => {
+				const isText = m.diagram_type === 'text' || m.notation === 'markdown';
+				if (isText && !showText) return false;
+				if (!isText && !showDiagrams) return false;
 				if (typeFilter && m.diagram_type.toLowerCase() !== typeFilter.toLowerCase()) {
 					return false;
 				}
@@ -369,13 +375,13 @@
 </script>
 
 <svelte:head>
-	<title>Diagrams — Iris</title>
+	<title>Views — Iris</title>
 </svelte:head>
 
 <div class="flex items-center justify-between">
 	<div>
-		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Diagrams</h1>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Browse and manage architectural diagrams.</p>
+		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Views</h1>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Browse and manage architectural views.</p>
 	</div>
 	<div class="flex items-center gap-2">
 		<button
@@ -385,20 +391,14 @@
 		>
 			{selectMode ? 'Cancel Select' : 'Select'}
 		</button>
-		<button
-			onclick={() => (showCreateDialog = true)}
-			class="rounded px-4 py-2 text-sm text-white"
-			style="background-color: var(--color-primary)"
-		>
-			New Diagram
-		</button>
-		<button
-			onclick={() => (showCreatePackageDialog = true)}
-			class="rounded border px-4 py-2 text-sm"
-			style="border-color: var(--color-primary); color: var(--color-primary)"
-		>
-			New Package
-		</button>
+		<HierarchyControls
+			showDiagrams={showDiagrams}
+			showText={showText}
+			onShowDiagrams={(v) => (showDiagrams = v)}
+			onShowText={(v) => (showText = v)}
+			oncreateview={() => (showCreateDialog = true)}
+			oncreatepackage={() => (showCreatePackageDialog = true)}
+		/>
 	</div>
 </div>
 
@@ -407,12 +407,12 @@
 	<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
 	<SetSelector value={currentSetId} onchange={handleSetChange} />
 	<div>
-		<label for="diagram-search" class="sr-only">Search diagrams</label>
+		<label for="diagram-search" class="sr-only">Search views</label>
 		<input
 			id="diagram-search"
 			bind:value={searchQuery}
 			type="search"
-			placeholder="Search diagrams..."
+			placeholder="Search views..."
 			class="rounded border px-3 py-2 text-sm"
 			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		/>
@@ -431,7 +431,9 @@
 			<option value="uml">UML</option>
 			<option value="archimate">ArchiMate</option>
 			<option value="c4">C4</option>
+			<option value="bpmn">BPMN</option>
 			<option value="doview">DoView</option>
+			<option value="markdown">Markdown</option>
 		</select>
 	</div>
 	<div>
@@ -449,6 +451,8 @@
 			<option value="class">Class</option>
 			<option value="deployment">Deployment</option>
 			<option value="process">Process</option>
+			<option value="collaboration">Collaboration</option>
+			<option value="choreography">Choreography</option>
 			<option value="roadmap">Roadmap</option>
 			<option value="free_form">Free Form</option>
 			<option value="use_case">Use Case</option>
@@ -457,6 +461,7 @@
 			<option value="container">Container</option>
 			<option value="motivation">Motivation</option>
 			<option value="strategy">Strategy</option>
+			<option value="text">Text</option>
 		</select>
 	</div>
 	<div>
@@ -546,7 +551,7 @@
 <!-- Results -->
 <div class="mt-4" aria-live="polite">
 	{#if loading}
-		<p style="color: var(--color-muted)">Loading diagrams...</p>
+		<p style="color: var(--color-muted)">Loading views...</p>
 	{:else if error}
 		<div role="alert" style="color: var(--color-danger)">
 			<p>{error}</p>
@@ -559,7 +564,7 @@
 			</button>
 		</div>
 	{:else if filteredModels.length === 0}
-		<p style="color: var(--color-muted)">No diagrams found.</p>
+		<p style="color: var(--color-muted)">No views found.</p>
 	{:else}
 		<div class="mb-3 flex items-center gap-3">
 			{#if selectMode}
@@ -568,23 +573,23 @@
 						type="checkbox"
 						checked={allSelected}
 						onclick={toggleSelectAll}
-						aria-label="Select all diagrams"
+						aria-label="Select all views"
 						class="h-4 w-4"
 					/>
 					Select all
 				</label>
 			{/if}
 			<p class="text-sm" style="color: var(--color-muted)">
-				{filteredModels.length} diagram{filteredModels.length === 1 ? '' : 's'}
+				{filteredModels.length} view{filteredModels.length === 1 ? '' : 's'}
 			</p>
 		</div>
 		{#if viewMode === 'tree'}
-			<ul role="tree" aria-label="Diagram hierarchy" class="tree-view" data-testid="diagrams-tree">
+			<ul role="tree" aria-label="View hierarchy" class="tree-view" data-testid="diagrams-tree">
 				{#if hierarchyTree.length === 0}
-					<li style="color: var(--color-muted); padding: 8px">No diagrams found.</li>
+					<li style="color: var(--color-muted); padding: 8px">No views found.</li>
 				{:else}
 					{#each hierarchyTree as node (node.id)}
-						<TreeNode {node} searchQuery={searchQuery} />
+						<TreeNode {node} searchQuery={searchQuery} {showDiagrams} {showText} />
 					{/each}
 				{/if}
 			</ul>
@@ -603,7 +608,7 @@
 								/>
 							{/if}
 							<a
-								href="/diagrams/{model.id}"
+								href="/views/{model.id}"
 								class="flex flex-1 items-center gap-3 rounded border p-3"
 								style="border-color: var(--color-border); color: var(--color-fg)"
 							>
@@ -685,7 +690,7 @@
 								/>
 							</div>
 						{/if}
-						<a href="/diagrams/{model.id}" class="flex flex-col">
+						<a href="/views/{model.id}" class="flex flex-col">
 							<div class="flex h-28 items-center justify-center overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
 								{#if thumbnailMode === 'png' && !thumbnailErrors.has(model.id)}
 									<img
@@ -798,8 +803,8 @@
 
 <ConfirmDialog
 	open={showBatchDeleteConfirm}
-	title="Delete Selected Diagrams"
-	message="Are you sure you want to delete {selectedIds.size} diagram{selectedIds.size !== 1 ? 's' : ''}? This action can be undone."
+	title="Delete Selected Views"
+	message="Are you sure you want to delete {selectedIds.size} view{selectedIds.size !== 1 ? 's' : ''}? This action can be undone."
 	confirmLabel="Delete"
 	onconfirm={handleBatchDelete}
 	oncancel={() => (showBatchDeleteConfirm = false)}

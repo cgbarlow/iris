@@ -44,27 +44,27 @@ describe('Node resize support (ADR-091-A)', () => {
 
 describe('NodeStylePanel integration (ADR-091-A)', () => {
 	it('diagram page imports NodeStylePanel', () => {
-		const pagePath = resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte');
+		const pagePath = resolve(__dirname, '../../src/routes/views/[id]/+page.svelte');
 		const source = readFileSync(pagePath, 'utf-8');
 		expect(source).toContain('NodeStylePanel');
 		expect(source).toContain("import NodeStylePanel from");
 	});
 
 	it('diagram page renders NodeStylePanel when a node is selected in edit mode', () => {
-		const pagePath = resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte');
+		const pagePath = resolve(__dirname, '../../src/routes/views/[id]/+page.svelte');
 		const source = readFileSync(pagePath, 'utf-8');
 		expect(source).toContain('NodeStylePanel');
 		expect(source).toContain('selectedEditNodeId');
 	});
 
 	it('diagram page listens for nodestylechange events', () => {
-		const pagePath = resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte');
+		const pagePath = resolve(__dirname, '../../src/routes/views/[id]/+page.svelte');
 		const source = readFileSync(pagePath, 'utf-8');
 		expect(source).toContain('nodestylechange');
 	});
 
 	it('diagram page handles node resize events and marks dirty', () => {
-		const pagePath = resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte');
+		const pagePath = resolve(__dirname, '../../src/routes/views/[id]/+page.svelte');
 		const source = readFileSync(pagePath, 'utf-8');
 		expect(source).toContain('noderesizeend');
 	});

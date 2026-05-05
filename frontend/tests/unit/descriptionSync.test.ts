@@ -10,7 +10,7 @@ import { resolve } from 'path';
 
 describe('Node description sync', () => {
 	const pageSrc = readFileSync(
-		resolve(__dirname, '../../src/routes/diagrams/[id]/+page.svelte'),
+		resolve(__dirname, '../../src/routes/views/[id]/+page.svelte'),
 		'utf-8',
 	);
 

@@ -56,7 +56,7 @@
 		const id = t.getAttribute('data-iris-id');
 		if (!kind || !id) return;
 		e.preventDefault();
-		const path = kind === 'diagram' ? `/diagrams/${id}` : `/elements/${id}`;
+		const path = kind === 'diagram' ? `/views/${id}` : `/elements/${id}`;
 		goto(path);
 	}
 

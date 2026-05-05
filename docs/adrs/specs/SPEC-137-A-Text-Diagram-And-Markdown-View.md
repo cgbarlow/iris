@@ -185,3 +185,123 @@ TreeNode covers the dashboard hierarchy where it matters most).
 - Bidirectional "what references this" graph — defer until needed.
 - Markdown extensions beyond stock marked output.
 - Collaborative editing OT/CRDT.
+
+## Amendment 2026-05-05 — UAT follow-ups (issue #27)
+
+This amendment records the implementation surfaces for the seven
+follow-up items captured in the ADR-137 amendment (sections A–G).
+
+### A. Mark-dirty in the markdown editor
+
+`frontend/src/routes/views/[id]/+page.svelte` — `oncontentchange`
+callback on the `<TextCanvas>` instance now sets `canvasDirty = true`
+in addition to writing `diagram.data.content`. The toolbar Save
+button (which gates on `!canvasDirty`) now enables the moment the
+user types.
+
+### B. Persist content (not nodes/edges) for Text views
+
+`saveCanvas()` builds the request body's `data` field via:
+
+```ts
+const data = canvasType === 'text'
+  ? { content: markdownContent }
+  : { nodes: canvasNodes, edges: canvasEdges };
+```
+
+`canvasType === 'text'` already exists for the canvas-vs-text
+rendering branch — we reuse it for the save branch.
+
+### C. Cursor-position markdown insertion
+
+`frontend/src/lib/canvas/text/TextCanvas.svelte` adds a new
+`textareaEl` prop declared with `$bindable()`. The internal
+`<textarea>` binds its DOM element via `bind:this={textareaEl}`. The
+parent page binds it back as `bind:textareaEl={textTextareaEl}`.
+
+The parent then provides a single helper:
+
+```ts
+function insertMarkdownAtCursor(snippet: string) {
+  // splice at selectionStart..selectionEnd, fall back to append
+  // restore cursor + focus via queueMicrotask
+}
+```
+
+The three add/link button handlers (`handleAddElement`,
+`handleLinkElement`, `handleInsertDiagram`) each gain a one-shot
+`canvasType === 'text'` branch that calls `insertMarkdownAtCursor`
+with the appropriate `[name](iris://kind/<id>)` snippet.
+
+### D. NotationPills now includes Markdown
+
+Covered by SPEC-136-A amendment (NotationPills lists all seven
+notations).
+
+### E. Frontend rename — `/diagrams` → `/views`
+
+| Surface                              | Change |
+|---|---|
+| `src/routes/diagrams/+page.svelte`   | git-renamed to `src/routes/views/+page.svelte` |
+| `src/routes/diagrams/[id]/+page.svelte` | git-renamed to `src/routes/views/[id]/+page.svelte` |
+| `src/routes/diagrams/+page.ts`       | New stub: `redirect(308, '/views' + url.search + url.hash)` |
+| `src/routes/diagrams/[id]/+page.ts`  | New stub: `redirect(308, '/views/' + params.id + url.search + url.hash)` |
+| `src/routes/+page.svelte` (Dashboard) | Cards/labels: "Diagrams" → "Views"; "Diagram Hierarchy" → "View Hierarchy"; nav target `/views`; search placeholder updated |
+| `src/lib/components/AppShell.svelte` | Menu item `/views`, label "Views" |
+| `src/lib/components/MarkdownView.svelte` | Internal `goto` for `iris://diagram/<id>` clicks now goes to `/views/<id>` |
+| `src/lib/components/TreeNode.svelte` | `nodeHref` builds `/views/<id>` for non-package nodes |
+| `src/lib/canvas/nodes/ModelRefNode.svelte` | "View diagram" link target `/views/<id>` |
+| `src/lib/canvas/controls/EntityDetailPanel.svelte` | Linked-diagram button targets `/views/<id>`; "Open Linked Diagram" → "Open Linked View" |
+| Page detail `recordVisit({ href })`  | Stored history entries point at `/views/<id>` |
+| `src/routes/elements/[id]/+page.svelte` | "Used in" links go to `/views/<id>` |
+| `src/routes/bookmarks/+page.svelte`  | Bookmarked-diagram links go to `/views/<id>` |
+| `src/routes/import/+page.svelte`     | "View Diagrams" CTA → "Browse Views"; href `/views` |
+| `src/routes/packages/[id]/+page.svelte` | After child create, `goto('/views/<id>')` |
+| `src/lib/components/SetQA.svelte`    | After AI applies a primary diagram, `goto('/views/<id>')` |
+| `src/lib/components/DiagramDialog.svelte` | Field label "Diagram Type" → "View Type"; markdown notation type entry "Text Document" → "Text" |
+
+The dialog filename, the underlying types (`Diagram`,
+`DiagramHierarchyNode`), the API URLs (`/api/diagrams/...`), the
+`diagram` column in `recordVisit.type`, and all backend code keep the
+`diagram` term — the rename is strictly user-facing.
+
+### F. `HierarchyControls` (shared component)
+
+New `frontend/src/lib/components/HierarchyControls.svelte` renders
+two dropdowns: **+ New** (View | Package) and **Show** (Diagrams
+checkbox + Text checkbox + an explanatory note that packages are
+always shown).
+
+Adopted by:
+
+- Dashboard hierarchy panel — replaces the inline "+ New" submenu and
+  removes the temporary `View → Diagram | Text` flattening that
+  v5.1.0 shipped (the notation pill in the Create dialog now drives
+  the choice).
+- Views index toolbar — replaces the standalone "New Diagram" + "New
+  Package" buttons.
+
+`TreeNode` gains `showDiagrams: boolean` and `showText: boolean`
+props (default `true`), with a derived `passesKindFilter` that hides
+leaf nodes whose kind is toggled off. Packages always pass.
+
+The Dashboard's existing Reorder button is preserved with a clearer
+tooltip ("Reorder — drag tree items to change their position").
+
+### G. EntityDialog scopes the notation pill
+
+`frontend/src/lib/canvas/controls/EntityDialog.svelte` passes
+`notations={['simple','uml','archimate','c4','bpmn','doview']}` to
+`<NotationPills>` — `markdown` is intentionally absent because text
+views do not have entities.
+
+### Tests added
+
+| File                                                          | Coverage |
+|---|---|
+| `frontend/tests/unit/notationPillsCoverage.test.ts`           | Every notation key in `DiagramDialog.NOTATION_TYPE_FALLBACK` appears in `NotationPills.ALL_NOTATIONS` (catches issue #27 root cause). |
+| `frontend/tests/unit/textCanvasSavePersistence.test.ts`       | Detail page `saveCanvas` branches on `canvasType === 'text'` and persists `data: { content: markdownContent }`; `oncontentchange` callback flips `canvasDirty = true`. |
+| `frontend/tests/unit/textCanvasInsertLink.test.ts`            | `TextCanvas` exposes `$bindable()` `textareaEl`; parent page defines `insertMarkdownAtCursor` and the three handlers branch on text mode to call it with `iris://element/` and `iris://diagram/` snippets. |
+| `frontend/tests/unit/docrefSelectorPolling.test.ts`           | Optimistic `importing` flip + 3 s polling while any document is `importing` + cleanup on teardown. |
+| `frontend/tests/unit/viewsRedirect.test.ts`                   | `/diagrams/+page.ts` and `/diagrams/[id]/+page.ts` redirect (308) to the `/views` equivalents preserving query + hash. |
+| `frontend/tests/unit/hierarchyControls.test.ts`               | Component renders the two dropdowns and emits `oncreateview` / `oncreatepackage` / `onShowDiagrams` / `onShowText`. |

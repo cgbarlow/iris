@@ -139,3 +139,54 @@ applied — no data loss to recover from.
   fix.
 - Backfill from any prior misconfiguration. There was no prior schema
   to backfill from.
+
+## Amendment 2026-05-05 — fire-and-forget import (issue #27)
+
+### Surface change
+
+- `backend/app/docref/router.py::import_document` returns **HTTP 202**
+  immediately. The async work is launched via `asyncio.create_task`
+  inside the route handler.
+- `backend/app/docref/service.py` adds `start_import_document(db, id)`
+  which marks status `importing` and commits, and returns a result
+  matching `DocRefImportResponse` with `chunk_count=0`. The original
+  `import_document(...)` is preserved unchanged for the background
+  task and existing tests.
+- `frontend/src/lib/components/DocRefSelector.svelte`:
+  - Optimistically flips the clicked document to `importing` so the
+    spinner shows the moment the click handler fires.
+  - After the POST returns, polls `/api/docref/documents` every 3 s
+    while any row has `status === 'importing'`; clears the timer on
+    component teardown.
+  - Removes the now-unreachable "Import failed" error path that
+    previously fired on edge-timeout 502s — the request can no
+    longer time out because the heavy lifting runs off-thread.
+
+### Why a background task and not BackgroundTasks (FastAPI)
+
+`fastapi.BackgroundTasks` runs **after** the response is sent but
+before the worker frees up — it would still hold the request worker
+for the duration of the import. `asyncio.create_task` from inside the
+handler hands the work to the event loop and returns the response
+straight away, freeing the worker. This matches the existing pattern
+for the post-install DocRef index refresh in
+`extensions/router.py`.
+
+### Why poll instead of SSE/WebSockets
+
+DocRef imports are infrequent (admins, occasional). Polling every 3 s
+while a single dropdown is open costs nothing meaningful and avoids a
+new transport channel. SSE/WebSockets become attractive if/when we
+have many concurrent long-running tasks across many users — not the
+DocRef shape today.
+
+### Verification
+
+- Backend unit test (preserved): existing
+  `backend/tests/test_docref/test_service.py` tests still pass against
+  `import_document` directly.
+- Frontend behavioural test (added):
+  `frontend/tests/unit/docrefSelectorPolling.test.ts` reads the
+  component source and asserts (a) it sets `status: 'importing'`
+  optimistically, (b) it schedules a poll while any document is
+  importing, (c) it clears the timer on teardown.

@@ -24,6 +24,8 @@
 		oncontentchange?: (content: string) => void;
 		/** Called whenever the heading list updates — wire to MarkdownToc. */
 		onheadings?: (headings: TocHeading[]) => void;
+		/** Two-way binding to the underlying textarea so the parent can insert markdown links at the cursor. */
+		textareaEl?: HTMLTextAreaElement;
 	}
 
 	let {
@@ -32,6 +34,7 @@
 		textDiagramIds,
 		oncontentchange,
 		onheadings,
+		textareaEl = $bindable(),
 	}: Props = $props();
 
 	function onInput(e: Event) {
@@ -44,6 +47,7 @@
 <div class="text-canvas" data-mode={editing ? 'edit' : 'view'}>
 	{#if editing}
 		<textarea
+			bind:this={textareaEl}
 			class="text-canvas__editor"
 			value={content ?? ''}
 			oninput={onInput}

@@ -474,6 +474,34 @@
 	let markdownContent = $derived((diagram?.data?.content as string | undefined) ?? '');
 	let textHeadings = $state<TocHeading[]>([]);
 	let showTocDrawer = $state(false);
+	/** Bound to the textarea inside TextCanvas so we can insert markdown links at the cursor. */
+	let textTextareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
+
+	/** Insert markdown text at the current cursor in the Text editor (issue #27). */
+	function insertMarkdownAtCursor(snippet: string) {
+		if (!diagram) return;
+		const ta = textTextareaEl;
+		const current = (diagram.data?.content as string | undefined) ?? '';
+		let next: string;
+		let cursor: number;
+		if (ta) {
+			const start = ta.selectionStart ?? current.length;
+			const end = ta.selectionEnd ?? current.length;
+			next = current.slice(0, start) + snippet + current.slice(end);
+			cursor = start + snippet.length;
+		} else {
+			next = current + (current.endsWith('\n') || current.length === 0 ? '' : '\n') + snippet;
+			cursor = next.length;
+		}
+		diagram.data = { ...(diagram.data ?? {}), content: next };
+		canvasDirty = true;
+		queueMicrotask(() => {
+			if (textTextareaEl) {
+				textTextareaEl.focus();
+				textTextareaEl.setSelectionRange(cursor, cursor);
+			}
+		});
+	}
 
 	/** Notation for UnifiedCanvas context. */
 	const notation = $derived<NotationType>(
@@ -508,7 +536,7 @@
 				areThemesLoaded() ? Promise.resolve() : loadThemes(),
 			]);
 			diagram = diagramResult;
-			recordVisit({ id: diagram.id, type: 'diagram', name: diagram.name, detail: diagram.diagram_type, setId: diagram.set_id ?? undefined, setName: diagram.set_name ?? undefined, description: diagram.description ?? undefined, href: `/diagrams/${diagram.id}` });
+			recordVisit({ id: diagram.id, type: 'diagram', name: diagram.name, detail: diagram.diagram_type, setId: diagram.set_id ?? undefined, setName: diagram.set_name ?? undefined, description: diagram.description ?? undefined, href: `/views/${diagram.id}` });
 			parseCanvasData();
 			// Smart default tab: show details if no canvas content
 			if (!userSelectedTab) {
@@ -643,7 +671,7 @@
 			});
 			showCreateChildDialog = false;
 			await loadHierarchyTree();
-			await goto(`/diagrams/${created.id}`);
+			await goto(`/views/${created.id}`);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to create child diagram';
 		}
@@ -901,7 +929,7 @@
 				headers: { 'If-Match': String(diagram.current_version) },
 			});
 			showDeleteDialog = false;
-			await goto('/diagrams');
+			await goto('/views');
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to delete diagram';
 		}
@@ -922,7 +950,7 @@
 				body: JSON.stringify(body),
 			});
 			showCloneDialog = false;
-			await goto(`/diagrams/${created.id}`);
+			await goto(`/views/${created.id}`);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to clone diagram';
 		}
@@ -971,6 +999,11 @@
 					notation: effectiveNotation,
 				}),
 			});
+			if (canvasType === 'text') {
+				insertMarkdownAtCursor(`[${name}](iris://element/${created.id})`);
+				showAddElement = false;
+				return;
+			}
 			const id = crypto.randomUUID();
 			const newNode: CanvasNode = {
 				id,
@@ -1274,7 +1307,7 @@
 		const node = canvasNodes.find((n) => n.id === nodeId) ?? null;
 		// If the node is a diagram reference, navigate to it
 		if (node?.data?.linkedModelId) {
-			goto(`/diagrams/${node.data.linkedModelId}`);
+			goto(`/views/${node.data.linkedModelId}`);
 			return;
 		}
 		selectedBrowseNode = node;
@@ -1305,13 +1338,19 @@
 			const metadata = activeTheme && !diagram.metadata?.theme_id
 				? { ...(diagram.metadata ?? {}), theme_id: activeTheme }
 				: diagram.metadata;
+			// Text-class diagrams (issue #26 / #27): persist markdown source rather
+			// than nodes/edges, otherwise the save wipes diagram.data.content and
+			// the browse view shows an empty canvas.
+			const data = canvasType === 'text'
+				? { content: markdownContent }
+				: { nodes: canvasNodes, edges: canvasEdges };
 			await apiFetch(`/api/diagrams/${diagram.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(diagram.current_version) },
 				body: JSON.stringify({
 					name: diagram.name,
 					description: diagram.description ?? '',
-					data: { nodes: canvasNodes, edges: canvasEdges },
+					data,
 					metadata,
 					change_summary: 'Updated diagram',
 				}),
@@ -1331,6 +1370,11 @@
 	}
 
 	function handleLinkElement(element: Element) {
+		if (canvasType === 'text') {
+			insertMarkdownAtCursor(`[${element.name}](iris://element/${element.id})`);
+			showElementPicker = false;
+			return;
+		}
 		const id = crypto.randomUUID();
 		const elementType = element.element_type as SimpleEntityType;
 		const newNode: CanvasNode = {
@@ -1353,6 +1397,11 @@
 	}
 
 	function handleInsertDiagram(linkedDiagram: Diagram) {
+		if (canvasType === 'text') {
+			insertMarkdownAtCursor(`[${linkedDiagram.name}](iris://diagram/${linkedDiagram.id})`);
+			showDiagramPicker = false;
+			return;
+		}
 		const id = crypto.randomUUID();
 		const newNode: CanvasNode = {
 			id,
@@ -1703,13 +1752,13 @@
 </script>
 
 <svelte:head>
-	<title>{diagram?.name ?? 'Diagram Detail'} — Iris</title>
+	<title>{diagram?.name ?? 'View Detail'} — Iris</title>
 </svelte:head>
 
 {#if loading}
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
 		<ol class="flex flex-wrap items-baseline gap-1">
-			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
+			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
 			<li aria-hidden="true">/</li>
 			<li aria-current="page">{page.params.id}</li>
 		</ol>
@@ -1718,7 +1767,7 @@
 {:else if error}
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
 		<ol class="flex flex-wrap items-baseline gap-1">
-			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
+			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
 			<li aria-hidden="true">/</li>
 			<li aria-current="page">{page.params.id}</li>
 		</ol>
@@ -1755,11 +1804,11 @@
 	<div style={(windowedBrowseSidebar || windowedCommentsSidebar) ? 'margin-right: 316px; margin-bottom: -24px; transition: margin-right 0.15s ease;' : 'margin-bottom: -24px; transition: margin-right 0.15s ease;'}>
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
 		<ol class="flex flex-wrap items-baseline gap-1">
-			<li><a href="/diagrams" style="color: var(--color-primary)">Diagrams</a></li>
+			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
 			{#each ancestors as ancestor}
 				<li class="flex items-baseline gap-1">
 					<span aria-hidden="true">/</span>
-					<a href="/diagrams/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
+					<a href="/views/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
 				</li>
 			{/each}
 			<li class="flex items-baseline gap-1">
@@ -2599,7 +2648,7 @@
 							class="rounded px-3 py-1.5 text-sm"
 							style="background-color: var(--color-primary); color: white"
 						>
-							Edit Canvas
+							{canvasType === 'text' ? 'Edit' : 'Edit Canvas'}
 						</button>
 					{/if}
 					<!-- View group (always visible) -->
@@ -2769,11 +2818,13 @@
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 							<TextCanvas
+								bind:textareaEl={textTextareaEl}
 								content={markdownContent}
 								editing={editing}
 								oncontentchange={(c) => {
 									if (diagram) {
 										diagram.data = { ...(diagram.data ?? {}), content: c };
+										canvasDirty = true;
 									}
 								}}
 								onheadings={(h) => (textHeadings = h)}
@@ -3023,7 +3074,7 @@
 									<td class="py-2" style="color: var(--color-fg)">{isSource ? 'Outgoing' : 'Incoming'}</td>
 									<td class="py-2">
 										<a
-											href="/diagrams/{isSource ? rel.target_package_id : rel.source_package_id}"
+											href="/views/{isSource ? rel.target_package_id : rel.source_package_id}"
 											style="color: var(--color-primary)"
 										>
 											{isSource ? rel.target_name : rel.source_name}

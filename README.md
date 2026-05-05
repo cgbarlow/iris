@@ -121,7 +121,7 @@ Four colour modes with WCAG-compliant contrast ratios:
 ### Collections & Sets
 
 - **Collections** — optional higher-level grouping for Sets; a Set can belong to one Collection for cross-set organisation and filtering
-- **Collection-scoped filtering** — Collection dropdown on Diagrams, Elements, and Ask AI pages cascades to filter available Sets
+- **Collection-scoped filtering** — Collection dropdown on Views, Elements, and Ask AI pages cascades to filter available Sets
 - **Multi-set AI context** — Ask AI supports selecting multiple Sets (with or without a Collection) as context for Q&A and diagram creation
 - **AI "Create Diagram" across all five notations** — the guided creation flow (ADR-094/ADR-132) now supports DoView (outcomes_map, overview), Simple (component, roadmap, free-form), UML (sequence, class), ArchiMate (process), and C4 (deployment). Pick a notation and (for non-DoView) a diagram type; the AI walks through setup questions, structure confirmation, content confirmation, then generates the diagram(s) end-to-end
 - **Session file upload** — Upload PDF, DOCX, XLSX, PPTX, CSV, or text files on the Ask AI Context tab as ephemeral AI context (extracted text, not stored)

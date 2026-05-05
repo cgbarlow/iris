@@ -1,6 +1,6 @@
 # ADR-136: BPMN 2.0 notation
 
-Status: Accepted (2026-05-04)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issue #27)
 
 ## Context
 
@@ -158,3 +158,31 @@ touched.
   template followed by this ADR.
 - [SPEC-136-A](specs/SPEC-136-A-BPMN-Notation.md) — element
   catalogue, theme, validation rules, and full UX spec.
+
+## Amendment 2026-05-05 — surface BPMN in Create dialog (issue #27)
+
+UAT noted that BPMN was nowhere to be found in the Create dialog —
+"I did not see BPMN notation listed when creating a new diagram/view,
+not sure how to create BPMN artefacts."
+
+The cause was that the v5.1.0 work updated the registry, the renderer,
+the palette, the MCP, the AI seed, and the `DiagramDialog` fallback
+type list — but missed the **`NotationPills` component itself**, which
+hard-coded a five-entry list (Simple, UML, ArchiMate, C4, DoView).
+DoView shipped fine because it happened to be in that list; BPMN
+silently fell off the picker.
+
+**Decision:** make `NotationPills` the single source of truth for
+which notations are user-pickable, listing all seven (Simple, UML,
+ArchiMate, C4, **BPMN**, DoView, Markdown). Callers can still scope
+the visible pills via an optional `notations` prop — `EntityDialog`
+uses this to exclude `markdown`, since text views have no entities to
+add.
+
+The Views index notation filter dropdown gained the same two missing
+entries (BPMN, Markdown) for consistency.
+
+This is a one-line root cause that would have been caught earlier by
+a test asserting "every registered notation is rendered in
+NotationPills". A unit test against the registry vs. the pill list now
+exists to prevent regression.

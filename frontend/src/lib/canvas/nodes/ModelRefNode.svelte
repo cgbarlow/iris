@@ -26,7 +26,7 @@
 	{/if}
 	{#if data.browseMode && data.linkedModelId}
 		<a
-			href="/diagrams/{data.linkedModelId}"
+			href="/views/{data.linkedModelId}"
 			class="canvas-node__browse-link"
 			aria-label="View {data.label} diagram"
 		>
