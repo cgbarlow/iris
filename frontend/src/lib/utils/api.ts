@@ -70,8 +70,11 @@ export async function apiFetch<T>(
 	options: RequestInit = {},
 ): Promise<T> {
 	const token = getAccessToken();
+	// v5.4.0 (#7): skip the default JSON Content-Type for FormData bodies
+	// so the browser sets `multipart/form-data; boundary=…` automatically.
+	const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
+		...(isFormData ? {} : { 'Content-Type': 'application/json' }),
 		...(options.headers as Record<string, string>),
 	};
 

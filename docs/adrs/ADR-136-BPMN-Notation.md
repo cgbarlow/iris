@@ -1,6 +1,6 @@
 # ADR-136: BPMN 2.0 notation
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33, #37, #37-reopen)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33, #37, #37-reopen) and 2026-05-06 (v5.4.0 BPMN-as-Elements + UI polish)
 
 ## Context
 
@@ -357,3 +357,111 @@ established pattern.
   asserting `useSvelteFlow` was *called* but not in what context.
   v5.3.1 tightens the assertion to *forbid* the call at script level
   in UnifiedCanvas — the right shape of regression guard.
+
+## Amendment 2026-05-06 — BPMN-as-Elements alignment + UI polish (v5.4.0)
+
+UAT against v5.3.x surfaced an architectural divergence and seven UI
+issues against the BPMN authoring shell. The headline decision is
+**BPMN nodes are now Iris Elements** (matching every other notation):
+adding a Task / Event / Gateway etc. POSTs `/api/elements` first and
+stores `entityId` on the canvas node. BPMN content joins the rest of
+the platform — search, knowledge graph, tags, comments, versioning,
+and `iris://element/<id>` references all start working.
+
+### A. BPMN-as-Elements (architectural)
+
+Pre-v5.4 every other notation's `handleAddElement` POSTed
+`/api/elements` and stored the resulting Element id on the canvas
+node. BPMN was the outlier — `BpmnAuthoringShell::makeBpmnNode`
+generated a node with no `entityId`, so BPMN content was invisible to
+search/graph/tagging/etc.
+
+Fix: a new `createBpmnElement(entityKey, name)` helper in the shell.
+All four node-creation paths route through it — drag-from-palette,
+drop-on-canvas, CommandPalette `create`/`append`, ContextPad-append,
+and the EventMatrixPicker create flow. `replace` mode in
+`handleCmdPick` PUTs `/api/elements/<id>` to update the existing
+Element's `element_type` rather than creating a new one. PropertyPanel
+edits (label/description) call `updateBpmnElement(entityId, patch)`
+fire-and-forget so the Element row stays in sync with the canvas.
+
+This is the architecturally correct shape — BPMN data lives in the
+same place every other notation's data lives.
+
+### B. Per-entity-type node sizing
+
+Pre-v5.4 every BPMN node was created with `width: 200`. Visually:
+- Events render as 56×56 circles (`.bpmn-event-wrap` CSS) — bounding
+  box extended ~150px past the circle.
+- Gateways same (56×56 diamonds).
+- Data objects 48×64.
+- Pools/lanes are large containers (240×120+).
+
+The over-wide bounding box pushed `<NodeToolbar>` (ContextPad) far to
+the right of the actual shape, making the action buttons feel
+disconnected and giving the user the impression they were clicking
+the connection-handle dots instead of pad buttons.
+
+Fix: a `BPMN_NODE_DIMENSIONS` lookup with per-entity-type widths +
+heights that match the renderer CSS. `makeBpmnNode` reads from it.
+The page's BPMN-trio handlers (Add Element / Add Diagram, see §G)
+duplicate the lookup as `bpmnDimsFor()` until a v5.5 refactor moves
+the constant into `$lib/types/canvas.ts`.
+
+### C. ContextPad bring-forward / send-backward
+
+When pools and lanes stack, the user previously had no z-order
+control. ContextPad gains two new actions (`bring_forward` ↑ /
+`send_backward` ↓). Shell handler computes max/min `zIndex` of other
+nodes and assigns +1/-1 — the optional `zIndex` field on xyflow's
+`Node` type is honoured by SvelteFlow's renderer.
+
+### D. Lane-on-pool parent detection
+
+`validateBpmn::lane_outside_pool` walks `parentId` correctly, but
+xyflow doesn't auto-set `parentId` when a lane is dragged onto a pool
+visually. The `lane_outside_pool` error fired even when the user had
+clearly dropped the lane inside the pool.
+
+Fix: a new `onnodedragstop` prop on `<UnifiedCanvas>` forwarded to
+xyflow. The shell's `handleBpmnDragStop` hit-tests the dragged lane's
+centre against pool rectangles; on hit, `parentId` is set and the
+error clears.
+
+### E. ProblemsPanel scroll containment
+
+`.bpmn-shell__problems` had `overflow: hidden` so the inner list's
+`overflow-y: auto` was clipped. Long problem lists scrolled the
+whole page instead of the panel. Fix: `overflow-y: auto` on the
+wrapper.
+
+### F. Theme-selector hidden on BPMN
+
+Theme is fixed for BPMN by the m043 `bpmn-default` seed; the
+ThemeSelector is irrelevant. Same on Text views (no canvas to
+theme). Both are now gated.
+
+### G. Add Element / Link Element / Add Diagram on BPMN
+
+The trio toolbar previously rendered only on the canvas `{:else}`
+branch — invisible on BPMN. Now rendered above `<BpmnAuthoringShell>`
+when `notation === 'bpmn' && editing`. Page-level handlers branch on
+`canvasType === 'bpmn'`:
+
+- **Add Element** opens `EntityDialog` with notation pinned to BPMN.
+  Result POSTs `/api/elements` and adds a canvas node with the right
+  `BPMN_NODE_DIMENSIONS` and `BPMN_DEFAULT_DISCRIMINATORS` payload.
+- **Link Element** opens `ElementPicker`. If a node is selected, sets
+  `entityId` on it; if no node selected, surfaces a helpful error.
+- **Add Diagram** opens `DiagramPicker`. Result places a `call_activity`
+  BPMN node (BPMN-standard sub-process reference) with `linkedModelId`
+  pointing at the picked diagram.
+
+### Out of scope (deferred to v5.5+)
+
+- Refactoring `BPMN_NODE_DIMENSIONS` + `BPMN_DEFAULT_DISCRIMINATORS`
+  into `$lib/types/canvas.ts` so the page and shell share a single
+  source. Both currently maintain the same lookup; mismatches would
+  show up in tests.
+- A bulk "select multiple → bring to front" action.
+- Auto-detection of nested swimlanes (lane-in-lane).

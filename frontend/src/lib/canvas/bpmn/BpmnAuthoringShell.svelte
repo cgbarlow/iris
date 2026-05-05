@@ -23,6 +23,8 @@
 	import ProblemsPanel from '$lib/canvas/validation/ProblemsPanel.svelte';
 	import BpmnToast from '$lib/canvas/bpmn/BpmnToast.svelte';
 	import { canConnect } from '$lib/canvas/validation/bpmnRules';
+	import { apiFetch, ApiError } from '$lib/utils/api';
+	import type { Element } from '$lib/types/api';
 	import {
 		BPMN_DEFAULT_DISCRIMINATORS,
 		type BpmnEntityType,
@@ -40,6 +42,9 @@
 		preferredThemeId?: string;
 		selectedEditNodeId: string | null;
 		history: ReturnType<typeof createCanvasHistory>;
+		/** v5.4.0 (#13): the diagram's set_id, used when POSTing /api/elements
+		 *  so the backing Iris Element lands in the right repository scope. */
+		setId?: string | null;
 		oncanvasdirty?: () => void;
 		onnodeselect?: (id: string | null) => void;
 		onedgeselect?: (id: string | null) => void;
@@ -52,6 +57,7 @@
 		preferredThemeId,
 		selectedEditNodeId = $bindable(null),
 		history,
+		setId,
 		oncanvasdirty,
 		onnodeselect,
 		onedgeselect,
@@ -95,25 +101,112 @@
 	// ────────────────────────────────────────────────────────────────────
 	// Drop / palette / command palette → create node
 	// ────────────────────────────────────────────────────────────────────
+
+	/**
+	 * v5.4.0 (#2/#4): per-entity-type node dimensions. Pre-v5.4 every BPMN
+	 * node was created with `width: 200`, which is correct for tasks but
+	 * wrong for events (visually 56×56 — see BpmnRenderer's `.bpmn-event-wrap`
+	 * CSS), gateways (56×56), data objects (48×64), pools (wide containers),
+	 * etc. The over-wide bounding box pushed ContextPad far to the right of
+	 * the actual shape. These widths match the CSS in BpmnRenderer.svelte.
+	 */
+	const BPMN_NODE_DIMENSIONS: Record<BpmnEntityType, { width: number; height: number }> = {
+		task:               { width: 200, height: 80 },
+		subprocess:         { width: 200, height: 80 },
+		call_activity:      { width: 200, height: 80 },
+		event_start:        { width: 56,  height: 56 },
+		event_intermediate: { width: 56,  height: 56 },
+		event_end:          { width: 56,  height: 56 },
+		event_boundary:     { width: 56,  height: 56 },
+		gateway:            { width: 56,  height: 56 },
+		pool:               { width: 600, height: 200 },
+		lane:               { width: 560, height: 100 },
+		data_object:        { width: 48,  height: 64 },
+		data_store:         { width: 64,  height: 64 },
+		group:              { width: 240, height: 140 },
+		text_annotation:    { width: 160, height: 56 },
+	};
+
+	/** v5.4.0 (#13): every BPMN node is now backed by an Iris Element —
+	 *  POSTs /api/elements with notation='bpmn' and stores the resulting
+	 *  Element id (the canonical Iris entity id) on the node so the rest
+	 *  of the platform (search, knowledge graph, tags, comments,
+	 *  iris://element/<id> refs) can find it. Mirrors the page-level
+	 *  handleAddElement pattern at views/[id]/+page.svelte. */
+	async function createBpmnElement(
+		entityKey: BpmnEntityType,
+		name: string,
+	): Promise<Element | null> {
+		const body: Record<string, unknown> = {
+			element_type: entityKey,
+			name,
+			description: '',
+			data: {},
+			notation: 'bpmn',
+		};
+		if (setId) body.set_id = setId;
+		try {
+			return await apiFetch<Element>('/api/elements', {
+				method: 'POST',
+				body: JSON.stringify(body),
+			});
+		} catch (e) {
+			toastMessage = e instanceof ApiError ? `Couldn't save element: ${e.message}` : "Couldn't save element — check connection.";
+			return null;
+		}
+	}
+
+	/** v5.4.0 (#13): keep the backing Element in sync when the user edits
+	 *  label/description in PropertyPanel. Best-effort — failures don't block
+	 *  the canvas-level update. Reuses the existing /api/elements PUT shape
+	 *  with If-Match for optimistic concurrency (matches handleEditElementSave). */
+	async function updateBpmnElement(
+		entityId: string,
+		patch: { name?: string; description?: string; element_type?: string },
+	): Promise<void> {
+		if (!entityId) return;
+		try {
+			const current = await apiFetch<Element>(`/api/elements/${entityId}`);
+			await apiFetch(`/api/elements/${entityId}`, {
+				method: 'PUT',
+				headers: { 'If-Match': String(current.current_version) },
+				body: JSON.stringify({
+					element_type: patch.element_type ?? current.element_type,
+					name: patch.name ?? current.name,
+					description: patch.description ?? current.description ?? '',
+					data: current.data,
+					notation: current.notation,
+				}),
+			});
+		} catch {
+			// Best-effort; canvas save will reconcile later.
+		}
+	}
+
 	function makeBpmnNode(
 		entityKey: BpmnEntityType,
 		position: { x: number; y: number },
+		options: { id?: string; label?: string; entityId?: string } = {},
 	): CanvasNode {
-		const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-			? crypto.randomUUID()
-			: `bpmn-${Math.random().toString(36).slice(2, 10)}`;
+		const id = options.id
+			?? ((typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+				? crypto.randomUUID()
+				: `bpmn-${Math.random().toString(36).slice(2, 10)}`);
 		// CanvasNodeData.entityType is typed narrowly as SimpleEntityType but
 		// stores values from every notation in practice (UML/ArchiMate/C4/DoView/BPMN).
 		// Cast through unknown matches the existing pattern elsewhere in the
 		// codebase for cross-notation entityType assignments.
+		const dims = BPMN_NODE_DIMENSIONS[entityKey] ?? { width: 200, height: 80 };
 		return {
 			id,
 			type: entityKey,
 			position,
-			width: 200,
+			width: dims.width,
+			height: dims.height,
 			data: {
-				label: humanLabel(entityKey),
+				label: options.label ?? humanLabel(entityKey),
 				entityType: entityKey,
+				entityId: options.entityId,
 				notation: 'bpmn',
 				data: { ...(BPMN_DEFAULT_DISCRIMINATORS[entityKey] ?? {}) },
 			},
@@ -149,7 +242,7 @@
 		return { x: 60, y: 60 };
 	}
 
-	function createNode(entityKey: BpmnEntityType, atPosition?: { x: number; y: number }) {
+	async function createNode(entityKey: BpmnEntityType, atPosition?: { x: number; y: number }) {
 		// Events have a 6×10 trigger × position matrix — route through the
 		// matrix picker so the user picks a meaningful variant rather than
 		// taking the default. Skip for boundary events that came from the
@@ -161,8 +254,15 @@
 			return;
 		}
 		const pos = atPosition ?? findOpenPosition();
+		// v5.4.0 (#13): create the backing Iris Element first; abort if it fails.
+		const label = humanLabel(entityKey);
+		const element = await createBpmnElement(entityKey, label);
+		if (!element) return;
 		pushHistory();
-		canvasNodes = [...canvasNodes, makeBpmnNode(entityKey, pos)];
+		canvasNodes = [
+			...canvasNodes,
+			makeBpmnNode(entityKey, pos, { entityId: element.id, label }),
+		];
 		dirty();
 	}
 
@@ -176,7 +276,7 @@
 		createNode(key as BpmnEntityType, position);
 	}
 
-	function handleEventVariant(variant: {
+	async function handleEventVariant(variant: {
 		entityType: BpmnEntityType;
 		eventTrigger: string;
 		eventDirection?: string;
@@ -185,7 +285,11 @@
 		eventPickerOpen = false;
 		const pos = pendingDropPosition ?? findOpenPosition();
 		pendingDropPosition = null;
-		const node = makeBpmnNode(variant.entityType, pos);
+		// v5.4.0 (#13): backing Element first.
+		const label = humanLabel(variant.entityType);
+		const element = await createBpmnElement(variant.entityType, label);
+		if (!element) return;
+		const node = makeBpmnNode(variant.entityType, pos, { entityId: element.id, label });
 		const data = (node.data as Record<string, unknown>);
 		data.data = {
 			...((data.data as Record<string, unknown> | undefined) ?? {}),
@@ -203,10 +307,10 @@
 	// ────────────────────────────────────────────────────────────────────
 	// CommandPalette: pick → create / append / replace
 	// ────────────────────────────────────────────────────────────────────
-	function handleCmdPick(entry: BpmnEntityTypeInfo, mode: CommandMode) {
+	async function handleCmdPick(entry: BpmnEntityTypeInfo, mode: CommandMode) {
 		if (mode === 'create') {
 			eventPickerContext = 'create';
-			createNode(entry.key);
+			await createNode(entry.key);
 			return;
 		}
 		if (mode === 'append') {
@@ -214,7 +318,11 @@
 			eventPickerContext = 'create';
 			const src = selectedNode;
 			const offset = { x: src.position.x + 280, y: src.position.y };
-			const newNode = makeBpmnNode(entry.key, offset);
+			// v5.4.0 (#13): backing Element first.
+			const label = humanLabel(entry.key);
+			const element = await createBpmnElement(entry.key, label);
+			if (!element) return;
+			const newNode = makeBpmnNode(entry.key, offset, { entityId: element.id, label });
 			pushHistory();
 			canvasNodes = [...canvasNodes, newNode];
 			canvasEdges = [
@@ -233,6 +341,12 @@
 		if (mode === 'replace') {
 			if (!selectedNode) return;
 			pushHistory();
+			// v5.4.0 (#13): mutate the existing Element's element_type rather
+			// than creating a new one — the Element identity follows the node.
+			const entityId = (selectedNode.data as { entityId?: string }).entityId;
+			if (entityId) {
+				updateBpmnElement(entityId, { element_type: entry.key });
+			}
 			canvasNodes = canvasNodes.map((n) => {
 				if (n.id !== selectedNode.id) return n;
 				return {
@@ -269,6 +383,12 @@
 				cmdMode = 'replace';
 				cmdOpen = true;
 				break;
+			case 'bring_forward':
+				adjustZOrder(nodeId, 'forward');
+				break;
+			case 'send_backward':
+				adjustZOrder(nodeId, 'backward');
+				break;
 			case 'delete':
 				deleteNodeById(nodeId);
 				break;
@@ -279,8 +399,78 @@
 		}
 	}
 
-	function appendBpmn(src: CanvasNode, key: BpmnEntityType) {
-		const newNode = makeBpmnNode(key, { x: src.position.x + 280, y: src.position.y });
+	/** v5.4.0 (#5): xyflow doesn't auto-set parentId on visual overlap, so
+	 *  validateBpmn::lane_outside_pool fires even when the user has dragged
+	 *  the lane visually inside a pool. After every drag, hit-test the
+	 *  dragged node against pool bounds and set parentId accordingly. The
+	 *  rule then walks `parentId` and clears the error.
+	 *
+	 *  Only fires on lanes (the only BPMN entity that has a "must-be-inside-
+	 *  parent" constraint per BPMN 2.0). */
+	function handleBpmnDragStop(nodeId: string, position: { x: number; y: number }) {
+		const node = canvasNodes.find((n) => n.id === nodeId);
+		if (!node) return;
+		const entityType = node.data?.entityType as string | undefined;
+		if (entityType !== 'lane') return;
+
+		// Hit-test against every pool's rectangle.
+		const dims = BPMN_NODE_DIMENSIONS.lane;
+		const lx1 = position.x;
+		const ly1 = position.y;
+		const lx2 = position.x + dims.width;
+		const ly2 = position.y + dims.height;
+
+		const pool = canvasNodes.find((p) => {
+			// Cast: data.entityType is typed as SimpleEntityType but stores BPMN values.
+			if ((p.data?.entityType as string) !== 'pool') return false;
+			const pd = BPMN_NODE_DIMENSIONS.pool;
+			const pw = (p as { width?: number }).width ?? pd.width;
+			const ph = (p as { height?: number }).height ?? pd.height;
+			const px2 = p.position.x + pw;
+			const py2 = p.position.y + ph;
+			// Centre-point hit-test (lane is "inside" if its centre falls in the pool).
+			const cx = (lx1 + lx2) / 2;
+			const cy = (ly1 + ly2) / 2;
+			return cx >= p.position.x && cx <= px2 && cy >= p.position.y && cy <= py2;
+		});
+
+		const newParentId = pool?.id ?? null;
+		const currentParentId = (node as { parentId?: string | null }).parentId ?? null;
+		if (newParentId === currentParentId) return; // no change
+
+		pushHistory();
+		canvasNodes = canvasNodes.map((n) =>
+			n.id === nodeId ? ({ ...n, parentId: newParentId } as unknown as CanvasNode) : n,
+		);
+		dirty();
+	}
+
+	/** v5.4.0 (#3): adjust the z-index of a node so the user can stack
+	 *  things (lane on pool, annotation on activity) and reorder. SvelteFlow
+	 *  honours the optional `zIndex` field on Node. */
+	function adjustZOrder(nodeId: string, direction: 'forward' | 'backward') {
+		pushHistory();
+		const others = canvasNodes
+			.filter((n) => n.id !== nodeId)
+			.map((n) => ((n as { zIndex?: number }).zIndex ?? 0));
+		const max = others.length > 0 ? Math.max(...others) : 0;
+		const min = others.length > 0 ? Math.min(...others) : 0;
+		const next = direction === 'forward' ? max + 1 : min - 1;
+		canvasNodes = canvasNodes.map((n) =>
+			n.id === nodeId ? ({ ...n, zIndex: next } as unknown as CanvasNode) : n,
+		);
+		dirty();
+	}
+
+	async function appendBpmn(src: CanvasNode, key: BpmnEntityType) {
+		// v5.4.0 (#13): backing Element first.
+		const label = humanLabel(key);
+		const element = await createBpmnElement(key, label);
+		if (!element) return;
+		const newNode = makeBpmnNode(key, { x: src.position.x + 280, y: src.position.y }, {
+			entityId: element.id,
+			label,
+		});
 		pushHistory();
 		canvasNodes = [...canvasNodes, newNode];
 		canvasEdges = [
@@ -308,6 +498,7 @@
 	// ────────────────────────────────────────────────────────────────────
 	function handlePropChange(id: string, patch: Record<string, unknown>) {
 		pushHistory();
+		const node = canvasNodes.find((n) => n.id === id);
 		canvasNodes = canvasNodes.map((n) => {
 			if (n.id !== id) return n;
 			// Top-level fields the panel knows about: label, description.
@@ -326,6 +517,17 @@
 			return next as CanvasNode;
 		});
 		dirty();
+
+		// v5.4.0 (#13): keep the backing Iris Element in sync. Fire-and-forget;
+		// canvas-level save reconciles failures. Only fires for label/description
+		// — discriminator fields live entirely on the canvas node payload.
+		const entityId = (node?.data as { entityId?: string } | undefined)?.entityId;
+		if (entityId && ('label' in patch || 'description' in patch)) {
+			updateBpmnElement(entityId, {
+				name: 'label' in patch ? (patch.label as string | undefined) : undefined,
+				description: 'description' in patch ? (patch.description as string | undefined) : undefined,
+			});
+		}
 	}
 
 	// ────────────────────────────────────────────────────────────────────
@@ -432,6 +634,7 @@
 				onbeforeconnect={handleBeforeConnect}
 				ondropentity={handleDropEntity}
 				oncontextpadaction={handleContextPadAction}
+				onnodedragstop={handleBpmnDragStop}
 				onnodeselect={(id) => { selectedEditNodeId = id; onnodeselect?.(id); }}
 				onedgeselect={(id) => onedgeselect?.(id)}
 			/>
@@ -499,7 +702,9 @@
 	.bpmn-shell__problems {
 		min-height: 80px;
 		max-height: 200px;
-		overflow: hidden;
+		/* v5.4.0 (#1): the inner ProblemsPanel list scrolls itself; the
+		   wrapper used to clip that scroll, sending overflow up to the page. */
+		overflow-y: auto;
 		border: 1px solid var(--color-border, #d4d4d4);
 		border-radius: 6px;
 		background: var(--color-surface, #fff);

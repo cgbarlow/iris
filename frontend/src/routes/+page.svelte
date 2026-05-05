@@ -512,10 +512,14 @@
 	{/if}
 
 	<!-- Stats -->
-	<div class="mt-6 grid grid-cols-5 gap-4" style="max-width: 1000px">
+	<!-- v5.4.0 (#11): grid is now 4-wide (Packages card removed). -->
+	<!-- v5.4.0 (#12): Collections + Sets cards get a muted-grey background
+		 (`dashboard-card--ambient`) so they read as "scope filters" distinct
+		 from the working-content cards (Views, Elements). -->
+	<div class="mt-6 grid grid-cols-4 gap-4" style="max-width: 1000px">
 		<div
-			class="rounded border p-4 text-center"
-			style="border-color: var(--color-border); color: var(--color-fg)"
+			class="dashboard-card--ambient rounded border p-4 text-center"
+			style="border-color: var(--color-border); color: var(--color-fg); background: var(--color-surface)"
 		>
 			{#if activeCollection}
 				<div class="text-xl font-bold" style="color: var(--color-fg)">{activeCollection.name}</div>
@@ -534,8 +538,8 @@
 			{/if}
 		</div>
 		<div
-			class="rounded border p-4 text-center"
-			style="border-color: var(--color-border); color: var(--color-fg)"
+			class="dashboard-card--ambient rounded border p-4 text-center"
+			style="border-color: var(--color-border); color: var(--color-fg); background: var(--color-surface)"
 		>
 			{#if activeSet}
 				<div class="text-xl font-bold" style="color: var(--color-fg)">{activeSet.name}</div>
@@ -553,16 +557,8 @@
 				</a>
 			{/if}
 		</div>
-		<a
-			href={setId ? `/packages?set_id=${setId}` : collectionId ? `/packages?collection_id=${collectionId}` : '/packages'}
-			class="rounded border p-4 text-center"
-			style="border-color: var(--color-border); color: var(--color-fg)"
-		>
-			<div class="text-3xl font-bold" style="color: var(--color-primary)">{packageCount}</div>
-			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Packages {#if activeSet || activeCollection}(filtered){/if}
-			</div>
-		</a>
+		<!-- v5.4.0 (#11): Packages card removed — the count was redundant
+			 with the hierarchy tree on this page. -->
 		<a
 			href={setId ? `/views?set_id=${setId}` : collectionId ? `/views?collection_id=${collectionId}` : '/views'}
 			class="rounded border p-4 text-center"
