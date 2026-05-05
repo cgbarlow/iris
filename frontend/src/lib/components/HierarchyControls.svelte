@@ -6,6 +6,11 @@
 	 *
 	 *  - "+ New"  → create View | create Package
 	 *  - "Show"   → toggle Diagrams / Text visibility (Packages always shown)
+	 *
+	 * Issue #30: dropdowns anchor `left-0` so the menu extends rightwards
+	 * from the button. `right-0` clipped under the AppShell on the
+	 * Dashboard hierarchy panel because that panel sits flush-left and
+	 * a leftward menu had nowhere to go.
 	 */
 	interface Props {
 		showDiagrams: boolean;
@@ -49,7 +54,7 @@
 		{#if newOpen}
 			<div
 				role="menu"
-				class="absolute right-0 z-50 mt-1 min-w-[160px] rounded border py-1 shadow-lg"
+				class="absolute left-0 z-50 mt-1 min-w-[160px] rounded border py-1 shadow-lg"
 				style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
 			>
 				<button
@@ -86,7 +91,7 @@
 		{#if showOpen}
 			<div
 				role="menu"
-				class="absolute right-0 z-50 mt-1 min-w-[180px] rounded border py-1 shadow-lg"
+				class="absolute left-0 z-50 mt-1 min-w-[180px] rounded border py-1 shadow-lg"
 				style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
 			>
 				<label
