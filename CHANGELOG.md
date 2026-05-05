@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-05-05
+
+BPMN canvas UX integration (issue #37). The six BPMN authoring
+surfaces specified in ADR-136 §UX (`BpmnPalette`, `ContextPad`,
+`CommandPalette`, `EventMatrixPicker`, `PropertyPanel`,
+`ProblemsPanel`) shipped as standalone components in v5.1.0 but were
+never mounted into the canvas — net effect was that BPMN was
+catalogue-only. v5.2.0 wires them in. No new design decisions; this
+is the integration pass for the design that already existed.
+
+### Added
+
+- **BPMN authoring shell** (ADR-136 v5.2.0 amendment, issue #37). New
+  `BpmnAuthoringShell` component renders a 3-column layout (palette /
+  canvas / property panel) with a bottom Problems dock and a
+  fixed-position toast for `canConnect` rejection reasons. Mounted
+  from the views detail page when `notation === 'bpmn' && editing`.
+  Replaces the generic right-panel stack on BPMN views; non-BPMN
+  views are unchanged.
+- **Drag-from-palette node creation**. `BpmnPalette` already emitted
+  `application/iris-bpmn-entity` on drag-start; `UnifiedCanvas` now
+  receives the drop, projects the cursor via
+  `useSvelteFlow().screenToFlowPosition`, and emits
+  `ondropentity(key, position)` so the shell can create a BPMN node
+  at the cursor with the right `BPMN_DEFAULT_DISCRIMINATORS` preset.
+- **On-element context pad**. `BpmnRenderer` now mounts `<ContextPad>`
+  via `<NodeToolbar>` when a BPMN node is selected — buttons for
+  Append Task / Append Gateway / Append End Event / Connect / Change
+  / Delete. The page-level action handler bridges to BpmnRenderer via
+  a new `bpmnContextPadAction` Svelte context (set by UnifiedCanvas).
+- **Always-on PropertyPanel** for BPMN views. Three tabs (General /
+  BPMN / Documentation) with discriminator selects + activity marker
+  checkboxes. Replaces the existing conditional ElementEditPanel /
+  NodeStylePanel / LinkedDiagramPanel stack on BPMN views only.
+- **CommandPalette N / A / R hotkeys**. Lifted out of CommandPalette's
+  self-binding so they only fire on BPMN views. Press **N** to create-
+  anything (modal opens with the full BPMN catalogue, fuzzy-search,
+  Enter to add a node), **A** to append-anything after the selected
+  node, **R** to replace the selected node's type. Modal backdrop +
+  Escape close.
+- **EventMatrixPicker** (6 × 10 trigger × position grid) opens
+  automatically when an `event_*` entity is added via palette / drop /
+  command — illegal cells visually disabled.
+- **ProblemsPanel** bottom-docked, reactive to `validateBpmn(data)`.
+  Severity badge counts (error / warning / info); click a row → the
+  canvas selects the offending node.
+- **canConnect at draw-time**. `<SvelteFlow isValidConnection={…}>`
+  consults `bpmnRules.canConnect` before allowing an edge to be drawn;
+  rejection reasons surface via the new `BpmnToast` component
+  (~80 lines, no new dep).
+- **`BpmnToast` component**. Aria-live, fixed-position bottom-centre,
+  auto-dismiss after 3.5s, two-way bindable `message` prop. Single
+  consumer (the BPMN shell); kept inline rather than pulling a toast
+  library.
+
+### Changed
+
+- **`UnifiedCanvas`** wraps its template in `<SvelteFlowProvider>` so
+  the script-level `useSvelteFlow()` call (used by the new drop
+  handler) has a store to read. Adds three new optional callback
+  props: `onbeforeconnect`, `ondropentity`, `oncontextpadaction`.
+  Existing canvases are unaffected — the props default to undefined
+  and the wiring is no-op when not provided.
+- **`BpmnRenderer`** declares `id?: string` (xyflow auto-passes it to
+  custom node components — Iris's renderer interface didn't).
+
+### Docs
+
+- ADR-136 v5.2.0 amendment — UX surface integration decisions (action
+  callback via Svelte context, `isValidConnection` for canConnect,
+  drag-drop MIME, hotkey gating).
+- SPEC-136-A v5.2.0 amendment — surface-by-surface integration map +
+  list of files added/modified.
+
+### Verification
+
+- 16 new tests in `bpmnCanvasIntegration.test.ts` (static-parser
+  style, matches v5.1.x coverage tests). Catches regression if any
+  surface mount, hook prop, or context wiring is removed.
+- Frontend: 802/803 vitest specs pass (the one pre-existing failure —
+  `importIdempotency > displays diagrams skipped count` — also fails
+  against the unmodified baseline).
+- `svelte-check`: 164 errors (= unchanged baseline, no new errors
+  introduced). Cast-through-unknown idiom used at the two cross-
+  notation entityType assignment sites in the shell, matching the
+  existing pattern for storing UML/ArchiMate/C4/DoView/BPMN entity
+  types in the narrowly-typed `CanvasNodeData.entityType` field.
+
+### Out of scope (carried forward from ADR-136)
+
+- Shape-pinned comment threads (Lucidchart's strongest differentiator).
+- Element templates (Camunda-style preconfigured Service Tasks).
+- bpmnlint integration for the Problems panel.
+- BPMN XML import/export.
+- Pool/Lane swimlane container semantics — pools/lanes still ship as
+  styled rectangles; full container semantics in a follow-up.
+
+### Closes
+
+- #37 (BPMN canvas UX integration).
+
 ## [5.1.2] - 2026-05-05
 
 UAT follow-ups against the v5.1.1 deployment — four contained bug
