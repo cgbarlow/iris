@@ -1,6 +1,6 @@
 # ADR-137: Text diagram subclass and shared Markdown renderer
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #30, #31, #32, #32-reopen)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #30, #31, #32, #32-reopen) and 2026-05-06 (v5.4.0 paste-image + tab-default + trio buttons)
 
 ## Context
 
@@ -457,3 +457,51 @@ trivially unit-testable without mounting Svelte.
 
 None of these are blocked; they all build on the toolbar + textarea
 + helper trio rather than replacing it.
+
+## Amendment 2026-05-06 — paste-image + tab-default + trio buttons (v5.4.0)
+
+Three follow-ups against the v5.3.0 markdown experience:
+
+### A. Paste image from clipboard (issue cluster #7)
+
+GitHub-style: paste a screenshot → upload to Iris → markdown link
+auto-inserted at the cursor. Implemented as a pure-helper +
+TextCanvas `onpaste` handler:
+
+- `markdownEditorToolbarHelpers.ts::uploadPastedImage(file)` POSTs
+  multipart `/api/images` and returns `{ id, url, mime, size_bytes }`.
+- `TextCanvas.svelte::handlePaste(e)` scans `clipboardData.items`
+  for `image/*`, uploads, splices `![pasted-image](/api/images/<id>)`
+  via the v5.3.0 `applyOp(insertAtCursor(…))` pattern. Non-image
+  paste falls through to browser default.
+- `apiFetch` wrapper (`$lib/utils/api.ts`) extended to skip its
+  default `Content-Type: application/json` when the body is a
+  `FormData` instance — the browser sets the multipart boundary.
+
+The image storage decision (table-with-blob vs Supabase Storage vs
+base64 inline) is documented in [ADR-145](ADR-145-Image-Upload-Storage.md).
+
+### B. Smart-tab default for Text views (issue cluster #9)
+
+Pre-v5.4 the smart-tab logic in `loadDiagram` checked `canvasNodes`
+or sequence participants to decide whether to land on Canvas or
+Details. Text views have neither — content lives in
+`diagram.data.content` as a markdown string — so the page always
+landed on Details for Text views regardless of content. Fixed by
+extending the `hasContent` predicate to read `data.content` for
+Text views.
+
+### C. Tab order: Canvas first (issue cluster #10)
+
+The four-tab strip (Details / Canvas / Relationships / Versions) is
+reordered so Canvas leads. The working-content tab gets the
+left-most position so the user starts at the thing they're actually
+editing.
+
+### D. Trio buttons in Text edit mode (issue cluster #8)
+
+The page-level Add Element / Link Element / Add Diagram toolbar was
+in the canvas `{:else}` branch only — invisible on Text views. v5.4.0
+also renders it above the Text branch in edit mode. The handlers
+already branched on `canvasType === 'text'` (v5.1.1) — no logic
+change, just rendering.

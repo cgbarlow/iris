@@ -35,7 +35,9 @@ describe('BPMN authoring shell exists (issue #37, v5.2.0)', () => {
 		// The mount must be guarded by notation === 'bpmn' so non-BPMN views
 		// keep the existing canvas branch unchanged. Accept either {#if … }
 		// or {:else if … } since the chain is part of an existing if/else.
-		const mountBlock = src.match(/\{(?:#if|:else if)[^}]*notation\s*===\s*'bpmn'[\s\S]{0,400}<BpmnAuthoringShell/);
+		// v5.4.0 (#8) inserts a trio toolbar between the guard and the shell;
+		// loosen the lookahead window from 400 to 4000 chars.
+		const mountBlock = src.match(/\{(?:#if|:else if)[^}]*notation\s*===\s*'bpmn'[\s\S]{0,4000}<BpmnAuthoringShell/);
 		expect(mountBlock).toBeTruthy();
 	});
 });

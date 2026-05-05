@@ -19,6 +19,8 @@
 		| 'append_end_event'
 		| 'connect'
 		| 'change'
+		| 'bring_forward'
+		| 'send_backward'
 		| 'delete';
 
 	interface Props {
@@ -40,6 +42,9 @@
 		{ id: 'append_end_event', label: 'Append End Event', tooltip: 'Append End Event',           glyph: '⬤' },
 		{ id: 'connect',          label: 'Connect',          tooltip: 'Drag to connect',            glyph: '⇢' },
 		{ id: 'change',           label: 'Change',           tooltip: 'Change element type (R)',    glyph: '🔧' },
+		// v5.4.0 (#3): z-order controls — needed when items stack (lane on pool, etc).
+		{ id: 'bring_forward',    label: 'Bring Forward',    tooltip: 'Bring forward',              glyph: '↑' },
+		{ id: 'send_backward',    label: 'Send Backward',    tooltip: 'Send backward',              glyph: '↓' },
 		{ id: 'delete',           label: 'Delete',           tooltip: 'Delete element (Del)',       glyph: '✖' },
 	];
 

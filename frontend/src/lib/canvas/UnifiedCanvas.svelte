@@ -34,6 +34,10 @@
 		onundo?: () => void;
 		onredo?: () => void;
 		onnodedragstart?: () => void;
+		/** v5.4.0 (#5): fired when a node drag ends. Page-level handler can
+		 *  hit-test the new position against pool/lane bounds and set
+		 *  parentId so `validateBpmn::lane_outside_pool` resolves. */
+		onnodedragstop?: (nodeId: string, position: { x: number; y: number }) => void;
 		ontogglemode?: () => void;
 		panX?: number;
 		/** v5.2.0 (issue #37): BPMN connection guard. Return false to block the
@@ -65,6 +69,7 @@
 		onundo,
 		onredo,
 		onnodedragstart,
+		onnodedragstop,
 		ontogglemode,
 		panX = 0,
 		onbeforeconnect,
@@ -303,6 +308,8 @@
 			onpaneclick={handlePaneClick}
 			onreconnect={handleReconnect}
 			onnodedragstart={() => onnodedragstart?.()}
+			onnodedragstop={(_e: MouseEvent | TouchEvent, n: CanvasNode, _ns: CanvasNode[]) =>
+				onnodedragstop?.(n.id, { x: n.position.x, y: n.position.y })}
 			isValidConnection={onbeforeconnect}
 			proOptions={{ hideAttribution: true }}
 			defaultEdgeOptions={{ type: defaultEdgeType }}

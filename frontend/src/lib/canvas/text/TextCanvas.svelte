@@ -14,7 +14,7 @@
 	import MarkdownView from '$lib/components/MarkdownView.svelte';
 	import type { TocHeading } from '$lib/components/markdownHelpers';
 	import MarkdownEditorToolbar from '$lib/canvas/text/MarkdownEditorToolbar.svelte';
-	import { wrapSelection, applyOp } from '$lib/canvas/text/markdownEditorToolbarHelpers';
+	import { wrapSelection, applyOp, insertAtCursor, uploadPastedImage } from '$lib/canvas/text/markdownEditorToolbarHelpers';
 
 	interface Props {
 		/** Markdown source — read from diagram.data.content. */
@@ -129,6 +129,34 @@
 		}
 		commitChange(ta);
 	}
+
+	/** v5.4.0 (#7): paste an image from the clipboard → upload to Iris →
+	 *  splice `![pasted-image](/api/images/<id>)` at the cursor. The user
+	 *  experience is GitHub-style. Falls through to the browser default
+	 *  for non-image clipboard content (text, etc). */
+	async function handlePaste(e: ClipboardEvent) {
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of items) {
+			if (item.kind === 'file' && item.type.startsWith('image/')) {
+				e.preventDefault();
+				const file = item.getAsFile();
+				if (!file) return;
+				const ta = e.currentTarget as HTMLTextAreaElement;
+				try {
+					const uploaded = await uploadPastedImage(file);
+					const op = insertAtCursor(ta, `![pasted-image](${uploaded.url})`);
+					applyOp(ta, op);
+					content = op.value;
+					oncontentchange?.(op.value);
+				} catch {
+					// Surface failures via the existing change channel rather
+					// than blocking — user can paste a fresh copy.
+				}
+				return;
+			}
+		}
+	}
 </script>
 
 <div class="text-canvas" data-mode={editing ? 'edit' : 'view'}>
@@ -143,7 +171,8 @@
 			value={content ?? ''}
 			oninput={onInput}
 			onkeydown={handleKeydown}
-			placeholder="Write markdown… use [label](iris://diagram/<id>) or iris://element/<id> to link to other Iris models. Tab indents; Esc then Tab moves focus."
+			onpaste={handlePaste}
+			placeholder="Write markdown… use [label](iris://diagram/<id>) or iris://element/<id> to link to other Iris models. Tab indents; Esc then Tab moves focus. Paste an image to upload it inline."
 			spellcheck="true"
 		></textarea>
 	{:else}

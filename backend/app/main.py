@@ -24,6 +24,7 @@ from app.diagrams.router import router as diagrams_router
 from app.docref.router import router as docref_router
 from app.elements.router import router as elements_router
 from app.export.router import router as export_router
+from app.images.router import router as images_router
 from app.extensions.router import router as extensions_router
 from app.graph.router import router as graph_router
 from app.import_pptx.router import router as import_pptx_router
@@ -181,6 +182,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(notifications_router)
     app.include_router(admin_thumbnails_router)
     app.include_router(import_router)
+    app.include_router(images_router)
     app.include_router(import_pptx_router)
     app.include_router(package_relationships_router)
     app.include_router(sets_router)
