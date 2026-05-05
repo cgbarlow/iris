@@ -74,13 +74,49 @@
 </div>
 
 <style>
-	.md-view :global(h1), .md-view :global(h2), .md-view :global(h3),
-	.md-view :global(h4), .md-view :global(h5), .md-view :global(h6) {
-		margin: 1.4em 0 0.6em;
-		line-height: 1.25;
+	/* Issue #32 reopen: typographic rules consolidated here as the
+	   single source of truth for rendered markdown (protocol #13).
+	   Both the User Guide and Text views now share these. */
+	.md-view :global(h1) {
+		font-size: 1.875rem; font-weight: bold;
+		margin: 0.5em 0 0.5em; line-height: 1.25;
+		color: var(--color-fg);
 	}
-	.md-view :global(p)   { margin: 0.6em 0; line-height: 1.55; }
-	.md-view :global(ul), .md-view :global(ol) { margin: 0.6em 0; padding-left: 1.5em; }
+	.md-view :global(h2) {
+		font-size: 1.25rem; font-weight: 600;
+		margin: 1.6em 0 0.5em; line-height: 1.3;
+		color: var(--color-fg);
+	}
+	.md-view :global(h3) {
+		font-size: 1.05rem; font-weight: 600;
+		margin: 1.4em 0 0.5em; line-height: 1.35;
+		color: var(--color-fg);
+	}
+	.md-view :global(h4), .md-view :global(h5), .md-view :global(h6) {
+		font-weight: 600;
+		margin: 1.2em 0 0.4em; line-height: 1.35;
+		color: var(--color-fg);
+	}
+	.md-view :global(p) {
+		color: var(--color-fg);
+		line-height: 1.6;
+		margin: 0 0 1rem;
+	}
+	.md-view :global(ul) {
+		color: var(--color-fg);
+		padding-left: 1.5rem;
+		list-style: disc;
+		margin: 0 0 1rem;
+	}
+	.md-view :global(ol) {
+		color: var(--color-fg);
+		padding-left: 1.5rem;
+		list-style: decimal;
+		margin: 0 0 1rem;
+	}
+	.md-view :global(li) { margin-bottom: 0.25rem; }
+	.md-view :global(strong) { font-weight: 600; }
+	.md-view :global(em) { font-style: italic; }
 	.md-view :global(code) {
 		background: var(--color-surface-hover, #f3f4f6);
 		padding: 1px 4px; border-radius: 3px;
@@ -91,10 +127,25 @@
 		padding: 10px 12px; border-radius: 6px;
 		overflow-x: auto;
 	}
+	.md-view :global(pre code) {
+		background: transparent; padding: 0; border-radius: 0;
+	}
 	.md-view :global(blockquote) {
 		border-left: 3px solid var(--color-border, #d1d5db);
 		margin: 1em 0; padding: 0.2em 0.8em;
 		color: var(--color-muted, #4b5563);
+	}
+	.md-view :global(hr) {
+		border: 0;
+		border-top: 1px solid var(--color-border, #d1d5db);
+		margin: 1.5em 0;
+	}
+	.md-view :global(img) {
+		display: block;
+		max-width: 100%;
+		margin: 1rem 0;
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
 	}
 	.md-view :global(a) { color: var(--color-primary, #2563eb); text-decoration: underline; }
 	.md-view :global(.md-iris-link) { cursor: pointer; }

@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-05-05
+
+Markdown experience overhaul (issue #32 reopen). Four bundled
+problems against the Text-class + MarkdownView surface introduced
+since v5.1.0. Headlined by the new in-editor formatting toolbar.
+
+### Added
+
+- **Markdown editor toolbar** (ADR-137 v5.3.0 amendment §D, issue
+  #32 reopen). New `MarkdownEditorToolbar` mounts above the existing
+  TextCanvas `<textarea>` in edit mode. 12 buttons:
+  **B / I / H1 / H2 / H3 / • UL / 1. OL / ❝ Quote / `</>` Code /
+  🔗 Link / 🖼 Image / ─ HR**. Pure-helper architecture (`wrapSelection` /
+  `prefixLines` / `insertAtCursor` in `markdownEditorToolbarHelpers.ts`)
+  so the formatting logic is unit-testable without mounting Svelte.
+  Markdown stays the canonical source — no hidden state, no WYSIWYG.
+  Keyboard shortcuts: **Ctrl/Cmd+B** (bold), **Ctrl/Cmd+I** (italic),
+  **Ctrl/Cmd+K** (link). Line-prefix actions toggle on/off (matches
+  GitHub / VSCode markdown shortcut conventions). Researched against
+  CodeMirror 6 / Milkdown / Tiptap / EasyMDE — chosen pattern matches
+  StackEdit / GitHub / HackMD / Obsidian source mode. **Zero new
+  dependencies** (protocol #11) — saving CodeMirror 6 / Milkdown for
+  a possible future "power editor" mode that can layer onto this
+  foundation.
+- **TOC drawer toggle button** (ADR-137 v5.3.0 amendment §B, issue
+  #32 reopen). The `showTocDrawer` state was wired in v5.1.0 with
+  both edit-mode and browse-mode `<MarkdownToc>` mounts in place,
+  but no button toggled it. Added a **TOC** button to the canvas
+  toolbar, gated on `canvasType === 'text'`, mounted in both the
+  in-place toolbar and the focus-mode toolbar (mirrors the existing
+  `Comments` button placement).
+
+### Fixed
+
+- **Markdown rendering parity — Text views now look like the User
+  Guide** (ADR-137 v5.3.0 amendment §A, issue #32 reopen).
+  Headings had no scale, lists had no bullets on Text views even
+  though the same `MarkdownView` rendered them perfectly on the
+  User Guide. Cause: the User Guide layout
+  (`guide/+layout.svelte`) carried scoped
+  `.guide-content :global(h1|h2|p|ul|ol|li|code|img|strong)` rules
+  that styled the rendered HTML *from the outside* — Text views
+  rendered through the same component but had no equivalent
+  wrapper styling. Lifted the typographic ruleset into
+  `MarkdownView.svelte`'s own `<style>` so rendered markdown
+  carries its own typography regardless of where it's mounted.
+  Drop the duplicates from the guide layout. Single source of
+  truth per protocol #13. Extends the rule set to cover `h3`,
+  `h4`–`h6`, `em`, `pre code`, `hr`.
+- **User Guide images stopped loading** (ADR-137 v5.3.0 amendment
+  §C, issue #32 reopen). Regression introduced when the guide
+  migrated to the shared MarkdownView in v5.1.0 — DOMPurify's
+  `ALLOWED_URI_REGEXP` required a scheme, so
+  `<img src="/guide/dashboard.png">` had its src silently stripped.
+  Widened the regex to also accept absolute (`/`) and relative
+  (`./`, `../`) paths. Added a defence-in-depth post-walk that runs
+  the same `urlIsAllowed` check on each `<img src>` because
+  DOMPurify allows `data:` on img/audio/video src by default —
+  closes the gap. `javascript:` / `data:` / `file:` remain
+  stripped on both `<a href>` and `<img src>`.
+
+### Docs
+
+- ADR-137 v5.3.0 amendment — markdown rendering parity, TOC, image
+  fix, editor toolbar (with the markdown-editor research summary).
+- SPEC-137-A v5.3.0 amendment — implementation surface map for each
+  of the four sub-fixes plus the toolbar button table.
+
+### Verification
+
+- 4 new vitest specs added (29 tests total) — `markdownImageAllowlist`
+  (9), `markdownViewParity` (6), `textViewTocToggle` (2),
+  `markdownEditorToolbar` (14, pure helpers).
+- Frontend: 833/834 vitest specs pass (the one pre-existing failure —
+  `importIdempotency > displays diagrams skipped count` — also fails
+  against the unmodified baseline).
+- `svelte-check`: 164 errors (= unchanged baseline, no new errors).
+- Backend untouched — no Supabase migration needed.
+
+### Closes
+
+- #32 (reopened) — markdown rendering parity, TOC drawer, editor
+  toolbar, User Guide images.
+
 ## [5.2.0] - 2026-05-05
 
 BPMN canvas UX integration (issue #37). The six BPMN authoring

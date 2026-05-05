@@ -305,3 +305,82 @@ views do not have entities.
 | `frontend/tests/unit/docrefSelectorPolling.test.ts`           | Optimistic `importing` flip + 3 s polling while any document is `importing` + cleanup on teardown. |
 | `frontend/tests/unit/viewsRedirect.test.ts`                   | `/diagrams/+page.ts` and `/diagrams/[id]/+page.ts` redirect (308) to the `/views` equivalents preserving query + hash. |
 | `frontend/tests/unit/hierarchyControls.test.ts`               | Component renders the two dropdowns and emits `oncreateview` / `oncreatepackage` / `onShowDiagrams` / `onShowText`. |
+
+## Amendment 2026-05-05 — markdown experience overhaul (issue #32 reopen, v5.3.0)
+
+Implementation surface map for the four ADR-137 v5.3.0 amendments.
+
+### A. Rendering parity (single source of truth in MarkdownView)
+
+Typography selectors lifted from `guide/+layout.svelte` (`.guide-content :global(…)`) to `MarkdownView.svelte` (`.md-view :global(…)`):
+
+- `h1` (1.875rem bold) / `h2` (1.25rem 600) / `h3` (1.05rem 600) / `h4`–`h6` (600)
+- `p` / `ul` (`list-style: disc`) / `ol` (`list-style: decimal`) / `li` / `strong` / `em`
+- `code` / `pre` / `pre code` (transparent reset) / `blockquote` / `hr` (1px border-top)
+- `img` (max-width: 100%, border, border-radius)
+
+`guide/+layout.svelte` reduces to layout-only (sticky nav, grid, narrow-screen breakpoint).
+
+### B. TOC drawer toggle
+
+`views/[id]/+page.svelte` toolbar — gated on `canvasType === 'text'`:
+
+```svelte
+{#if canvasType === 'text'}
+  <button
+    onclick={() => (showTocDrawer = !showTocDrawer)}
+    aria-pressed={showTocDrawer}
+    aria-label="Toggle table of contents"
+    title="Table of contents"
+  >TOC</button>
+{/if}
+```
+
+Mounted in both the in-place toolbar and the focus-mode toolbar (matches the existing `Comments` button placement). The drawer mounts at lines 2834 (edit) and 2903 (browse) were already in place from v5.1.0 — this amendment adds the trigger.
+
+### C. Image / link allowlist (defence in depth)
+
+| Layer | Check | `/guide/foo.png` | `data:` |
+|---|---|---|---|
+| 1. DOMPurify `ALLOWED_URI_REGEXP` | `/^(?:(?:https?|mailto|iris):|\/|\.{1,2}\/)/i` | passes | rejected → DOMPurify strips |
+| 2. `urlIsAllowed` post-walk on anchors | `new URL(href, placeholder).protocol ∈ ALLOWED_SCHEMES` | passes (resolves to `https:`) | rejected (`data:`) |
+| 3. **NEW**: `urlIsAllowed` post-walk on `<img src>` | same | passes | rejected (DOMPurify allows `data:` on img by default — this layer covers that gap) |
+
+### D. Markdown editor toolbar
+
+| File | Lines | Purpose |
+|---|---|---|
+| `frontend/src/lib/canvas/text/markdownEditorToolbarHelpers.ts` | ~95 | Pure helpers (`wrapSelection`, `prefixLines`, `insertAtCursor`, `applyOp`) returning `EditorOp` records. Trivially unit-testable; no Svelte. |
+| `frontend/src/lib/canvas/text/MarkdownEditorToolbar.svelte` | ~110 | 12-button bar that calls helpers + applies the result via `applyOp` + fires `onchange`. |
+| `frontend/src/lib/canvas/text/TextCanvas.svelte` | (modified) | Mounts the toolbar above the textarea in edit mode. Adds Ctrl/Cmd+B / +I / +K shortcuts inside the existing `handleKeydown` (alongside the v5.1.2 Tab trap). |
+
+Toolbar buttons (left → right):
+
+| Button | Action | Shortcut |
+|---|---|---|
+| **B** | wrap `**…**` | Ctrl/Cmd+B |
+| **I** | wrap `*…*` | Ctrl/Cmd+I |
+| **H1** | line prefix `# ` (toggle) | — |
+| **H2** | line prefix `## ` (toggle) | — |
+| **H3** | line prefix `### ` (toggle) | — |
+| **• UL** | line prefix `- ` (toggle, every selected line) | — |
+| **1. OL** | line prefix `1. ` (toggle, every selected line) | — |
+| **❝ Quote** | line prefix `> ` (toggle) | — |
+| **`</>` Code** | wrap `` `…` `` | — |
+| **🔗 Link** | wrap `[…](url)` | Ctrl/Cmd+K |
+| **🖼 Image** | insert `![alt](path)` | — |
+| **─ HR** | insert `\n---\n` | — |
+
+Cursor / selection behaviour:
+- Empty selection + wrap → caret placed between markers so the user types content directly.
+- Non-empty selection + wrap → markers wrap the selection; cursor restored adjusted for marker length.
+- Line-prefix actions toggle: if all touched lines already start with the prefix, it's stripped (matches GitHub / VSCode markdown shortcut conventions).
+
+### Tests added in v5.3.0
+
+| File | Coverage |
+|---|---|
+| `frontend/tests/unit/markdownImageAllowlist.test.ts` | Absolute and relative paths preserved; `javascript:`/`data:`/`file:` stripped on both `<a>` and `<img>`. |
+| `frontend/tests/unit/markdownViewParity.test.ts` | Heading + list + img rules live in MarkdownView and are absent from the guide layout. |
+| `frontend/tests/unit/textViewTocToggle.test.ts` | TOC button rendered for Text views; flips `showTocDrawer`. |
+| `frontend/tests/unit/markdownEditorToolbar.test.ts` | Pure-helper unit tests: wrap, line-prefix (single/multi-line, toggle off), insert-at-cursor. |
