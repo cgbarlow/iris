@@ -2393,6 +2393,20 @@
 								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
 							</button>
 						{/if}
+						{#if canvasType === 'text'}
+							<!-- Issue #32 reopen: TOC drawer toggle for Text views.
+								 The drawer was wired in v5.1.0 but no button toggled it. -->
+							<button
+								onclick={() => (showTocDrawer = !showTocDrawer)}
+								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								aria-pressed={showTocDrawer}
+								aria-label="Toggle table of contents"
+								title="Table of contents"
+							>
+								TOC
+							</button>
+						{/if}
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
@@ -2690,6 +2704,20 @@
 							>
 								Comments
 								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
+							</button>
+						{/if}
+						{#if canvasType === 'text'}
+							<!-- Issue #32 reopen: TOC drawer toggle for Text views.
+								 The drawer was wired in v5.1.0 but no button toggled it. -->
+							<button
+								onclick={() => (showTocDrawer = !showTocDrawer)}
+								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
+								style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								aria-pressed={showTocDrawer}
+								aria-label="Toggle table of contents"
+								title="Table of contents"
+							>
+								TOC
 							</button>
 						{/if}
 						<button

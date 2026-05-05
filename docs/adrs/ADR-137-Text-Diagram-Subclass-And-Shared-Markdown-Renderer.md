@@ -1,6 +1,6 @@
 # ADR-137: Text diagram subclass and shared Markdown renderer
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #30, #31, #32)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #30, #31, #32, #32-reopen)
 
 ## Context
 
@@ -337,3 +337,123 @@ rather than reusing the canvas wording, mirroring the design intent
 the user spelled out in the issue: a single Canvas tab whose
 behaviour switches by notation; the "type of diagram" label remains
 authoritative.
+
+## Amendment 2026-05-05 — markdown experience overhaul (issue #32 reopen, v5.3.0)
+
+UAT against v5.1.2 surfaced four problems against the Text-class +
+MarkdownView surface that the previous amendments hadn't covered.
+v5.3.0 ships them as one bundle.
+
+### A. Markdown rendering parity (User Guide ↔ Text views)
+
+The User Guide's pages looked correctly typographed (heading scale,
+bullets, image styling) but the same markdown rendered through the
+same `MarkdownView` on a Text view came out bare. Cause: the User
+Guide layout (`guide/+layout.svelte`) carried scoped
+`.guide-content :global(h1|h2|p|ul|ol|li|code|img|strong)` rules
+that styled the rendered HTML *from the outside*. Text views rendered
+through the same component but had **no equivalent wrapper styling**
+because they're not inside `.guide-content`.
+
+Fix: lift those typographic rules into `MarkdownView.svelte`'s own
+`<style>` block so rendered markdown carries its own typography
+regardless of where it's mounted. Drop the duplicated rules from the
+guide layout. Single source of truth per protocol #13. Also extends
+the rule set to cover `h3`, `h4`–`h6`, `em`, `pre code`, `hr` — the
+guide's prior coverage didn't include them either, but Text views
+exercise the full ATX heading + horizontal-rule range.
+
+### B. TOC drawer toggle
+
+`showTocDrawer = $state(false)` was wired in v5.1.0 with both
+edit-mode and browse-mode `{#if showTocDrawer} <MarkdownToc /> {/if}`
+mounts. The toggle button was never added — `showTocDrawer = true`
+appeared nowhere in the page.
+
+Fix: add a **TOC** button to the canvas-area toolbar that appears
+only when `canvasType === 'text'` (mirrors the existing `Comments`
+button gating). Toggles `showTocDrawer`. Visible in both edit and
+browse modes. The drawer mounts already in place fire automatically.
+
+### C. User-Guide images stopped loading
+
+Regression introduced in v5.1.0 when the User Guide migrated to the
+shared `MarkdownView`. The custom DOMPurify config
+
+```ts
+ALLOWED_URI_REGEXP: /^(?:https?|mailto|iris):/i
+```
+
+requires a scheme, and `<img src="/guide/dashboard.png">` doesn't
+have one. DOMPurify silently stripped the src. Pre-v5.1.0 the User
+Guide page rendered with DOMPurify's default URI regex which allows
+relative paths.
+
+Fix: widen the regex to also accept absolute (`/`) and relative
+(`./`, `../`) paths:
+
+```ts
+ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|iris):|\/|\.{1,2}\/)/i
+```
+
+Path-only refs cannot carry `javascript:` or `data:` payloads — they
+have no scheme.
+
+**Layered defence for img src.** DOMPurify allows `data:` on
+`img/audio/video src` by default for legitimate inline-image use,
+even when `ALLOWED_URI_REGEXP` excludes them. We don't ship inline
+data: images and they're a tracking/exfil vector — added a post-walk
+in `renderMarkdown` that runs the same `urlIsAllowed` check on each
+`<img src>` and strips it if disallowed. Mirrors the existing anchor
+walk. Tests assert `javascript:`, `data:`, `file:` remain blocked on
+both anchors and images.
+
+### D. Markdown editor toolbar
+
+The user explicitly asked for a research-driven recommendation —
+"Do your research for the best markdown tools that people love and
+lets make this a great markdown editing experience."
+
+Surveyed CodeMirror 6, Milkdown, Tiptap, EasyMDE/SimpleMDE, plus
+the toolbar-on-textarea pattern used by StackEdit / GitHub / HackMD /
+Obsidian (source mode) / BBEdit. **Decision: ship a custom toolbar
+over the existing `<textarea>`.**
+
+Rationale:
+- **Markdown stays the canonical source.** No hidden state. The
+  v5.1.0 `iris://` link convention works unchanged. Copy-paste
+  round-trips perfectly. WYSIWYG (Tiptap, Milkdown's default mode)
+  would have introduced a paradigm shift not warranted by the issue.
+- **Zero new dependencies** (protocol #11). The most-loved heavy
+  options (CodeMirror 6, Milkdown) are reserved for a possible
+  future "power editor" mode — they can layer onto this foundation
+  rather than replace it.
+- **Reuses what we already have**. Toolbar reads the textarea via
+  the v5.1.1 `textareaEl` `$bindable`. Each button calls a pure
+  helper (`wrapSelection`, `prefixLines`, `insertAtCursor`) and
+  forwards the result through `oncontentchange`, which the page-
+  level `canvasDirty` wiring picks up unchanged.
+- **Keyboard shortcuts** for the three most-used actions
+  (Ctrl/Cmd+B / +I / +K) handled inside TextCanvas's existing
+  keydown trap — no new global listener. Tab indenting, Esc-then-
+  Tab focus escape (issue #31) all preserved.
+- **Toggle behaviour** for line-prefix actions (H1/H2/H3/UL/OL/
+  Quote) follows GitHub / VSCode markdown shortcut conventions:
+  applying the same prefix again strips it.
+
+Surface: 12 buttons in a 32px-tall sticky bar above the textarea —
+**B / I / H1 / H2 / H3 / • UL / 1. OL / ❝ Quote / `</>` Code / 🔗 Link / 🖼 Image / ─ HR**.
+
+The pure helpers live in `markdownEditorToolbarHelpers.ts` (matches
+the `markdownHelpers.ts` separation pattern from v5.1.0) so they're
+trivially unit-testable without mounting Svelte.
+
+### Future v5.x extensions enabled by this foundation
+
+- Live-preview split view (mount MarkdownView next to the textarea on
+  the same `data.content` source).
+- Slash-command popup (Notion-style).
+- CodeMirror 6 power-editor mode (toggle from the toolbar).
+
+None of these are blocked; they all build on the toolbar + textarea
++ helper trio rather than replacing it.
