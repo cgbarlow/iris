@@ -92,3 +92,37 @@ export function applyOp(ta: HTMLTextAreaElement, op: EditorOp) {
 	ta.setSelectionRange(op.selectionStart, op.selectionEnd);
 	ta.focus();
 }
+
+/**
+ * v5.4.0 (#7): upload a pasted clipboard image to /api/images and
+ * return the public URL. Used by `TextCanvas.onpaste` to splice
+ * `![pasted](/api/images/<id>)` at the cursor.
+ *
+ * Multipart form upload — works with the FastAPI `UploadFile` shape
+ * the v5.4.0 backend route expects. apiFetch wrapper handles auth.
+ */
+import { apiFetch } from '$lib/utils/api';
+
+interface UploadedImage {
+	id: string;
+	url: string;
+	mime: string;
+	size_bytes: number;
+}
+
+export async function uploadPastedImage(file: File): Promise<UploadedImage> {
+	const form = new FormData();
+	form.append('file', file, file.name || 'pasted-image.png');
+	// apiFetch detects FormData bodies and skips the default JSON
+	// Content-Type so the browser sets a proper multipart boundary.
+	const resp = await apiFetch<{ id: string; mime: string; size_bytes: number }>(
+		'/api/images',
+		{ method: 'POST', body: form },
+	);
+	return {
+		id: resp.id,
+		mime: resp.mime,
+		size_bytes: resp.size_bytes,
+		url: `/api/images/${resp.id}`,
+	};
+}

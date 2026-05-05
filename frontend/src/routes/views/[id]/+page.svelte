@@ -539,11 +539,18 @@
 			diagram = diagramResult;
 			recordVisit({ id: diagram.id, type: 'diagram', name: diagram.name, detail: diagram.diagram_type, setId: diagram.set_id ?? undefined, setName: diagram.set_name ?? undefined, description: diagram.description ?? undefined, href: `/views/${diagram.id}` });
 			parseCanvasData();
-			// Smart default tab: show details if no canvas content
+			// Smart default tab: show details if no canvas content.
+			// v5.4.0 (#9): Text views (markdown notation) have no canvas
+			// nodes — their content lives in `data.content` as a markdown
+			// string. Without this branch the page lands on Details for
+			// every Text view that has any markdown.
 			if (!userSelectedTab) {
-				const hasContent = diagram.diagram_type === 'sequence'
-					? sequenceData.participants.length > 0
-					: canvasNodes.length > 0;
+				const isText = diagram.diagram_type === 'text' || diagram.notation === 'markdown';
+				const hasContent = isText
+					? !!(diagram.data?.content as string | undefined)?.length
+					: diagram.diagram_type === 'sequence'
+						? sequenceData.participants.length > 0
+						: canvasNodes.length > 0;
 				activeTab = hasContent ? 'canvas' : 'details';
 			}
 			refreshNodeDescriptions();
@@ -987,6 +994,48 @@
 		return { x: 60, y: 60 };
 	}
 
+	/** v5.4.0 (#8): per-entity-type BPMN node dimensions used by the
+	 *  page-level handleAddElement / handleInsertDiagram BPMN branches.
+	 *  Mirrors `BPMN_NODE_DIMENSIONS` in BpmnAuthoringShell (single source
+	 *  of truth would be better long-term — flagged for v5.5). */
+	function bpmnDimsFor(entityType: string): { width: number; height: number } {
+		const D: Record<string, { width: number; height: number }> = {
+			task: { width: 200, height: 80 },
+			subprocess: { width: 200, height: 80 },
+			call_activity: { width: 200, height: 80 },
+			event_start: { width: 56, height: 56 },
+			event_intermediate: { width: 56, height: 56 },
+			event_end: { width: 56, height: 56 },
+			event_boundary: { width: 56, height: 56 },
+			gateway: { width: 56, height: 56 },
+			pool: { width: 600, height: 200 },
+			lane: { width: 560, height: 100 },
+			data_object: { width: 48, height: 64 },
+			data_store: { width: 64, height: 64 },
+			group: { width: 240, height: 140 },
+			text_annotation: { width: 160, height: 56 },
+		};
+		return D[entityType] ?? { width: 200, height: 80 };
+	}
+
+	/** v5.4.0 (#8): minimal BPMN_DEFAULT_DISCRIMINATORS shadow — enough to
+	 *  let the page handlers create BPMN nodes that match the renderer's
+	 *  expectations without importing the BPMN module on non-BPMN views. */
+	function bpmnDefaultDiscriminators(entityType: string): Record<string, unknown> {
+		const D: Record<string, Record<string, unknown>> = {
+			task: { taskType: 'none' },
+			subprocess: { subprocessKind: 'embedded' },
+			event_start: { eventTrigger: 'none' },
+			event_intermediate: { eventDirection: 'catch', eventTrigger: 'message' },
+			event_end: { eventTrigger: 'none' },
+			event_boundary: { boundaryInterrupting: true, eventTrigger: 'message' },
+			gateway: { gatewayType: 'exclusive' },
+			data_object: { dataKind: 'object' },
+			pool: { orientation: 'horizontal' },
+		};
+		return { ...(D[entityType] ?? {}) };
+	}
+
 	async function handleAddElement(name: string, elementType: SimpleEntityType, description: string, _tags?: string[], elementNotation?: string) {
 		try {
 			const effectiveNotation = elementNotation ?? notation ?? 'simple';
@@ -1002,6 +1051,32 @@
 			});
 			if (canvasType === 'text') {
 				insertMarkdownAtCursor(`[${name}](iris://element/${created.id})`);
+				showAddElement = false;
+				return;
+			}
+			// v5.4.0 (#8/#13): BPMN canvas — match the BpmnAuthoringShell shape
+			// (per-entity-type dimensions, BPMN_DEFAULT_DISCRIMINATORS payload).
+			if (canvasType === 'bpmn') {
+				const dims = bpmnDimsFor(elementType as string);
+				const id = crypto.randomUUID();
+				const newNode: CanvasNode = {
+					id,
+					type: elementType,
+					position: findOpenPosition(),
+					width: dims.width,
+					height: dims.height,
+					data: {
+						label: name,
+						entityType: elementType,
+						description,
+						entityId: created.id,
+						notation: 'bpmn',
+						data: bpmnDefaultDiscriminators(elementType as string),
+					},
+				} as unknown as CanvasNode;
+				history.pushState(canvasNodes, canvasEdges);
+				canvasNodes = [...canvasNodes, newNode];
+				canvasDirty = true;
 				showAddElement = false;
 				return;
 			}
@@ -1376,6 +1451,25 @@
 			showElementPicker = false;
 			return;
 		}
+		// v5.4.0 (#8): on BPMN, "Link Element" binds the picked Element to the
+		// SELECTED node (by setting entityId on the node's data) rather than
+		// inserting a new node. If nothing's selected, surface a hint.
+		if (canvasType === 'bpmn') {
+			if (!selectedEditNodeId) {
+				error = 'Select a BPMN node first, then click Link Element to bind a repository entity to it.';
+				showElementPicker = false;
+				return;
+			}
+			history.pushState(canvasNodes, canvasEdges);
+			canvasNodes = canvasNodes.map((n) =>
+				n.id === selectedEditNodeId
+					? { ...n, data: { ...n.data, entityId: element.id, label: element.name } }
+					: n,
+			);
+			canvasDirty = true;
+			showElementPicker = false;
+			return;
+		}
 		const id = crypto.randomUUID();
 		const elementType = element.element_type as SimpleEntityType;
 		const newNode: CanvasNode = {
@@ -1400,6 +1494,33 @@
 	function handleInsertDiagram(linkedDiagram: Diagram) {
 		if (canvasType === 'text') {
 			insertMarkdownAtCursor(`[${linkedDiagram.name}](iris://diagram/${linkedDiagram.id})`);
+			showDiagramPicker = false;
+			return;
+		}
+		// v5.4.0 (#8): on BPMN, "Add Diagram" places a call_activity node
+		// (BPMN-standard "this activity calls another process") with
+		// linkedModelId pointing at the picked diagram.
+		if (canvasType === 'bpmn') {
+			const id = crypto.randomUUID();
+			const dims = bpmnDimsFor('call_activity');
+			const newNode: CanvasNode = {
+				id,
+				type: 'call_activity',
+				position: findOpenPosition(),
+				width: dims.width,
+				height: dims.height,
+				data: {
+					label: linkedDiagram.name,
+					entityType: 'call_activity',
+					description: linkedDiagram.description ?? '',
+					linkedModelId: linkedDiagram.id,
+					notation: 'bpmn',
+					data: {},
+				},
+			} as unknown as CanvasNode;
+			history.pushState(canvasNodes, canvasEdges);
+			canvasNodes = [...canvasNodes, newNode];
+			canvasDirty = true;
 			showDiagramPicker = false;
 			return;
 		}
@@ -1991,15 +2112,7 @@
 			</svg>
 		</button>
 		<div class="flex gap-1" role="tablist" aria-label="Diagram sections">
-			<button
-				role="tab"
-				aria-selected={activeTab === 'details'}
-				onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
-				class="px-4 py-2 text-sm"
-				style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
-			>
-				Details
-			</button>
+			<!-- v5.4.0 (#10): Canvas first — the working content tab leads. -->
 			<button
 				role="tab"
 				aria-selected={activeTab === 'canvas'}
@@ -2008,6 +2121,15 @@
 				style="color: {activeTab === 'canvas' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'canvas' ? 'var(--color-primary)' : 'transparent'}"
 			>
 				Canvas
+			</button>
+			<button
+				role="tab"
+				aria-selected={activeTab === 'details'}
+				onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
+				class="px-4 py-2 text-sm"
+				style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
+			>
+				Details
 			</button>
 			<button
 				role="tab"
@@ -2355,7 +2477,9 @@
 					{/if}
 					<!-- View group (always visible) -->
 					<div class="ml-auto flex items-center gap-2">
-						{#if notation && editing}
+						{#if notation && editing && (notation as string) !== 'bpmn' && (notation as string) !== 'markdown' && (canvasType as string) !== 'text'}
+							<!-- v5.4.0 (#6): theme selector irrelevant on BPMN (theme fixed by m043
+								 bpmn-default seed) and on Text views (no canvas to theme). -->
 							<ThemeSelector {notation} />
 						{/if}
 						<div class="relative">
@@ -2393,7 +2517,7 @@
 								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
 							</button>
 						{/if}
-						{#if canvasType === 'text'}
+						{#if (canvasType as string) === 'text'}
 							<!-- Issue #32 reopen: TOC drawer toggle for Text views.
 								 The drawer was wired in v5.1.0 but no button toggled it. -->
 							<button
@@ -2668,7 +2792,9 @@
 					{/if}
 					<!-- View group (always visible) -->
 					<div class="ml-auto flex items-center gap-2">
-						{#if notation && editing}
+						{#if notation && editing && (notation as string) !== 'bpmn' && (notation as string) !== 'markdown' && (canvasType as string) !== 'text'}
+							<!-- v5.4.0 (#6): theme selector irrelevant on BPMN (theme fixed by m043
+								 bpmn-default seed) and on Text views (no canvas to theme). -->
 							<ThemeSelector {notation} />
 						{/if}
 						<div class="relative">
@@ -2706,7 +2832,7 @@
 								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
 							</button>
 						{/if}
-						{#if canvasType === 'text'}
+						{#if (canvasType as string) === 'text'}
 							<!-- Issue #32 reopen: TOC drawer toggle for Text views.
 								 The drawer was wired in v5.1.0 but no button toggled it. -->
 							<button
@@ -2844,6 +2970,37 @@
 						</FocusView>
 					{:else if canvasType === 'text'}
 					<!-- Issue #26 / ADR-137: Text diagrams render markdown view/edit instead of a canvas. -->
+					<!-- v5.4.0 (#8): Add Element / Link Element / Add Diagram available
+						 on Text views in edit mode — handlers branch on canvasType to
+						 splice an iris:// markdown link at the cursor (v5.1.1). -->
+					<div class="mb-3 flex flex-wrap items-center gap-2">
+						<button
+							onclick={() => (showAddElement = true)}
+							class="rounded px-3 py-1.5 text-sm text-white"
+							style="background-color: var(--color-primary)"
+						>
+							Add Element
+						</button>
+						<button
+							onclick={() => (showElementPicker = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Link Element
+						</button>
+						<button
+							onclick={() => (showDiagramPicker = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Add Diagram
+						</button>
+						<div class="ml-auto flex items-center gap-2">
+							<button onclick={saveCanvas} disabled={saving || !canvasDirty} class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50" style="background-color: var(--color-success, #16a34a)">{saving ? 'Saving...' : 'Save'}</button>
+							<button onclick={discardChanges} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Discard</button>
+							{#if canvasDirty}<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>{/if}
+						</div>
+					</div>
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 							<TextCanvas
@@ -2867,6 +3024,41 @@
 					<!-- v5.2.0 (issue #37): BPMN authoring shell — palette / canvas /
 						 property panel + bottom problems dock + canConnect toast.
 						 Replaces the generic right-panel stack on BPMN views in edit mode. -->
+					<!-- v5.4.0 (#8): trio toolbar above the shell so Add Element / Link
+						 Element / Add Diagram work on BPMN views too. Add Element opens
+						 EntityDialog (notation=bpmn — v5.1.2 issue #33), Link Element
+						 binds an Element to the selected node, Add Diagram inserts a
+						 BPMN call_activity referencing the picked diagram. -->
+					<div class="mb-3 flex flex-wrap items-center gap-2">
+						<button
+							onclick={() => (showAddElement = true)}
+							class="rounded px-3 py-1.5 text-sm text-white"
+							style="background-color: var(--color-primary)"
+						>
+							Add Element
+						</button>
+						<button
+							onclick={() => (showElementPicker = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Link Element
+						</button>
+						<button
+							onclick={() => (showDiagramPicker = true)}
+							class="rounded px-3 py-1.5 text-sm"
+							style="border: 1px solid var(--color-border); color: var(--color-fg)"
+						>
+							Add Diagram
+						</button>
+						<div class="ml-auto flex items-center gap-2">
+							<button onclick={handleUndo} disabled={!history.canUndo} class="rounded px-3 py-1.5 text-sm disabled:opacity-50" style="border: 1px solid var(--color-border); color: var(--color-fg)" aria-label="Undo">Undo</button>
+							<button onclick={handleRedo} disabled={!history.canRedo} class="rounded px-3 py-1.5 text-sm disabled:opacity-50" style="border: 1px solid var(--color-border); color: var(--color-fg)" aria-label="Redo">Redo</button>
+							<button onclick={saveCanvas} disabled={saving || !canvasDirty} class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50" style="background-color: var(--color-success, #16a34a)">{saving ? 'Saving...' : 'Save'}</button>
+							<button onclick={discardChanges} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Discard</button>
+							{#if canvasDirty}<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>{/if}
+						</div>
+					</div>
 					<BpmnAuthoringShell
 						{notation}
 						{preferredThemeId}
@@ -2874,6 +3066,7 @@
 						bind:canvasEdges
 						bind:selectedEditNodeId
 						{history}
+						setId={diagram?.set_id ?? null}
 						oncanvasdirty={() => (canvasDirty = true)}
 						onnodeselect={handleNodeSelect}
 						onedgeselect={handleEdgeSelect}

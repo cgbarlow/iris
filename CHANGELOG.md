@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-05-06
+
+BPMN polish + markdown experience polish + image paste + dashboard
+tweaks (issue cluster against v5.3.1). Headlined by **BPMN-as-Elements
+alignment** (every BPMN node now creates a backing Iris Element,
+matching every other notation) and **clipboard image paste** (paste a
+screenshot in the markdown editor → Iris uploads → markdown link
+auto-inserted at the cursor).
+
+### Added
+
+- **BPMN nodes are Iris Elements** (ADR-136 v5.4.0 amendment §A,
+  ADR-145, issue cluster #13). Every BPMN node-creation path —
+  drag-from-palette, drop-on-canvas, CommandPalette
+  `create`/`append`, ContextPad-append, EventMatrixPicker — now
+  POSTs `/api/elements` first and stores `entityId` on the canvas
+  node. Replace mode PUTs the existing Element's `element_type`.
+  PropertyPanel label/description edits sync back via fire-and-forget
+  PUT. BPMN content joins search, knowledge graph, tagging,
+  comments, versioning, and `iris://element/<id>` references.
+- **Clipboard image paste** (ADR-137 v5.4.0 amendment §A, ADR-145,
+  issue cluster #7). Paste an image into the markdown editor → Iris
+  uploads to the new `images` table → markdown link
+  `![pasted-image](/api/images/<id>)` auto-inserted at the cursor.
+  GitHub-style. New backend `images` module (`POST /api/images` +
+  `GET /api/images/{id}`); 5 MB cap; magic-byte MIME validation
+  (PNG/JPEG/GIF/WebP); SQLite BLOB / Postgres BYTEA parity.
+- **ContextPad bring-forward / send-backward actions** (ADR-136
+  v5.4.0 amendment §C, issue cluster #3). Two new ContextPad
+  buttons (↑ / ↓) for z-order control when items stack (e.g. lane on
+  pool, annotation on activity).
+- **Lane-on-pool parent detection** (ADR-136 v5.4.0 amendment §D,
+  issue cluster #5). Dragging a lane onto a pool now sets
+  `parentId` on drop, so `validateBpmn::lane_outside_pool` no
+  longer fires false positives. New `onnodedragstop` prop on
+  `<UnifiedCanvas>` forwarded to xyflow; shell-level hit-test runs
+  on BPMN views only.
+- **Add Element / Link Element / Add Diagram on BPMN + Text edit
+  modes** (ADR-136 v5.4.0 amendment §G, ADR-137 v5.4.0 amendment
+  §D, issue cluster #8). Trio toolbar above both branches. On
+  BPMN: Add Element creates a BPMN node + Element; Link Element
+  binds a picked Element to the selected node; Add Diagram inserts
+  a `call_activity` BPMN sub-process referencing the picked
+  diagram. On Text: handlers already wired via v5.1.1
+  `insertMarkdownAtCursor` — only the toolbar render was missing.
+
+### Changed
+
+- **Per-entity-type BPMN node sizing** (ADR-136 v5.4.0 amendment §B,
+  issue cluster #2 + #4). Pre-v5.4 every BPMN node was created with
+  `width: 200`. Events/gateways/data-objects render at 56×56 / 48×64
+  visually but the bounding box was 200px wide, pushing the
+  ContextPad far to the right of the actual shape. New
+  `BPMN_NODE_DIMENSIONS` lookup matches the renderer CSS:
+  events/gateways 56×56, activities 200×80, swimlanes 240–600 wide,
+  data-objects 48×64, etc.
+- **Markdown view defaults to Canvas tab when content exists**
+  (ADR-137 v5.4.0 amendment §B, issue cluster #9). Smart-tab
+  predicate now reads `diagram.data.content` for Text views —
+  pre-v5.4 the page always landed on Details for Text because
+  the predicate only checked `canvasNodes` / sequence participants.
+- **Tab order: Canvas first** (ADR-137 v5.4.0 amendment §C, issue
+  cluster #10). Canvas is now the left-most tab in the views detail
+  page (was Details). The working-content tab gets the working-
+  content position.
+
+### Fixed
+
+- **ProblemsPanel scrolls itself, not the page** (ADR-136 v5.4.0
+  amendment §E, issue cluster #1). `.bpmn-shell__problems` had
+  `overflow: hidden`, clipping the inner list's `overflow-y: auto`.
+  Long problem lists now scroll inside the panel.
+- **Theme dropdown hidden on BPMN + Text views** (ADR-136 v5.4.0
+  amendment §F, issue cluster #6). BPMN theme is fixed by m043's
+  bpmn-default seed; Text views have no canvas to theme.
+- **Dashboard: Packages card removed; Collections + Sets cards
+  visually distinct** (issue cluster #11 + #12). Packages card
+  count was redundant with the hierarchy tree. Collections + Sets
+  get a muted-grey background (`var(--color-surface)`) so they
+  read as "scope filters" distinct from the working-content cards
+  (Views, Elements).
+
+### Docs
+
+- ADR-145 / SPEC-145-A — image upload storage decision (table vs
+  Supabase Storage vs base64) and schema/endpoints.
+- ADR-136 v5.4.0 amendment — BPMN-as-Elements + per-type sizing +
+  z-order + parent-on-drop + ProblemsPanel + theme + trio buttons.
+- ADR-137 v5.4.0 amendment — paste-image + smart-tab default + tab
+  order + trio render in Text mode.
+
+### Verification
+
+- 11 new vitest specs added (≥ 30 tests covering Phase 1–5).
+- 2 new backend pytest specs (5 tests on the images endpoint).
+- Frontend full suite: 866/867 vitest pass (1 pre-existing baseline
+  failure unchanged — `importIdempotency > displays diagrams skipped
+  count`, fails against unmodified baseline too).
+- `svelte-check`: 164 errors (= unchanged baseline, no new errors).
+- Backend BPMN suite stays green; new images suite 5/5.
+
 ## [5.3.1] - 2026-05-05
 
 Hot-fix for v5.2.0 (issue #37 reopen). Every canvas — not just BPMN —
