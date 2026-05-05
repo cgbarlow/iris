@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-05-05
+
+Hot-fix for v5.2.0 (issue #37 reopen). Every canvas — not just BPMN —
+crashed on load with `Uncaught Error: To call useStore outside of
+<SvelteFlow /> you need to wrap your component in a
+<SvelteFlowProvider />`.
+
+### Fixed
+
+- **All canvases crash with "useStore outside of SvelteFlow"**
+  (ADR-136 v5.3.1 amendment, issue #37 reopen). v5.2.0 added
+  `useSvelteFlow()` at the script level of `UnifiedCanvas` to power
+  the BPMN palette drag-drop's coordinate projection. xyflow's hook
+  uses `getContext` at call time and only resolves inside
+  `<SvelteFlowProvider>` (or `<SvelteFlow>`). v5.2.0 also wrapped
+  UnifiedCanvas's *own template* in the provider — but Svelte's
+  lifecycle runs the script BEFORE the template mounts, so the hook
+  ran with no context above it and threw. Net effect: every
+  notation's canvas was broken in production, not just BPMN.
+  - Fix: extract a thin `CanvasDropArea` component that owns the
+    drop handlers and calls `useSvelteFlow()` from its own script.
+    Mount it inside the existing `<SvelteFlowProvider>` so its
+    initialisation happens *after* the provider is set up.
+  - Regression guard: `bpmnCanvasIntegration.test.ts` adds a test
+    asserting `UnifiedCanvas` does NOT call `useSvelteFlow` at
+    script level. Catches the exact pattern that broke v5.2.0.
+
 ## [5.3.0] - 2026-05-05
 
 Markdown experience overhaul (issue #32 reopen). Four bundled

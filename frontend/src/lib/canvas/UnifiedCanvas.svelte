@@ -5,7 +5,7 @@
 	 * Supports both edit and browse modes.
 	 */
 	import { setContext } from 'svelte';
-	import { SvelteFlow, SvelteFlowProvider, Controls, Background, useSvelteFlow } from '@xyflow/svelte';
+	import { SvelteFlow, SvelteFlowProvider, Controls, Background } from '@xyflow/svelte';
 	import { ConnectionMode } from '@xyflow/system';
 	import type { Connection, Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
@@ -15,6 +15,7 @@
 	import FitViewTrigger from './FitViewTrigger.svelte';
 	import CanvasAnnouncer from './controls/CanvasAnnouncer.svelte';
 	import KeyboardHandler from './controls/KeyboardHandler.svelte';
+	import CanvasDropArea from './CanvasDropArea.svelte';
 	import type { CanvasNode, CanvasEdge, NotationType } from '$lib/types/canvas';
 
 	interface Props {
@@ -79,24 +80,12 @@
 	// renderer-level prop hop.
 	setContext('bpmnContextPadAction', oncontextpadaction);
 
-	const flow = useSvelteFlow();
-
-	function handleDragOver(e: DragEvent) {
-		// Required for the browser to fire `drop` — the default behaviour
-		// rejects the drop entirely.
-		if (e.dataTransfer?.types.includes('application/iris-bpmn-entity')) {
-			e.preventDefault();
-			e.dataTransfer.dropEffect = 'copy';
-		}
-	}
-
-	function handleDrop(e: DragEvent) {
-		const key = e.dataTransfer?.getData('application/iris-bpmn-entity');
-		if (!key) return;
-		e.preventDefault();
-		const position = flow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-		ondropentity?.(key, position);
-	}
+	// v5.3.1 hot-fix (issue #37 reopen): the v5.2.0 implementation called
+	// `useSvelteFlow()` here at script-level, which threw "useStore outside
+	// of <SvelteFlow />" because the script runs *before* the
+	// SvelteFlowProvider in this same component's template mounts. Drop
+	// handling now lives in <CanvasDropArea>, a child of the provider — its
+	// script runs after the provider sets up so the hook resolves.
 
 	let announcer: CanvasAnnouncer | undefined = $state();
 	let keyboardHandler: KeyboardHandler | undefined = $state();
@@ -264,11 +253,12 @@
 	}
 </script>
 
-<!-- v5.2.0 (issue #37): wrap in SvelteFlowProvider so the script-level
-	 useSvelteFlow() call (used by handleDrop's screenToFlowPosition) has a
-	 store to read. Required because the drop handler lives on the OUTER div,
-	 above <SvelteFlow>'s own implicit provider. -->
+<!-- v5.2.0 (issue #37): SvelteFlowProvider so descendants can use
+	 useSvelteFlow(). v5.3.1 hot-fix (issue #37 reopen): drop handler
+	 moved into <CanvasDropArea> (a provider descendant) so its hook
+	 call happens AFTER the provider mounts. -->
 <SvelteFlowProvider>
+<CanvasDropArea ondropentity={browseMode ? undefined : ondropentity}>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
 	class="model-canvas{browseMode ? ' model-canvas--browse' : ''}"
@@ -276,8 +266,6 @@
 	aria-label="{notationLabel} diagram canvas{browseMode ? ' — browse mode (read-only)' : ''}{connectMode ? ' — connect mode active' : ''}"
 	aria-roledescription="interactive diagram{browseMode ? ', read-only' : ''}"
 	onkeydown={browseMode ? undefined : handleKeydown}
-	ondragover={browseMode ? undefined : handleDragOver}
-	ondrop={browseMode ? undefined : handleDrop}
 >
 	{#if browseMode}
 		<SvelteFlow
@@ -382,4 +370,5 @@
 
 	<CanvasAnnouncer bind:this={announcer} />
 </div>
+</CanvasDropArea>
 </SvelteFlowProvider>
