@@ -8,6 +8,9 @@
 		currentDiagramId?: string;
 		searchQuery?: string;
 		showDiagramsOnly?: boolean;
+		/** Issue #27: per-kind visibility toggles from the Show dropdown. */
+		showDiagrams?: boolean;
+		showText?: boolean;
 		expandedIds?: Set<string>;
 		siblings?: DiagramHierarchyNode[];
 		onreorder?: (parentId: string | null, orderedIds: string[]) => void;
@@ -26,6 +29,8 @@
 		currentDiagramId = '',
 		searchQuery = '',
 		showDiagramsOnly = false,
+		showDiagrams = true,
+		showText = true,
 		expandedIds = new Set<string>(),
 		siblings = [],
 		onreorder,
@@ -74,12 +79,19 @@
 				? 'hollow'
 				: 'none'
 	);
-	const nodeHref = $derived(isPackage ? `/packages/${node.id}` : `/diagrams/${node.id}`);
+	const nodeHref = $derived(isPackage ? `/packages/${node.id}` : `/views/${node.id}`);
 
 	const passesDiagramFilter = $derived(
 		!showDiagramsOnly || node.has_content || descendantHasContent(node)
 	);
-	const visible = $derived((matchesSearch || childMatchesSearch) && passesDiagramFilter);
+	/** Issue #27: hide leaf nodes whose kind is toggled off; packages are always shown. */
+	const isText = $derived(node.diagram_type === 'text');
+	const passesKindFilter = $derived(
+		isPackage || (isText ? showText : showDiagrams),
+	);
+	const visible = $derived(
+		(matchesSearch || childMatchesSearch) && passesDiagramFilter && passesKindFilter,
+	);
 
 	function toggleExpand() {
 		expanded = !expanded;
@@ -254,6 +266,8 @@
 						{currentDiagramId}
 						{searchQuery}
 						{showDiagramsOnly}
+						{showDiagrams}
+						{showText}
 						{expandedIds}
 						siblings={node.children}
 						{onreorder}

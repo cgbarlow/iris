@@ -84,7 +84,7 @@
 		{ href: '/', label: 'Dashboard', shortcut: 'H', icon: 'dashboard' },
 		{ href: '/collections', label: 'Collections', shortcut: 'C', icon: 'collections' },
 		{ href: '/sets', label: 'Sets', shortcut: 'T', icon: 'sets' },
-		{ href: '/diagrams', label: 'Diagrams', shortcut: 'M', icon: 'diagrams' },
+		{ href: '/views', label: 'Views', shortcut: 'M', icon: 'diagrams' },
 		{ href: '/elements', label: 'Elements', shortcut: 'E', icon: 'elements' },
 		{ href: '/settings', label: 'Settings', shortcut: 'S', icon: 'settings' },
 	];

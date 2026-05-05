@@ -30,6 +30,7 @@
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let searchInput = $state<HTMLInputElement | null>(null);
+	let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let selectedCount = $derived(selectedDocIds.length);
 
@@ -59,6 +60,7 @@
 			const resp = await apiFetch<{ items: DocRefDocument[] }>('/api/docref/documents');
 			documents = resp.items;
 			ondocuments?.(resp.items.map(d => ({ id: d.id, title: d.title })));
+			schedulePollIfImporting();
 		} catch (e) {
 			if (e instanceof ApiError && e.status === 404) {
 				// Extension not available — hide component
@@ -70,13 +72,33 @@
 		loading = false;
 	}
 
+	/** Issue #27: import is now a background task on the backend, so we
+	 * poll /documents every few seconds while any document is in the
+	 * `importing` state and stop polling once everything settles. */
+	function schedulePollIfImporting() {
+		if (pollTimer) {
+			clearTimeout(pollTimer);
+			pollTimer = null;
+		}
+		const stillImporting = documents.some((d) => d.status === 'importing');
+		if (stillImporting) {
+			pollTimer = setTimeout(() => { loadDocuments(); }, 3000);
+		}
+	}
+
 	async function importDocument(doc: DocRefDocument) {
 		if (importingIds.has(doc.id)) return;
 		importingIds = new Set([...importingIds, doc.id]);
+		// Optimistic local update so the spinner appears immediately.
+		documents = documents.map((d) =>
+			d.id === doc.id ? { ...d, status: 'importing', error_message: null } : d,
+		);
 		try {
 			await apiFetch(`/api/docref/documents/${doc.id}/import`, {
 				method: 'POST',
 			});
+			// Poll for the actual outcome — the backend runs the import
+			// off the request thread so HTTP success only means "queued".
 			await loadDocuments();
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Import failed';
@@ -105,6 +127,12 @@
 		if (!open) {
 			searchQuery = '';
 		}
+	});
+
+	$effect(() => {
+		return () => {
+			if (pollTimer) clearTimeout(pollTimer);
+		};
 	});
 </script>
 

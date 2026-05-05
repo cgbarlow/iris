@@ -1,6 +1,6 @@
 # ADR-137: Text diagram subclass and shared Markdown renderer
 
-Status: Accepted (2026-05-04)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issue #27)
 
 ## Context
 
@@ -166,3 +166,121 @@ smuggling vector. We belt-and-brace it:
   pipeline; this ADR consolidates it into the shared component.
 - [SPEC-137-A](specs/SPEC-137-A-Text-Diagram-And-Markdown-View.md) —
   schema, rendering rules, link extraction, UX details.
+
+## Amendment 2026-05-05 — UAT follow-ups (issue #27)
+
+UAT against render-supabase-uat surfaced four functional gaps and a
+broad terminology change. Each is addressed without re-architecting
+the v5.1.0 design — the Text-as-Diagram-subclass + shared-MarkdownView
+pieces stand. The amendments tighten the editor and rename the
+user-facing surface from "Diagrams" to "Views" so a Text view sits
+naturally alongside a Canvas view.
+
+### A. Save was always disabled in the markdown editor (root-cause bug)
+
+`canvasDirty` is the single flag that gates the toolbar Save button on
+the diagram detail page. The first-cut TextCanvas wiring updated
+`diagram.data.content` in `oncontentchange` but never set
+`canvasDirty = true`, so Save stayed greyed out forever. **Fix:** flip
+`canvasDirty` from the same callback. One-line change in the parent
+page; Text editing is now indistinguishable from canvas editing as far
+as the dirty-tracking contract is concerned.
+
+### B. Save wiped the markdown content (root-cause bug)
+
+`saveCanvas` always wrote `data: { nodes: canvasNodes, edges: canvasEdges }`
+to the API. For a Text diagram those arrays are empty, so saving an
+edited text view replaced `data.content` with an empty
+nodes/edges object — and the next browse render fell into the
+"empty canvas" branch instead of MarkdownView. This is exactly what
+the user saw: "I now see a normal canvas diagram with the diagram and
+element boxes I added in the markdown editor, however none of the
+markdown text I wrote." **Fix:** branch on `canvasType === 'text'`
+inside `saveCanvas` and persist `{ content: markdownContent }`
+instead.
+
+### C. Add Diagram / Add Element / Link Element insert markdown links in Text mode
+
+The toolbar buttons live one level above the canvas/text branch and
+were creating canvas nodes regardless of mode. In Text mode the user
+expects an `iris://` markdown link inserted at the cursor. **Fix:**
+`TextCanvas` now exposes its `<textarea>` upward via a `$bindable`
+`textareaEl` prop. The page reads `selectionStart/End`, splices the
+markdown link in at the cursor, updates `diagram.data.content`, and
+restores focus. `handleAddElement`, `handleLinkElement` and
+`handleInsertDiagram` each gain a one-shot Text branch that calls a
+shared `insertMarkdownAtCursor(snippet)` helper.
+
+### D. BPMN was missing from `NotationPills` (covered by ADR-136 amendment)
+
+Same root cause as the BPMN regression noted in the ADR-136 amendment
+above — the picker hard-coded a five-entry list. The Text class also
+needs `markdown` to be in that picker, so it benefits from the same
+fix.
+
+### E. "Diagrams" → "Views" — frontend terminology and routing
+
+Issue #27 renames the user-facing concept so a Text view doesn't have
+to live under a "Diagrams" menu. **Scope is frontend-only** at the
+user's explicit request — backend tables, API routes and stored data
+all keep the `diagram` term to avoid an invasive migration. The
+changes:
+
+- `src/routes/diagrams/` moved to `src/routes/views/` (git-rename to
+  preserve history).
+- Stub `+page.ts` files at `/diagrams` and `/diagrams/[id]` issue an
+  HTTP 308 redirect to `/views` and `/views/<id>` so existing
+  bookmarks and external deep-links keep working.
+- All in-app navigation (`href`, `goto`, `recordVisit.href`,
+  `MarkdownView` click handler, `TreeNode.nodeHref`,
+  `EntityDetailPanel`, `ModelRefNode`, `AppShell` nav, dashboard cards
+  and breadcrumbs) updated to `/views`.
+- Visible labels swapped: page titles, the AppShell menu entry,
+  dashboard "Diagrams" card → "Views", "Diagram Hierarchy" tab →
+  "View Hierarchy", search/filter placeholders, batch dialog
+  copy, etc.
+- `DiagramDialog` field label "Diagram Type" → "View Type" and the
+  markdown notation's type entry shortened from "Text Document" to
+  "Text" per UAT note ("the View Type we get in the drop-down is
+  'Text'").
+
+### F. Hierarchy panel — two-button standard
+
+Both the Dashboard hierarchy panel and the Views index now share a
+new `HierarchyControls` component with exactly two dropdowns:
+
+- **+ New** → View | Package. The notation pill in the resulting
+  Create dialog handles Diagram-vs-Text selection (drops the
+  earlier dashboard-only `View → Diagram | Text` submenu, which the
+  user explicitly asked us to flatten).
+- **Show** → checkboxes for *Diagrams* and *Text*. Packages are
+  always shown — the dropdown labels this so the absence of a
+  Packages toggle is intentional, not a bug.
+
+The Dashboard's existing Reorder button is kept (drag-to-reorder tree
+items) with a clearer tooltip; the user noted they weren't sure what
+it does, so we don't remove the capability — we just explain it.
+
+`TreeNode` gains `showDiagrams` / `showText` props so the hierarchy
+view honours the toggle on both pages without re-implementing the
+filter.
+
+### G. EntityDialog notation pill scope
+
+`EntityDialog` (used for "Add Element" on a canvas) keeps its
+notation picker but now passes `notations={[..., excluding 'markdown']}`
+to `NotationPills` — text views have no entities, so offering markdown
+in this context is misleading.
+
+## Out of scope (this amendment)
+
+- **Backend rename** from `diagram` to `view`. The user explicitly
+  deferred this ("Don't make this change on the backend (yet), as this
+  may get very messy"). API routes (`/api/diagrams/*`) and stored
+  fields (`diagram_type`, `diagrams.data`) stay as-is. Frontend types
+  (`Diagram`, `DiagramHierarchyNode`) similarly keep their names so the
+  TypeScript surface against the API stays trivially mappable.
+- **Markdown editor toolbar redesign** — Add/Link buttons keep their
+  current labels even in Text mode. A future pass could rename them in
+  Text context ("Insert Element Link" etc.) but the existing labels
+  read sensibly enough now that they actually insert what they say.

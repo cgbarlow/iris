@@ -209,3 +209,36 @@ open") that recurred in user reviews.
 | Problems panel         | `frontend/src/lib/canvas/validation/ProblemsPanel.svelte`                                     |
 | Backend tests          | `backend/tests/test_diagrams/test_bpmn_notation.py` (26 tests)                                |
 | Frontend tests         | `frontend/tests/unit/bpmnEntityTypes.test.ts`, `bpmnValidation.test.ts` (26 tests)            |
+
+## Amendment 2026-05-05 — `NotationPills` is the single source of truth (issue #27)
+
+`NotationPills.svelte` previously hard-coded the visible notations and
+silently omitted BPMN (and Markdown). Despite the registry, renderer,
+palette, AI seed and DiagramDialog fallback all being wired up, the
+user could not pick BPMN when creating a new view.
+
+### Surface change
+
+- `frontend/src/lib/components/NotationPills.svelte` now lists all
+  seven notations: Simple, UML, ArchiMate, C4, **BPMN**, DoView,
+  **Markdown**. The pill list is the canonical source for which
+  notations a user can pick.
+- A new optional `notations: string[]` prop scopes the visible pills
+  for callers that need to exclude entries.
+  `EntityDialog.svelte` passes `[..., excluding 'markdown']` because
+  text views have no entities to add.
+- The notation filter dropdown on the Views index
+  (`frontend/src/routes/views/+page.svelte`) gains the same two
+  missing entries (BPMN, Markdown).
+- The diagram-type filter on the Views index gains entries for
+  `collaboration`, `choreography` and `text` so BPMN- and Markdown-
+  authored views are filterable.
+
+### Verification
+
+`frontend/tests/unit/notationPillsCoverage.test.ts` (added) reads
+`NotationPills.svelte` and `DiagramDialog.svelte` and asserts that
+every notation key registered in `NOTATION_TYPE_FALLBACK` appears in
+the pill list. This catches the exact regression that produced
+issue #27 — adding a notation to the registry without surfacing it in
+the picker.

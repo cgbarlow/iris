@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.1] - 2026-05-05
+
+UAT follow-ups (issue #27) for the v5.1.0 release. The user-facing
+"Diagrams" surface is renamed to "Views" so a Text view sits naturally
+alongside a Canvas view; backend tables, API routes and stored data
+keep the `diagram` term to avoid an invasive migration. See the
+amendments at the end of
+[ADR-135](docs/adrs/ADR-135-DocRef-Supabase-Migration-Parity.md),
+[ADR-136](docs/adrs/ADR-136-BPMN-Notation.md) and
+[ADR-137](docs/adrs/ADR-137-Text-Diagram-Subclass-And-Shared-Markdown-Renderer.md).
+
+### Fixed
+
+- **DocRef "Import failed" while the import actually succeeded**
+  (ADR-135 amendment, issue #27). Importing a real document
+  (e.g. Social Security Act) reliably surfaced "Import failed" in the
+  UI even though the import completed a few seconds later — Render's
+  edge timed the synchronous CSV download + per-chunk INSERT out at
+  ~100s while the asyncio task on the backend kept going. The
+  endpoint is now fire-and-forget: returns HTTP 202 + `importing`
+  status immediately, runs the import via `asyncio.create_task`, and
+  the frontend polls `/documents` every ~3s while any document is
+  importing.
+- **Save button stayed disabled in the markdown editor**
+  (ADR-137 amendment §A, issue #27). The TextCanvas content callback
+  updated `diagram.data.content` but never set `canvasDirty=true`, so
+  the toolbar Save button stayed greyed out.
+- **Saving a Text view wiped the markdown content**
+  (ADR-137 amendment §B, issue #27). `saveCanvas` always wrote
+  `data: { nodes, edges }`, blowing away `data.content`. The browse
+  view then fell into the "empty canvas" branch instead of MarkdownView
+  and the user saw an empty diagram with floating boxes from any
+  Add Element / Add Diagram buttons. Save now branches on
+  `canvasType === 'text'` and persists `{ content: markdownContent }`.
+- **Add Element / Link Element / Add Diagram now insert markdown links
+  in Text mode** (ADR-137 amendment §C, issue #27). TextCanvas exposes
+  its `<textarea>` upward via a `$bindable` `textareaEl`; the parent
+  page splices a `[name](iris://kind/<id>)` snippet at the cursor
+  instead of creating a canvas node.
+- **BPMN missing from `NotationPills`** (ADR-136 amendment, issue #27).
+  The picker hard-coded a five-entry list (Simple, UML, ArchiMate, C4,
+  DoView), silently dropping BPMN despite v5.1.0 wiring up the rest of
+  the BPMN stack. The pill list now contains all seven notations and a
+  unit test asserts coverage against `DiagramDialog.NOTATION_TYPE_FALLBACK`
+  so the regression can't recur.
+
+### Changed
+
+- **"Diagrams" → "Views" across the frontend** (ADR-137 amendment §E,
+  issue #27). User-facing only — backend, API routes and stored data
+  keep the `diagram` term per UAT direction. Routes moved from
+  `src/routes/diagrams/` to `src/routes/views/` (git-renamed); old
+  `/diagrams` and `/diagrams/<id>` URLs issue HTTP 308 redirects to the
+  `/views` equivalents preserving query + hash. Visible labels updated
+  on the dashboard cards, hierarchy tab ("Diagram Hierarchy" → "View
+  Hierarchy"), AppShell nav, page titles, breadcrumbs, search
+  placeholders, batch dialogs and the Create dialog ("Diagram Type" →
+  "View Type"; the markdown notation's type entry shortened from "Text
+  Document" to "Text" per the UAT note).
+- **Hierarchy panel buttons standardised** (ADR-137 amendment §F,
+  issue #27). New shared `HierarchyControls` component renders two
+  dropdowns — "+ New" (View | Package) and "Show" (Diagrams /
+  Text checkboxes; packages always shown). Adopted by both the
+  Dashboard hierarchy panel and the Views index toolbar so the two
+  pages now read identically. The Dashboard's Reorder button is kept
+  with a clearer tooltip.
+- **`EntityDialog` notation pill scoped** (ADR-137 amendment §G,
+  issue #27). Excludes `markdown` because text views have no entities
+  to add.
+
+### Docs
+
+- ADR-135 / SPEC-135-A — DocRef async import amendment.
+- ADR-136 / SPEC-136-A — `NotationPills` is the canonical picker;
+  notation filter dropdown gains BPMN + Markdown entries.
+- ADR-137 / SPEC-137-A — UAT follow-ups (sections A–G), file-by-file
+  rename table, new `HierarchyControls` and `TreeNode` filter props.
+
 ## [5.1.0] - 2026-05-04
 
 Two new notations and a bug fix that unblocked the Iris AI Legislation

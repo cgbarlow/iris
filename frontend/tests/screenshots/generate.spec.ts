@@ -26,9 +26,9 @@ const SHOTS = [
 	{ name: 'collections', url: '/collections' },
 	{ name: 'sets', url: '/sets' },
 	// Packages don't have a list page — show a sample package detail
-	// if we can find one; fall back to diagrams.
-	{ name: 'packages', url: '/diagrams' },
-	{ name: 'diagrams', url: '/diagrams' },
+	// if we can find one; fall back to views.
+	{ name: 'packages', url: '/views' },
+	{ name: 'diagrams', url: '/views' },
 	// Knowledge graph embeds on the dashboard once collection scope is set.
 	// Leaving this identical to `dashboard` is fine — the markdown can use
 	// the same image for both pages.

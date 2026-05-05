@@ -285,12 +285,12 @@
 
 		<div class="mt-4 flex gap-3">
 			<a
-				href={importSetId ? `/diagrams?set_id=${importSetId}` : '/diagrams'}
+				href={importSetId ? `/views?set_id=${importSetId}` : '/views'}
 				onclick={() => { if (importSetId && importSetName) setActiveSet(importSetId, importSetName); }}
 				class="rounded px-4 py-2 text-sm text-white"
 				style="background-color: var(--color-primary)"
 			>
-				View Diagrams
+				Browse Views
 			</a>
 			<button
 				onclick={resetForm}
@@ -349,12 +349,12 @@
 
 		<div class="mt-4 flex gap-3">
 			<a
-				href={importSetId ? `/diagrams?set_id=${importSetId}` : '/diagrams'}
+				href={importSetId ? `/views?set_id=${importSetId}` : '/views'}
 				onclick={() => { if (importSetId && importSetName) setActiveSet(importSetId, importSetName); }}
 				class="rounded px-4 py-2 text-sm text-white"
 				style="background-color: var(--color-primary)"
 			>
-				View Diagrams
+				Browse Views
 			</a>
 			<button
 				onclick={resetForm}

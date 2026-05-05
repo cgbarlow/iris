@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +17,8 @@ from app.docref.models import (
     DocRefRefreshResponse,
 )
 from app.docref import service
+
+log = logging.getLogger("app.docref.router")
 
 router = APIRouter(
     prefix="/api/docref",
@@ -50,24 +54,38 @@ async def list_documents(
 @router.post(
     "/documents/{document_id}/import",
     response_model=DocRefImportResponse,
+    status_code=202,
 )
 async def import_document(
     document_id: str,
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> DocRefImportResponse:
-    """Import a document's chunked CSV from DocRef."""
+    """Kick off a DocRef document import.
+
+    Issue #27: large CSVs can take well over a minute to download +
+    insert, and edge proxies (Render, Cloudflare) close the request
+    before the backend finishes — the user sees "Import failed" but
+    the import actually completes a moment later. We now mark the
+    document `importing` synchronously, schedule the actual work as a
+    background task, and return 202 immediately. The frontend polls
+    `/documents` and reflects the real status.
+    """
     db = request.app.state.db_manager.main_db
     try:
-        result = await service.import_document(
-            db, document_id, imported_by=current_user["id"]
-        )
+        result = await service.start_import_document(db, document_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Import failed: {exc}"
-        ) from exc
+
+    user_id = current_user["id"]
+
+    async def _run() -> None:
+        try:
+            await service.import_document(db, document_id, imported_by=user_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("DocRef import failed for %s: %s", document_id, exc)
+
+    asyncio.create_task(_run())
     return DocRefImportResponse(**result)
 
 

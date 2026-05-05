@@ -190,6 +190,31 @@ async def get_document(
     return _row_to_dict(row) if row else None
 
 
+async def start_import_document(
+    db: DatabasePort,
+    document_id: str,
+) -> dict[str, object]:
+    """Mark a document as 'importing' synchronously so the caller can
+    return immediately while the actual download/parse runs in the
+    background (issue #27 — Render and similar edges time out long
+    requests, so the import must be fire-and-forget).
+    """
+    now = datetime.now(tz=UTC).isoformat()
+
+    doc = await get_document(db, document_id)
+    if doc is None:
+        msg = f"Document {document_id} not found"
+        raise ValueError(msg)
+
+    await db.execute(
+        "UPDATE docref_documents SET status = 'importing', "
+        "error_message = NULL, updated_at = ? WHERE id = ?",
+        (now, document_id),
+    )
+    await db.commit()
+    return {"document_id": document_id, "status": "importing", "chunk_count": 0}
+
+
 async def import_document(
     db: DatabasePort,
     document_id: str,

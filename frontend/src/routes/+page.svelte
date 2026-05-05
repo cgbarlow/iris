@@ -5,6 +5,7 @@
 	import { setActiveSet, clearActiveSet, getActiveSetId } from '$lib/stores/activeSet.svelte.js';
 	import { setActiveCollection, clearActiveCollection, getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
@@ -91,11 +92,11 @@
 	let treeSearchQuery = $state('');
 	let treeExpandedIds = $state(new Set<string>());
 	let reorderMode = $state(false);
-	let showCreateMenu = $state(false);
+	let showDiagrams = $state(true);
+	let showText = $state(true);
 	let showCreateDiagramDialog = $state(false);
-	/** Initial notation pre-set on the Create dialog when opened from the
-	 * View submenu (issue #26 — "Diagram" opens with notation cleared,
-	 * "Text" opens with notation='markdown'). */
+	/** Optional pre-set notation passed to the Create dialog (kept undefined
+	 * post-#27 so the user always picks the notation in the dialog itself). */
 	let createInitialNotation = $state<string | undefined>(undefined);
 	let showCreatePackageDialog = $state(false);
 	let newPackageName = $state('');
@@ -368,7 +369,7 @@
 			});
 			showCreateDiagramDialog = false;
 			await loadHierarchy();
-			await goto(`/diagrams/${created.id}`);
+			await goto(`/views/${created.id}`);
 		} catch {
 			// handled by dialog
 		}
@@ -563,13 +564,13 @@
 			</div>
 		</a>
 		<a
-			href={setId ? `/diagrams?set_id=${setId}` : collectionId ? `/diagrams?collection_id=${collectionId}` : '/diagrams'}
+			href={setId ? `/views?set_id=${setId}` : collectionId ? `/views?collection_id=${collectionId}` : '/views'}
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
 			<div class="text-3xl font-bold" style="color: var(--color-primary)">{diagramCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
-				Diagrams {#if activeSet || activeCollection}(filtered){/if}
+				Views {#if activeSet || activeCollection}(filtered){/if}
 			</div>
 		</a>
 		<a
@@ -588,7 +589,7 @@
 		Filter by Collection or Set above, or search across your architecture repository below.
 	</p>
 
-	<!-- Diagram Hierarchy + Knowledge Graph -->
+	<!-- View Hierarchy + Knowledge Graph -->
 	{#if true}
 		{@const hasHierarchy = !!activeSet}
 		{@const showSideBySide = hasHierarchy && wideEnough}
@@ -604,7 +605,7 @@
 						class="px-5 py-2 text-sm font-medium transition-colors"
 						style="color: {viewTab === 'hierarchy' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {viewTab === 'hierarchy' ? 'var(--color-primary)' : 'transparent'}; margin-bottom: -1px"
 					>
-						Diagram Hierarchy
+						View Hierarchy
 					</button>
 					<button
 						role="tab"
@@ -623,29 +624,20 @@
 				<!-- Hierarchy panel -->
 				{#if hasHierarchy && (showSideBySide || viewTab === 'hierarchy')}
 					<div style="max-width: 500px; min-width: 280px; {showSideBySide ? 'flex: 0 0 380px;' : 'width: 100%;'} overflow-y: auto">
-						<div class="flex items-center gap-1" style="position: relative">
-							<button
-								onclick={() => { showCreateMenu = !showCreateMenu; }}
-								class="rounded px-2 py-1 text-xs"
-								style="background: var(--color-primary); color: white"
-								title="Create new item"
-							>+ New</button>
-							{#if showCreateMenu}
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div style="position: fixed; inset: 0; z-index: 9" onclick={() => (showCreateMenu = false)}></div>
-								<!-- Issue #26: "Diagram" entry replaced with a "View" submenu offering Diagram and Text. -->
-								<div style="position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; min-width: 140px; border-radius: 6px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden">
-									<div class="px-3 pt-2 pb-1 text-xs" style="color: var(--color-muted); font-weight: 600">View</div>
-									<button onclick={() => { createInitialNotation = undefined; showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Diagram</button>
-									<button onclick={() => { createInitialNotation = 'markdown'; showCreateDiagramDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; cursor: pointer">Text</button>
-									<button onclick={() => { showCreatePackageDialog = true; showCreateMenu = false; }} class="block w-full px-3 py-2 text-left text-xs" style="color: var(--color-fg); background: none; border: none; border-top: 1px solid var(--color-border); cursor: pointer">Package</button>
-								</div>
-							{/if}
+						<div class="flex items-center gap-2" style="position: relative">
+							<HierarchyControls
+								{showDiagrams}
+								{showText}
+								onShowDiagrams={(v) => (showDiagrams = v)}
+								onShowText={(v) => (showText = v)}
+								oncreateview={() => { createInitialNotation = undefined; showCreateDiagramDialog = true; }}
+								oncreatepackage={() => (showCreatePackageDialog = true)}
+							/>
 							<button
 								onclick={() => { reorderMode = !reorderMode; }}
 								class="rounded px-2 py-1 text-xs"
 								style="border: 1px solid {reorderMode ? 'var(--color-primary)' : 'var(--color-border)'}; background: {reorderMode ? 'var(--color-primary)' : 'transparent'}; color: {reorderMode ? 'white' : 'var(--color-muted)'}"
-								title={reorderMode ? 'Exit reorder mode' : 'Reorder diagrams'}
+								title={reorderMode ? 'Done — exit drag-and-drop reorder mode' : 'Reorder — drag tree items to change their position'}
 							>
 								{reorderMode ? 'Done' : 'Reorder'}
 							</button>
@@ -654,18 +646,18 @@
 							id="tree-search"
 							bind:value={treeSearchQuery}
 							type="search"
-							placeholder="Filter diagrams..."
+							placeholder="Filter views..."
 							class="mt-2 w-full rounded border px-3 py-2 text-sm"
 							style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 						/>
 						{#if hierarchyLoading}
 							<p class="mt-2 text-sm" style="color: var(--color-muted)">Loading hierarchy...</p>
 						{:else if hierarchyTree.length === 0}
-							<p class="mt-2 text-sm" style="color: var(--color-muted)">No diagrams in this set.</p>
+							<p class="mt-2 text-sm" style="color: var(--color-muted)">No views in this set.</p>
 						{:else}
 							<ul role="tree" class="mt-4" style="list-style: none; padding: 0; margin: 0">
 								{#each hierarchyTree as node (node.id)}
-									<TreeNode {node} searchQuery={treeSearchQuery} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} {contextItemIds} onaddcontext={handleTreeAddToContext} onremovecontext={removeAiContextItem} onhover={(id) => { hoveredNodeId = id; }} {graphHoverIds} {peekExpandedIds} {autoExpandDepth} />
+									<TreeNode {node} searchQuery={treeSearchQuery} {showDiagrams} {showText} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} {contextItemIds} onaddcontext={handleTreeAddToContext} onremovecontext={removeAiContextItem} onhover={(id) => { hoveredNodeId = id; }} {graphHoverIds} {peekExpandedIds} {autoExpandDepth} />
 								{/each}
 							</ul>
 						{/if}
@@ -708,7 +700,7 @@
 									} else if (nodeType === 'set') {
 										goto(`/?set_id=${nodeId}`);
 									} else {
-										const routeMap: Record<string, string> = { package: '/packages', diagram: '/diagrams', element: '/elements' };
+										const routeMap: Record<string, string> = { package: '/packages', diagram: '/views', element: '/elements' };
 										goto(`${routeMap[nodeType] || '/elements'}/${nodeId}`);
 									}
 								}}
@@ -730,7 +722,7 @@
 			bind:value={searchQuery}
 			oninput={onSearchInput}
 			type="search"
-			placeholder="Search elements and diagrams..."
+			placeholder="Search elements and views..."
 			class="mt-1 w-full rounded border px-3 py-2 text-sm"
 			style="max-width: 500px; border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 		/>
@@ -896,7 +888,7 @@
 
 		{#if filteredHistory.length === 0}
 			<p class="mt-4 text-sm" style="color: var(--color-muted)">
-				{historySearchQuery.trim() ? 'No history matches your search.' : 'No pages visited yet. Browse collections, sets, diagrams, packages, or elements to build your history.'}
+				{historySearchQuery.trim() ? 'No history matches your search.' : 'No pages visited yet. Browse collections, sets, views, packages, or elements to build your history.'}
 			</p>
 		{:else}
 			{#each Object.entries(groupedHistory) as [dateLabel, items]}

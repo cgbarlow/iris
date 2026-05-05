@@ -20,7 +20,7 @@ import type { EdgeRoutingType } from '$lib/types/canvas';
 
 const FRONTEND_SRC = resolve(import.meta.dirname, '../../src/lib/canvas');
 const TYPES_FILE = resolve(import.meta.dirname, '../../src/lib/types/canvas.ts');
-const PAGE_FILE = resolve(import.meta.dirname, '../../src/routes/diagrams/[id]/+page.svelte');
+const PAGE_FILE = resolve(import.meta.dirname, '../../src/routes/views/[id]/+page.svelte');
 const EDGE_STYLE_PANEL = resolve(import.meta.dirname, '../../src/lib/canvas/controls/EdgeStylePanel.svelte');
 
 const simpleEdgeFiles = [

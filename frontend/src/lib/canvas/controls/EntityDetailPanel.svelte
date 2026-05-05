@@ -89,11 +89,11 @@
 
 				{#if entity.linkedModelId}
 					<a
-						href="/diagrams/{entity.linkedModelId}"
+						href="/views/{entity.linkedModelId}"
 						class="block rounded px-3 py-2 text-center text-sm text-white"
 						style="background-color: var(--color-primary)"
 					>
-						Open Linked Diagram
+						Open Linked View
 					</a>
 				{/if}
 			</div>
@@ -109,7 +109,7 @@
 						{#each usedInDiagrams as ref}
 							<li>
 								<a
-									href="/diagrams/{ref.diagram_id}"
+									href="/views/{ref.diagram_id}"
 									class="block rounded px-2 py-1 text-sm"
 									style="color: var(--color-primary)"
 								>

@@ -794,7 +794,7 @@
 					{#each usedInModels as model}
 						<li>
 							<a
-								href="/diagrams/{model.diagram_id}"
+								href="/views/{model.diagram_id}"
 								class="flex items-center gap-3 rounded border block p-3"
 								style="border-color: var(--color-border); color: var(--color-primary)"
 							>

@@ -49,7 +49,7 @@ A diagram is a visual model — a DoView strategy diagram, a process flow, a UML
 
 > **Sign in as architect or admin.**
 
-- **New Diagram** — from the package detail page or `/diagrams`. Choose a notation from the picker; each notation has its own toolbar (see [Notations](notations)).
+- **New View** — from the package detail page or `/views` (the **+ New** dropdown). Choose a notation from the picker; each notation has its own toolbar (see [Notations](notations)). Pick **Markdown** to create a Text view.
 - **Edit canvas** — see [Canvas Editing](canvas-editing) for the full edit-mode surface (add element, connect, move, undo/redo, save, locks, fullscreen).
 
 ### Diagram types
