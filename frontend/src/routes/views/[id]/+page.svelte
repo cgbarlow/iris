@@ -2870,6 +2870,36 @@
 						</div>
 					{/if}
 					{/if}
+				{:else if canvasType === 'text'}
+					<!-- Issue #32: browse-mode Text branch — without this Text views fall
+						 through to `canvasNodes.length === 0` and show "Start Building"
+						 because Text views legitimately have zero canvas nodes. -->
+					{#if markdownContent}
+						<div class="flex gap-4">
+							<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
+								<TextCanvas
+									content={markdownContent}
+									editing={false}
+									oncontentchange={() => {}}
+									onheadings={(h) => (textHeadings = h)}
+								/>
+							</div>
+							{#if showTocDrawer}
+								<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
+							{/if}
+						</div>
+					{:else}
+						<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
+							<p style="color: var(--color-muted)">This text view is empty.</p>
+							<button
+								onclick={handleStartEditing}
+								class="rounded px-4 py-2 text-sm text-white"
+								style="background-color: var(--color-primary)"
+							>
+								Start Writing
+							</button>
+						</div>
+					{/if}
 				{:else if canvasNodes.length === 0}
 					<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
 						<p style="color: var(--color-muted)">This diagram has no canvas content yet.</p>

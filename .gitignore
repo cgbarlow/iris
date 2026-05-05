@@ -56,4 +56,5 @@ CLAUDE.md
 
 #temp
 temp/
-ea-visual-audit/iris.code-workspace
+ea-visual-audit/
+iris.code-workspace

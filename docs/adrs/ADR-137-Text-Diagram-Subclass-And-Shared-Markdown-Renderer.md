@@ -1,6 +1,6 @@
 # ADR-137: Text diagram subclass and shared Markdown renderer
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issue #27)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #30, #31, #32)
 
 ## Context
 
@@ -284,3 +284,56 @@ in this context is misleading.
   current labels even in Text mode. A future pass could rename them in
   Text context ("Insert Element Link" etc.) but the existing labels
   read sensibly enough now that they actually insert what they say.
+
+## Amendment 2026-05-05 — v5.1.2 follow-ups (issues #30 / #31 / #32)
+
+UAT against the v5.1.1 deployment surfaced three more issues against
+the same Text-class + HierarchyControls + Views surfaces. All three
+land as a single v5.1.2 patch.
+
+### #30 — Hierarchy panel dropdowns clipped under AppShell
+
+`HierarchyControls.svelte` previously anchored both menus with
+`absolute right-0`. On the Dashboard hierarchy panel — which sits
+flush-left against the AppShell — the right-anchored dropdown extended
+*leftwards* off the panel and ended up under the AppShell nav.
+
+Fix: switch both menus to `absolute left-0`. The menus extend
+*rightwards* from the button, which works on both the Dashboard
+(plenty of room to the right of the narrow hierarchy panel) and the
+Views toolbar (the buttons sit alongside other toolbar items with
+empty space to their right). Single-line change in two places.
+
+### #31 — Tab in markdown editor moved focus instead of indenting
+
+The TextCanvas `<textarea>` had no `keydown` handler so Tab fell
+through to the browser default (move focus to the next tab-stop). The
+editor now intercepts Tab, splices a literal `\t` at the selection,
+forwards the change through the existing `oncontentchange` callback
+(so `canvasDirty` flips), and restores the cursor.
+
+`Shift+Tab` outdents — strips a leading `\t` or up to four spaces
+from the line containing the caret.
+
+WCAG 2.1.2 (No Keyboard Trap) is preserved via an Esc-then-Tab
+escape hatch: pressing Esc once disables the trap; the next Tab moves
+focus normally; any subsequent keystroke re-enables the trap. The
+placeholder text now mentions this so the affordance is discoverable.
+
+### #32 — Text view browse mode showed "Start Building"
+
+The v5.1.1 amendment introduced the `{:else if canvasType === 'text'}`
+branch only inside the `{#if editing}` block. Browse mode for a Text
+view fell through to `{:else if canvasNodes.length === 0}` (Text views
+legitimately have zero canvas nodes) and rendered the canvas
+"Start Building" empty-state.
+
+Fix: add a parallel `{:else if canvasType === 'text'}` branch in the
+browse-mode chain *before* the empty-canvas check, mounting
+`<TextCanvas content={markdownContent} editing={false} />` so
+MarkdownView fires. When `markdownContent` is blank we render a
+text-specific empty-state ("This text view is empty — Start Writing")
+rather than reusing the canvas wording, mirroring the design intent
+the user spelled out in the issue: a single Canvas tab whose
+behaviour switches by notation; the "type of diagram" label remains
+authoritative.

@@ -1,6 +1,6 @@
 # ADR-136: BPMN 2.0 notation
 
-Status: Accepted (2026-05-04) — amended 2026-05-05 (issue #27)
+Status: Accepted (2026-05-04) — amended 2026-05-05 (issues #27, #33)
 
 ## Context
 
@@ -186,3 +186,34 @@ This is a one-line root cause that would have been caught earlier by
 a test asserting "every registered notation is rendered in
 NotationPills". A unit test against the registry vs. the pill list now
 exists to prevent regression.
+
+## Amendment 2026-05-05 — EntityDialog BPMN case (issue #33, v5.1.2)
+
+UAT against v5.1.1 surfaced the *next* link in the same chain: the
+NotationPills picker now offers BPMN (per the previous amendment), but
+clicking **Add Element** on a BPMN view opened `EntityDialog` and
+showed Simple-notation entity types (Actor, Boundary, Component, Note,
+Service, …) — because `EntityDialog.svelte`'s entity-type switch had
+no `case 'bpmn':` and silently fell through to the `default:` Simple
+branch.
+
+Fix in v5.1.2: add a `case 'bpmn':` branch that uses
+`BPMN_ENTITY_TYPES` and applies `BPMN_DIAGRAM_TYPE_FILTER`, mirroring
+the UML / DoView pattern in the same file. A new coverage test
+`entityDialogBpmn.test.ts` asserts that **every notation key in
+`NotationPills.ALL_NOTATIONS`** has a corresponding switch case in
+`EntityDialog` (markdown excepted — text views have no entities;
+simple is the `default:` fallback by convention). This catches the
+exact regression class — adding a notation to the pills without
+wiring its entity types in the dialog.
+
+This is the same v5.1.0 oversight pattern as the v5.1.1 NotationPills
+fix: the registry, renderer, themes, palette and validation rules
+shipped, but the picker dialog was not updated. The two coverage
+tests (notation-pills + entity-dialog) together close that loop.
+
+The deeper UX gap — the BPMN authoring surfaces (`BpmnPalette` /
+`ContextPad` / `CommandPalette` / `EventMatrixPicker` /
+`PropertyPanel` / `ProblemsPanel`) that exist on disk but are not
+mounted into the canvas — is tracked separately for v5.2.0
+(see issue #34). v5.1.2 is the last v5.1.x patch.

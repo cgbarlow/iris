@@ -42,6 +42,60 @@
 		content = value;
 		oncontentchange?.(value);
 	}
+
+	/**
+	 * Issue #31: trap Tab inside the textarea so it indents instead of
+	 * moving focus. Esc temporarily releases the trap so the next Tab
+	 * moves focus normally — preserves WCAG 2.1.2 (No Keyboard Trap).
+	 */
+	let tabTrapEnabled = $state(true);
+
+	function commitChange(ta: HTMLTextAreaElement) {
+		content = ta.value;
+		oncontentchange?.(ta.value);
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		const ta = e.currentTarget as HTMLTextAreaElement;
+
+		if (e.key === 'Escape') {
+			tabTrapEnabled = false;
+			return;
+		}
+
+		if (e.key !== 'Tab') {
+			tabTrapEnabled = true;
+			return;
+		}
+
+		if (!tabTrapEnabled) {
+			tabTrapEnabled = true;
+			return;
+		}
+
+		e.preventDefault();
+		const start = ta.selectionStart;
+		const end = ta.selectionEnd;
+		const value = ta.value;
+
+		if (e.shiftKey) {
+			const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+			if (value[lineStart] === '\t') {
+				ta.value = value.slice(0, lineStart) + value.slice(lineStart + 1);
+				const offset = start === lineStart ? 0 : 1;
+				ta.setSelectionRange(start - offset, end - 1);
+			} else {
+				const spaces = value.slice(lineStart).match(/^ {1,4}/)?.[0].length ?? 0;
+				if (spaces === 0) return;
+				ta.value = value.slice(0, lineStart) + value.slice(lineStart + spaces);
+				ta.setSelectionRange(Math.max(start - spaces, lineStart), end - spaces);
+			}
+		} else {
+			ta.value = value.slice(0, start) + '\t' + value.slice(end);
+			ta.setSelectionRange(start + 1, start + 1);
+		}
+		commitChange(ta);
+	}
 </script>
 
 <div class="text-canvas" data-mode={editing ? 'edit' : 'view'}>
@@ -51,7 +105,8 @@
 			class="text-canvas__editor"
 			value={content ?? ''}
 			oninput={onInput}
-			placeholder="Write markdown… use [label](iris://diagram/<id>) or iris://element/<id> to link to other Iris models."
+			onkeydown={handleKeydown}
+			placeholder="Write markdown… use [label](iris://diagram/<id>) or iris://element/<id> to link to other Iris models. Tab indents; Esc then Tab moves focus."
 			spellcheck="true"
 		></textarea>
 	{:else}
