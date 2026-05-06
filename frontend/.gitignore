@@ -25,3 +25,7 @@ vite.config.ts.timestamp-*
 # Probe output (markdown results + screenshots)
 tests/probes/output/*
 !tests/probes/output/.gitkeep
+
+# v5.5.0: UAT verification harness — storageState + per-run screenshots
+tests/e2e/uat/.auth/
+tests/e2e/uat/screenshots/

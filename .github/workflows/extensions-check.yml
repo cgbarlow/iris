@@ -1,0 +1,30 @@
+name: extensions-check
+
+# v5.5.0 (issue #48): polls each Iris extension's source repo daily for
+# a newer release than what `extensions/manifest.json` currently pins.
+# When a newer release exists, opens (or refreshes) a single issue per
+# extension titled "Upgrade: <id> extension". Re-running is a no-op
+# while the issue stays open — close the issue to file a fresh one for
+# the next upgrade event.
+
+on:
+  schedule:
+    - cron: '7 8 * * *'   # daily 08:07 UTC; GitHub may delay a few min
+  workflow_dispatch:        # allow manual trigger from the Actions tab
+
+permissions:
+  issues: write             # gh issue create / list
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Scan extension sources for newer releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/check_extension_updates.py

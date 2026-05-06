@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth.dependencies import get_current_user
 from app.extensions.models import (
+    CheckUpdateResponse,
     ExtensionInstall,
     ExtensionListResponse,
     ExtensionResponse,
@@ -19,7 +22,9 @@ from app.extensions.service import (
     install_extension,
     list_extensions,
     uninstall_extension,
+    update_latest_version,
 )
+from app.extensions.sources import get_source
 
 router = APIRouter(prefix="/api/extensions", tags=["extensions"])
 
@@ -67,6 +72,12 @@ async def install(
     if existing is not None:
         raise HTTPException(status_code=409, detail="Extension already installed")
 
+    # v5.5.0 (issue #48): default the source from the registry if the
+    # client didn't provide it (most clients won't yet).
+    source = get_source(extension_id) or {}
+    method = body.source_method or source.get("source_method") or "local"
+    source_url = body.source_url or source.get("source_url")
+
     try:
         result = await install_extension(
             db,
@@ -76,6 +87,8 @@ async def install(
             version=body.version,
             installed_by=current_user["id"],
             config=body.config,
+            source_method=method,
+            source_url=source_url,
         )
     except Exception as exc:
         raise HTTPException(  # noqa: B904
@@ -190,3 +203,195 @@ async def disable(
     if result is None:
         raise HTTPException(status_code=404, detail="Extension not found")
     return ExtensionResponse(**result)
+
+
+def _compare_semver(a: str, b: str) -> int:
+    """Return positive if a > b, negative if a < b, 0 if equal.
+
+    Tolerates prerelease/`v`-prefixes by stripping them first.
+    """
+    def _parts(v: str) -> list[int]:
+        v = v.lstrip("vV")
+        out: list[int] = []
+        for chunk in v.split("."):
+            num = ""
+            for c in chunk:
+                if c.isdigit():
+                    num += c
+                else:
+                    break
+            out.append(int(num) if num else 0)
+        return out
+
+    pa, pb = _parts(a), _parts(b)
+    while len(pa) < len(pb):
+        pa.append(0)
+    while len(pb) < len(pa):
+        pb.append(0)
+    if pa > pb:
+        return 1
+    if pa < pb:
+        return -1
+    return 0
+
+
+@router.post("/{extension_id}/check-update", response_model=CheckUpdateResponse)
+async def check_update(
+    extension_id: str,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> CheckUpdateResponse:
+    """v5.5.0 (issue #48): poll the GitHub releases API for the
+    extension's source repo, persist the latest tag, and report whether
+    an update is available."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = request.app.state.db_manager.main_db
+    installed = await get_extension(db, extension_id)
+    if installed is None:
+        raise HTTPException(status_code=404, detail="Extension not found")
+
+    source = get_source(extension_id) or {}
+    if source.get("source_method") != "github":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "check-update is only supported for github-sourced "
+                "extensions"
+            ),
+        )
+
+    owner = source.get("github_owner")
+    repo = source.get("github_repo")
+    if not owner or not repo:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing github_owner / github_repo in sources.json",
+        )
+
+    # GitHub releases API. Optional GITHUB_TOKEN env var raises rate
+    # limits but isn't required for public repos.
+    import os
+
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    latest_tag: str | None = None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:  # noqa: PLR2004
+                payload = resp.json()
+                # GitHub omits 'v' prefix in `tag_name` only sometimes —
+                # the comparator strips it.
+                latest_tag = payload.get("tag_name") or payload.get("name")
+            elif resp.status_code == 404:  # noqa: PLR2004
+                # Repo has no releases yet — leave latest unset and fall
+                # through. Not an error; just no upgrade available.
+                latest_tag = None
+            else:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"GitHub API returned {resp.status_code}",
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(  # noqa: B904
+            status_code=502,
+            detail=f"Failed to query GitHub API: {exc}",
+        )
+
+    now = datetime.now(tz=UTC).isoformat()
+    await update_latest_version(
+        db,
+        extension_id,
+        latest_version=latest_tag,
+        checked_at=now,
+    )
+
+    update_available = (
+        latest_tag is not None
+        and _compare_semver(latest_tag, str(installed.get("version") or "0")) > 0
+    )
+
+    return CheckUpdateResponse(
+        id=extension_id,
+        installed_version=str(installed.get("version") or ""),
+        latest_version=latest_tag,
+        latest_version_checked_at=now,
+        update_available=update_available,
+        source_url=source.get("source_url"),
+    )
+
+
+@router.post("/{extension_id}/upgrade", response_model=ExtensionResponse)
+async def upgrade(
+    extension_id: str,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> ExtensionResponse:
+    """v5.5.0 (issue #48): trigger an automated upgrade. Currently
+    supported for mnemos only — pulls the latest from MNEMOSv2 and
+    restarts the container."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = request.app.state.db_manager.main_db
+    installed = await get_extension(db, extension_id)
+    if installed is None:
+        raise HTTPException(status_code=404, detail="Extension not found")
+
+    source = get_source(extension_id) or {}
+    if not source.get("supports_auto_upgrade"):
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                f"Automated upgrade not supported for '{extension_id}' yet."
+            ),
+        )
+
+    if extension_id == "mnemos":
+        from app.mnemos.setup import (  # noqa: PLC0415
+            clone_or_update_repo,
+            start_container,
+            stop_container,
+        )
+
+        ok, msg = await stop_container()
+        if not ok:
+            print(f"[MNEMOS] Warning during upgrade stop: {msg}", flush=True)
+
+        cloned, clone_msg = clone_or_update_repo(
+            source_url=source.get("source_url"),
+        )
+        if not cloned:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update mnemos repo: {clone_msg}",
+            )
+
+        ok, msg = await start_container()
+        if not ok:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to restart mnemos: {msg}",
+            )
+
+        # The new installed_version is the latest_version we found.
+        if installed.get("latest_version"):
+            now = datetime.now(tz=UTC).isoformat()
+            await db.execute(
+                "UPDATE extensions SET version = ?, updated_at = ? WHERE id = ?",
+                (installed["latest_version"], now, extension_id),
+            )
+            await db.commit()
+
+    refreshed = await get_extension(db, extension_id)
+    if refreshed is None:
+        raise HTTPException(status_code=500, detail="Extension vanished")
+    return ExtensionResponse(**refreshed)

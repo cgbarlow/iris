@@ -1,0 +1,8 @@
+{
+  "_comment": "v5.5.0 (issue #48): the canonical 'currently shipped' version per extension. The daily GitHub Action compares this against each extension's latest GitHub release. Bump these in upgrade PRs.",
+  "versions": {
+    "mnemos": "1.0.0",
+    "scenia": "1.0.0",
+    "docref": "1.0.0"
+  }
+}

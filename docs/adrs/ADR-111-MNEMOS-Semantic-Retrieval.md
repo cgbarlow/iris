@@ -63,3 +63,22 @@
 |--------|----------|------|
 | Proposed | Engineering | 2026-03-29 |
 | Approved | Engineering | 2026-03-29 |
+
+## Amendment 2026-05-06 — v5.5.0: MNEMOSv2 + auto-clone (issue #48)
+
+`backend/app/mnemos/setup.py` previously expected operators to
+manually clone the MNEMOS repo as a sibling directory. v5.5.0 adds
+`clone_or_update_repo(source_url, branch?)` so the install + upgrade
+flow can pull / update from a configured source URL automatically.
+
+The default source URL is now
+`https://github.com/ro0TuX777/MNEMOSv2.git` (the v2 fork superseding
+the original repo). Override at deploy time via
+`IRIS_MNEMOS_REPO_URL` and `IRIS_MNEMOS_REPO_BRANCH`. The helper
+handles both fresh clone (creates the parent dir and runs `git
+clone --depth 1 --branch <branch>`) and update (`git fetch && git
+reset --hard origin/<branch>`).
+
+Pairs with the new daily extension scanner (ADR-146) and the new
+POST `/api/extensions/{id}/upgrade` endpoint, which calls this helper
+between the existing stop_container / start_container lifecycle.

@@ -12,7 +12,12 @@ if TYPE_CHECKING:
 
 
 def _row_to_dict(row: tuple) -> dict[str, object]:
-    """Convert an extensions row to a dict."""
+    """Convert an extensions row to a dict.
+
+    v5.5.0: row is now 13 fields (added source_method, source_url,
+    latest_version, latest_version_checked_at). Legacy 9-field rows
+    coming from a not-yet-migrated DB are tolerated by index defaults.
+    """
     config_raw = row[8]
     config = json.loads(config_raw) if isinstance(config_raw, str) else (config_raw or {})
     return {
@@ -25,7 +30,18 @@ def _row_to_dict(row: tuple) -> dict[str, object]:
         "installed_by": row[6],
         "updated_at": row[7],
         "config": config,
+        "source_method": row[9] if len(row) > 9 and row[9] is not None else "local",
+        "source_url": row[10] if len(row) > 10 else None,
+        "latest_version": row[11] if len(row) > 11 else None,
+        "latest_version_checked_at": row[12] if len(row) > 12 else None,
     }
+
+
+_SELECT_COLS = (
+    "id, name, description, version, is_enabled, installed_at, installed_by, "
+    "updated_at, config, source_method, source_url, latest_version, "
+    "latest_version_checked_at"
+)
 
 
 async def install_extension(
@@ -37,16 +53,20 @@ async def install_extension(
     version: str,
     installed_by: str,
     config: dict[str, object] | None = None,
+    source_method: str | None = None,
+    source_url: str | None = None,
 ) -> dict[str, object]:
     """Install (register) an extension."""
     now = datetime.now(tz=UTC).isoformat()
     config_json = json.dumps(config or {})
+    method = source_method or "local"
 
     await db.execute(
         "INSERT INTO extensions (id, name, description, version, is_enabled, "
-        "installed_at, installed_by, updated_at, config) "
-        "VALUES (?, ?, ?, ?, TRUE, ?, ?, ?, ?)",
-        (extension_id, name, description, version, now, installed_by, now, config_json),
+        "installed_at, installed_by, updated_at, config, source_method, source_url) "
+        "VALUES (?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?, ?)",
+        (extension_id, name, description, version, now, installed_by, now,
+         config_json, method, source_url),
     )
     await db.commit()
 
@@ -60,7 +80,35 @@ async def install_extension(
         "installed_by": installed_by,
         "updated_at": now,
         "config": config or {},
+        "source_method": method,
+        "source_url": source_url,
+        "latest_version": None,
+        "latest_version_checked_at": None,
     }
+
+
+async def update_latest_version(
+    db: DatabasePort,
+    extension_id: str,
+    *,
+    latest_version: str | None,
+    checked_at: str,
+) -> dict[str, object] | None:
+    """v5.5.0 (issue #48): persist the result of a check-update poll."""
+    cursor = await db.execute(
+        "SELECT id FROM extensions WHERE id = ?",
+        (extension_id,),
+    )
+    if await cursor.fetchone() is None:
+        return None
+
+    await db.execute(
+        "UPDATE extensions SET latest_version = ?, latest_version_checked_at = ? "
+        "WHERE id = ?",
+        (latest_version, checked_at, extension_id),
+    )
+    await db.commit()
+    return await get_extension(db, extension_id)
 
 
 async def uninstall_extension(
@@ -128,9 +176,7 @@ async def get_extension(
 ) -> dict[str, object] | None:
     """Get a single extension by ID."""
     cursor = await db.execute(
-        "SELECT id, name, description, version, is_enabled, "
-        "installed_at, installed_by, updated_at, config "
-        "FROM extensions WHERE id = ?",
+        f"SELECT {_SELECT_COLS} FROM extensions WHERE id = ?",
         (extension_id,),
     )
     row = await cursor.fetchone()
@@ -144,9 +190,7 @@ async def list_extensions(
 ) -> list[dict[str, object]]:
     """List all installed extensions."""
     cursor = await db.execute(
-        "SELECT id, name, description, version, is_enabled, "
-        "installed_at, installed_by, updated_at, config "
-        "FROM extensions ORDER BY name",
+        f"SELECT {_SELECT_COLS} FROM extensions ORDER BY name",
     )
     rows = await cursor.fetchall()
     return [_row_to_dict(row) for row in rows]

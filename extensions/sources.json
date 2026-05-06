@@ -1,0 +1,32 @@
+{
+  "_comment": "v5.5.0 (issue #48): single source-of-truth for Iris extensions. Read by backend (app/extensions/sources.py) and by the daily GitHub Action (scripts/check_extension_updates.py). Add new extensions here.",
+  "extensions": {
+    "mnemos": {
+      "name": "MNEMOS",
+      "description": "Semantic memory and retrieval service for improved AI context quality across large datasets.",
+      "source_method": "github",
+      "source_url": "https://github.com/ro0TuX777/MNEMOSv2",
+      "github_owner": "ro0TuX777",
+      "github_repo": "MNEMOSv2",
+      "supports_auto_upgrade": true
+    },
+    "scenia": {
+      "name": "Scenia",
+      "description": "Open-source roadmapping tool for strategic planning and initiative tracking.",
+      "source_method": "github",
+      "source_url": "https://github.com/cgbarlow/waylonkenning_scenia",
+      "github_owner": "cgbarlow",
+      "github_repo": "waylonkenning_scenia",
+      "supports_auto_upgrade": false
+    },
+    "docref": {
+      "name": "DocRef",
+      "description": "NZ legislation from legislation.docref.nz as AI context for Iris AI.",
+      "source_method": "local",
+      "source_url": null,
+      "github_owner": null,
+      "github_repo": null,
+      "supports_auto_upgrade": false
+    }
+  }
+}
