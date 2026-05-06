@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.8] - 2026-05-07
+
+### Fixed
+
+- **`/api/extensions/{id}/check-update` 500 on Postgres** (issue #55
+  follow-up). m048 declared `latest_version_checked_at` as TEXT
+  (matching SQLite), but the rest of the extensions table uses
+  TIMESTAMPTZ for `installed_at` / `updated_at`. The asyncpg adapter
+  auto-converts ISO datetime strings to Python datetime objects;
+  binding a datetime to a TEXT column raised
+  `asyncpg.exceptions.DataError: invalid input for query argument $2:
+  datetime.datetime(...) (expected str, got datetime)` and crashed
+  the worker mid-response, so the user saw a 500 with no CORS
+  headers.
+
+  New migration `m050_latest_version_checked_at_timestamptz.sql`
+  ALTERs the column to TIMESTAMPTZ to match the rest of the table.
+  Idempotent — guarded by an `information_schema` check.
+
+### Operator notes
+
+After merge, run on UAT/Supabase:
+
+```
+psql "$SUPABASE_DB_URL" -f backend/app/migrations/supabase/m050_latest_version_checked_at_timestamptz.sql
+```
+
+Then click "Check for updates" on mnemos again — should succeed.
+
+## [5.5.7] - 2026-05-07
+
+### Fixed
+
+- **GitHub API 403 from `/api/extensions/{id}/check-update`** (issue
+  #55 follow-up). Unauthenticated requests are limited to 60/hr per
+  IP; Render's shared egress hits the limit quickly. Now declares
+  `GITHUB_TOKEN` as a `sync: false` env var on the iris-api
+  service in `render.yaml`. With a fine-grained PAT scoped to
+  "Public Repositories (read-only)" set in the Render dashboard,
+  the limit jumps to 5000/hr.
+- **Helpful 403/429 error message**. The endpoint now surfaces
+  "GitHub API rate limit hit. Set GITHUB_TOKEN…" instead of bare
+  status code so users know what to do.
+
+### Operator notes (post-merge)
+
+1. Generate a fine-grained PAT on GitHub:
+   Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens → Generate new token. Scope it to
+   "Public Repositories (read-only)" — no write access needed.
+2. In Render dashboard → iris-api → Environment, add
+   `GITHUB_TOKEN=<paste>`. Save → triggers redeploy.
+3. Click "Check for updates" on the mnemos card — should succeed
+   now.
+
 ## [5.5.6] - 2026-05-07
 
 Backend deploy fix for issue #55.
