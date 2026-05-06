@@ -2882,7 +2882,12 @@
 										</svg>
 									</button>
 									<div class="flex items-center gap-2">
-										<button onclick={() => (showAddElement = true)} class="rounded px-3 py-1.5 text-sm text-white" style="background-color: var(--color-primary)">Add Element</button>
+										<!-- v5.5.1 (#46 item #12 follow-up): the parent toolbar's
+											 Add Element was gated in v5.4.1 but the FocusView's
+											 duplicate trio was missed. Same gate applied here. -->
+										{#if (notation as string) !== 'bpmn'}
+											<button onclick={() => (showAddElement = true)} class="rounded px-3 py-1.5 text-sm text-white" style="background-color: var(--color-primary)">Add Element</button>
+										{/if}
 										<button onclick={() => (showElementPicker = true)} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Link Element</button>
 										<button onclick={() => (showDiagramPicker = true)} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Add Diagram</button>
 									</div>
