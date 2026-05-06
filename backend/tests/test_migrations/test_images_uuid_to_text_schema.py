@@ -48,3 +48,14 @@ def test_idempotent_via_information_schema_guard() -> None:
     # re-running the migration on a TEXT-shaped table is a no-op.
     assert "information_schema.columns" in sql
     assert "data_type = 'uuid'" in sql
+
+
+def test_drops_and_recreates_images_delete_policy() -> None:
+    """Postgres refuses to ALTER a column referenced by a policy. The
+    migration must drop images_delete (which references uploaded_by)
+    before the ALTER and recreate it with the right TEXT/UUID casts."""
+    sql = MIGRATION.read_text(encoding="utf-8")
+    assert "DROP POLICY IF EXISTS images_delete ON images" in sql
+    assert "CREATE POLICY images_delete ON images" in sql
+    # Recreated policy compares uploaded_by (TEXT) against auth.uid()::text.
+    assert "auth.uid()::text" in sql

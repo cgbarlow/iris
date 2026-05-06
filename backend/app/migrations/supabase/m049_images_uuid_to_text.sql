@@ -10,12 +10,22 @@
 -- catch (silent before v5.4.1; console.error after) swallowed the
 -- failure, and users saw "ctrl-v does nothing".
 --
--- Idempotent: ALTER … TYPE TEXT USING id::text. If the column is
+-- Postgres refuses to ALTER a column type while a policy references
+-- it, so we drop the images_delete policy (which references
+-- uploaded_by) before the ALTER and recreate it with an explicit
+-- ::text cast against auth.uid() afterward.
+--
+-- Idempotent: ALTER … TYPE TEXT USING …::text. If the column is
 -- already TEXT (e.g. on a fresh deploy that has only this migration
 -- and m046 in correct shape), the ALTER is a no-op.
 
 DO $$
 BEGIN
+    -- Drop the policies that depend on uploaded_by so we can ALTER.
+    -- DROP POLICY IF EXISTS is idempotent — safe if policies were
+    -- never created.
+    DROP POLICY IF EXISTS images_delete ON images;
+
     -- images.id: UUID → TEXT
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -34,3 +44,15 @@ BEGIN
     END IF;
 END
 $$;
+
+-- Recreate the policy with TEXT-aware comparisons. `profiles.id` is
+-- UUID so the inner check compares UUID-to-UUID; `uploaded_by` is now
+-- TEXT so it compares against auth.uid()::text.
+CREATE POLICY images_delete ON images
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role = 'admin'
+    )
+    OR uploaded_by = auth.uid()::text
+  );
