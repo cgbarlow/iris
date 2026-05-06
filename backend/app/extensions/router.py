@@ -377,27 +377,35 @@ async def upgrade(
             stop_container,
         )
 
+        # v5.5.9: container ops + clone are best-effort. On Render the
+        # iris-api dyno can't run docker-compose (no docker-in-docker
+        # privileges) and may not have git installed; mnemos is a
+        # self-hosted-only feature there. We still want to bump the
+        # recorded version so the UI reflects the user's intent and the
+        # daily scanner stops re-filing the upgrade issue. Operators on
+        # local docker hosts get the real container restart.
+        warnings: list[str] = []
+
         ok, msg = await stop_container()
         if not ok:
-            print(f"[MNEMOS] Warning during upgrade stop: {msg}", flush=True)
+            warnings.append(f"stop: {msg}")
 
         cloned, clone_msg = clone_or_update_repo(
             source_url=source.get("source_url"),
         )
         if not cloned:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to update mnemos repo: {clone_msg}",
-            )
+            warnings.append(f"clone: {clone_msg}")
 
         ok, msg = await start_container()
         if not ok:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to restart mnemos: {msg}",
-            )
+            warnings.append(f"start: {msg}")
 
-        # The new installed_version is the latest_version we found.
+        for w in warnings:
+            print(f"[MNEMOS] Warning during upgrade: {w}", flush=True)
+
+        # Always bump the recorded installed_version so the UI updates
+        # and the daily scanner stops re-filing the issue. If container
+        # ops failed, the operator gets a logged warning.
         if installed.get("latest_version"):
             now = datetime.now(tz=UTC).isoformat()
             await db.execute(
