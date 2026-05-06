@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.4] - 2026-05-06
+
+Visual + layout fixes uncovered by the live UAT verification run.
+
+### Fixed
+
+- **View-detail hierarchy sidebar buttons match the dashboard's
+  `+ New ▾` / `Show ▾` pattern** (issue #46 hierarchy-panel-match
+  follow-up). Pre-fix the sidebar showed `Diagrams` (a single
+  toggle) and `+ Child` (a primary button with a dropdown). The
+  dashboard's `HierarchyControls` uses the `+ New ▾` / `Show ▾`
+  visual; the sidebar now mirrors it: `+ New ▾` (with Package
+  unindented + View indented, child-create semantics) and
+  `Show ▾` (with the existing "Only with children" toggle and a
+  greyed "Views" section header — same shape as the dashboard).
+- **BPMN Problems panel falls below the fold**. The
+  `.bpmn-shell` height calc used `100vh - 230px`; the rest of
+  the canvases use `100vh - 317px`. The smaller constant left
+  87px of overflow that pushed the Problems panel below the
+  viewport bottom. Now matches the page chrome other canvases
+  account for.
+- **Item 11 test: BPMN palette is an accordion**. The Events
+  section is collapsed by default; the test now expands it via
+  the section heading before clicking Start Event.
+
 ## [5.5.3] - 2026-05-06
 
 Real runtime verification of issue #46 against UAT via the Playwright

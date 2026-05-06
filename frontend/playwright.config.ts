@@ -64,11 +64,26 @@ export default defineConfig({
 			},
 		},
 		{
+			// v5.5.4: ensures a BPMN view exists on UAT for the suite to
+			// drive (creates one in the "test" collection if none exists).
+			name: 'uat-ensure-fixtures',
+			testDir: 'tests/e2e/uat',
+			testMatch: /ensure-.*\.setup\.ts$/,
+			use: {
+				browserName: 'chromium',
+				baseURL: UAT_BASE_URL,
+				storageState: UAT_STORAGE_STATE,
+				viewport: { width: 1440, height: 900 },
+				ignoreHTTPSErrors: true,
+			},
+			dependencies: ['uat-setup'],
+		},
+		{
 			// v5.5.0: UAT verification suite — drives the live deployment to
 			// confirm released fixes actually landed correctly.
 			name: 'uat',
 			testDir: 'tests/e2e/uat',
-			testIgnore: /auth\.setup\.ts$/,
+			testIgnore: /\.setup\.ts$/,
 			use: {
 				browserName: 'chromium',
 				baseURL: UAT_BASE_URL,
@@ -77,7 +92,7 @@ export default defineConfig({
 				screenshot: 'only-on-failure',
 				ignoreHTTPSErrors: true,
 			},
-			dependencies: ['uat-setup'],
+			dependencies: ['uat-ensure-fixtures'],
 			retries: 0,
 		},
 	],

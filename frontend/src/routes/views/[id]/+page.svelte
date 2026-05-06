@@ -222,6 +222,9 @@
 	let showCreateChildDialog = $state(false);
 	let showCreateChildPackageDialog = $state(false);
 	let showChildMenu = $state(false);
+	// v5.5.4 (#46 hierarchy-button-match): controls the new Show ▾ dropdown
+	// in the view-detail hierarchy sidebar.
+	let showHierarchyShowMenu = $state(false);
 	let childPackageName = $state('');
 	let childPackageDescription = $state('');
 	let showParentPicker = $state(false);
@@ -2016,24 +2019,22 @@
 		>
 			<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border); flex-shrink: 0">
 				<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
-				<div class="flex items-center gap-1">
-					<button
-						onclick={() => (treeDiagramsOnly = !treeDiagramsOnly)}
-						class="rounded px-2 py-1 text-xs"
-						style="border: 1px solid {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {treeDiagramsOnly ? 'var(--color-surface, transparent)' : 'transparent'}"
-						title="Show only items with child diagrams"
-						aria-pressed={treeDiagramsOnly}
-					>
-						Diagrams
-					</button>
+				<div class="flex items-center gap-2" style="position: relative">
+					<!-- v5.5.4 (#46 hierarchy-button-match): match the dashboard's
+						 "+ New ▾" / "Show ▾" pattern from HierarchyControls. The
+						 semantics here are child-create (Package / Diagram) rather
+						 than top-level, but visually they line up with the
+						 dashboard's hierarchy panel. -->
 					<div style="position: relative">
 						<button
-							onclick={() => (showChildMenu = !showChildMenu)}
-							class="rounded px-2 py-1 text-xs"
-							style="background: var(--color-primary); color: white; border: 1px solid var(--color-primary)"
-							title="Create child item"
+							type="button"
+							onclick={() => { showChildMenu = !showChildMenu; showHierarchyShowMenu = false; }}
+							class="rounded px-3 py-1 text-xs text-white"
+							style="background-color: var(--color-primary)"
+							aria-haspopup="menu"
+							aria-expanded={showChildMenu}
 						>
-							+ Child
+							+ New ▾
 						</button>
 						{#if showChildMenu}
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -2043,25 +2044,72 @@
 								onkeydown={(e) => { if (e.key === 'Escape') showChildMenu = false; }}
 							></div>
 							<div
-								style="position: absolute; top: 100%; right: 0; z-index: 10; min-width: 120px"
-								class="mt-1 rounded border shadow-md"
-								style:border-color="var(--color-border)"
-								style:background-color="var(--color-surface)"
+								role="menu"
+								class="absolute right-0 z-50 mt-1 min-w-[160px] rounded border py-1 shadow-lg"
+								style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
 							>
 								<button
-									onclick={() => { showCreateChildDialog = true; showChildMenu = false; }}
-									class="block w-full px-3 py-2 text-left text-xs hover:opacity-80"
-									style="color: var(--color-fg)"
-								>
-									Diagram
-								</button>
-								<button
+									role="menuitem"
 									onclick={() => { showCreateChildPackageDialog = true; showChildMenu = false; }}
-									class="block w-full px-3 py-2 text-left text-xs hover:opacity-80"
-									style="color: var(--color-fg); border-top: 1px solid var(--color-border)"
+									class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
+									style="color: var(--color-fg)"
 								>
 									Package
 								</button>
+								<button
+									role="menuitem"
+									onclick={() => { showCreateChildDialog = true; showChildMenu = false; }}
+									class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
+									style="color: var(--color-fg); padding-left: 2rem"
+								>
+									View
+								</button>
+							</div>
+						{/if}
+					</div>
+					<div style="position: relative">
+						<button
+							type="button"
+							onclick={() => { showHierarchyShowMenu = !showHierarchyShowMenu; showChildMenu = false; }}
+							class="rounded border px-3 py-1 text-xs"
+							style="border-color: var(--color-border); color: var(--color-fg)"
+							aria-haspopup="menu"
+							aria-expanded={showHierarchyShowMenu}
+						>
+							Show ▾
+						</button>
+						{#if showHierarchyShowMenu}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div
+								style="position: fixed; inset: 0; z-index: 9"
+								onclick={() => (showHierarchyShowMenu = false)}
+								onkeydown={(e) => { if (e.key === 'Escape') showHierarchyShowMenu = false; }}
+							></div>
+							<div
+								role="menu"
+								class="absolute right-0 z-50 mt-1 min-w-[180px] rounded border py-1 shadow-lg"
+								style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
+							>
+								<div
+									class="px-4 pb-0.5 pt-1 text-xs uppercase tracking-wide"
+									style="color: var(--color-muted); pointer-events: none"
+								>
+									Views
+								</div>
+								<label
+									class="flex cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:opacity-80"
+									style="color: var(--color-fg)"
+								>
+									<input
+										type="checkbox"
+										checked={treeDiagramsOnly}
+										onchange={(e) => (treeDiagramsOnly = (e.target as HTMLInputElement).checked)}
+									/>
+									Only with children
+								</label>
+								<p class="mt-1 px-4 py-1 text-xs" style="color: var(--color-muted)">
+									Packages are always shown.
+								</p>
 							</div>
 						{/if}
 					</div>
