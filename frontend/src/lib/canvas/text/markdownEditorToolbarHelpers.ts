@@ -102,6 +102,7 @@ export function applyOp(ta: HTMLTextAreaElement, op: EditorOp) {
  * the v5.4.0 backend route expects. apiFetch wrapper handles auth.
  */
 import { apiFetch } from '$lib/utils/api';
+import { API_BASE_URL } from '$lib/config';
 
 interface UploadedImage {
 	id: string;
@@ -119,10 +120,17 @@ export async function uploadPastedImage(file: File): Promise<UploadedImage> {
 		'/api/images',
 		{ method: 'POST', body: form },
 	);
+	// v5.5.2 (issue #46 item #4 follow-up): the resulting markdown link
+	// must point at the API origin, not the frontend origin. In Supabase
+	// mode the frontend is at iris-uat.chrisbarlow.nz but the API is at
+	// iris-api-*.onrender.com — a relative `/api/images/<id>` URL would
+	// resolve against the frontend and 404. API_BASE_URL is '' in
+	// self-hosted SQLite mode (relative paths work) and the absolute
+	// API origin in Supabase mode.
 	return {
 		id: resp.id,
 		mime: resp.mime,
 		size_bytes: resp.size_bytes,
-		url: `/api/images/${resp.id}`,
+		url: `${API_BASE_URL}/api/images/${resp.id}`,
 	};
 }
