@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hand-authored ArchiMate Open Exchange (3.0) sample. Used by the test
+  suite to exercise the view-parsing path: 3 elements, 2 relationships,
+  1 view containing all three nodes + both connections.
+-->
+<model xmlns="http://www.opengroup.org/xsd/archimate/3.0/"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       identifier="model-sample-with-view">
+  <name xml:lang="en">Iris Sample (with view)</name>
+  <documentation>Hand-authored fixture for the iris OEX importer.</documentation>
+
+  <elements>
+    <element identifier="el-customer" xsi:type="BusinessActor">
+      <name xml:lang="en">Customer</name>
+      <documentation>External buyer.</documentation>
+    </element>
+    <element identifier="el-place-order" xsi:type="BusinessProcess">
+      <name xml:lang="en">Place Order</name>
+    </element>
+    <element identifier="el-order-svc" xsi:type="ApplicationService">
+      <name xml:lang="en">Order Service</name>
+    </element>
+  </elements>
+
+  <relationships>
+    <relationship identifier="rel-serves" source="el-place-order" target="el-customer" xsi:type="Serving"/>
+    <relationship identifier="rel-realises" source="el-order-svc" target="el-place-order" xsi:type="Realization"/>
+  </relationships>
+
+  <views>
+    <diagrams>
+      <view identifier="view-overview" xsi:type="Diagram">
+        <name xml:lang="en">Overview</name>
+        <node identifier="n-customer" elementRef="el-customer" x="40" y="40" w="120" h="60"/>
+        <node identifier="n-place-order" elementRef="el-place-order" x="220" y="40" w="120" h="60"/>
+        <node identifier="n-order-svc" elementRef="el-order-svc" x="220" y="160" w="120" h="60"/>
+        <connection identifier="c-serves" relationshipRef="rel-serves" source="n-place-order" target="n-customer"/>
+        <connection identifier="c-realises" relationshipRef="rel-realises" source="n-order-svc" target="n-place-order"/>
+      </view>
+    </diagrams>
+  </views>
+</model>
