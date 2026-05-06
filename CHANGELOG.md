@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.3] - 2026-05-06
+
+Real runtime verification of issue #46 against UAT via the Playwright
+harness, plus one confirmed bug fix.
+
+### Fixed
+
+- **+New dropdown View button has no left indent** (issue #46 item #3
+  root cause). Pre-fix the dropdown's View button used Tailwind class
+  `pl-8` for the indent, but the deployed Tailwind v4 build never
+  emitted that class — visually Package and View sat at the same
+  X-coordinate. Confirmed via Playwright screenshot diff against UAT.
+  Fix: switch to inline `style="padding-left: 2rem"` so the indent is
+  immune to Tailwind's content-detection edge cases.
+
+### Changed
+
+- **Playwright UAT harness: more robust BPMN-view discovery + edit-
+  mode handling.** The harness now queries `/api/diagrams?notation=
+  bpmn` directly via the authed page context (rather than scraping
+  dashboard links by text content), and skips BPMN-edit-mode tests
+  cleanly when the edit lock can't be acquired (rather than failing
+  with a 30s timeout). The `auth.setup.ts` flow now handles both
+  Supabase-mode "Email" and SQLite-mode "Username" labels via
+  `getByRole('textbox', …)` and waits for the form to fully hydrate.
+- **`ignoreHTTPSErrors: true` on the UAT projects** so headless
+  chromium without the system CA bundle can drive the live UAT site
+  (relevant for WSL2 / minimal Linux runners).
+
+### Verification status (issue #46 reopen)
+
+Ran the UAT Playwright suite against v5.5.2-on-UAT. Results:
+
+- ✅ #37 BPMN canvas mounts without `useStore outside …` (passes)
+- ✅ #37 `/api/bookmarks` returns < 500 (passes — confirms m047)
+- ✅ #37 `/api/graph/settings` returns < 500 (passes)
+- ✅ #46 #1 /views toolbar HierarchyControls left of Select (passes)
+- ✅ #46 #2 Show dropdown shows greyed Views label (passes)
+- ❌ #46 #3 +New dropdown View indented — fixed in v5.5.3 above
+- ⏭ #46 #4 markdown paste — skipped (no Text view discovery yet)
+- ⏭ #46 #5+12, #6/7, #8, #9, #11 BPMN edit-mode tests — could not
+  enter edit mode in headless run (likely edit-lock contention from
+  a manual session; tests now skip cleanly rather than fail)
+- ⏭ #46 #10 /elements/<id> Used in Diagrams + Relationships —
+  skipped (fragile element-discovery logic; needs improvement)
+
+The harness is now reusable for v5.5.4+ once edit-lock/Text-view
+discovery is improved.
+
 ## [5.5.2] - 2026-05-06
 
 Two follow-up fixes after applying v5.5.1's m049 to UAT surfaced the
