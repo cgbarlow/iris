@@ -106,3 +106,36 @@ def test_load_sources_includes_mnemos_with_v2_url() -> None:
 def test_load_manifest_has_mnemos_baseline() -> None:
     manifest = cu.load_manifest()
     assert "mnemos" in manifest
+
+
+def test_fetch_deployed_versions_returns_none_without_pat() -> None:
+    """v5.5.10: with no IRIS_PAT, return None so caller falls back to manifest."""
+    assert cu.fetch_deployed_versions("https://iris-api.example.com", None) is None
+
+
+def test_fetch_deployed_versions_parses_api_response(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    payload = {
+        "items": [
+            {"id": "mnemos", "version": "2.0.0", "name": "MNEMOS"},
+            {"id": "scenia", "version": "1.0.0", "name": "Scenia"},
+        ]
+    }
+
+    class _FakeResp:
+        def __enter__(self) -> "_FakeResp":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return json.dumps(payload).encode("utf-8")
+
+    def fake_urlopen(req, timeout):  # type: ignore[no-untyped-def]
+        # Verify the Authorization header is set.
+        assert req.get_header("Authorization") == "Bearer iris_pat_xyz"
+        return _FakeResp()
+
+    monkeypatch.setattr(cu.urllib.request, "urlopen", fake_urlopen)
+    deployed = cu.fetch_deployed_versions("https://iris-api.example.com", "iris_pat_xyz")
+    assert deployed == {"mnemos": "2.0.0", "scenia": "1.0.0"}

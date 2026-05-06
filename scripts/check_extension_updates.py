@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """v5.5.0 (issue #48): daily extension upgrade scanner.
 
-Reads `extensions/sources.json` and `extensions/manifest.json`, queries
-the GitHub releases API for each github-sourced extension, and opens an
-issue (deduplicated by title) when a newer release exists than what
-the manifest currently pins.
+Queries the deployed iris-api's GET /api/extensions for the actual
+installed versions (rather than reading a static manifest), then
+queries the GitHub releases API for each github-sourced extension and
+opens an issue (deduplicated by title) when a newer release exists.
+
+v5.5.10 (issue #55 follow-up): switched from manifest.json to
+live API query so manual upgrades on UAT (which bump the row's
+version field) don't keep re-filing the issue. Falls back to
+manifest.json if the API is unreachable so the scanner still works
+when iris-api is down or before any deploy.
 
 Run via the scheduled `extensions-check` GitHub Action. Manual:
 
-  GITHUB_TOKEN=<...> python scripts/check_extension_updates.py [--dry-run]
+  GITHUB_TOKEN=<gh-pat> \\
+  IRIS_API_URL=https://iris-api-gtb3.onrender.com \\
+  IRIS_PAT=iris_pat_<...> \\
+  python scripts/check_extension_updates.py [--dry-run]
 
 When --dry-run is passed, the script prints what it would file but
 doesn't call `gh issue create` / `gh issue list`. Used by the unit
@@ -38,7 +47,34 @@ def load_sources() -> dict[str, dict[str, object]]:
 
 
 def load_manifest() -> dict[str, str]:
+    """Fallback when the live API isn't reachable. Useful for the very
+    first scanner run before any deploy, or when iris-api is down."""
+    if not MANIFEST_PATH.is_file():
+        return {}
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("versions", {})
+
+
+def fetch_deployed_versions(api_url: str, pat: str | None) -> dict[str, str] | None:
+    """v5.5.10: query the deployed iris-api for the actual installed
+    versions of each extension. Returns { extension_id: version } or
+    None on failure (so the caller falls back to manifest.json)."""
+    if not api_url or not pat:
+        return None
+    url = api_url.rstrip("/") + "/api/extensions"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {pat}")
+    req.add_header("Accept", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        print(f"  iris-api {url} returned {exc.code}: {exc.reason}", file=sys.stderr)
+        return None
+    except urllib.error.URLError as exc:
+        print(f"  Failed to reach iris-api at {url}: {exc.reason}", file=sys.stderr)
+        return None
+    items = payload.get("items", [])
+    return {item["id"]: item.get("version", "0.0.0") for item in items if "id" in item}
 
 
 def parse_semver(version: str) -> list[int]:
@@ -155,7 +191,18 @@ def main() -> int:
 
     sources = load_sources()
     manifest = load_manifest()
-    token = os.environ.get("GITHUB_TOKEN")
+    gh_token = os.environ.get("GITHUB_TOKEN")
+    iris_api_url = os.environ.get("IRIS_API_URL", "https://iris-api-gtb3.onrender.com")
+    iris_pat = os.environ.get("IRIS_PAT")
+
+    # v5.5.10: prefer live API state. Fall back to the committed
+    # manifest only when the API is unreachable / unauthed.
+    deployed = fetch_deployed_versions(iris_api_url, iris_pat)
+    if deployed is None:
+        print(f"  iris-api unreachable or no IRIS_PAT — falling back to {MANIFEST_PATH.name}")
+        deployed = manifest
+    else:
+        print(f"  using live deployed versions from {iris_api_url}")
 
     exit_code = 0
     for extension_id, src in sources.items():
@@ -167,7 +214,7 @@ def main() -> int:
             print(f"  skip {extension_id}: missing github_owner/github_repo")
             continue
 
-        installed = manifest.get(extension_id, "0.0.0")
+        installed = deployed.get(extension_id, manifest.get(extension_id, "0.0.0"))
         print(f"checking {extension_id} ({owner}/{repo}) — installed v{installed}")
 
         latest = fetch_latest_release(owner, repo, token)
