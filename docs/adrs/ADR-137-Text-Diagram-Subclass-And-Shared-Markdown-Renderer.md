@@ -505,3 +505,31 @@ in the canvas `{:else}` branch only — invisible on Text views. v5.4.0
 also renders it above the Text branch in edit mode. The handlers
 already branched on `canvasType === 'text'` (v5.1.1) — no logic
 change, just rendering.
+
+## Amendment 2026-05-06 — v5.4.1 fixes (issue #46)
+
+### A. Surface clipboard image paste failures (issue #46 item #4)
+
+Pre-fix, `TextCanvas.svelte`'s `handlePaste` had a silent catch (no
+logging, no UI signal) — when `/api/images` failed for any reason
+(auth, network, MIME rejection), the user saw the editor no-op with
+zero feedback. The amendment:
+
+- The catch now calls `console.error('Image paste failed:', err)` so
+  the underlying status / response body is visible in dev tools.
+- A new optional `onpasteerror?: (err: unknown) => void` prop lets
+  the parent (`views/[id]/+page.svelte`) surface a toast or other
+  visible signal when needed.
+
+The "fall back to default browser paste behaviour" is preserved for
+non-image clipboard items.
+
+### B. Trio Text-branch duplicate removed (issue #46 item #5)
+
+v5.4.0 §D rendered a Text-specific trio above the Text branch. In
+practice the parent canvas toolbar's trio (in the canvas `{:else}`
+branch — which covers all non-sequence canvases) was already
+rendering for Text. The Text-branch render was a duplicate. The
+amendment removes the duplicate; v5.4.0 §D's intent is preserved
+(the trio still renders for Text views in edit mode) by virtue of
+the parent toolbar.
