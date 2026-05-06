@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.7] - 2026-05-07
+
+### Fixed
+
+- **GitHub API 403 from `/api/extensions/{id}/check-update`** (issue
+  #55 follow-up). Unauthenticated requests are limited to 60/hr per
+  IP; Render's shared egress hits the limit quickly. Now declares
+  `GITHUB_TOKEN` as a `sync: false` env var on the iris-api
+  service in `render.yaml`. With a fine-grained PAT scoped to
+  "Public Repositories (read-only)" set in the Render dashboard,
+  the limit jumps to 5000/hr.
+- **Helpful 403/429 error message**. The endpoint now surfaces
+  "GitHub API rate limit hit. Set GITHUB_TOKEN…" instead of bare
+  status code so users know what to do.
+
+### Operator notes (post-merge)
+
+1. Generate a fine-grained PAT on GitHub:
+   Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens → Generate new token. Scope it to
+   "Public Repositories (read-only)" — no write access needed.
+2. In Render dashboard → iris-api → Environment, add
+   `GITHUB_TOKEN=<paste>`. Save → triggers redeploy.
+3. Click "Check for updates" on the mnemos card — should succeed
+   now.
+
 ## [5.5.6] - 2026-05-07
 
 Backend deploy fix for issue #55.

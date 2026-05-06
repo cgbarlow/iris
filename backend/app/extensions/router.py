@@ -293,6 +293,21 @@ async def check_update(
                 # Repo has no releases yet — leave latest unset and fall
                 # through. Not an error; just no upgrade available.
                 latest_tag = None
+            elif resp.status_code in (403, 429):  # noqa: PLR2004
+                # v5.5.7 (issue #55 follow-up): GitHub rate-limits
+                # unauthenticated requests at 60/hr per IP. Render's
+                # shared egress hits this quickly. Surface a hint at the
+                # GITHUB_TOKEN env var rather than a bare status code.
+                remaining = resp.headers.get("X-RateLimit-Remaining")
+                hint = (
+                    "GitHub API rate limit hit. Set GITHUB_TOKEN env var "
+                    "on the iris-api service to authenticated requests "
+                    "(5000/hr instead of 60/hr)."
+                ) if remaining == "0" else (
+                    "GitHub API returned 403 (likely missing auth). Set "
+                    "GITHUB_TOKEN env var on the iris-api service."
+                )
+                raise HTTPException(status_code=502, detail=hint)
             else:
                 raise HTTPException(
                     status_code=502,

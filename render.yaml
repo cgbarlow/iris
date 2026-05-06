@@ -74,6 +74,14 @@ services:
         sync: false
       - key: IRIS_DEBUG
         value: "false"
+      # v5.5.7 (issue #55 follow-up): GitHub PAT used by
+      # POST /api/extensions/{id}/check-update to query releases.
+      # Without it, requests are unauthenticated (60/hr per IP) and
+      # Render's shared egress hits the limit quickly → 403. With it,
+      # the limit is 5000/hr per token. Use a fine-grained PAT scoped
+      # to "Public Repositories (read-only)" — no write access needed.
+      - key: GITHUB_TOKEN
+        sync: false
 
   # --- MCP server: standalone Streamable-HTTP MCP for AI agents ---
   # ADR-134: split out of iris-api so the API doesn't carry the MCP SDK
