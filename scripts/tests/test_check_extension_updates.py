@@ -108,12 +108,13 @@ def test_load_manifest_has_mnemos_baseline() -> None:
     assert "mnemos" in manifest
 
 
-def test_fetch_deployed_versions_returns_none_without_pat() -> None:
-    """v5.5.10: with no IRIS_PAT, return None so caller falls back to manifest."""
-    assert cu.fetch_deployed_versions("https://iris-api.example.com", None) is None
+def test_fetch_deployed_versions_returns_none_without_url() -> None:
+    """v5.5.10: with empty api_url, return None so caller falls back to manifest."""
+    assert cu.fetch_deployed_versions("") is None
 
 
-def test_fetch_deployed_versions_parses_api_response(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_fetch_deployed_versions_hits_public_status_endpoint(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """v5.5.10: scanner uses the unauthenticated public-status endpoint."""
     payload = {
         "items": [
             {"id": "mnemos", "version": "2.0.0", "name": "MNEMOS"},
@@ -131,11 +132,15 @@ def test_fetch_deployed_versions_parses_api_response(monkeypatch) -> None:  # ty
         def read(self) -> bytes:
             return json.dumps(payload).encode("utf-8")
 
+    seen_url: list[str] = []
+
     def fake_urlopen(req, timeout):  # type: ignore[no-untyped-def]
-        # Verify the Authorization header is set.
-        assert req.get_header("Authorization") == "Bearer iris_pat_xyz"
+        seen_url.append(req.full_url)
+        # No Authorization header on the public endpoint.
+        assert req.get_header("Authorization") is None
         return _FakeResp()
 
     monkeypatch.setattr(cu.urllib.request, "urlopen", fake_urlopen)
-    deployed = cu.fetch_deployed_versions("https://iris-api.example.com", "iris_pat_xyz")
+    deployed = cu.fetch_deployed_versions("https://iris-api.example.com")
     assert deployed == {"mnemos": "2.0.0", "scenia": "1.0.0"}
+    assert seen_url == ["https://iris-api.example.com/api/extensions/public-status"]

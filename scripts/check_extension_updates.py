@@ -16,7 +16,6 @@ Run via the scheduled `extensions-check` GitHub Action. Manual:
 
   GITHUB_TOKEN=<gh-pat> \\
   IRIS_API_URL=https://iris-api-gtb3.onrender.com \\
-  IRIS_PAT=iris_pat_<...> \\
   python scripts/check_extension_updates.py [--dry-run]
 
 When --dry-run is passed, the script prints what it would file but
@@ -54,15 +53,20 @@ def load_manifest() -> dict[str, str]:
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8")).get("versions", {})
 
 
-def fetch_deployed_versions(api_url: str, pat: str | None) -> dict[str, str] | None:
+def fetch_deployed_versions(api_url: str) -> dict[str, str] | None:
     """v5.5.10: query the deployed iris-api for the actual installed
     versions of each extension. Returns { extension_id: version } or
-    None on failure (so the caller falls back to manifest.json)."""
-    if not api_url or not pat:
+    None on failure (so the caller falls back to manifest.json).
+
+    Uses the unauthenticated /api/extensions/public-status endpoint —
+    the data (id + version + source URL) isn't sensitive (it's already
+    in extensions/sources.json in a public repo), so avoiding an extra
+    auth secret in the GitHub Action is the cleaner design.
+    """
+    if not api_url:
         return None
-    url = api_url.rstrip("/") + "/api/extensions"
+    url = api_url.rstrip("/") + "/api/extensions/public-status"
     req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Bearer {pat}")
     req.add_header("Accept", "application/json")
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -193,13 +197,13 @@ def main() -> int:
     manifest = load_manifest()
     gh_token = os.environ.get("GITHUB_TOKEN")
     iris_api_url = os.environ.get("IRIS_API_URL", "https://iris-api-gtb3.onrender.com")
-    iris_pat = os.environ.get("IRIS_PAT")
 
-    # v5.5.10: prefer live API state. Fall back to the committed
-    # manifest only when the API is unreachable / unauthed.
-    deployed = fetch_deployed_versions(iris_api_url, iris_pat)
+    # v5.5.10: prefer live API state via the public-status endpoint.
+    # Fall back to the committed manifest only when the API is
+    # unreachable.
+    deployed = fetch_deployed_versions(iris_api_url)
     if deployed is None:
-        print(f"  iris-api unreachable or no IRIS_PAT — falling back to {MANIFEST_PATH.name}")
+        print(f"  iris-api unreachable — falling back to {MANIFEST_PATH.name}")
         deployed = manifest
     else:
         print(f"  using live deployed versions from {iris_api_url}")

@@ -6,19 +6,19 @@ name: extensions-check
 # is a no-op while the issue stays open — close the issue to file a
 # fresh one for the next upgrade event.
 #
-# v5.5.10 (issue #55 follow-up): the script now queries the deployed
-# iris-api at IRIS_API_URL (auth: IRIS_PAT) for the actual installed
-# versions instead of reading a static manifest. So when an operator
-# clicks Upgrade on the UAT extension manager (which bumps the row's
+# v5.5.10 (issue #55 follow-up): the script queries the deployed
+# iris-api's public /api/extensions/public-status endpoint for the
+# actual installed versions instead of reading a static manifest. So
+# when an operator clicks Upgrade on UAT (which bumps the row's
 # version field), the next scanner run sees v2.0.0 as installed and
 # stops re-filing the issue. Falls back to extensions/manifest.json
 # only when the API is unreachable.
 #
-# Operator: in the repo's Settings → Secrets and variables → Actions,
-# add IRIS_PAT as a repository secret. Generate it via the Iris
-# extension manager / PAT flow on the production deploy. Optional:
-# override IRIS_API_URL via repository variable if your iris-api host
-# differs from the default.
+# No secret to manage — the public-status endpoint exposes only
+# id/name/version/source data which is already in
+# extensions/sources.json in this public repo. Optional: override
+# IRIS_API_URL via repository variable if your iris-api host differs
+# from the default.
 
 on:
   schedule:
@@ -41,5 +41,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IRIS_API_URL: ${{ vars.IRIS_API_URL || 'https://iris-api-gtb3.onrender.com' }}
-          IRIS_PAT: ${{ secrets.IRIS_PAT }}
         run: python scripts/check_extension_updates.py

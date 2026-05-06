@@ -40,6 +40,35 @@ async def list_all(
     return ExtensionListResponse(items=[ExtensionResponse(**item) for item in items])
 
 
+@router.get("/public-status")
+async def public_status(request: Request) -> dict[str, list[dict[str, str | None]]]:
+    """v5.5.10: minimal public endpoint for the daily extension scanner.
+
+    Returns just `id`, `name`, `version`, `source_method`,
+    `source_url`, `latest_version` — no operational fields like
+    installed_by / installed_at / config. The extensions list isn't
+    secret (it's in `extensions/sources.json` in a public repo);
+    exposing the deployed versions lets the scanner stop re-filing
+    upgrade issues for already-applied upgrades without requiring
+    yet another auth secret in the GitHub Action.
+    """
+    db = request.app.state.db_manager.main_db
+    items = await list_extensions(db)
+    return {
+        "items": [
+            {
+                "id": str(item["id"]),
+                "name": str(item["name"]),
+                "version": str(item["version"]),
+                "source_method": item.get("source_method"),
+                "source_url": item.get("source_url"),
+                "latest_version": item.get("latest_version"),
+            }
+            for item in items
+        ]
+    }
+
+
 @router.get("/{extension_id}", response_model=ExtensionResponse)
 async def get_one(
     extension_id: str,

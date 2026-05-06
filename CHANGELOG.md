@@ -9,41 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.5.10] - 2026-05-07
 
+### Added
+
+- **`GET /api/extensions/public-status`** — minimal public read-only
+  endpoint returning `id / name / version / source_method /
+  source_url / latest_version` for each installed extension. Used
+  by the daily scanner workflow. No sensitive operational data
+  (no `installed_by`, `installed_at`, `config` or timestamps), so
+  no auth required. The extensions list itself is already public
+  (`extensions/sources.json` in this public repo).
+
 ### Changed
 
-- **Daily extension scanner now reads the deployed iris-api state**
+- **Daily extension scanner reads the deployed iris-api state**
   instead of the static `extensions/manifest.json` (issue #55
   follow-up). Pre-fix the scanner compared GitHub's latest release
-  to a committed manifest version. After an operator clicks Upgrade
-  on the UAT extension manager — which bumps the database row's
-  `version` — the manifest.json is unchanged, so the next daily run
-  re-files the issue even though the deployment is on the new
-  version.
+  to a committed manifest version. After an operator clicked
+  Upgrade on the UAT extension manager — which bumped the database
+  row's `version` — the manifest was unchanged, so the next daily
+  run re-filed the issue even though the deployment was already on
+  the new version.
 
-  Now: `scripts/check_extension_updates.py` first GETs
-  `${IRIS_API_URL}/api/extensions` with `Authorization: Bearer
-  ${IRIS_PAT}` for the actual installed versions. Falls back to
-  `manifest.json` only when the API is unreachable.
-
-  Workflow declares both env vars (`IRIS_API_URL` defaults to the
-  Render iris-api host; `IRIS_PAT` is a repo secret).
-
-### Operator notes
-
-In the GitHub repo: Settings → Secrets and variables → Actions →
-Repository secrets → New repository secret:
-
-- Name: `IRIS_PAT`
-- Value: a Personal Access Token issued via the Iris extension
-  manager's PAT flow on the production deploy (ADR-127).
-
-Optional: override `IRIS_API_URL` via repository variable if your
-iris-api host differs from the default.
-
-After the next daily run (or `workflow_dispatch`), if mnemos has
-been upgraded to v2.0.0 on the deployment, the scanner sees
-`installed=2.0.0`, finds no newer release, and skips. Issue #55 can
-be closed.
+  Now `scripts/check_extension_updates.py` GETs
+  `${IRIS_API_URL}/api/extensions/public-status` (no auth) for the
+  actual installed versions. Falls back to `manifest.json` only when
+  the API is unreachable. The workflow needs no new secrets — just
+  optionally set `IRIS_API_URL` as a repository variable if your
+  iris-api host differs from the default.
+- **`GITHUB_TOKEN` documented as a backend env var in
+  `docs/deployment-render-supabase.md`** (was implicitly required
+  by v5.5.7 but not in the deployment table). Lifts GitHub's 60/hr
+  unauthenticated rate limit to 5000/hr.
 
 ## [5.5.9] - 2026-05-07
 
