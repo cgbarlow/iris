@@ -1,7 +1,7 @@
 {
 	"name": "frontend",
 	"private": true,
-	"version": "5.4.1",
+	"version": "5.5.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -12,6 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:unit": "vitest run",
 		"test:e2e": "playwright test --project=e2e",
+		"test:uat": "PLAYWRIGHT_UAT=1 playwright test --project=uat",
 		"test:bdd": "npx bddgen && playwright test --project=bdd",
 		"test:all-e2e": "npx bddgen && playwright test",
 		"test:probe": "tsx tests/probes/spread-slider-probe.ts",

@@ -7,6 +7,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-05-06
+
+UAT verification harness against the live deployment (issues #46/#37
+reopen) plus the mnemos→MNEMOSv2 upgrade and the extension scanner +
+data-model expansion (issue #48).
+
+### Added
+
+- **UAT-targeted Playwright project** (issue #46/#37 reopen,
+  ADR-147 / SPEC-147-A). New `uat` Playwright project drives the live
+  https://iris-uat.chrisbarlow.nz deployment using a tester account,
+  takes labelled screenshots, and asserts visible state. Run via
+  `npm run test:uat`. New `uat-setup` project signs the tester in once
+  and persists `storageState` for the suite. 12 verification specs
+  cover every item in issue #46 (toolbar order, Show dropdown label,
+  +New ordering, markdown paste, trio dedup, Problems panel layout,
+  ContextPad actions, drag-to-connect, Used in Diagrams /
+  Relationships, EventTriggerFlyout, Add Element gating); 3 specs
+  cover issue #37 (BPMN canvas mounts without `useStore outside
+  <SvelteFlowProvider />`, `/api/bookmarks` and `/api/graph/settings`
+  return < 500). Opt-in via env var `PLAYWRIGHT_UAT=1` so local
+  vite/preview servers aren't started for remote-only runs.
+- **Extension source-tracking columns** (issue #48, ADR-146 /
+  SPEC-146-A). New SQLite migration `m046_extensions_source.py` and
+  Postgres mirror `m048_extensions_source.sql` add `source_method`,
+  `source_url`, `latest_version`, `latest_version_checked_at` to the
+  `extensions` table. Backend `ExtensionResponse` exposes them; the
+  install endpoint persists the source from the registry.
+- **Shared extension source registry** (`extensions/sources.json`,
+  `backend/app/extensions/sources.py`). Single source-of-truth used
+  by the backend, the frontend (via API), and the daily GitHub
+  Action. Mnemos's source URL is now
+  `https://github.com/ro0TuX777/MNEMOSv2`.
+- **POST /api/extensions/{id}/check-update** (issue #48). Polls the
+  GitHub releases API for a github-sourced extension and persists
+  `latest_version` + `latest_version_checked_at`.
+- **POST /api/extensions/{id}/upgrade** (issue #48). Currently
+  supports mnemos: stops the container, runs `clone_or_update_repo`
+  to pull MNEMOSv2's latest, restarts. Returns 501 for extensions
+  that don't yet support automated upgrade.
+- **Extension manager UI: source badge + version diff + update pill +
+  Check Updates / Upgrade buttons** (issue #48). The page now shows
+  whether an extension is `GitHub` / `npm` / `Local`, links to the
+  source URL, renders installed-vs-latest versions, highlights an
+  "Update available" pill via the new `isNewerSemver` helper, and
+  exposes per-row Check for updates and Upgrade actions.
+- **Daily extension upgrade scanner workflow** (issue #48,
+  `.github/workflows/extensions-check.yml`,
+  `scripts/check_extension_updates.py`). Runs daily at 08:07 UTC.
+  For each github-sourced extension whose latest release is newer
+  than the manifest baseline, opens a single deduplicated issue
+  titled `Upgrade: <name> extension`. Closing the issue resets the
+  dedup so the next upgrade event files a fresh one. Manual trigger
+  via `workflow_dispatch`.
+- **`extensions/manifest.json`** — committed baseline of the
+  "currently shipped" version per extension. Bumped in upgrade PRs.
+
+### Changed
+
+- **mnemos auto-clone** (issue #48, ADR-111 amendment). New
+  `clone_or_update_repo()` helper in `backend/app/mnemos/setup.py`
+  clones the configured source repo on a fresh install or pulls the
+  latest on upgrade. Default URL now points at MNEMOSv2; override via
+  `IRIS_MNEMOS_REPO_URL`.
+- **keep-alive workflow now warms `iris-api/health` and the
+  iris-uat frontend** alongside the existing favicon ping.
+  `/health` exercises the FastAPI app stack rather than just the
+  static favicon Render serves directly, which keeps the database
+  bootstrap warm. The frontend ping prevents the static-site dyno
+  from spinning down mid-flow.
+
+### Fixed
+
+- **`/api/bookmarks` 500 on UAT** (issue #37 reopen). The SQLite
+  migration `m038_element_bookmarks.py` (which adds the `element_id`
+  column) was never mirrored to Supabase, so the bookmarks router's
+  `SELECT diagram_id, package_id, element_id, created_at FROM
+  bookmarks` failed on Postgres. New migration
+  `m047_element_bookmarks.sql` adds the column, the index, replaces
+  the strict 2-way CHECK with a 3-way one, and adds the
+  per-user-per-element UNIQUE.
+
+### Docs
+
+- ADR-146 / SPEC-146-A — extension source tracking decision +
+  schema, endpoint shapes, scanner workflow steps, manifest format.
+- ADR-147 / SPEC-147-A — UAT Playwright verification harness:
+  on-demand only, fixture-based credentials, screenshot policy.
+- ADR-111 v5.5.0 amendment — mnemos auto-clone + MNEMOSv2 default.
+
+### Verification
+
+- 8 new vitest specs (semverCompare 7 + extensionManagerFields 6).
+- 12 new backend pytest specs across `test_extensions/test_sources.py`,
+  `test_migrations/test_extensions_source_schema.py`,
+  `test_migrations/test_element_bookmarks_schema.py`.
+- 7 new pytest specs for the scanner script.
+- Frontend full vitest suite: 879/880 pass (1 baseline failure
+  unchanged).
+- `svelte-check`: 164 errors (= unchanged baseline).
+- UAT Playwright suite ships in this release; manual run via
+  `npm run test:uat` after promoting v5.5.0 to UAT.
+
+### Operator notes
+
+- After merging, run the new Postgres migrations on UAT/Supabase:
+  ```
+  psql "$SUPABASE_DB_URL" -f backend/app/migrations/supabase/m047_element_bookmarks.sql
+  psql "$SUPABASE_DB_URL" -f backend/app/migrations/supabase/m048_extensions_source.sql
+  ```
+  m047 fixes the `/api/bookmarks` 500 (issue #37); m048 adds the new
+  source-tracking columns (issue #48).
+
 ## [5.4.1] - 2026-05-06
 
 UAT follow-up to v5.4.0 (issue #46): 12 polish items spanning the

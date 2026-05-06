@@ -20,12 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Wake the iris-api and iris-mcp UAT services
+      - name: Wake the iris-api, iris-mcp, and iris-frontend UAT services
         run: |
           set -euo pipefail
+          # v5.5.0: hit iris-api /health (exercises the FastAPI app + DB
+          # bootstrap, not just the static favicon Render serves directly),
+          # plus the frontend so Render's free-tier doesn't spin it down
+          # mid-flow. /favicon.ico is retained as a cheap secondary so
+          # we still see the static-asset edge come up too.
           URLS=(
+            'https://iris-api-gtb3.onrender.com/health'
             'https://iris-api-gtb3.onrender.com/favicon.ico'
             'https://iris-mcp-gtb3.onrender.com/info'  # ADR-134; update suffix when Render assigns it
+            'https://iris-uat.chrisbarlow.nz/'
           )
           for url in "${URLS[@]}"; do
             for attempt in 1 2; do
