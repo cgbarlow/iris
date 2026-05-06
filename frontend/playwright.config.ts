@@ -57,6 +57,10 @@ export default defineConfig({
 				browserName: 'chromium',
 				baseURL: UAT_BASE_URL,
 				viewport: { width: 1440, height: 900 },
+				// v5.5.3: ignore HTTPS errors so headless chromium without the
+				// system CA bundle (e.g. minimal Linux / WSL2 with extracted
+				// libs) can still drive the live UAT site.
+				ignoreHTTPSErrors: true,
 			},
 		},
 		{
@@ -71,6 +75,7 @@ export default defineConfig({
 				storageState: UAT_STORAGE_STATE,
 				viewport: { width: 1440, height: 900 },
 				screenshot: 'only-on-failure',
+				ignoreHTTPSErrors: true,
 			},
 			dependencies: ['uat-setup'],
 			retries: 0,
