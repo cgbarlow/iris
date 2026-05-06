@@ -2,6 +2,11 @@
 
 Handles starting/stopping the MNEMOS Docker container and making the
 mnemos_sdk importable when the extension is installed.
+
+v5.5.0 (issue #48): added clone_or_update_repo() so the upgrade
+endpoint can pull from MNEMOSv2 (the new fork at
+https://github.com/ro0TuX777/MNEMOSv2) without an operator manually
+re-cloning. Default source URL is configurable via IRIS_MNEMOS_REPO_URL.
 """
 
 from __future__ import annotations
@@ -21,12 +26,70 @@ _MNEMOS_REPO = os.environ.get(
 )
 _MNEMOS_REPO = os.path.abspath(_MNEMOS_REPO)
 
+# v5.5.0 (issue #48): default source URL for fresh clones / upgrades.
+# Override at deploy time via IRIS_MNEMOS_REPO_URL.
+_DEFAULT_MNEMOS_REPO_URL = "https://github.com/ro0TuX777/MNEMOSv2.git"
+
 
 def _mnemos_repo_exists() -> bool:
     """Check if the MNEMOS repo is available on disk."""
     return os.path.isdir(_MNEMOS_REPO) and os.path.isfile(
         os.path.join(_MNEMOS_REPO, "docker-compose.yml")
     )
+
+
+def clone_or_update_repo(
+    *,
+    source_url: str | None = None,
+    branch: str | None = None,
+) -> tuple[bool, str]:
+    """Ensure the MNEMOS repo at _MNEMOS_REPO is up to date.
+
+    If the directory doesn't exist, clones source_url. If it exists and
+    is a git repo, runs `git fetch && git reset --hard origin/<branch>`
+    to bring it to the latest. Returns (success, message).
+
+    Used by the v5.5.0 upgrade endpoint and by start_container() on
+    fresh installs.
+    """
+    url = source_url or os.environ.get("IRIS_MNEMOS_REPO_URL") or _DEFAULT_MNEMOS_REPO_URL
+    target_branch = branch or os.environ.get("IRIS_MNEMOS_REPO_BRANCH") or "main"
+
+    if not os.path.isdir(_MNEMOS_REPO):
+        # Fresh clone.
+        parent = os.path.dirname(_MNEMOS_REPO)
+        try:
+            os.makedirs(parent, exist_ok=True)
+            proc = subprocess.run(
+                ["git", "clone", "--depth", "1", "--branch", target_branch, url, _MNEMOS_REPO],
+                capture_output=True, check=False, timeout=120,
+            )
+            if proc.returncode != 0:
+                err = proc.stderr.decode().strip() or proc.stdout.decode().strip()
+                return False, f"git clone failed: {err}"
+            return True, f"Cloned {url}@{target_branch}"
+        except Exception as exc:  # noqa: BLE001
+            return False, f"git clone failed: {exc}"
+
+    # Existing checkout — update.
+    if not os.path.isdir(os.path.join(_MNEMOS_REPO, ".git")):
+        return False, f"{_MNEMOS_REPO} exists but isn't a git repo; refusing to overwrite"
+
+    try:
+        subprocess.run(
+            ["git", "fetch", "--depth", "1", "origin", target_branch],
+            cwd=_MNEMOS_REPO, capture_output=True, check=True, timeout=60,
+        )
+        subprocess.run(
+            ["git", "reset", "--hard", f"origin/{target_branch}"],
+            cwd=_MNEMOS_REPO, capture_output=True, check=True, timeout=30,
+        )
+        return True, f"Pulled origin/{target_branch}"
+    except subprocess.CalledProcessError as exc:
+        err = (exc.stderr or b"").decode().strip()
+        return False, f"git update failed: {err}"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"git update failed: {exc}"
 
 
 def ensure_sdk_importable() -> None:

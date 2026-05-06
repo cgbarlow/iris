@@ -317,3 +317,23 @@ export async function loginAs(page: Page, username: string, password: string): P
 }
 
 export { ADMIN_USERNAME, ADMIN_PASSWORD };
+
+// v5.5.0 (issue #46/#37 reopen): the UAT verification harness signs in as a
+// dedicated tester account that already exists on iris-uat.chrisbarlow.nz.
+// These are sandbox credentials for the UAT site only — same convention as
+// the admin constants above.
+export const TESTER_USERNAME = 'tester@test.local';
+export const TESTER_PASSWORD = 'riddlemetest863!';
+
+/**
+ * Sign in as the dedicated UAT tester account, then wait for the dashboard.
+ * Mirrors {@link loginAsAdmin} but for the UAT-targeted Playwright project.
+ */
+export async function loginAsTester(page: Page): Promise<void> {
+	await page.goto('/login');
+	await page.getByLabel('Username').fill(TESTER_USERNAME);
+	await page.getByLabel('Password').fill(TESTER_PASSWORD);
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await page.waitForURL('/', { timeout: 30_000 });
+	await page.getByRole('heading', { name: 'Dashboard' }).waitFor({ timeout: 15_000 });
+}

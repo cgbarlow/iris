@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { isNewerSemver } from '$lib/utils/semverCompare';
 
 	type Extension = {
 		id: string;
@@ -11,6 +12,11 @@
 		installed_by: string;
 		updated_at: string;
 		config: Record<string, unknown>;
+		// v5.5.0 (issue #48): source-tracking fields populated by the backend.
+		source_method?: string;
+		source_url?: string | null;
+		latest_version?: string | null;
+		latest_version_checked_at?: string | null;
 	};
 
 	type KnownExtension = {
@@ -18,6 +24,9 @@
 		name: string;
 		description: string;
 		version: string;
+		source_method?: string;
+		source_url?: string | null;
+		supports_auto_upgrade?: boolean;
 	};
 
 	const KNOWN_EXTENSIONS: KnownExtension[] = [
@@ -26,6 +35,9 @@
 			name: 'Scenia',
 			description: 'Open-source roadmapping tool for strategic planning and initiative tracking.',
 			version: '1.0.0',
+			source_method: 'github',
+			source_url: 'https://github.com/cgbarlow/waylonkenning_scenia',
+			supports_auto_upgrade: false,
 		},
 		{
 			id: 'mnemos',
@@ -33,6 +45,9 @@
 			description:
 				'Semantic memory and retrieval service for improved AI context quality across large datasets.',
 			version: '1.0.0',
+			source_method: 'github',
+			source_url: 'https://github.com/ro0TuX777/MNEMOSv2',
+			supports_auto_upgrade: true,
 		},
 		{
 			id: 'docref',
@@ -40,6 +55,9 @@
 			description:
 				'NZ legislation from legislation.docref.nz as AI context for Iris AI.',
 			version: '1.0.0',
+			source_method: 'local',
+			source_url: null,
+			supports_auto_upgrade: false,
 		},
 	];
 
@@ -117,6 +135,39 @@
 		actionLoading = null;
 	}
 
+	// v5.5.0 (issue #48): per-extension Check-Updates + Upgrade flow.
+	let checkingUpdate = $state<string | null>(null);
+	let upgrading = $state<string | null>(null);
+
+	async function checkForUpdates(extensionId: string) {
+		checkingUpdate = extensionId;
+		error = null;
+		try {
+			await apiFetch(`/api/extensions/${extensionId}/check-update`, { method: 'POST' });
+			await loadExtensions();
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to check for updates';
+		}
+		checkingUpdate = null;
+	}
+
+	async function upgradeExtension(extensionId: string) {
+		upgrading = extensionId;
+		error = null;
+		try {
+			await apiFetch(`/api/extensions/${extensionId}/upgrade`, { method: 'POST' });
+			await loadExtensions();
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to upgrade extension';
+		}
+		upgrading = null;
+	}
+
+	function updateAvailable(installed: Extension | undefined): boolean {
+		if (!installed) return false;
+		return isNewerSemver(installed.latest_version, installed.version);
+	}
+
 	// MNEMOS reindex
 	let reindexing = $state(false);
 	let reindexResult = $state<string | null>(null);
@@ -163,11 +214,53 @@
 			>
 				<div class="flex items-start justify-between">
 					<div>
-						<div class="flex items-center gap-2">
+						<div class="flex items-center gap-2 flex-wrap">
 							<h2 class="text-lg font-semibold" style="color: var(--color-fg)">
 								{known.name}
 							</h2>
-							<span class="text-xs" style="color: var(--color-muted)">v{known.version}</span>
+							<!-- v5.5.0 (issue #48): installed/latest version pair -->
+							<span class="text-xs" style="color: var(--color-muted)">
+								v{installed?.version ?? known.version}
+								{#if installed?.latest_version && isNewerSemver(installed.latest_version, installed.version)}
+									→ <span style="color: var(--color-fg)">v{installed.latest_version}</span>
+								{:else if installed?.latest_version}
+									(latest v{installed.latest_version})
+								{/if}
+							</span>
+							<!-- Source method badge -->
+							{#if (installed?.source_method ?? known.source_method) === 'github'}
+								<span
+									class="rounded-full px-2 py-0.5 text-xs font-medium"
+									style="background-color: rgba(59, 130, 246, 0.15); color: rgb(37, 99, 235)"
+									title="Pulled from GitHub"
+								>
+									GitHub
+								</span>
+							{:else if (installed?.source_method ?? known.source_method) === 'npm'}
+								<span
+									class="rounded-full px-2 py-0.5 text-xs font-medium"
+									style="background-color: rgba(220, 38, 38, 0.15); color: rgb(220, 38, 38)"
+								>
+									npm
+								</span>
+							{:else}
+								<span
+									class="rounded-full px-2 py-0.5 text-xs font-medium"
+									style="background-color: var(--color-bg); color: var(--color-muted)"
+								>
+									Local
+								</span>
+							{/if}
+							<!-- Update-available pill -->
+							{#if updateAvailable(installed)}
+								<span
+									class="rounded-full px-2 py-0.5 text-xs font-medium"
+									style="background-color: rgba(245, 158, 11, 0.18); color: rgb(180, 83, 9)"
+									title="A newer release is available on the source repo"
+								>
+									Update available
+								</span>
+							{/if}
 							{#if installed}
 								<span
 									class="rounded-full px-2 py-0.5 text-xs font-medium"
@@ -191,17 +284,56 @@
 						<p class="mt-1 text-sm" style="color: var(--color-muted)">
 							{known.description}
 						</p>
+						{#if (installed?.source_url ?? known.source_url)}
+							<p class="mt-1 text-xs">
+								<a
+									href={installed?.source_url ?? known.source_url ?? '#'}
+									target="_blank"
+									rel="noopener noreferrer"
+									style="color: var(--color-primary, #3b82f6)"
+								>
+									{installed?.source_url ?? known.source_url}
+								</a>
+							</p>
+						{/if}
 						{#if installed}
 							<p class="mt-2 text-xs" style="color: var(--color-muted)">
 								Installed {new Date(installed.installed_at).toLocaleDateString()}
+								{#if installed.latest_version_checked_at}
+									· Last checked {new Date(installed.latest_version_checked_at).toLocaleDateString()}
+								{/if}
 							</p>
 						{/if}
 						{#if known.id === 'mnemos' && installed?.is_enabled && reindexResult}
 							<p class="mt-2 text-xs" style="color: var(--color-success, #16a34a)">{reindexResult}</p>
 						{/if}
 					</div>
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-2 flex-wrap">
 						{#if installed}
+							<!-- v5.5.0 (issue #48): Check for updates is available
+								 for github-sourced extensions; Upgrade is available
+								 only when latest > installed AND the extension
+								 supports automated upgrade. -->
+							{#if (installed.source_method ?? known.source_method) === 'github'}
+								<button
+									onclick={() => checkForUpdates(known.id)}
+									disabled={checkingUpdate === known.id}
+									class="rounded px-3 py-1.5 text-sm"
+									style="border: 1px solid var(--color-border); color: var(--color-fg)"
+								>
+									{checkingUpdate === known.id ? 'Checking…' : 'Check for updates'}
+								</button>
+							{/if}
+							{#if updateAvailable(installed) && known.supports_auto_upgrade}
+								<button
+									onclick={() => upgradeExtension(known.id)}
+									disabled={upgrading === known.id}
+									class="rounded px-3 py-1.5 text-sm font-medium"
+									style="background-color: var(--color-primary); color: white"
+								>
+									{upgrading === known.id ? 'Upgrading…' : `Upgrade to v${installed.latest_version}`}
+								</button>
+							{/if}
 							{#if known.id === 'mnemos' && installed.is_enabled}
 								<button
 									onclick={reindexMnemos}
