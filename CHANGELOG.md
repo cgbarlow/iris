@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.6] - 2026-05-07
+
+Backend deploy fix for issue #55.
+
+### Fixed
+
+- **`/api/extensions/{id}/check-update` returns "only supported for
+  github-sourced extensions" on UAT** (issue #55 root cause). The
+  Dockerfile copied `backend/`, `iris-client/`, `mcp/` but **not
+  `extensions/`** (where `sources.json` lives). At runtime
+  `get_source()` couldn't find the registry, so every extension's
+  `source_method` resolved to `None`, and the github-only branch
+  raised 400.
+
+  Fix: `COPY extensions/ extensions/` in the Dockerfile. Plus a
+  defensive `log.warning` in `sources.py::_load()` so any future
+  deploy that misses this directory surfaces the cause in iris-api
+  logs instead of silently failing.
+
+After UAT redeploys, clicking "Check for updates" on the mnemos
+card hits the GitHub API, populates `latest_version`, and the
+"Update available" pill + "Upgrade to v2.0.0" button render.
+
 ## [5.5.5] - 2026-05-07
 
 Two small fixes around the extension manager UI for issue #55 and the

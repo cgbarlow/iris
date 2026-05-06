@@ -11,6 +11,13 @@ WORKDIR /opt/render/project/src
 COPY backend/ backend/
 COPY iris-client/ iris-client/
 COPY mcp/ mcp/
+# v5.5.6 (issue #55 follow-up): the extensions registry (sources.json /
+# manifest.json) lives at the repo root and is read by the backend at
+# runtime via Path(__file__).parents[3] / "extensions". Without this
+# copy, /api/extensions/{id}/check-update fails with "only supported
+# for github-sourced extensions" because get_source() can't find the
+# file.
+COPY extensions/ extensions/
 
 # Install Python dependencies. iris-client and iris-mcp install first
 # so backend's lazy `attach_mcp` import succeeds.
