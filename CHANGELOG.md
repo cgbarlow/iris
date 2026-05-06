@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.10] - 2026-05-07
+
+### Added
+
+- **`GET /api/extensions/public-status`** — minimal public read-only
+  endpoint returning `id / name / version / source_method /
+  source_url / latest_version` for each installed extension. Used
+  by the daily scanner workflow. No sensitive operational data
+  (no `installed_by`, `installed_at`, `config` or timestamps), so
+  no auth required. The extensions list itself is already public
+  (`extensions/sources.json` in this public repo).
+
+### Changed
+
+- **Daily extension scanner reads the deployed iris-api state**
+  instead of the static `extensions/manifest.json` (issue #55
+  follow-up). Pre-fix the scanner compared GitHub's latest release
+  to a committed manifest version. After an operator clicked
+  Upgrade on the UAT extension manager — which bumped the database
+  row's `version` — the manifest was unchanged, so the next daily
+  run re-filed the issue even though the deployment was already on
+  the new version.
+
+  Now `scripts/check_extension_updates.py` GETs
+  `${IRIS_API_URL}/api/extensions/public-status` (no auth) for the
+  actual installed versions. Falls back to `manifest.json` only when
+  the API is unreachable. The workflow needs no new secrets — just
+  optionally set `IRIS_API_URL` as a repository variable if your
+  iris-api host differs from the default.
+- **`GITHUB_TOKEN` documented as a backend env var in
+  `docs/deployment-render-supabase.md`** (was implicitly required
+  by v5.5.7 but not in the deployment table). Lifts GitHub's 60/hr
+  unauthenticated rate limit to 5000/hr.
+
+## [5.5.9] - 2026-05-07
+
+### Fixed
+
+- **Extension manager rendered `vv2.0.0`** (issue #55 follow-up).
+  GitHub release tags often start with `v` (`v2.0.0`) while the
+  manifest stores them without (`1.0.0`). The UI prepended `v` for
+  visual consistency, doubling up. New `vNum()` helper strips any
+  pre-existing prefix.
+- **`POST /api/extensions/mnemos/upgrade` 500'd on Render** with
+  `[Errno 2] No such file or directory: 'git'` (issue #55
+  follow-up). The Render Docker image didn't include git; the
+  `clone_or_update_repo` helper failed at the first subprocess.
+  Even with git, `docker compose up` doesn't work on Render's
+  managed dynos (no docker-in-docker privileges) — mnemos is a
+  self-hosted-only feature there.
+
+  Fix: add `git` to the Dockerfile's apt install list, and treat
+  container/clone failures in the upgrade endpoint as warnings
+  rather than fatal errors. The recorded `installed_version` always
+  bumps to the latest so the UI reflects the user's intent and the
+  daily scanner stops re-filing the issue. Self-hosted operators
+  with docker get the real container restart; Render operators get
+  a successful version bump (with a logged warning) and can verify
+  the actual mnemos service runs elsewhere.
+
 ## [5.5.8] - 2026-05-07
 
 ### Fixed

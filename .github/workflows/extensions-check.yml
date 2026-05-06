@@ -1,11 +1,24 @@
 name: extensions-check
 
-# v5.5.0 (issue #48): polls each Iris extension's source repo daily for
-# a newer release than what `extensions/manifest.json` currently pins.
-# When a newer release exists, opens (or refreshes) a single issue per
-# extension titled "Upgrade: <id> extension". Re-running is a no-op
-# while the issue stays open — close the issue to file a fresh one for
-# the next upgrade event.
+# v5.5.0 (issue #48): polls each Iris extension's source repo daily and
+# opens (or refreshes) a single issue per extension titled
+# "Upgrade: <id> extension" when a newer release exists. Re-running
+# is a no-op while the issue stays open — close the issue to file a
+# fresh one for the next upgrade event.
+#
+# v5.5.10 (issue #55 follow-up): the script queries the deployed
+# iris-api's public /api/extensions/public-status endpoint for the
+# actual installed versions instead of reading a static manifest. So
+# when an operator clicks Upgrade on UAT (which bumps the row's
+# version field), the next scanner run sees v2.0.0 as installed and
+# stops re-filing the issue. Falls back to extensions/manifest.json
+# only when the API is unreachable.
+#
+# No secret to manage — the public-status endpoint exposes only
+# id/name/version/source data which is already in
+# extensions/sources.json in this public repo. Optional: override
+# IRIS_API_URL via repository variable if your iris-api host differs
+# from the default.
 
 on:
   schedule:
@@ -27,4 +40,5 @@ jobs:
       - name: Scan extension sources for newer releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IRIS_API_URL: ${{ vars.IRIS_API_URL || 'https://iris-api-gtb3.onrender.com' }}
         run: python scripts/check_extension_updates.py

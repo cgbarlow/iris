@@ -189,6 +189,7 @@ Each Render service has its own **Environment → Environment Variables** tab. A
 | `SUPABASE_JWT_SECRET` | `your-jwt-secret` | JWT secret from Supabase **Settings → API Keys → JWT Settings**. The backend uses this to verify tokens issued by Supabase Auth. |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | Supabase **secret** key — backend only. Grants RLS-bypassing access. **Never** expose this in the frontend bundle. |
 | `SUPABASE_URL` | `https://<project-id>.supabase.co` | Supabase project URL. Same value as `VITE_SUPABASE_URL`. |
+| `GITHUB_TOKEN` | `github_pat_11A...` | (v5.5.7+) Used by `POST /api/extensions/{id}/check-update` when polling GitHub releases. Without it, requests are unauthenticated and Render's shared egress hits GitHub's 60/hr per-IP rate limit quickly → 403. Set a fine-grained PAT scoped to **Public Repositories (read-only)** — no write access needed. With it, the limit is 5000/hr per token. |
 
 ### Optional backend rate-limit overrides
 

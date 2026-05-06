@@ -3,7 +3,8 @@ FROM python:3.12-slim
 # Install system dependencies
 #   mdbtools: .eap file import (MS Access to SQLite conversion)
 #   libcairo2: SVG thumbnail generation via cairosvg
-RUN apt-get update && apt-get install -y --no-install-recommends mdbtools libcairo2 && rm -rf /var/lib/apt/lists/*
+#   git:      mnemos extension auto-clone (POST /api/extensions/mnemos/upgrade)
+RUN apt-get update && apt-get install -y --no-install-recommends mdbtools libcairo2 git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/render/project/src
 

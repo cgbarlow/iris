@@ -40,6 +40,35 @@ async def list_all(
     return ExtensionListResponse(items=[ExtensionResponse(**item) for item in items])
 
 
+@router.get("/public-status")
+async def public_status(request: Request) -> dict[str, list[dict[str, str | None]]]:
+    """v5.5.10: minimal public endpoint for the daily extension scanner.
+
+    Returns just `id`, `name`, `version`, `source_method`,
+    `source_url`, `latest_version` — no operational fields like
+    installed_by / installed_at / config. The extensions list isn't
+    secret (it's in `extensions/sources.json` in a public repo);
+    exposing the deployed versions lets the scanner stop re-filing
+    upgrade issues for already-applied upgrades without requiring
+    yet another auth secret in the GitHub Action.
+    """
+    db = request.app.state.db_manager.main_db
+    items = await list_extensions(db)
+    return {
+        "items": [
+            {
+                "id": str(item["id"]),
+                "name": str(item["name"]),
+                "version": str(item["version"]),
+                "source_method": item.get("source_method"),
+                "source_url": item.get("source_url"),
+                "latest_version": item.get("latest_version"),
+            }
+            for item in items
+        ]
+    }
+
+
 @router.get("/{extension_id}", response_model=ExtensionResponse)
 async def get_one(
     extension_id: str,
@@ -377,27 +406,35 @@ async def upgrade(
             stop_container,
         )
 
+        # v5.5.9: container ops + clone are best-effort. On Render the
+        # iris-api dyno can't run docker-compose (no docker-in-docker
+        # privileges) and may not have git installed; mnemos is a
+        # self-hosted-only feature there. We still want to bump the
+        # recorded version so the UI reflects the user's intent and the
+        # daily scanner stops re-filing the upgrade issue. Operators on
+        # local docker hosts get the real container restart.
+        warnings: list[str] = []
+
         ok, msg = await stop_container()
         if not ok:
-            print(f"[MNEMOS] Warning during upgrade stop: {msg}", flush=True)
+            warnings.append(f"stop: {msg}")
 
         cloned, clone_msg = clone_or_update_repo(
             source_url=source.get("source_url"),
         )
         if not cloned:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to update mnemos repo: {clone_msg}",
-            )
+            warnings.append(f"clone: {clone_msg}")
 
         ok, msg = await start_container()
         if not ok:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to restart mnemos: {msg}",
-            )
+            warnings.append(f"start: {msg}")
 
-        # The new installed_version is the latest_version we found.
+        for w in warnings:
+            print(f"[MNEMOS] Warning during upgrade: {w}", flush=True)
+
+        # Always bump the recorded installed_version so the UI updates
+        # and the daily scanner stops re-filing the issue. If container
+        # ops failed, the operator gets a logged warning.
         if installed.get("latest_version"):
             now = datetime.now(tz=UTC).isoformat()
             await db.execute(

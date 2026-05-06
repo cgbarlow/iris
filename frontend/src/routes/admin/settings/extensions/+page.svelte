@@ -155,6 +155,17 @@
 		return known.source_url ?? installed?.source_url ?? null;
 	}
 
+	/**
+	 * v5.5.9: GitHub release tags often start with `v` (e.g. `v2.0.0`)
+	 * while the manifest stores them without (`1.0.0`). The UI prepends
+	 * `v` for visual consistency, so strip any pre-existing prefix to
+	 * avoid `vv2.0.0`.
+	 */
+	function vNum(version: string | null | undefined): string {
+		if (!version) return '';
+		return version.replace(/^v/i, '');
+	}
+
 	async function checkForUpdates(extensionId: string) {
 		checkingUpdate = extensionId;
 		error = null;
@@ -236,11 +247,11 @@
 							</h2>
 							<!-- v5.5.0 (issue #48): installed/latest version pair -->
 							<span class="text-xs" style="color: var(--color-muted)">
-								v{installed?.version ?? known.version}
+								v{vNum(installed?.version ?? known.version)}
 								{#if installed?.latest_version && isNewerSemver(installed.latest_version, installed.version)}
-									→ <span style="color: var(--color-fg)">v{installed.latest_version}</span>
+									→ <span style="color: var(--color-fg)">v{vNum(installed.latest_version)}</span>
 								{:else if installed?.latest_version}
-									(latest v{installed.latest_version})
+									(latest v{vNum(installed.latest_version)})
 								{/if}
 							</span>
 							<!-- Source method badge -->
@@ -347,7 +358,7 @@
 									class="rounded px-3 py-1.5 text-sm font-medium"
 									style="background-color: var(--color-primary); color: white"
 								>
-									{upgrading === known.id ? 'Upgrading…' : `Upgrade to v${installed.latest_version}`}
+									{upgrading === known.id ? 'Upgrading…' : `Upgrade to v${vNum(installed.latest_version)}`}
 								</button>
 							{/if}
 							{#if known.id === 'mnemos' && installed.is_enabled}
