@@ -88,6 +88,11 @@ auto-inserted at the cursor).
   get a muted-grey background (`var(--color-surface)`) so they
   read as "scope filters" distinct from the working-content cards
   (Views, Elements).
+- **Dashboard: count colours match the knowledge-graph palette**
+  (post-v5.4.0 amendment). Collections / Sets / Views / Elements
+  count tiles now use `getNodeTypeColor()` from the same palette
+  the graph below already renders with — visually anchoring each
+  count to the matching node colour in the graph legend.
 
 ### Docs
 
