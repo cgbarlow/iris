@@ -9,6 +9,7 @@
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
+	import { getNodeTypeColor } from '$lib/utils/graphColors';
 
 	import { loadGraphSettings, saveGraphSettings, fetchAdminDefaults, clearUserOverrides, migrateLocalSettingsToAdmin } from '$lib/utils/graphColors';
 	import { getCurrentUser } from '$lib/stores/auth.svelte.js';
@@ -532,7 +533,10 @@
 				</button>
 			{:else}
 				<a href="/collections" style="color: inherit; text-decoration: none">
-					<div class="text-3xl font-bold" style="color: var(--color-primary)">{activeSet && !activeSet.collection_id ? '-' : collectionCount}</div>
+					<!-- v5.4.0: count colours match the knowledge-graph legend so the
+						 dashboard cards visually anchor to the same node colour the
+						 user sees in the graph below. -->
+					<div class="text-3xl font-bold" style="color: {getNodeTypeColor('collection')}">{activeSet && !activeSet.collection_id ? '-' : collectionCount}</div>
 					<div class="mt-1 text-sm" style="color: var(--color-muted)">Collections</div>
 				</a>
 			{/if}
@@ -552,7 +556,7 @@
 				</button>
 			{:else}
 				<a href={collectionId ? `/sets?collection_id=${collectionId}` : '/sets'} style="color: inherit; text-decoration: none">
-					<div class="text-3xl font-bold" style="color: var(--color-primary)">{setCount}</div>
+					<div class="text-3xl font-bold" style="color: {getNodeTypeColor('set')}">{setCount}</div>
 					<div class="mt-1 text-sm" style="color: var(--color-muted)">Sets {#if activeCollection}(filtered){/if}</div>
 				</a>
 			{/if}
@@ -564,7 +568,7 @@
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
-			<div class="text-3xl font-bold" style="color: var(--color-primary)">{diagramCount}</div>
+			<div class="text-3xl font-bold" style="color: {getNodeTypeColor('diagram')}">{diagramCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
 				Views {#if activeSet || activeCollection}(filtered){/if}
 			</div>
@@ -574,7 +578,7 @@
 			class="rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 		>
-			<div class="text-3xl font-bold" style="color: var(--color-primary)">{elementCount}</div>
+			<div class="text-3xl font-bold" style="color: {getNodeTypeColor('element')}">{elementCount}</div>
 			<div class="mt-1 text-sm" style="color: var(--color-muted)">
 				Elements {#if activeSet || activeCollection}(filtered){/if}
 			</div>
