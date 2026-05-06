@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.8] - 2026-05-07
+
+### Fixed
+
+- **`/api/extensions/{id}/check-update` 500 on Postgres** (issue #55
+  follow-up). m048 declared `latest_version_checked_at` as TEXT
+  (matching SQLite), but the rest of the extensions table uses
+  TIMESTAMPTZ for `installed_at` / `updated_at`. The asyncpg adapter
+  auto-converts ISO datetime strings to Python datetime objects;
+  binding a datetime to a TEXT column raised
+  `asyncpg.exceptions.DataError: invalid input for query argument $2:
+  datetime.datetime(...) (expected str, got datetime)` and crashed
+  the worker mid-response, so the user saw a 500 with no CORS
+  headers.
+
+  New migration `m050_latest_version_checked_at_timestamptz.sql`
+  ALTERs the column to TIMESTAMPTZ to match the rest of the table.
+  Idempotent — guarded by an `information_schema` check.
+
+### Operator notes
+
+After merge, run on UAT/Supabase:
+
+```
+psql "$SUPABASE_DB_URL" -f backend/app/migrations/supabase/m050_latest_version_checked_at_timestamptz.sql
+```
+
+Then click "Check for updates" on mnemos again — should succeed.
+
 ## [5.5.7] - 2026-05-07
 
 ### Fixed
