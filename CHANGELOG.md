@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.9] - 2026-05-07
+
+### Fixed
+
+- **Extension manager rendered `vv2.0.0`** (issue #55 follow-up).
+  GitHub release tags often start with `v` (`v2.0.0`) while the
+  manifest stores them without (`1.0.0`). The UI prepended `v` for
+  visual consistency, doubling up. New `vNum()` helper strips any
+  pre-existing prefix.
+- **`POST /api/extensions/mnemos/upgrade` 500'd on Render** with
+  `[Errno 2] No such file or directory: 'git'` (issue #55
+  follow-up). The Render Docker image didn't include git; the
+  `clone_or_update_repo` helper failed at the first subprocess.
+  Even with git, `docker compose up` doesn't work on Render's
+  managed dynos (no docker-in-docker privileges) — mnemos is a
+  self-hosted-only feature there.
+
+  Fix: add `git` to the Dockerfile's apt install list, and treat
+  container/clone failures in the upgrade endpoint as warnings
+  rather than fatal errors. The recorded `installed_version` always
+  bumps to the latest so the UI reflects the user's intent and the
+  daily scanner stops re-filing the issue. Self-hosted operators
+  with docker get the real container restart; Render operators get
+  a successful version bump (with a logged warning) and can verify
+  the actual mnemos service runs elsewhere.
+
 ## [5.5.8] - 2026-05-07
 
 ### Fixed
