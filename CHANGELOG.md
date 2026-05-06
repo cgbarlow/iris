@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.2] - 2026-05-06
+
+Two follow-up fixes after applying v5.5.1's m049 to UAT surfaced the
+remaining edges in the markdown image paste flow.
+
+### Fixed
+
+- **Pasted image renders blank in browse mode** (issue #46 item #4
+  follow-up). `uploadPastedImage` returned a relative URL
+  `/api/images/<id>`. In Supabase mode the frontend
+  (iris-uat.chrisbarlow.nz) and the API (iris-api-*.onrender.com)
+  are on different origins, so the rendered `<img>` resolved the
+  relative path against the frontend origin and 404'd. Now prepends
+  `API_BASE_URL` so the markdown link is absolute when needed; in
+  self-hosted SQLite mode where API_BASE_URL is empty, the URL stays
+  relative and resolves to the same origin (unchanged behaviour).
+- **m049 migration fails on Postgres deploys with the v5.4.0
+  policies applied**. Postgres refuses to ALTER a column type while
+  a policy references it: 'cannot alter type of a column used in a
+  policy definition'. The original m049 hit this on `uploaded_by`
+  because the `images_delete` policy depends on it. m049 now drops
+  the policy, ALTERs both columns, and recreates the policy with
+  TEXT-aware casts. (PR #50 was merged before this commit pushed,
+  so main shipped without the fix; this PR re-applies it.)
+
+### Operator notes
+
+If you applied v5.5.1's m049 manually as I posted in chat, you've
+already got the policy-aware version on UAT. No further migration
+needed — but the file in main now reflects what you ran, so future
+deploys are correct.
+
+## [5.5.1] - 2026-05-06
+
+Two concrete follow-up fixes for issue #46 found during the v5.5.0
+post-merge code audit. The remaining items from #46 still need the
+Playwright UAT suite (`npm run test:uat`) run from a machine with the
+chromium runtime libs to confirm they actually work end-to-end.
+
+### Fixed
+
+- **Markdown clipboard paste 500 on Postgres** (issue #46 item #4
+  root cause). The original `m046_images.sql` declared `images.id`
+  and `images.uploaded_by` as `UUID`, but the Python service passes
+  `str(uuid.uuid4())` and Iris user IDs are `TEXT`. asyncpg doesn't
+  auto-coerce strings to `UUID`, so `INSERT INTO images` failed with
+  "invalid input syntax for type uuid" — `/api/images` 500'd, the
+  markdown editor's onpaste catch swallowed it, users saw "ctrl-v
+  does nothing". New migration `m049_images_uuid_to_text.sql` ALTERs
+  both columns to `TEXT` (idempotent — guarded by an
+  `information_schema` check so re-running is a no-op). After
+  applying the migration on UAT/Supabase, the markdown paste flow
+  works end-to-end.
+- **FocusView's Add Element button now hidden on BPMN edit views**
+  (issue #46 item #12 follow-up). v5.4.1 gated the parent canvas
+  toolbar's Add Element on `notation !== 'bpmn'` but missed the
+  FocusView's duplicate trio (which renders only when focus mode is
+  active). Same gate applied to that button.
+
+### Operator notes
+
+After merging, run on UAT/Supabase:
+
+```
+psql "$SUPABASE_DB_URL" -f backend/app/migrations/supabase/m049_images_uuid_to_text.sql
+```
+
+This converts the existing `images.id` and `images.uploaded_by`
+columns from UUID to TEXT in place. The migration is idempotent.
+
+After promotion, run `npm run test:uat` from a machine with
+Playwright deps installed (`npx playwright install chromium &&
+npx playwright install-deps` — `install-deps` may need sudo on
+minimal Linux/WSL2). Failing specs become the punch list for
+v5.5.2.
+
+### Verification
+
+- 5 new backend pytest specs (test_images_uuid_to_text_schema).
+- No frontend changes apart from the FocusView gate.
+
 ## [5.5.0] - 2026-05-06
 
 UAT verification harness against the live deployment (issues #46/#37
