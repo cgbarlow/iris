@@ -780,7 +780,13 @@
 		min-height: 0;
 		min-width: 0;
 		gap: 8px;
-		height: calc(100vh - 230px);
+		/* v5.5.4 (#46 items #6/#7 follow-up): match the page-chrome
+		   constant the other canvases use (calc(100vh - 317px)) — the
+		   v5.2.0 230px was too small, leaving the Problems panel below
+		   the fold. flex-shrink: 0 on the panel is necessary but not
+		   sufficient — the parent shell itself has to fit in the
+		   viewport to begin with. */
+		height: calc(100vh - 317px);
 	}
 	.bpmn-shell__row {
 		display: grid;

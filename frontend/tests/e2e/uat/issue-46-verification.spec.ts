@@ -375,8 +375,17 @@ test('issue #46 item 11: EventTriggerFlyout shows on Start Event drop', async ({
 		test.skip(true, 'Edit mode never activated (likely edit-lock contention).');
 	}
 
+	// The BPMN palette is an accordion — Activities is open by default,
+	// so we need to expand the Events section before its entries render.
+	const eventsHeading = page.getByRole('button', { name: /^Events$/ }).first();
+	await eventsHeading.waitFor({ timeout: 10_000 });
+	if ((await eventsHeading.getAttribute('aria-expanded')) !== 'true') {
+		await eventsHeading.click();
+	}
+
 	// Click Start Event in the palette.
-	const startEvent = page.getByRole('button', { name: /Start Event/i }).first();
+	const startEvent = page.locator('[data-key="event_start"]').first();
+	await startEvent.waitFor({ timeout: 10_000 });
 	await startEvent.click();
 
 	// Flyout should appear.
