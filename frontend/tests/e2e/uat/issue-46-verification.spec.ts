@@ -125,8 +125,12 @@ test('issue #46 item 3: +New dropdown lists Package above an indented View', asy
 	expect(vBox).not.toBeNull();
 	// Package above View
 	expect(pBox!.y).toBeLessThan(vBox!.y);
-	// View indented — its left edge should sit RIGHT of Package's left edge.
-	expect(vBox!.x).toBeGreaterThan(pBox!.x);
+	// View indented. Both buttons are `block w-full` so their bounding-box
+	// x is the same — the indent lives in `padding-left`. Compare the
+	// computed padding-left values.
+	const pPadLeft = await packageBtn.evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft));
+	const vPadLeft = await viewBtn.evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft));
+	expect(vPadLeft).toBeGreaterThan(pPadLeft);
 
 	await page.screenshot({ path: `${SHOTS}/03-newdropdown-package-above-view.png`, fullPage: false });
 });
@@ -275,13 +279,15 @@ test('issue #46 item 8: ContextPad Append Task creates a new node', async ({ pag
 	const before = await nodes.count();
 	test.skip(before === 0, 'BPMN view has no existing nodes to use as the source.');
 
-	// Click the first existing node to open the ContextPad.
-	await nodes.first().click();
+	// Click the first existing node to open the ContextPad. Force-click
+	// since the .bpmn-activity body can intercept pointer events on the
+	// underlying svelte-flow node wrapper.
+	await nodes.first().click({ force: true });
 	const pad = page.locator('.bpmn-context-pad').first();
 	await pad.waitFor({ timeout: 10_000 });
 
 	const appendTaskBtn = pad.locator('[data-action="append_task"]').first();
-	await appendTaskBtn.click();
+	await appendTaskBtn.click({ force: true });
 
 	// Wait for the new task node to mount.
 	await expect.poll(async () => await nodes.count(), { timeout: 15_000 }).toBeGreaterThan(before);
@@ -307,15 +313,32 @@ test('issue #46 item 9: drag-to-connect creates a sequence_flow edge', async ({ 
 	const nodeCount = await nodes.count();
 	test.skip(nodeCount < 2, 'Need ≥2 BPMN nodes to test drag-to-connect.');
 
-	// Find source/target handles for drag — xyflow renders ".source" and
-	// ".target" handle children inside each node.
-	const sourceHandle = nodes.nth(0).locator('.svelte-flow__handle.source, .source-handle').first();
-	const targetHandle = nodes.nth(1).locator('.svelte-flow__handle.target, .target-handle').first();
+	// xyflow renders handles as `.svelte-flow__handle` divs with
+	// data-handlepos="left|right". Source = right, target = left.
+	const sourceHandle = nodes.nth(0).locator('[data-handlepos="right"]').first();
+	const targetHandle = nodes.nth(1).locator('[data-handlepos="left"]').first();
 	await sourceHandle.waitFor();
 	await targetHandle.waitFor();
 
 	const edgesBefore = await page.locator('.svelte-flow__edge').count();
-	await sourceHandle.dragTo(targetHandle);
+	// xyflow handle drag in headless is fragile because the activity body
+	// can intercept pointer events. Use a manual mouse drag with explicit
+	// move steps so xyflow's onConnectStart / onConnectEnd fire.
+	const srcBox = await sourceHandle.boundingBox();
+	const tgtBox = await targetHandle.boundingBox();
+	if (srcBox && tgtBox) {
+		const sx = srcBox.x + srcBox.width / 2;
+		const sy = srcBox.y + srcBox.height / 2;
+		const tx = tgtBox.x + tgtBox.width / 2;
+		const ty = tgtBox.y + tgtBox.height / 2;
+		await page.mouse.move(sx, sy);
+		await page.mouse.down();
+		// Multi-step move so xyflow's drag tracking fires.
+		for (let i = 1; i <= 10; i++) {
+			await page.mouse.move(sx + (tx - sx) * (i / 10), sy + (ty - sy) * (i / 10), { steps: 5 });
+		}
+		await page.mouse.up();
+	}
 	await expect.poll(async () => await page.locator('.svelte-flow__edge').count(), { timeout: 10_000 }).toBeGreaterThan(edgesBefore);
 
 	// Confirm at least one edge has type sequence_flow (rendered via the
