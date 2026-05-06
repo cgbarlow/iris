@@ -384,13 +384,9 @@
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Browse and manage architectural views.</p>
 	</div>
 	<div class="flex items-center gap-2">
-		<button
-			onclick={() => { selectMode = !selectMode; if (!selectMode) cancelSelection(); }}
-			class="rounded border px-3 py-2 text-sm"
-			style="border-color: var(--color-border); {selectMode ? 'background: var(--color-primary); color: white' : 'color: var(--color-fg)'}"
-		>
-			{selectMode ? 'Cancel Select' : 'Select'}
-		</button>
+		<!-- v5.4.1 (#46 item #1): HierarchyControls leftmost to match the
+			 dashboard ordering — the +New / Show pair anchors the toolbar; the
+			 page-specific Select sits to its right. -->
 		<HierarchyControls
 			showDiagrams={showDiagrams}
 			showText={showText}
@@ -399,6 +395,13 @@
 			oncreateview={() => (showCreateDialog = true)}
 			oncreatepackage={() => (showCreatePackageDialog = true)}
 		/>
+		<button
+			onclick={() => { selectMode = !selectMode; if (!selectMode) cancelSelection(); }}
+			class="rounded border px-3 py-2 text-sm"
+			style="border-color: var(--color-border); {selectMode ? 'background: var(--color-primary); color: white' : 'color: var(--color-fg)'}"
+		>
+			{selectMode ? 'Cancel Select' : 'Select'}
+		</button>
 	</div>
 </div>
 

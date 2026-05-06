@@ -2689,13 +2689,18 @@
 					{#if editing}
 						<!-- Create group -->
 						<div class="flex items-center gap-2">
-							<button
-								onclick={() => (showAddElement = true)}
-								class="rounded px-3 py-1.5 text-sm text-white"
-								style="background-color: var(--color-primary)"
-							>
-								Add Element
-							</button>
+							<!-- v5.4.1 (#46 item #12): Add Element is hidden for BPMN —
+								 the BPMN palette sidebar already covers element creation,
+								 so this button would be redundant. -->
+							{#if (notation as string) !== 'bpmn'}
+								<button
+									onclick={() => (showAddElement = true)}
+									class="rounded px-3 py-1.5 text-sm text-white"
+									style="background-color: var(--color-primary)"
+								>
+									Add Element
+								</button>
+							{/if}
 							<button
 								onclick={() => (showElementPicker = true)}
 								class="rounded px-3 py-1.5 text-sm"
@@ -2970,37 +2975,11 @@
 						</FocusView>
 					{:else if canvasType === 'text'}
 					<!-- Issue #26 / ADR-137: Text diagrams render markdown view/edit instead of a canvas. -->
-					<!-- v5.4.0 (#8): Add Element / Link Element / Add Diagram available
-						 on Text views in edit mode — handlers branch on canvasType to
-						 splice an iris:// markdown link at the cursor (v5.1.1). -->
-					<div class="mb-3 flex flex-wrap items-center gap-2">
-						<button
-							onclick={() => (showAddElement = true)}
-							class="rounded px-3 py-1.5 text-sm text-white"
-							style="background-color: var(--color-primary)"
-						>
-							Add Element
-						</button>
-						<button
-							onclick={() => (showElementPicker = true)}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Link Element
-						</button>
-						<button
-							onclick={() => (showDiagramPicker = true)}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Add Diagram
-						</button>
-						<div class="ml-auto flex items-center gap-2">
-							<button onclick={saveCanvas} disabled={saving || !canvasDirty} class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50" style="background-color: var(--color-success, #16a34a)">{saving ? 'Saving...' : 'Save'}</button>
-							<button onclick={discardChanges} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Discard</button>
-							{#if canvasDirty}<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>{/if}
-						</div>
-					</div>
+					<!-- v5.4.1 (#46 item #5): the Add Element / Link Element / Add
+						 Diagram trio AND the Save/Discard buttons are already rendered
+						 in the canvas-toolbar above (lines 2687-2862) for all non-
+						 sequence canvases. The duplicates that lived here in v5.4.0
+						 have been removed. -->
 					<div class="flex gap-4">
 						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
 							<TextCanvas
@@ -3024,41 +3003,12 @@
 					<!-- v5.2.0 (issue #37): BPMN authoring shell — palette / canvas /
 						 property panel + bottom problems dock + canConnect toast.
 						 Replaces the generic right-panel stack on BPMN views in edit mode. -->
-					<!-- v5.4.0 (#8): trio toolbar above the shell so Add Element / Link
-						 Element / Add Diagram work on BPMN views too. Add Element opens
-						 EntityDialog (notation=bpmn — v5.1.2 issue #33), Link Element
-						 binds an Element to the selected node, Add Diagram inserts a
-						 BPMN call_activity referencing the picked diagram. -->
-					<div class="mb-3 flex flex-wrap items-center gap-2">
-						<button
-							onclick={() => (showAddElement = true)}
-							class="rounded px-3 py-1.5 text-sm text-white"
-							style="background-color: var(--color-primary)"
-						>
-							Add Element
-						</button>
-						<button
-							onclick={() => (showElementPicker = true)}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Link Element
-						</button>
-						<button
-							onclick={() => (showDiagramPicker = true)}
-							class="rounded px-3 py-1.5 text-sm"
-							style="border: 1px solid var(--color-border); color: var(--color-fg)"
-						>
-							Add Diagram
-						</button>
-						<div class="ml-auto flex items-center gap-2">
-							<button onclick={handleUndo} disabled={!history.canUndo} class="rounded px-3 py-1.5 text-sm disabled:opacity-50" style="border: 1px solid var(--color-border); color: var(--color-fg)" aria-label="Undo">Undo</button>
-							<button onclick={handleRedo} disabled={!history.canRedo} class="rounded px-3 py-1.5 text-sm disabled:opacity-50" style="border: 1px solid var(--color-border); color: var(--color-fg)" aria-label="Redo">Redo</button>
-							<button onclick={saveCanvas} disabled={saving || !canvasDirty} class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50" style="background-color: var(--color-success, #16a34a)">{saving ? 'Saving...' : 'Save'}</button>
-							<button onclick={discardChanges} class="rounded px-3 py-1.5 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">Discard</button>
-							{#if canvasDirty}<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>{/if}
-						</div>
-					</div>
+					<!-- v5.4.1 (#46 items #5 + #12): the trio + Save/Discard already
+						 render in the canvas-toolbar above (lines 2687-2862) for all
+						 non-sequence canvases; the Add Element button there is gated
+						 on notation !== 'bpmn' since the BPMN palette below already
+						 covers element creation. The duplicate trio that lived here
+						 in v5.4.0 has been removed. -->
 					<BpmnAuthoringShell
 						{notation}
 						{preferredThemeId}
