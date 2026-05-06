@@ -20,8 +20,15 @@ setup('sign in as tester', async ({ page }) => {
 	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
 	await page.goto('/login');
-	await page.getByLabel('Username').fill(TESTER_USERNAME);
-	await page.getByLabel('Password').fill(TESTER_PASSWORD);
+	// v5.5.3: wait for the form to hydrate (Svelte mounts client-side),
+	// then pick the right user field — UAT (Supabase mode) labels it
+	// "Email" via ARIA; SQLite mode labels it "Username".
+	await page.getByRole('button', { name: 'Sign in' }).waitFor({ timeout: 15_000 });
+	const emailField = page.getByRole('textbox', { name: /^Email$/i });
+	const usernameField = page.getByRole('textbox', { name: /^Username$/i });
+	const userField = (await emailField.count()) ? emailField.first() : usernameField.first();
+	await userField.fill(TESTER_USERNAME);
+	await page.locator('input[type="password"]').first().fill(TESTER_PASSWORD);
 	await page.getByRole('button', { name: 'Sign in' }).click();
 	await page.waitForURL('/', { timeout: 30_000 });
 	await page.getByRole('heading', { name: 'Dashboard' }).waitFor({ timeout: 15_000 });

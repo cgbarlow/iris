@@ -70,8 +70,8 @@
 				<button
 					role="menuitem"
 					onclick={() => { oncreateview(); closeAll(); }}
-					class="block w-full pl-8 pr-4 py-1.5 text-left text-sm hover:opacity-80"
-					style="color: var(--color-fg)"
+					class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
+					style="color: var(--color-fg); padding-left: 2rem"
 				>
 					View
 				</button>
