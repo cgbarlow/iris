@@ -465,3 +465,92 @@ when `notation === 'bpmn' && editing`. Page-level handlers branch on
   show up in tests.
 - A bulk "select multiple → bring to front" action.
 - Auto-detection of nested swimlanes (lane-in-lane).
+
+## Amendment 2026-05-06 — v5.4.1 fixes (issue #46)
+
+UAT against v5.4.0 surfaced four BPMN issues the v5.4.0 work didn't
+catch and one UX redesign request. This amendment captures the
+follow-up.
+
+### A. BPMN edges create real Relationship records (issue #46 item #10)
+
+Pre-fix, BPMN handle-drag connections only updated local
+`canvasEdges` state — no `/api/relationships` record was created. So
+`/elements/<id>`'s Relationships panel (which queries
+`/api/relationships?element_id=…`) showed nothing for BPMN-drawn
+connections, even though the Element itself existed via v5.4.0's
+BPMN-as-Elements work.
+
+`BpmnAuthoringShell` now wires `onconnectnodes={handleBpmnConnect}`
+on `<UnifiedCanvas>`. The handler:
+
+- Resolves source/target nodes from `canvasNodes`.
+- If both have `data.entityId`, POSTs `/api/relationships` with
+  `relationship_type: 'sequence_flow'`, capturing the resulting id.
+- Adds an edge to `canvasEdges` with `type: 'sequence_flow'` and
+  `data.relationshipId` if the POST succeeded.
+- Calls `dirty()` to mark the diagram unsaved.
+
+Mirrors the page-level `handleRelationshipSave` flow other notations
+use (DRY).
+
+### B. Default edge type for BPMN is sequence_flow (issue #46 item #9)
+
+`UnifiedCanvas`'s `defaultEdgeType` $derived had cases for `uml`,
+`archimate`, default `'uses'` — no BPMN case. Handle-drag
+connections in BPMN views landed as type `'uses'`, and the
+validator's "no outgoing sequence flow" rule (filters by
+`e.type === 'sequence_flow'`) kept firing.
+
+The amendment adds a leading `notation === 'bpmn' ? 'sequence_flow'`
+arm. Combined with §A above, BPMN edges are now correctly typed both
+locally (in canvas state) and remotely (in the relationship record).
+
+### C. Problems panel layout — flex-shrink: 0 (issue #46 items #6 + #7)
+
+`.bpmn-shell__problems` had `max-height: 200px` and `overflow-y: auto`
+from v5.4.0, but the flex algorithm in the parent column ignored the
+cap and grew the panel to fit content, sending overflow back to the
+page. Adding `flex-shrink: 0` makes the cap stick.
+
+### D. Event trigger flyout (issue #46 item #11)
+
+The 60-cell `EventMatrixPicker` dialog was too heavy for the common
+flow — the user had already chosen the position by clicking
+`Start Event` / `Intermediate Event` / `End Event` in the palette, so
+5/6 rows of the matrix were noise.
+
+The new `EventTriggerFlyout.svelte` is a compact ContextPad-style row
+of trigger glyph buttons that appears next to the just-placed node.
+Renders only the legal triggers for the chosen position (filtered via
+the existing `isLegal` logic, now extracted into the shared
+`bpmnEventModel.ts` for reuse). On pick: patches
+`node.data.data.eventTrigger`. On dismiss (Esc / outside-click /
+close): the placed node keeps its default `none` trigger.
+
+`EventMatrixPicker` is retained for the Ctrl-N command-palette
+advanced flow but is no longer auto-opened on palette drop / click.
+
+### E. ContextPad action error visibility (issue #46 item #8)
+
+`createBpmnElement`'s catch now also `console.error`s the underlying
+exception in addition to setting `toastMessage`, so silent ContextPad
+no-ops are diagnosable in production browsers when the toast is
+missed (focus loss, repeated set, etc).
+
+### F. Trio gating on BPMN (issue #46 item #12)
+
+The trio's "Add Element" button is hidden when `notation === 'bpmn'`
+because the BPMN palette sidebar already covers element creation.
+"Link Element" and "Add Diagram" remain — they have distinct semantics
+(bind an existing repository element to a node; insert a `call_activity`
+sub-process reference).
+
+### G. Trio duplication removed (issue #46 item #5)
+
+The parent canvas toolbar's trio (in the canvas `{:else}` branch)
+already covers all non-sequence canvases, including Text and BPMN.
+v5.4.0 mistakenly added duplicate trios in the Text and BPMN inner
+branches. The duplicates have been removed; the trio now renders
+exactly once outside the FocusView (which has its own intentional
+toolbar duplicate because the focus overlay hides the parent).

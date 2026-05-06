@@ -302,3 +302,16 @@ state read/written, callback wiring.
 | `docs/adrs/specs/SPEC-136-A-BPMN-Notation.md` | This integration map. |
 | `CHANGELOG.md` | New `[5.2.0]` section. |
 | `frontend/package.json` + `package-lock.json` | Version bump 5.1.2 → 5.2.0. |
+
+## v5.4.1 amendment — issue #46 fixes
+
+| Change | File | Notes |
+|---|---|---|
+| **Default edge type for BPMN** | `frontend/src/lib/canvas/UnifiedCanvas.svelte` | `defaultEdgeType` $derived gains a leading `notation === 'bpmn' ? 'sequence_flow'` arm. Without this, handle-drag connections in BPMN views landed as type `'uses'` and `validateBpmn::no_outgoing_sequence_flow` kept firing. |
+| **Connect → Relationship** | `frontend/src/lib/canvas/bpmn/BpmnAuthoringShell.svelte` | New async `handleBpmnConnect(srcId, tgtId)` wired as `onconnectnodes` on `<UnifiedCanvas>`. Resolves source/target entityIds; if both present, POSTs `/api/relationships` with `relationship_type: 'sequence_flow'`; always pushes a new edge with `type: 'sequence_flow'` to `canvasEdges`; calls `dirty()`. Mirrors the page-level `handleRelationshipSave` flow other notations use. |
+| **Problems panel `flex-shrink: 0`** | `frontend/src/lib/canvas/bpmn/BpmnAuthoringShell.svelte` (.bpmn-shell__problems) | Pre-fix the `max-height: 200px` cap was honoured visually but the flex algorithm still expanded the panel; adding `flex-shrink: 0` makes the cap stick. |
+| **Event trigger flyout** | `frontend/src/lib/canvas/palette/EventTriggerFlyout.svelte` (new), `frontend/src/lib/canvas/palette/bpmnEventModel.ts` (new) | Compact ContextPad-style horizontal row of trigger glyph buttons. Replaces the 60-cell EventMatrixPicker dialog on palette-drop / palette-click. Filters `TRIGGERS` by `isLegal(position, trigger)` so only legal triggers render. `bpmnEventModel.ts` is the shared source for `TRIGGERS`, `isLegal`, `variantFor`, and a new `positionFor(entityType)` helper. |
+| **EventMatrixPicker no longer auto-opens on palette flow** | `frontend/src/lib/canvas/bpmn/BpmnAuthoringShell.svelte` (`createNode`) | The matrix dialog stays mounted for the Ctrl-N command-palette advanced create flow; on the palette path the placed node gets a default `none` trigger and the `EventTriggerFlyout` shows next to it. |
+| **createBpmnElement console.error** | `frontend/src/lib/canvas/bpmn/BpmnAuthoringShell.svelte` (createBpmnElement catch) | In addition to the `toastMessage`, emit a `console.error` so silent ContextPad failures are diagnosable in production. |
+| **Trio Add Element button gated on notation !== 'bpmn'** | `frontend/src/routes/views/[id]/+page.svelte` (canvas toolbar Create group) | The BPMN palette sidebar already covers element creation; the trio's Add Element button is hidden on BPMN. Link Element + Add Diagram remain. |
+| **Trio duplicates removed** | `frontend/src/routes/views/[id]/+page.svelte` (Text + BPMN inner branches) | v5.4.0 added duplicate trios in the Text and BPMN inner branches. The parent canvas toolbar's trio already covers both. The duplicates have been removed; FocusView's intentional duplicate (when the focus overlay hides the parent) is preserved. |

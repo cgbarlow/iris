@@ -52,6 +52,8 @@
 			+ New ▾
 		</button>
 		{#if newOpen}
+			<!-- v5.4.1 (#46 item #3): Package above View, with View indented to
+				 visually convey the package → view containment relationship. -->
 			<div
 				role="menu"
 				class="absolute left-0 z-50 mt-1 min-w-[160px] rounded border py-1 shadow-lg"
@@ -59,19 +61,19 @@
 			>
 				<button
 					role="menuitem"
-					onclick={() => { oncreateview(); closeAll(); }}
-					class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
-					style="color: var(--color-fg)"
-				>
-					View
-				</button>
-				<button
-					role="menuitem"
 					onclick={() => { oncreatepackage(); closeAll(); }}
 					class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
 					style="color: var(--color-fg)"
 				>
 					Package
+				</button>
+				<button
+					role="menuitem"
+					onclick={() => { oncreateview(); closeAll(); }}
+					class="block w-full pl-8 pr-4 py-1.5 text-left text-sm hover:opacity-80"
+					style="color: var(--color-fg)"
+				>
+					View
 				</button>
 			</div>
 		{/if}
@@ -94,6 +96,16 @@
 				class="absolute left-0 z-50 mt-1 min-w-[180px] rounded border py-1 shadow-lg"
 				style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
 			>
+				<!-- v5.4.1 (#46 item #2): "Views" section header above the
+					 Diagrams checkbox. Greyed and non-interactive — informs the
+					 user that "Diagrams" is a kind of View, since the data model
+					 calls them diagrams but the UI calls them Views. -->
+				<div
+					class="px-4 pb-0.5 pt-1 text-xs uppercase tracking-wide"
+					style="color: var(--color-muted); pointer-events: none"
+				>
+					Views
+				</div>
 				<label
 					class="flex cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:opacity-80"
 					style="color: var(--color-fg)"

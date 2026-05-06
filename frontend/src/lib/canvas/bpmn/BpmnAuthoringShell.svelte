@@ -19,6 +19,9 @@
 	import BpmnPalette from '$lib/canvas/palette/BpmnPalette.svelte';
 	import CommandPalette, { type CommandMode } from '$lib/canvas/palette/CommandPalette.svelte';
 	import EventMatrixPicker from '$lib/canvas/palette/EventMatrixPicker.svelte';
+	import EventTriggerFlyout from '$lib/canvas/palette/EventTriggerFlyout.svelte';
+	import { positionFor as eventPositionFor, type EventPosition } from '$lib/canvas/palette/bpmnEventModel';
+	import type { BpmnEventTrigger } from '$lib/types/canvas';
 	import PropertyPanel, { type PropertyPanelData } from '$lib/canvas/properties/PropertyPanel.svelte';
 	import ProblemsPanel from '$lib/canvas/validation/ProblemsPanel.svelte';
 	import BpmnToast from '$lib/canvas/bpmn/BpmnToast.svelte';
@@ -69,6 +72,12 @@
 	let eventPickerContext = $state<'create' | 'replace'>('create');
 	let pendingDropPosition = $state<{ x: number; y: number } | null>(null);
 	let toastMessage = $state('');
+	// v5.4.1 (#46 item #11): when a palette-drop / palette-click places an
+	// event node, set this to the new node's id so the EventTriggerFlyout
+	// renders next to it. Cleared on pick or close.
+	let pendingTriggerNodeId = $state<string | null>(null);
+	let pendingTriggerPosition = $state<EventPosition>('start');
+	let pendingTriggerFlyoutXY = $state<{ x: number; y: number }>({ x: 0, y: 0 });
 
 	// ────────────────────────────────────────────────────────────────────
 	// Selection → PropertyPanel data
@@ -151,6 +160,11 @@
 				body: JSON.stringify(body),
 			});
 		} catch (e) {
+			// v5.4.1 (#46 item #8): also console.error so dev tools shows the
+			// underlying status/body when ContextPad actions silently no-op
+			// in production. The toast surfaces the cause to the user; the
+			// console line gives operators a stack to follow.
+			console.error('createBpmnElement failed:', e);
 			toastMessage = e instanceof ApiError ? `Couldn't save element: ${e.message}` : "Couldn't save element — check connection.";
 			return null;
 		}
@@ -243,27 +257,34 @@
 	}
 
 	async function createNode(entityKey: BpmnEntityType, atPosition?: { x: number; y: number }) {
-		// Events have a 6×10 trigger × position matrix — route through the
-		// matrix picker so the user picks a meaningful variant rather than
-		// taking the default. Skip for boundary events that came from the
-		// context pad's append flow (handled separately).
-		const isEvent = entityKey.startsWith('event_');
-		if (isEvent && eventPickerContext === 'create') {
-			pendingDropPosition = atPosition ?? findOpenPosition();
-			eventPickerOpen = true;
-			return;
-		}
 		const pos = atPosition ?? findOpenPosition();
 		// v5.4.0 (#13): create the backing Iris Element first; abort if it fails.
 		const label = humanLabel(entityKey);
 		const element = await createBpmnElement(entityKey, label);
 		if (!element) return;
+		const newNode = makeBpmnNode(entityKey, pos, { entityId: element.id, label });
 		pushHistory();
-		canvasNodes = [
-			...canvasNodes,
-			makeBpmnNode(entityKey, pos, { entityId: element.id, label }),
-		];
+		canvasNodes = [...canvasNodes, newNode];
 		dirty();
+
+		// v5.4.1 (#46 item #11): for events, surface a compact trigger
+		// flyout next to the placed node so the user can pick a Message/
+		// Timer/Signal/etc. trigger inline. Replaces the 60-cell
+		// EventMatrixPicker dialog whose bulk duplicated the position
+		// dimension the user already supplied via the palette.
+		const isEvent = entityKey.startsWith('event_');
+		if (isEvent && eventPickerContext === 'create') {
+			const epos = eventPositionFor(entityKey);
+			if (epos) {
+				pendingTriggerNodeId = newNode.id;
+				pendingTriggerPosition = epos;
+				// Anchor the flyout just above-right of the node. Coordinates are
+				// in canvas-space; SvelteFlow's transform will keep it visually
+				// near the node as the user pans/zooms is acceptable as a UX
+				// trade-off here since the flyout is dismissed quickly.
+				pendingTriggerFlyoutXY = { x: pos.x + 64, y: pos.y - 8 };
+			}
+		}
 	}
 
 	function handlePaletteSelect(key: BpmnEntityType) {
@@ -274,6 +295,25 @@
 	function handleDropEntity(key: string, position: { x: number; y: number }) {
 		eventPickerContext = 'create';
 		createNode(key as BpmnEntityType, position);
+	}
+
+	/** v5.4.1 (#46 item #11): apply the picked trigger to the node that's
+	 *  currently waiting on the EventTriggerFlyout. Patches
+	 *  `node.data.data.eventTrigger` and clears the pending state. */
+	function handleTriggerPick(t: BpmnEventTrigger) {
+		const id = pendingTriggerNodeId;
+		if (!id) return;
+		canvasNodes = canvasNodes.map((n) => {
+			if (n.id !== id) return n;
+			const data = { ...(n.data as Record<string, unknown>) };
+			data.data = {
+				...((data.data as Record<string, unknown> | undefined) ?? {}),
+				eventTrigger: t,
+			};
+			return { ...n, data } as CanvasNode;
+		});
+		dirty();
+		pendingTriggerNodeId = null;
 	}
 
 	async function handleEventVariant(variant: {
@@ -531,6 +571,62 @@
 	}
 
 	// ────────────────────────────────────────────────────────────────────
+	// v5.4.1 (#46 item #10): connect → POST /api/relationships + add edge
+	// ────────────────────────────────────────────────────────────────────
+	/** Wired as `onconnectnodes` on <UnifiedCanvas> so handle-drag
+	 *  connections in BPMN views create a real Relationship record (the
+	 *  same record other notations create via the page-level
+	 *  handleRelationshipSave). Without this, edges only existed in the
+	 *  diagram's canvas_edges JSON; /elements/<id>'s Relationships panel
+	 *  walked /api/relationships and saw nothing.
+	 *
+	 *  Always adds the edge locally so the canvas updates immediately;
+	 *  the relationship POST is best-effort (mirrors the non-BPMN
+	 *  handleRelationshipSave at views/[id]/+page.svelte:1310-1375). */
+	async function handleBpmnConnect(sourceId: string, targetId: string) {
+		const sourceNode = canvasNodes.find((n) => n.id === sourceId);
+		const targetNode = canvasNodes.find((n) => n.id === targetId);
+		const sourceEntityId = (sourceNode?.data as { entityId?: string } | undefined)?.entityId;
+		const targetEntityId = (targetNode?.data as { entityId?: string } | undefined)?.entityId;
+
+		let relationshipId: string | undefined;
+		if (sourceEntityId && targetEntityId) {
+			try {
+				const rel = await apiFetch<{ id: string }>('/api/relationships', {
+					method: 'POST',
+					body: JSON.stringify({
+						source_element_id: sourceEntityId,
+						target_element_id: targetEntityId,
+						relationship_type: 'sequence_flow',
+						label: '',
+						description: '',
+					}),
+				});
+				relationshipId = rel.id;
+			} catch (e) {
+				// Non-fatal: edge still works visually even without a DB record.
+				console.error('handleBpmnConnect: /api/relationships POST failed:', e);
+			}
+		}
+
+		pushHistory();
+		canvasEdges = [
+			...canvasEdges,
+			{
+				id: `e-${sourceId}-${targetId}`,
+				source: sourceId,
+				target: targetId,
+				type: 'sequence_flow',
+				data: {
+					label: '',
+					...(relationshipId ? { relationshipId } : {}),
+				},
+			} as CanvasEdge,
+		];
+		dirty();
+	}
+
+	// ────────────────────────────────────────────────────────────────────
 	// canConnect bridge
 	// ────────────────────────────────────────────────────────────────────
 	function handleBeforeConnect(c: Edge | Connection): boolean {
@@ -632,6 +728,7 @@
 				bind:nodes={canvasNodes}
 				bind:edges={canvasEdges}
 				onbeforeconnect={handleBeforeConnect}
+				onconnectnodes={handleBpmnConnect}
 				ondropentity={handleDropEntity}
 				oncontextpadaction={handleContextPadAction}
 				onnodedragstop={handleBpmnDragStop}
@@ -660,6 +757,17 @@
 	bind:open={eventPickerOpen}
 	onpick={handleEventVariant}
 	onclose={() => { eventPickerOpen = false; pendingDropPosition = null; }}
+/>
+
+<!-- v5.4.1 (#46 item #11): inline trigger flyout shown immediately
+	 after a palette-drop / palette-click placed an event node. -->
+<EventTriggerFlyout
+	open={pendingTriggerNodeId !== null}
+	position={pendingTriggerPosition}
+	x={pendingTriggerFlyoutXY.x}
+	y={pendingTriggerFlyoutXY.y}
+	onpick={handleTriggerPick}
+	onclose={() => (pendingTriggerNodeId = null)}
 />
 
 <BpmnToast bind:message={toastMessage} />
@@ -705,6 +813,10 @@
 		/* v5.4.0 (#1): the inner ProblemsPanel list scrolls itself; the
 		   wrapper used to clip that scroll, sending overflow up to the page. */
 		overflow-y: auto;
+		/* v5.4.1 (#46 items #6/#7): without flex-shrink: 0 the flex algorithm
+		   collapses the max-height cap when there are many problems and the
+		   panel grows past its bounds, sending overflow back to the page. */
+		flex-shrink: 0;
 		border: 1px solid var(--color-border, #d4d4d4);
 		border-radius: 6px;
 		background: var(--color-surface, #fff);

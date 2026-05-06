@@ -114,14 +114,20 @@
 		padding: 0.15,
 	});
 
-	/** Default edge type based on notation. */
+	/** Default edge type based on notation. v5.4.1 (#46 item #9): a BPMN
+	 *  case was missing pre-fix, so handle-drag connections in BPMN views
+	 *  fell through to 'uses' and the validator's "no outgoing
+	 *  sequence flow" rule (filters by type==='sequence_flow') still
+	 *  fired even though the user had drawn an edge. */
 	const defaultEdgeType = $derived(
+		notation === 'bpmn' ? 'sequence_flow' :
 		notation === 'uml' ? 'association' :
 		notation === 'archimate' ? 'serving' :
 		'uses'
 	);
 
 	const notationLabel = $derived(
+		notation === 'bpmn' ? 'BPMN' :
 		notation === 'uml' ? 'UML' :
 		notation === 'archimate' ? 'ArchiMate' :
 		notation === 'c4' ? 'C4' :

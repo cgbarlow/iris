@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.4.1] - 2026-05-06
+
+UAT follow-up to v5.4.0 (issue #46): 12 polish items spanning the
+hierarchy controls, the trio toolbar, the BPMN authoring shell, and the
+markdown paste flow. Headlined by two BPMN architectural fixes — the
+default edge type for BPMN was never set (handle-drag connections
+landed as `'uses'` instead of `'sequence_flow'`, so the validator's
+"no outgoing sequence flow" rule kept firing); and BPMN connections
+never created `/api/relationships` records, so /elements/<id>'s
+Relationships panel stayed empty. The 60-cell EventMatrixPicker dialog
+on event drop has been replaced with an inline ContextPad-style
+trigger flyout that shows only the legal triggers for the chosen
+position.
+
+### Fixed
+
+- **BPMN edges now create real Relationship records** (ADR-136 v5.4.1
+  amendment §A, issue #46 item #10). `BpmnAuthoringShell` now wires
+  `onconnectnodes` to `<UnifiedCanvas>` and POSTs `/api/relationships`
+  with `relationship_type: 'sequence_flow'` whenever both endpoints
+  have backing entityIds. /elements/<id>'s Relationships panel now
+  lists BPMN-drawn connections.
+- **BPMN handle-drag default edge type is sequence_flow** (ADR-136
+  v5.4.1 amendment §B, issue #46 item #9). `defaultEdgeType` was
+  missing the BPMN case, so the validator's "no outgoing sequence
+  flow" rule kept firing because edges landed as type `'uses'`.
+- **Problems panel caps at 200px and scrolls itself** (ADR-136 v5.4.1
+  amendment §C, issue #46 items #6 + #7). Pre-fix the panel had
+  `max-height: 200px` but no `flex-shrink: 0`, so the flex algorithm
+  collapsed the cap and the panel pushed the page off-screen.
+- **Trio toolbar (Add Element / Link Element / Add Diagram) renders
+  exactly once** (issue #46 item #5). v5.4.0 added duplicate trios in
+  the Text and BPMN inner branches; the parent canvas toolbar already
+  covered both. Duplicates removed.
+- **Markdown clipboard paste failures now surface in dev tools**
+  (ADR-137 v5.4.1 amendment §A, issue #46 item #4). Pre-fix the catch
+  was silent; users saw the editor no-op with no feedback. Now logs
+  via `console.error` and exposes an optional `onpasteerror` callback.
+- **ContextPad action failures console.error** (issue #46 item #8).
+  `createBpmnElement`'s catch now also logs the underlying error so
+  silent ContextPad no-ops are diagnosable in production.
+
+### Changed
+
+- **Event picker is an inline trigger flyout, not a 60-cell dialog**
+  (ADR-136 v5.4.1 amendment §D, issue #46 item #11). When the user
+  drops a Start / Intermediate / End / Boundary event from the
+  palette, a compact ContextPad-style row of legal triggers appears
+  next to the placed node. The 6×10 dialog is no longer auto-opened
+  on palette flow (still available for the Ctrl-N command-palette
+  advanced flow). New `bpmnEventModel.ts` extracts `TRIGGERS`,
+  `isLegal`, `variantFor`, `positionFor` as the single source of
+  truth (DRY).
+- **Add Element button hidden on BPMN edit view** (issue #46 item
+  #12). The BPMN palette sidebar already covers element creation, so
+  the trio's Add Element button would be redundant.
+- **HierarchyControls Show dropdown shows a "Views" section header**
+  (issue #46 item #2). Greyed, non-interactive, above the Diagrams
+  checkbox — clarifies that "Diagrams" is a kind of View.
+- **HierarchyControls +New dropdown lists Package above View, View
+  indented** (issue #46 item #3). Visually conveys the
+  package → view containment relationship.
+- **/views toolbar matches the dashboard ordering** (issue #46 item
+  #1). HierarchyControls is the leftmost button; Select sits to its
+  right (was reversed pre-fix).
+
+### Docs
+
+- ADR-136 v5.4.1 amendment — default BPMN edge type, relationship-on-
+  connect, event trigger flyout, trio gating, Problems panel
+  flex-shrink.
+- ADR-137 v5.4.1 amendment — surface paste errors via `console.error`
+  + `onpasteerror`.
+
+### Verification
+
+- 8 new vitest specs added (5 Phase 1, 2 Phase 2, 1 Phase 3).
+- Frontend full suite: 879/880 pass (1 pre-existing baseline failure
+  unchanged).
+- `svelte-check`: 164 errors (= unchanged baseline).
+- No backend changes; backend pytest unaffected.
+
 ## [5.4.0] - 2026-05-06
 
 BPMN polish + markdown experience polish + image paste + dashboard

@@ -29,6 +29,8 @@
 		onheadings?: (headings: TocHeading[]) => void;
 		/** Two-way binding to the underlying textarea so the parent can insert markdown links at the cursor. */
 		textareaEl?: HTMLTextAreaElement;
+		/** v5.4.1 (#46 item #4): called when clipboard image paste fails (network, MIME, auth). The parent can surface a toast; the handler also console.errors so dev tools shows the underlying cause. */
+		onpasteerror?: (err: unknown) => void;
 	}
 
 	let {
@@ -38,6 +40,7 @@
 		oncontentchange,
 		onheadings,
 		textareaEl = $bindable(),
+		onpasteerror,
 	}: Props = $props();
 
 	function onInput(e: Event) {
@@ -149,9 +152,13 @@
 					applyOp(ta, op);
 					content = op.value;
 					oncontentchange?.(op.value);
-				} catch {
-					// Surface failures via the existing change channel rather
-					// than blocking — user can paste a fresh copy.
+				} catch (err) {
+					// v5.4.1 (#46 item #4): surface the failure so users can
+					// see *something* in dev tools when paste silently no-ops
+					// (auth, network, MIME rejection). Pre-fix the catch was
+					// empty and the user couldn't tell upload had failed.
+					console.error('Image paste failed:', err);
+					onpasteerror?.(err);
 				}
 				return;
 			}
