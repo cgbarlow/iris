@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.5.5] - 2026-05-07
+
+Two small fixes around the extension manager UI for issue #55 and the
+v5.5.3 test-harness padding-left assertion.
+
+### Fixed
+
+- **Extension manager hides GitHub badge / Check Updates / Upgrade
+  buttons for extensions installed before v5.5.0** (issue #55
+  follow-up). Mnemos was installed when m048 didn't exist; when
+  m048 added the `source_method` column with default `'local'`, the
+  existing row got `'local'` rather than the registry's actual
+  `'github'`. The frontend's `installed?.source_method ?? known
+  .source_method` precedence let stale `'local'` win over the
+  registry's `'github'`, so the GitHub-only UI branch (badge / Check
+  Updates / Upgrade button) was hidden. Now uses an
+  `effectiveSourceMethod()` / `effectiveSourceUrl()` helper that
+  trusts the registry whenever it declares a non-local source —
+  source-of-truth-wins-over-stale-row.
+
+  After upgrading, the mnemos card on `/admin/settings/extensions`
+  shows the GitHub badge, source URL, "Check for updates" button,
+  and (after one click) the latest version + Upgrade-to-v2.0.0
+  button.
+
+### Test harness
+
+- Item 3 padding-left assertion (originally checked button bbox.x,
+  but block w-full buttons share an x even when padding differs).
+  Test now passes — the v5.5.3 inline-style indent fix is verified
+  on UAT.
+- Item 8 force-clicks the BPMN node (the .bpmn-activity body
+  intercepts pointer events on the underlying svelte-flow wrapper).
+- Item 9 uses `[data-handlepos="right"|"left"]` selectors and a
+  manual stepped mouse drag for xyflow's connection lifecycle.
+  Items 8 + 9 still fragile in headless but the underlying code
+  fixes (v5.4.1) are confirmed via static-parser tests.
+
 ## [5.5.4] - 2026-05-06
 
 Visual + layout fixes uncovered by the live UAT verification run.
