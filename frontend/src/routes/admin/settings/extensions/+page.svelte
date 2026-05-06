@@ -139,6 +139,22 @@
 	let checkingUpdate = $state<string | null>(null);
 	let upgrading = $state<string | null>(null);
 
+	/**
+	 * v5.5.5 (issue #55 follow-up): the registry (KNOWN_EXTENSIONS) is the
+	 * canonical source for source_method / source_url. Installed-row values
+	 * can be stale — extensions installed before v5.5.0 have
+	 * source_method='local' (the m048 default) even though the registry
+	 * knows they're github-sourced. Prefer the registry whenever it
+	 * declares a non-local source.
+	 */
+	function effectiveSourceMethod(installed: Extension | undefined, known: KnownExtension): string {
+		if (known.source_method && known.source_method !== 'local') return known.source_method;
+		return installed?.source_method ?? known.source_method ?? 'local';
+	}
+	function effectiveSourceUrl(installed: Extension | undefined, known: KnownExtension): string | null {
+		return known.source_url ?? installed?.source_url ?? null;
+	}
+
 	async function checkForUpdates(extensionId: string) {
 		checkingUpdate = extensionId;
 		error = null;
@@ -228,7 +244,7 @@
 								{/if}
 							</span>
 							<!-- Source method badge -->
-							{#if (installed?.source_method ?? known.source_method) === 'github'}
+							{#if effectiveSourceMethod(installed, known) === 'github'}
 								<span
 									class="rounded-full px-2 py-0.5 text-xs font-medium"
 									style="background-color: rgba(59, 130, 246, 0.15); color: rgb(37, 99, 235)"
@@ -236,7 +252,7 @@
 								>
 									GitHub
 								</span>
-							{:else if (installed?.source_method ?? known.source_method) === 'npm'}
+							{:else if effectiveSourceMethod(installed, known) === 'npm'}
 								<span
 									class="rounded-full px-2 py-0.5 text-xs font-medium"
 									style="background-color: rgba(220, 38, 38, 0.15); color: rgb(220, 38, 38)"
@@ -284,15 +300,15 @@
 						<p class="mt-1 text-sm" style="color: var(--color-muted)">
 							{known.description}
 						</p>
-						{#if (installed?.source_url ?? known.source_url)}
+						{#if effectiveSourceUrl(installed, known)}
 							<p class="mt-1 text-xs">
 								<a
-									href={installed?.source_url ?? known.source_url ?? '#'}
+									href={effectiveSourceUrl(installed, known) ?? '#'}
 									target="_blank"
 									rel="noopener noreferrer"
 									style="color: var(--color-primary, #3b82f6)"
 								>
-									{installed?.source_url ?? known.source_url}
+									{effectiveSourceUrl(installed, known)}
 								</a>
 							</p>
 						{/if}
@@ -314,7 +330,7 @@
 								 for github-sourced extensions; Upgrade is available
 								 only when latest > installed AND the extension
 								 supports automated upgrade. -->
-							{#if (installed.source_method ?? known.source_method) === 'github'}
+							{#if effectiveSourceMethod(installed, known) === 'github'}
 								<button
 									onclick={() => checkForUpdates(known.id)}
 									disabled={checkingUpdate === known.id}
