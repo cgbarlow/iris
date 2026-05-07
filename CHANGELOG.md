@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Show menu offered "Only with children" instead of the dashboard's
   Diagrams / Text type-filter checkboxes. Both screens now render
   the same `HierarchyControls` component.
+- **Dashboard Collections/Sets cards: selected-name colour matches
+  the count colour** — when no scope was selected, the count used
+  the knowledge-graph node colour (`getNodeTypeColor('collection')`
+  / `'set'`); when selected, the name dropped back to plain
+  foreground. Both states now use the type-coloured value so the
+  card's visual identity carries through.
 
 ### Fixed
 
