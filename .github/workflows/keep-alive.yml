@@ -28,8 +28,15 @@ jobs:
           # plus the frontend so Render's free-tier doesn't spin it down
           # mid-flow. /favicon.ico is retained as a cheap secondary so
           # we still see the static-asset edge come up too.
+          # v5.6.1: also ping /api/extensions/public-status — the only
+          # public DB-touching endpoint we have. /health doesn't query
+          # the database, so the asyncpg pool to Supabase still went
+          # cold between user sessions and the first real page load
+          # paid the reconnect cost. public-status is a tiny SELECT
+          # that keeps the pool warm.
           URLS=(
             'https://iris-api-gtb3.onrender.com/health'
+            'https://iris-api-gtb3.onrender.com/api/extensions/public-status'
             'https://iris-api-gtb3.onrender.com/favicon.ico'
             'https://iris-mcp-gtb3.onrender.com/info'  # ADR-134; update suffix when Render assigns it
             'https://iris-uat.chrisbarlow.nz/'

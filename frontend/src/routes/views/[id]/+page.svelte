@@ -35,6 +35,7 @@
 	import PackagePicker from '$lib/components/PackagePicker.svelte';
 	import NodeDeleteDialog from '$lib/components/NodeDeleteDialog.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
+	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
@@ -221,13 +222,15 @@
 	let treeSearchQuery = $state('');
 	let showCreateChildDialog = $state(false);
 	let showCreateChildPackageDialog = $state(false);
-	let showChildMenu = $state(false);
-	// v5.5.4 (#46 hierarchy-button-match): controls the new Show ▾ dropdown
-	// in the view-detail hierarchy sidebar.
-	let showHierarchyShowMenu = $state(false);
 	let childPackageName = $state('');
 	let childPackageDescription = $state('');
 	let showParentPicker = $state(false);
+	// v5.6.1: align with dashboard's HierarchyControls — Diagrams / Text type
+	// filters (Packages always shown). The legacy `treeDiagramsOnly` toggle on
+	// the focus/full-screen sidebar variants below uses a separate, narrower
+	// "only items with child diagrams" filter.
+	let showDiagrams = $state(true);
+	let showText = $state(true);
 	let treeDiagramsOnly = $state(false);
 	let treeExpandedIds = $state(new Set<string>());
 	let sidebarScrollTop = $state(0);
@@ -2019,100 +2022,19 @@
 		>
 			<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border); flex-shrink: 0">
 				<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
-				<div class="flex items-center gap-2" style="position: relative">
-					<!-- v5.5.4 (#46 hierarchy-button-match): match the dashboard's
-						 "+ New ▾" / "Show ▾" pattern from HierarchyControls. The
-						 semantics here are child-create (Package / Diagram) rather
-						 than top-level, but visually they line up with the
-						 dashboard's hierarchy panel. -->
-					<div style="position: relative">
-						<button
-							type="button"
-							onclick={() => { showChildMenu = !showChildMenu; showHierarchyShowMenu = false; }}
-							class="rounded px-3 py-1 text-xs text-white"
-							style="background-color: var(--color-primary)"
-							aria-haspopup="menu"
-							aria-expanded={showChildMenu}
-						>
-							+ New ▾
-						</button>
-						{#if showChildMenu}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								style="position: fixed; inset: 0; z-index: 9"
-								onclick={() => (showChildMenu = false)}
-								onkeydown={(e) => { if (e.key === 'Escape') showChildMenu = false; }}
-							></div>
-							<div
-								role="menu"
-								class="absolute right-0 z-50 mt-1 min-w-[160px] rounded border py-1 shadow-lg"
-								style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
-							>
-								<button
-									role="menuitem"
-									onclick={() => { showCreateChildPackageDialog = true; showChildMenu = false; }}
-									class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
-									style="color: var(--color-fg)"
-								>
-									Package
-								</button>
-								<button
-									role="menuitem"
-									onclick={() => { showCreateChildDialog = true; showChildMenu = false; }}
-									class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
-									style="color: var(--color-fg); padding-left: 2rem"
-								>
-									View
-								</button>
-							</div>
-						{/if}
-					</div>
-					<div style="position: relative">
-						<button
-							type="button"
-							onclick={() => { showHierarchyShowMenu = !showHierarchyShowMenu; showChildMenu = false; }}
-							class="rounded border px-3 py-1 text-xs"
-							style="border-color: var(--color-border); color: var(--color-fg)"
-							aria-haspopup="menu"
-							aria-expanded={showHierarchyShowMenu}
-						>
-							Show ▾
-						</button>
-						{#if showHierarchyShowMenu}
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								style="position: fixed; inset: 0; z-index: 9"
-								onclick={() => (showHierarchyShowMenu = false)}
-								onkeydown={(e) => { if (e.key === 'Escape') showHierarchyShowMenu = false; }}
-							></div>
-							<div
-								role="menu"
-								class="absolute right-0 z-50 mt-1 min-w-[180px] rounded border py-1 shadow-lg"
-								style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
-							>
-								<div
-									class="px-4 pb-0.5 pt-1 text-xs uppercase tracking-wide"
-									style="color: var(--color-muted); pointer-events: none"
-								>
-									Views
-								</div>
-								<label
-									class="flex cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:opacity-80"
-									style="color: var(--color-fg)"
-								>
-									<input
-										type="checkbox"
-										checked={treeDiagramsOnly}
-										onchange={(e) => (treeDiagramsOnly = (e.target as HTMLInputElement).checked)}
-									/>
-									Only with children
-								</label>
-								<p class="mt-1 px-4 py-1 text-xs" style="color: var(--color-muted)">
-									Packages are always shown.
-								</p>
-							</div>
-						{/if}
-					</div>
+				<div class="flex items-center gap-2">
+					<!-- v5.6.1: reuse the shared HierarchyControls component (DRY).
+						 Same +New / Show menus as the dashboard so the toolbar reads
+						 the same everywhere. The +New here creates a *child* under
+						 the current diagram's package, hence the dialog handlers. -->
+					<HierarchyControls
+						{showDiagrams}
+						{showText}
+						onShowDiagrams={(v) => (showDiagrams = v)}
+						onShowText={(v) => (showText = v)}
+						oncreatepackage={() => (showCreateChildPackageDialog = true)}
+						oncreateview={() => (showCreateChildDialog = true)}
+					/>
 					<button
 						onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
 						class="rounded p-1 text-xs"
@@ -2141,7 +2063,7 @@
 				{:else}
 					<ul role="tree">
 						{#each hierarchyTree as node (node.id)}
-							<TreeNode {node} currentDiagramId={diagram.id} searchQuery={treeSearchQuery} showDiagramsOnly={treeDiagramsOnly} expandedIds={treeExpandedIds} />
+							<TreeNode {node} currentDiagramId={diagram.id} searchQuery={treeSearchQuery} {showDiagrams} {showText} expandedIds={treeExpandedIds} />
 						{/each}
 					</ul>
 				{/if}

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.1] - 2026-05-07
+
+### Added
+
+- **iris-mcp returns a `web_url` per entity** — every tool response that
+  carries an entity id now also carries a resolved front-end URL
+  (`https://<IRIS_WEB_URL>/views/<id>`, `/elements/<id>`,
+  `/packages/<id>`, `/sets/<id>`, `/collections/<id>`). Search results
+  decorate per-result via the `result_type` discriminator. Reads from
+  the new `IRIS_WEB_URL` env var; when unset the field is omitted and
+  responses are identical to v5.6.0. Stops MCP-using LLMs from guessing
+  the iris host and producing broken links. Render UAT defaults to
+  `https://iris-uat.chrisbarlow.nz`. Surfaced in `/info` for diagnosis.
+
+### Changed
+
+- **Hierarchy controls on `/views/[id]` now reuse the shared
+  `HierarchyControls` component (DRY)** — the diagram-detail page's
+  hierarchy sidebar had its own inline copy of the +New / Show
+  dropdown buttons that drifted from the dashboard's version: the
+  Show menu offered "Only with children" instead of the dashboard's
+  Diagrams / Text type-filter checkboxes. Both screens now render
+  the same `HierarchyControls` component.
+- **Dashboard Collections/Sets cards: selected-name colour matches
+  the count colour** — when no scope was selected, the count used
+  the knowledge-graph node colour (`getNodeTypeColor('collection')`
+  / `'set'`); when selected, the name dropped back to plain
+  foreground. Both states now use the type-coloured value so the
+  card's visual identity carries through.
+
+### Fixed
+
+- **First page load latency after idle on UAT** — the keep-alive
+  workflow now also pings `/api/extensions/public-status`, the
+  one public DB-touching endpoint we have. `/health` keeps the
+  FastAPI dyno warm but doesn't query the database, so the asyncpg
+  pool to Supabase still went cold between sessions and the first
+  real page paid the reconnect cost. `public-status` is a tiny
+  SELECT that keeps the pool hot.
+
 ## [5.6.0] - 2026-05-07
 
 ### Added

@@ -523,7 +523,10 @@
 			style="border-color: var(--color-border); color: var(--color-fg); background: var(--color-surface)"
 		>
 			{#if activeCollection}
-				<div class="text-xl font-bold" style="color: var(--color-fg)">{activeCollection.name}</div>
+				<!-- v5.6.1: name uses the same knowledge-graph node colour as the
+					 count, so the card's visual identity carries through both
+					 unselected (count) and selected (name) states. -->
+				<div class="text-xl font-bold" style="color: {getNodeTypeColor('collection')}">{activeCollection.name}</div>
 				<button
 					onclick={() => { clearActiveCollection(); clearActiveSet(); setId = ''; collectionId = ''; loadDashboard(); }}
 					class="mt-1 inline-block text-sm"
@@ -546,7 +549,7 @@
 			style="border-color: var(--color-border); color: var(--color-fg); background: var(--color-surface)"
 		>
 			{#if activeSet}
-				<div class="text-xl font-bold" style="color: var(--color-fg)">{activeSet.name}</div>
+				<div class="text-xl font-bold" style="color: {getNodeTypeColor('set')}">{activeSet.name}</div>
 				<button
 					onclick={() => { clearActiveSet(); setId = ''; loadDashboard(); }}
 					class="mt-1 inline-block text-sm"
