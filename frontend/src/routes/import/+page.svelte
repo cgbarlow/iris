@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** Import page — upload .qea/.eap (SparxEA) or .pptx (DoView) files. */
+	/** Import page — upload .qea/.eap (SparxEA), .pptx (DoView), or .xml/.archimate/.oex (ArchiMate Open Exchange) files. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
@@ -63,8 +63,12 @@
 	let showCreateSetDialog = $state(false);
 	let selectorRef: { reload: () => Promise<void> } | undefined = $state();
 
+	const ARCHIMATE_EXT = /\.(xml|archimate|oex)$/i;
 	const isBatch = $derived(selectedFiles.length > 1 && selectedFiles.every((f) => f.name.endsWith('.pptx')));
 	const isPptx = $derived(selectedFiles.length === 1 && (selectedFiles[0]?.name.endsWith('.pptx') ?? false));
+	const isArchimate = $derived(
+		selectedFiles.length === 1 && (selectedFiles[0] ? ARCHIMATE_EXT.test(selectedFiles[0].name) : false),
+	);
 	const hasResults = $derived(summary !== null || batchSummary !== null);
 
 	function handleDragOver(event: DragEvent) {
@@ -94,10 +98,14 @@
 
 	function selectFiles(files: File[]) {
 		const valid = files.filter(
-			(f) => f.name.endsWith('.qea') || f.name.endsWith('.eap') || f.name.endsWith('.pptx'),
+			(f) =>
+				f.name.endsWith('.qea') ||
+				f.name.endsWith('.eap') ||
+				f.name.endsWith('.pptx') ||
+				ARCHIMATE_EXT.test(f.name),
 		);
 		if (valid.length === 0) {
-			error = 'Supported formats: .qea, .eap (SparxEA) or .pptx (DoView).';
+			error = 'Supported formats: .qea, .eap (SparxEA); .pptx (DoView); .xml, .archimate, .oex (ArchiMate Open Exchange).';
 			return;
 		}
 		// Multi-file only for .pptx
@@ -160,7 +168,11 @@
 
 				progress = 20;
 
-				const endpoint = isPptx ? '/api/import/pptx' : '/api/import/sparx';
+				const endpoint = isPptx
+					? '/api/import/pptx'
+					: isArchimate
+						? '/api/import/archimate'
+						: '/api/import/sparx';
 				const response = await fetch(`${API_BASE_URL}${endpoint}`, {
 					method: 'POST',
 					headers,
@@ -223,7 +235,7 @@
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
 	<p class="mt-1 text-sm" style="color: var(--color-muted)">
-		Import diagrams from SparxEA (.qea, .eap) or DoView (.pptx) files. Select multiple .pptx files for batch import.
+		Import diagrams from SparxEA (.qea, .eap), DoView (.pptx), or ArchiMate Open Exchange (.xml, .archimate, .oex) files. Select multiple .pptx files for batch import.
 	</p>
 </div>
 
@@ -383,7 +395,7 @@
 		<input
 			bind:this={fileInputEl}
 			type="file"
-			accept=".qea,.eap,.pptx"
+			accept=".qea,.eap,.pptx,.xml,.archimate,.oex"
 			multiple
 			class="hidden"
 			onchange={handleFileInput}
@@ -400,7 +412,7 @@
 			{/if}
 		</p>
 		<p class="mt-1 text-xs" style="color: var(--color-muted)">
-			SparxEA (.qea, .eap) or DoView (.pptx) — select multiple .pptx for batch import
+			SparxEA (.qea, .eap), DoView (.pptx), or ArchiMate Open Exchange (.xml, .archimate, .oex) — select multiple .pptx for batch import
 		</p>
 	</div>
 

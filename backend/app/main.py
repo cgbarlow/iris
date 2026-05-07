@@ -27,6 +27,7 @@ from app.export.router import router as export_router
 from app.images.router import router as images_router
 from app.extensions.router import router as extensions_router
 from app.graph.router import router as graph_router
+from app.import_archimate.router import router as import_archimate_router
 from app.import_pptx.router import router as import_pptx_router
 from app.import_sparx.router import router as import_router
 from app.locks.router import admin_router as admin_locks_router
@@ -184,6 +185,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(import_router)
     app.include_router(images_router)
     app.include_router(import_pptx_router)
+    app.include_router(import_archimate_router)
     app.include_router(package_relationships_router)
     app.include_router(sets_router)
     app.include_router(collections_router)
