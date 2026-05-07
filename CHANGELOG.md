@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-05-07
+
+### Added
+
+- **ArchiMate Open Exchange XML import** (issue #52) — iris now imports
+  ArchiMate models in the format published by The Open Group at
+  http://www.opengroup.org/xsd/archimate/, supporting the 3.0, 3.1, and
+  3.2 namespace variants. New endpoint `POST /api/import/archimate`
+  accepts `.xml`, `.archimate`, and `.oex` uploads; the import page
+  dropzone has been extended to advertise the format and route uploads
+  to the new endpoint.
+
+  - 40+ ArchiMate element types map to native iris types via the
+    existing `ARCHIMATE_STEREOTYPE_MAP` (DRY — single source of truth
+    shared with the SparxEA importer).
+  - 12 ArchiMate relationship types (Composition, Aggregation,
+    Assignment, Realization, Serving, Triggering, Flow, Specialization,
+    Access, Influence, Association, plus the legacy `Used`/`UsedBy`
+    aliases).
+  - **Auto-generated Overview diagram** when the source OEX file is
+    model-only (no embedded views) — common in real-world exports.
+    Layout is a type-grouped grid with edges drawn from the iris
+    relationship table. An `auto_layout` warning records that the
+    diagram was synthesised.
+  - Nested `<node>` containment (compound nodes) is flattened to
+    absolute coordinates on import.
+  - Two committed fixtures: `docs/reference/ArchiMate/sample-with-view.xml`
+    (hand-authored, 3/2/1) and `docs/reference/ArchiMate/msd-map.xml`
+    (real-world: 127 elements, 977 relationships, 0 views).
+  - New UAT Playwright spec
+    `frontend/tests/e2e/uat/issue-52-archimate-import.spec.ts` drives
+    end-to-end import of the MSD fixture against the live UAT
+    deployment.
+- **ADR-148** + **SPEC-148-A** documenting the format support, mapping
+  tables, auto-layout strategy, and accepted file extensions.
+
 ## [5.5.10] - 2026-05-07
 
 ### Added
