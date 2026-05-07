@@ -16,6 +16,11 @@ from iris_client import IrisClient
 from mcp import types
 
 from iris_mcp.errors import format_error
+from iris_mcp.links import (
+    with_web_url,
+    with_web_urls_list,
+    with_web_urls_search,
+)
 
 
 @dataclass(frozen=True)
@@ -45,52 +50,62 @@ async def _search(c: IrisClient, args: dict[str, Any]) -> str:
         collection_id=args.get("collection_id"),
         limit=int(args.get("limit", 25)),
     )
-    return result.model_dump_json()
+    return with_web_urls_search(result.model_dump_json())
 
 
 async def _get_diagram(c: IrisClient, args: dict[str, Any]) -> str:
-    return (await c.get_diagram(args["diagram_id"])).model_dump_json()
+    return with_web_url(
+        (await c.get_diagram(args["diagram_id"])).model_dump_json(), "diagram",
+    )
 
 
 async def _list_diagrams(c: IrisClient, args: dict[str, Any]) -> str:
     rows = await c.list_diagrams(set_id=args.get("set_id"))
-    return json.dumps([r.model_dump() for r in rows])
+    return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "diagram")
 
 
 async def _get_element(c: IrisClient, args: dict[str, Any]) -> str:
-    return (await c.get_element(args["element_id"])).model_dump_json()
+    return with_web_url(
+        (await c.get_element(args["element_id"])).model_dump_json(), "element",
+    )
 
 
 async def _list_elements(c: IrisClient, args: dict[str, Any]) -> str:
     rows = await c.list_elements(set_id=args.get("set_id"))
-    return json.dumps([r.model_dump() for r in rows])
+    return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "element")
 
 
 async def _get_package(c: IrisClient, args: dict[str, Any]) -> str:
-    return (await c.get_package(args["package_id"])).model_dump_json()
+    return with_web_url(
+        (await c.get_package(args["package_id"])).model_dump_json(), "package",
+    )
 
 
 async def _list_packages(c: IrisClient, args: dict[str, Any]) -> str:
     rows = await c.list_packages(set_id=args.get("set_id"))
-    return json.dumps([r.model_dump() for r in rows])
+    return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "package")
 
 
 async def _list_sets(c: IrisClient, args: dict[str, Any]) -> str:
     rows = await c.list_sets(collection_id=args.get("collection_id"))
-    return json.dumps([r.model_dump() for r in rows])
+    return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "set")
 
 
 async def _get_set(c: IrisClient, args: dict[str, Any]) -> str:
-    return (await c.get_set(args["set_id"])).model_dump_json()
+    return with_web_url(
+        (await c.get_set(args["set_id"])).model_dump_json(), "set",
+    )
 
 
 async def _list_collections(c: IrisClient, _args: dict[str, Any]) -> str:
     rows = await c.list_collections()
-    return json.dumps([r.model_dump() for r in rows])
+    return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "collection")
 
 
 async def _get_collection(c: IrisClient, args: dict[str, Any]) -> str:
-    return (await c.get_collection(args["collection_id"])).model_dump_json()
+    return with_web_url(
+        (await c.get_collection(args["collection_id"])).model_dump_json(), "collection",
+    )
 
 
 async def _export(
