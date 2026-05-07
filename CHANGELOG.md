@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.1] - 2026-05-07
+
+### Changed
+
+- **Hierarchy controls on `/views/[id]` now reuse the shared
+  `HierarchyControls` component (DRY)** — the diagram-detail page's
+  hierarchy sidebar had its own inline copy of the +New / Show
+  dropdown buttons that drifted from the dashboard's version: the
+  Show menu offered "Only with children" instead of the dashboard's
+  Diagrams / Text type-filter checkboxes. Both screens now render
+  the same `HierarchyControls` component.
+
+### Fixed
+
+- **First page load latency after idle on UAT** — the keep-alive
+  workflow now also pings `/api/extensions/public-status`, the
+  one public DB-touching endpoint we have. `/health` keeps the
+  FastAPI dyno warm but doesn't query the database, so the asyncpg
+  pool to Supabase still went cold between sessions and the first
+  real page paid the reconnect cost. `public-status` is a tiny
+  SELECT that keeps the pool hot.
+
 ## [5.6.0] - 2026-05-07
 
 ### Added
