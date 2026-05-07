@@ -78,6 +78,10 @@ def create_app() -> FastAPI:
             "service": "iris-mcp",
             "endpoint": "/",
             "backend": iris_url,
+            # v5.6.1: surface IRIS_WEB_URL in the info payload so an
+            # operator can verify the deployment knows the front-end
+            # URL it'll inject into tool responses.
+            "web_url": os.environ.get("IRIS_WEB_URL"),
         }
 
     async def mcp_asgi(

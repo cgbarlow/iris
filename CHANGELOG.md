@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.6.1] - 2026-05-07
 
+### Added
+
+- **iris-mcp returns a `web_url` per entity** — every tool response that
+  carries an entity id now also carries a resolved front-end URL
+  (`https://<IRIS_WEB_URL>/views/<id>`, `/elements/<id>`,
+  `/packages/<id>`, `/sets/<id>`, `/collections/<id>`). Search results
+  decorate per-result via the `result_type` discriminator. Reads from
+  the new `IRIS_WEB_URL` env var; when unset the field is omitted and
+  responses are identical to v5.6.0. Stops MCP-using LLMs from guessing
+  the iris host and producing broken links. Render UAT defaults to
+  `https://iris-uat.chrisbarlow.nz`. Surfaced in `/info` for diagnosis.
+
 ### Changed
 
 - **Hierarchy controls on `/views/[id]` now reuse the shared
