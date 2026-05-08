@@ -356,26 +356,12 @@
 		if (mode === 'append') {
 			if (!selectedNode) return;
 			eventPickerContext = 'create';
-			const src = selectedNode;
-			const offset = { x: src.position.x + 280, y: src.position.y };
-			// v5.4.0 (#13): backing Element first.
-			const label = humanLabel(entry.key);
-			const element = await createBpmnElement(entry.key, label);
-			if (!element) return;
-			const newNode = makeBpmnNode(entry.key, offset, { entityId: element.id, label });
-			pushHistory();
-			canvasNodes = [...canvasNodes, newNode];
-			canvasEdges = [
-				...canvasEdges,
-				{
-					id: `e-${src.id}-${newNode.id}`,
-					source: src.id,
-					target: newNode.id,
-					type: 'sequence_flow',
-					data: { label: '' },
-				} as CanvasEdge,
-			];
-			dirty();
+			// v5.6.2 (#69 follow-up): route through appendBpmnNodeWithEdge so
+			// the /api/relationships POST fires alongside the canvas edge —
+			// matching the ContextPad append paths and handleBpmnConnect's
+			// drag-handle path. Pre-fix this branch silently skipped the POST
+			// and /elements/<id>'s Relationships panel stayed empty.
+			await appendBpmnNodeWithEdge(selectedNode, entry.key);
 			return;
 		}
 		if (mode === 'replace') {
@@ -502,8 +488,13 @@
 		dirty();
 	}
 
-	async function appendBpmn(src: CanvasNode, key: BpmnEntityType) {
-		// v5.4.0 (#13): backing Element first.
+	/** v5.6.2 (issue #69 follow-up to BPMN-02): DRY helper used by every
+	 *  "append a node connected to the source" path — ContextPad
+	 *  Append-Task / Append-Gateway / Append-End-Event and CommandPalette
+	 *  append-mode pick. Adds the new node, the connecting edge, and
+	 *  POSTs /api/relationships so /elements/<id>'s Relationships panel
+	 *  resolves back. Mirrors handleBpmnConnect's shape. Best-effort POST. */
+	async function appendBpmnNodeWithEdge(src: CanvasNode, key: BpmnEntityType) {
 		const label = humanLabel(key);
 		const element = await createBpmnElement(key, label);
 		if (!element) return;
@@ -511,6 +502,28 @@
 			entityId: element.id,
 			label,
 		});
+		const sourceEntityId = (src.data as { entityId?: string } | undefined)?.entityId;
+		const targetEntityId = element.id;
+
+		let relationshipId: string | undefined;
+		if (sourceEntityId && targetEntityId) {
+			try {
+				const rel = await apiFetch<{ id: string }>('/api/relationships', {
+					method: 'POST',
+					body: JSON.stringify({
+						source_element_id: sourceEntityId,
+						target_element_id: targetEntityId,
+						relationship_type: 'sequence_flow',
+						label: '',
+						description: '',
+					}),
+				});
+				relationshipId = rel.id;
+			} catch (e) {
+				console.error('appendBpmnNodeWithEdge: /api/relationships POST failed:', e);
+			}
+		}
+
 		pushHistory();
 		canvasNodes = [...canvasNodes, newNode];
 		canvasEdges = [
@@ -520,10 +533,14 @@
 				source: src.id,
 				target: newNode.id,
 				type: 'sequence_flow',
-				data: { label: '' },
+				data: { label: '', ...(relationshipId ? { relationshipId } : {}) },
 			} as CanvasEdge,
 		];
 		dirty();
+	}
+
+	async function appendBpmn(src: CanvasNode, key: BpmnEntityType) {
+		await appendBpmnNodeWithEdge(src, key);
 	}
 
 	function deleteNodeById(nodeId: string) {
