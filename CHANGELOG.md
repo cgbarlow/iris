@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **BPMN drag-handle connections didn't register** (issue #69, ADR-136
+  v5.6.2 amendment). Headline user repro: "connecting start node to
+  task, the connector does not register even though edges are connected
+  and the problem bar still gives a warning." Root cause: xyflow svelte's
+  `Handle.svelte` calls `store.addEdge(connection)` with a Connection
+  object that has no `type` field; xyflow's `addEdge` util doesn't apply
+  `defaultEdgeOptions`, so the bound `canvasEdges` got an edge with
+  `e.type === undefined`. The validator's `isSequence(e)` then returned
+  false, `outDeg` for the start event stayed at 0, and the
+  "no outgoing sequence flow" warning persisted. Separately,
+  `BpmnAuthoringShell.handleBpmnConnect` was wired to `onconnectnodes`
+  (a custom UnifiedCanvas prop, not a real SvelteFlow event) — drag-
+  handle connections never went through `handleConnect`, so the
+  `/api/relationships` POST never fired and `/elements/<id>`'s
+  Relationships panel stayed empty.
+
+  Fix:
+  - New pure helper `frontend/src/lib/canvas/edgeOnConnect.ts` exports
+    `patchConnectedEdgeType` to upgrade the type-less auto-added edge
+    after xyflow's `addEdge` runs. Idempotent.
+  - `UnifiedCanvas.svelte` wires `onconnect={handleSvelteFlowConnect}`
+    on the editing `<SvelteFlow>`. The handler calls the helper, then
+    notifies the consumer via `onconnectnodes?.(source, target)` so
+    the BPMN shell's relationship POST chain still fires.
+  - `BpmnAuthoringShell.handleBpmnConnect` no longer appends a fresh
+    edge (UnifiedCanvas now owns edge addition); it POSTs
+    `/api/relationships` and patches the existing edge with the
+    resulting `relationshipId`.
+
+  Closes BPMN-01 / -02 / -03 / -09 from the issue #69 consolidated bug
+  ledger. Remaining ledger items (BPMN-04/08 etc.) tracked for follow-up
+  waves.
+
+  Why this wasn't caught earlier: v5.4.1's tests
+  (`bpmnDefaultEdgeType.test.ts`, `bpmnConnectRelationship.test.ts`)
+  were static-parser style — they grep the source for the right code
+  patterns and passed when the strings were present. The runtime wiring
+  between SvelteFlow's drag-connect and the consumer handler chain was
+  never exercised. v5.6.2 adds 8 behavioural unit tests for the helper
+  + 4 static guards for the `<SvelteFlow>` wiring; the existing
+  `bpmnConnectRelationship.test.ts` is updated to assert the new
+  edge-patching contract.
+
 ## [5.6.1] - 2026-05-07
 
 ### Added
