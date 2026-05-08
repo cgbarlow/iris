@@ -356,26 +356,12 @@
 		if (mode === 'append') {
 			if (!selectedNode) return;
 			eventPickerContext = 'create';
-			const src = selectedNode;
-			const offset = { x: src.position.x + 280, y: src.position.y };
-			// v5.4.0 (#13): backing Element first.
-			const label = humanLabel(entry.key);
-			const element = await createBpmnElement(entry.key, label);
-			if (!element) return;
-			const newNode = makeBpmnNode(entry.key, offset, { entityId: element.id, label });
-			pushHistory();
-			canvasNodes = [...canvasNodes, newNode];
-			canvasEdges = [
-				...canvasEdges,
-				{
-					id: `e-${src.id}-${newNode.id}`,
-					source: src.id,
-					target: newNode.id,
-					type: 'sequence_flow',
-					data: { label: '' },
-				} as CanvasEdge,
-			];
-			dirty();
+			// v5.6.2 (#69 follow-up): route through appendBpmnNodeWithEdge so
+			// the /api/relationships POST fires alongside the canvas edge —
+			// matching the ContextPad append paths and handleBpmnConnect's
+			// drag-handle path. Pre-fix this branch silently skipped the POST
+			// and /elements/<id>'s Relationships panel stayed empty.
+			await appendBpmnNodeWithEdge(selectedNode, entry.key);
 			return;
 		}
 		if (mode === 'replace') {
@@ -502,8 +488,13 @@
 		dirty();
 	}
 
-	async function appendBpmn(src: CanvasNode, key: BpmnEntityType) {
-		// v5.4.0 (#13): backing Element first.
+	/** v5.6.2 (issue #69 follow-up to BPMN-02): DRY helper used by every
+	 *  "append a node connected to the source" path — ContextPad
+	 *  Append-Task / Append-Gateway / Append-End-Event and CommandPalette
+	 *  append-mode pick. Adds the new node, the connecting edge, and
+	 *  POSTs /api/relationships so /elements/<id>'s Relationships panel
+	 *  resolves back. Mirrors handleBpmnConnect's shape. Best-effort POST. */
+	async function appendBpmnNodeWithEdge(src: CanvasNode, key: BpmnEntityType) {
 		const label = humanLabel(key);
 		const element = await createBpmnElement(key, label);
 		if (!element) return;
@@ -511,6 +502,28 @@
 			entityId: element.id,
 			label,
 		});
+		const sourceEntityId = (src.data as { entityId?: string } | undefined)?.entityId;
+		const targetEntityId = element.id;
+
+		let relationshipId: string | undefined;
+		if (sourceEntityId && targetEntityId) {
+			try {
+				const rel = await apiFetch<{ id: string }>('/api/relationships', {
+					method: 'POST',
+					body: JSON.stringify({
+						source_element_id: sourceEntityId,
+						target_element_id: targetEntityId,
+						relationship_type: 'sequence_flow',
+						label: '',
+						description: '',
+					}),
+				});
+				relationshipId = rel.id;
+			} catch (e) {
+				console.error('appendBpmnNodeWithEdge: /api/relationships POST failed:', e);
+			}
+		}
+
 		pushHistory();
 		canvasNodes = [...canvasNodes, newNode];
 		canvasEdges = [
@@ -520,10 +533,14 @@
 				source: src.id,
 				target: newNode.id,
 				type: 'sequence_flow',
-				data: { label: '' },
+				data: { label: '', ...(relationshipId ? { relationshipId } : {}) },
 			} as CanvasEdge,
 		];
 		dirty();
+	}
+
+	async function appendBpmn(src: CanvasNode, key: BpmnEntityType) {
+		await appendBpmnNodeWithEdge(src, key);
 	}
 
 	function deleteNodeById(nodeId: string) {
@@ -571,59 +588,50 @@
 	}
 
 	// ────────────────────────────────────────────────────────────────────
-	// v5.4.1 (#46 item #10): connect → POST /api/relationships + add edge
+	// connect → POST /api/relationships (edge already added by UnifiedCanvas)
 	// ────────────────────────────────────────────────────────────────────
-	/** Wired as `onconnectnodes` on <UnifiedCanvas> so handle-drag
-	 *  connections in BPMN views create a real Relationship record (the
-	 *  same record other notations create via the page-level
-	 *  handleRelationshipSave). Without this, edges only existed in the
-	 *  diagram's canvas_edges JSON; /elements/<id>'s Relationships panel
-	 *  walked /api/relationships and saw nothing.
+	/** Wired as `onconnectnodes` on the UnifiedCanvas component.
 	 *
-	 *  Always adds the edge locally so the canvas updates immediately;
-	 *  the relationship POST is best-effort (mirrors the non-BPMN
-	 *  handleRelationshipSave at views/[id]/+page.svelte:1310-1375). */
+	 *  v5.6.2 (issue #69): UnifiedCanvas's `handleSvelteFlowConnect` now owns
+	 *  edge addition (calling `patchConnectedEdgeType` to fix xyflow's
+	 *  type-less auto-add) and invokes this handler AFTER the edge is in
+	 *  canvasEdges. So this handler no longer re-adds the edge — it just
+	 *  POSTs the Relationship record and patches the existing edge with the
+	 *  resulting `relationshipId` so the element-detail Relationships panel
+	 *  can resolve back.
+	 *
+	 *  Best-effort: if the POST fails, the edge still works visually. */
 	async function handleBpmnConnect(sourceId: string, targetId: string) {
 		const sourceNode = canvasNodes.find((n) => n.id === sourceId);
 		const targetNode = canvasNodes.find((n) => n.id === targetId);
 		const sourceEntityId = (sourceNode?.data as { entityId?: string } | undefined)?.entityId;
 		const targetEntityId = (targetNode?.data as { entityId?: string } | undefined)?.entityId;
 
-		let relationshipId: string | undefined;
-		if (sourceEntityId && targetEntityId) {
-			try {
-				const rel = await apiFetch<{ id: string }>('/api/relationships', {
-					method: 'POST',
-					body: JSON.stringify({
-						source_element_id: sourceEntityId,
-						target_element_id: targetEntityId,
-						relationship_type: 'sequence_flow',
-						label: '',
-						description: '',
-					}),
-				});
-				relationshipId = rel.id;
-			} catch (e) {
-				// Non-fatal: edge still works visually even without a DB record.
-				console.error('handleBpmnConnect: /api/relationships POST failed:', e);
-			}
-		}
-
 		pushHistory();
-		canvasEdges = [
-			...canvasEdges,
-			{
-				id: `e-${sourceId}-${targetId}`,
-				source: sourceId,
-				target: targetId,
-				type: 'sequence_flow',
-				data: {
-					label: '',
-					...(relationshipId ? { relationshipId } : {}),
-				},
-			} as CanvasEdge,
-		];
 		dirty();
+
+		if (!sourceEntityId || !targetEntityId) return;
+
+		try {
+			const rel = await apiFetch<{ id: string }>('/api/relationships', {
+				method: 'POST',
+				body: JSON.stringify({
+					source_element_id: sourceEntityId,
+					target_element_id: targetEntityId,
+					relationship_type: 'sequence_flow',
+					label: '',
+					description: '',
+				}),
+			});
+			// Patch the just-added edge with the Relationship id.
+			canvasEdges = canvasEdges.map((e) => {
+				if (e.source !== sourceId || e.target !== targetId) return e;
+				const data = { ...((e as { data?: Record<string, unknown> }).data ?? {}), relationshipId: rel.id, label: (e.data as { label?: string } | undefined)?.label ?? '' };
+				return { ...e, data } as CanvasEdge;
+			});
+		} catch (e) {
+			console.error('handleBpmnConnect: /api/relationships POST failed:', e);
+		}
 	}
 
 	// ────────────────────────────────────────────────────────────────────

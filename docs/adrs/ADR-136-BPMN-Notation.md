@@ -554,3 +554,92 @@ v5.4.0 mistakenly added duplicate trios in the Text and BPMN inner
 branches. The duplicates have been removed; the trio now renders
 exactly once outside the FocusView (which has its own intentional
 toolbar duplicate because the focus overlay hides the parent).
+
+## Amendment 2026-05-08 — v5.6.2 BPMN-03 root cause (issue #69)
+
+### A. Drag-handle connections were silently typeless
+
+User report (#69): "connecting start node to task, the connector does
+not register even though edges are connected and the problem bar still
+gives a warning."
+
+Root cause — discovered while triaging closed BPMN bugs against current
+`main`:
+
+1. xyflow svelte's `Handle.svelte` runs `store.addEdge(connection)`
+   immediately after `isValidConnection` returns true (Handle.svelte:108).
+2. The `addEdge` util in `@xyflow/system` (index.mjs:1048) does
+   `edges.concat({ ...edgeParams, id: getEdgeId(...) })` — it does **not**
+   apply `defaultEdgeOptions`. The Connection object only carries
+   `{source, target, sourceHandle, targetHandle}`, so the auto-added edge
+   has **no `type` field**.
+3. `validateBpmn`'s `isSequence(e)` keys on `e.type === 'sequence_flow'`.
+   The type-less auto-added edge fails the check; `outDeg` for the source
+   stays at 0; "no outgoing sequence flow" warning persists despite the
+   user having drawn the edge.
+4. `BpmnAuthoringShell.handleBpmnConnect` was wired to `onconnectnodes`,
+   which is a **custom prop** on UnifiedCanvas — not a real SvelteFlow
+   event. `onconnectnodes` only fires from `handleConnect` in
+   UnifiedCanvas, which only gets called from KeyboardHandler (keyboard
+   shortcut C) or `handleNodeClick` connect-mode. Drag-handle connections
+   never went through `handleConnect` because `<SvelteFlow>` had **no
+   `onconnect` prop wired**. So `handleBpmnConnect` never fired on drag,
+   `/api/relationships` was never POSTed, and `/elements/<id>`'s
+   Relationships panel stayed empty.
+
+This affected **every notation**, not just BPMN — non-BPMN canvases got
+type-less edges too, but no validator surfaced the issue, so it went
+unnoticed.
+
+### B. Fix
+
+1. **New helper** `frontend/src/lib/canvas/edgeOnConnect.ts` —
+   `patchConnectedEdgeType(edges, connection, defaultEdgeType)` is a pure
+   function that upgrades the just-added type-less edge to carry
+   `type: defaultEdgeType` (and `data.relationshipType` for legacy
+   readers). Idempotent — re-running on an already-typed edge is a no-op.
+2. **UnifiedCanvas** wires `onconnect={handleSvelteFlowConnect}` on the
+   editing `<SvelteFlow>`. The handler calls `patchConnectedEdgeType` then
+   notifies the consumer via `onconnectnodes?.(c.source, c.target)` so
+   the BPMN shell's relationship POST chain still fires.
+3. **BpmnAuthoringShell.handleBpmnConnect** no longer appends a fresh
+   edge (UnifiedCanvas now owns edge addition). It POSTs
+   `/api/relationships` and patches the existing edge with the resulting
+   `relationshipId` so `/elements/<id>` can resolve back.
+
+### C. Why static-parser tests didn't catch this
+
+The v5.4.1 fix (issue #46/9 + #46/10) shipped two tests:
+`bpmnDefaultEdgeType.test.ts` and `bpmnConnectRelationship.test.ts`.
+Both are static-parser style — they grep the source for code patterns
+(`/notation === 'bpmn'.*'sequence_flow'/`,
+`/onconnectnodes\s*=\s*\{/`) and pass when the right strings are
+present. **They never exercise the runtime wiring** between SvelteFlow's
+drag-connect events and the consumer handler chain. The strings were
+all present; the chain wasn't connected.
+
+This is the user's frustration in #69 — "barely any of the fixes have
+been resolved" — captured precisely. v5.6.2 introduces:
+- A pure unit-tested helper (`patchConnectedEdgeType`) — 8 specs
+- A static guard (`canvasOnConnectWiring.test.ts`) that fails if the
+  `<SvelteFlow>` `onconnect` wiring is dropped — 4 specs
+- An updated `bpmnConnectRelationship.test.ts` that asserts the new
+  edge-patching contract (no longer appends, maps + sets relationshipId)
+
+The static guards remain a regression net rather than a behavioural
+proof — for that, the planned local-backend Playwright harness
+(ADR-149, deferred from #69) closes the loop end-to-end.
+
+### D. Bugs transitively closed
+
+The Wave A fix closes four entries in the issue #69 consolidated bug
+ledger:
+- BPMN-01 (default edge type wasn't applied to drag-handle edges)
+- BPMN-02 (POST `/api/relationships` never fired from drag-handle)
+- BPMN-03 (the headline reproducer)
+- BPMN-09 (`/elements/<id>` Relationships empty, downstream of -02)
+
+Remaining ledger items (BPMN-04/08 — ContextPad append no-op;
+entityId-on-Element-POST-failure surfacing) and medium-priority items
+(BPMN-05..17) are tracked for follow-up waves; v5.6.2 ships only the
+critical-path fix.

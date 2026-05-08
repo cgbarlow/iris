@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.2] - 2026-05-08
+
+BPMN polish (issue #69) — closes the user-reported drag-connect bug
+that v5.4.1's "claimed-fix" tests didn't actually catch. Root cause +
+fix detailed in ADR-136 v5.6.2 amendment §A-D.
+
+### Fixed
+
+- **BPMN drag-handle connections didn't register** (issue #69, BPMN-03,
+  ADR-136 v5.6.2 amendment §A-B). Headline user repro: "connecting
+  start node to task, the connector does not register even though edges
+  are connected and the problem bar still gives a warning." Root cause:
+  xyflow svelte's `Handle.svelte` calls `store.addEdge(connection)`
+  with a Connection object that has no `type` field; xyflow's `addEdge`
+  util doesn't apply `defaultEdgeOptions`, so the bound `canvasEdges`
+  got an edge with `e.type === undefined`. The validator's
+  `isSequence(e)` then returned false, `outDeg` for the start event
+  stayed at 0, and the "no outgoing sequence flow" warning persisted.
+  Separately, `BpmnAuthoringShell.handleBpmnConnect` was wired to
+  `onconnectnodes` (a custom UnifiedCanvas prop, not a real SvelteFlow
+  event) — drag-handle connections never went through `handleConnect`,
+  so the `/api/relationships` POST never fired and `/elements/<id>`'s
+  Relationships panel stayed empty.
+
+  Fix:
+  - New pure helper `frontend/src/lib/canvas/edgeOnConnect.ts` exports
+    `patchConnectedEdgeType` to upgrade the type-less auto-added edge
+    after xyflow's `addEdge` runs. Idempotent.
+  - `UnifiedCanvas.svelte` wires `onconnect={handleSvelteFlowConnect}`
+    on the editing `<SvelteFlow>`. The handler calls the helper, then
+    notifies the consumer via `onconnectnodes?.(source, target)` so
+    the BPMN shell's relationship POST chain still fires.
+  - `BpmnAuthoringShell.handleBpmnConnect` no longer appends a fresh
+    edge (UnifiedCanvas now owns edge addition); it POSTs
+    `/api/relationships` and patches the existing edge with the
+    resulting `relationshipId`.
+
+  Closes BPMN-01 / -02 / -03 / -09 from the issue #69 consolidated bug
+  ledger.
+- **BPMN ContextPad and CommandPalette append paths didn't POST
+  `/api/relationships`** (issue #69 follow-up to BPMN-02). Same gap as
+  the drag-handle bug: `appendBpmn` and `handleCmdPick('append')` added
+  a sequence_flow edge to the canvas but never persisted the
+  Relationship record, so `/elements/<id>`'s Relationships panel stayed
+  empty for ContextPad-appended and CommandPalette-appended nodes
+  too. Extracted shared helper `appendBpmnNodeWithEdge` (DRY per
+  protocol #13) — both append paths now route through it; mirrors
+  `handleBpmnConnect`'s POST-then-patch shape.
+- **BPMN node-creation orphan-on-failure guard** (BPMN-08, locked in
+  with `bpmnEntityIdGuard.test.ts`). Already-correct behaviour locked
+  in with a static-parser test that fails if any node-creation path
+  (createNode / handleEventVariant / appendBpmnNodeWithEdge) drops the
+  `if (!element) return` guard before mutating canvasNodes.
+
+### Verification
+
+- 12 new behavioural / static unit tests covering BPMN-01/02/03/04/08/09
+  across `edgeOnConnect.test.ts` (8), `canvasOnConnectWiring.test.ts`
+  (4), `bpmnAppendRelationship.test.ts` (4), `bpmnEntityIdGuard.test.ts`
+  (4), `bpmnDragConnectRoundTrip.test.ts` (5).
+- Existing `bpmnConnectRelationship.test.ts` updated to assert the
+  new edge-patching contract (no more append-on-connect).
+- Full BPMN unit suite: 110/110 pass across 21 test files.
+- Frontend full suite: 920 pass, 3 unchanged pre-existing baseline
+  failures (extensionManagerFields / importIdempotency /
+  importPageAcceptsArchimate — verified failing on `main` without
+  these changes).
+- `svelte-check`: 164 errors (= unchanged baseline, 0 new errors).
+
+### Why earlier "claimed-fixed" entries didn't stick
+
+v5.4.1's tests (`bpmnDefaultEdgeType.test.ts`,
+`bpmnConnectRelationship.test.ts`) were static-parser style — they
+grep the source for the right code patterns and pass when the strings
+are present, but never exercise the SvelteFlow → consumer handler
+chain. The strings were all present in v5.4.1; the chain wasn't
+connected. v5.6.2 adds behavioural unit tests for the helper, static
+guards for the SvelteFlow wiring, and a unit-level round-trip
+integration test that proves the chain end-to-end. The eventual
+local-backend Playwright harness (ADR-149, deferred from #69) closes
+the runtime-level loop.
+
+### Out of scope (deferred from issue #69)
+
+The remaining medium-priority items in the consolidated bug ledger
+(BPMN-05 ProblemsPanel layout, -07 theme-dropdown gating, -11 event
+trigger flyout, -12 Add-Element gating, -13/-14/-15 hierarchy
+controls, -16 markdown image paste, -17 trio dedup) verified green
+via the existing test suite in this triage pass. None of these have
+the "looks-fine-in-static-parser, broken-at-runtime" failure mode
+that hit BPMN-03; they're visible UI bugs that would have been
+re-reported if regressed.
+
 ## [5.6.1] - 2026-05-07
 
 ### Added
