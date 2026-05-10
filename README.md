@@ -60,7 +60,7 @@ The default self-hosted mode requires no external services. The optional Render 
 | **ArchiMate** | 11 types across Business, Application, Technology layers | Serving, Composition, Aggregation, Assignment, Realization, Access, Influence, Triggering |
 | **C4** | Person, Software System, Container, Component, Code Element, Deployment Node, Infrastructure Node | Uses, Depends On, Contains |
 | **DoView** | Outcome Box, Final Outcome, Overview Tile, Source Reference | Causal Link |
-| **Markdown (Text)** | Markdown source rendered as a document; cross-links via the `iris://diagram/<id>` and `iris://element/<id>` URL scheme | TOC drawer with depth-indented headings; in-editor toolbar (B / I / H1–H3 / lists / quote / code / link / image / hr) and Ctrl+B / Ctrl+I / Ctrl+K shortcuts; clipboard image paste |
+| **Markdown (Text)** | Markdown source rendered as a document; cross-links via the `iris://diagram/<id>` and `iris://element/<id>` URL scheme; ` ```mermaid ` fenced blocks render as SVG diagrams (flowchart, sequence, class, state, ER, gantt) | TOC drawer with depth-indented headings; in-editor toolbar (B / I / H1–H3 / lists / quote / code / link / image / hr) and Ctrl+B / Ctrl+I / Ctrl+K shortcuts; clipboard image paste |
 | **BPMN 2.0** *(preview, WIP)* | 14 base types across Activities, Events, Gateways, Swimlanes, Data, Artifacts via discriminator fields | Sequence Flow (default + conditional), Message Flow, Association, Data Association |
 | **Sequence** *(UML diagram type)* | Participants with lifelines | Sync, Async, Reply messages with activation boxes |
 

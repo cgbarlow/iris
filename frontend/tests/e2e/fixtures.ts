@@ -206,6 +206,41 @@ export async function createSet(
 }
 
 /**
+ * Create a diagram via the API and return the response body.
+ */
+export async function createDiagram(
+	baseURL: string | undefined,
+	token: string,
+	data: {
+		diagram_type: string;
+		notation: string;
+		name: string;
+		description?: string;
+		data?: Record<string, unknown>;
+	},
+): Promise<Record<string, unknown>> {
+	const origin = baseURL ?? API_BASE;
+	const res = await fetchWithRetry(`${origin}/api/diagrams`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			diagram_type: data.diagram_type,
+			notation: data.notation,
+			name: data.name,
+			description: data.description ?? '',
+			data: data.data ?? {},
+		}),
+	});
+	if (!res.ok) {
+		throw new Error(`createDiagram failed: ${res.status} ${await res.text()}`);
+	}
+	return (await res.json()) as Record<string, unknown>;
+}
+
+/**
  * Create a package via the API and return the response body.
  */
 export async function createPackage(

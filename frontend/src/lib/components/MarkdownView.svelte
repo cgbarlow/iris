@@ -28,6 +28,7 @@
 		type ExtractedLink,
 		type TocHeading,
 	} from './markdownHelpers';
+	import { runMermaidIn, type MermaidTheme } from './markdownMermaidRender';
 	export type { ExtractedLink, TocHeading } from './markdownHelpers';
 
 	interface Props {
@@ -60,14 +61,37 @@
 		goto(path);
 	}
 
+	// ADR-149: mermaid runs after {@html} injects placeholders.
+	let rootEl: HTMLDivElement | undefined = $state();
+	let theme: MermaidTheme = $state('default');
+
+	function readTheme(): MermaidTheme {
+		return document.documentElement.classList.contains('dark') ? 'dark' : 'default';
+	}
+
+	$effect(() => {
+		// Re-run when html changes (new content) or theme flips.
+		void html;
+		void theme;
+		if (!rootEl) return;
+		void runMermaidIn(rootEl, theme);
+	});
+
 	onMount(() => {
 		// Headings/links are emitted via queueMicrotask after the first $derived run.
 		void headings;
 		void html;
+		theme = readTheme();
+		const observer = new MutationObserver(() => {
+			const next = readTheme();
+			if (next !== theme) theme = next;
+		});
+		observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+		return () => observer.disconnect();
 	});
 </script>
 
-<div class="md-view" onclick={onClick} role="presentation">
+<div bind:this={rootEl} class="md-view" onclick={onClick} role="presentation">
 	<!-- Sanitised markdown — pipeline above enforces protocol #7. -->
 	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 	{@html html}
@@ -152,5 +176,34 @@
 	/* Issue #26: text-document refs render in muted colour vs. black diagram refs. */
 	.md-view :global(.md-iris-link--text) {
 		color: var(--color-muted, #6b7280) !important;
+	}
+	/* ADR-149: mermaid placeholder + rendered SVG override the
+	   :global(pre) code-block styling above so the diagram reads
+	   cleanly. */
+	.md-view :global(.mermaid-block) {
+		background: transparent;
+		padding: 0;
+		border-radius: 0;
+		overflow: visible;
+		margin: 1rem 0;
+	}
+	.md-view :global(.mermaid-block svg) {
+		max-width: 100%;
+		height: auto;
+		display: block;
+	}
+	.md-view :global(.mermaid-error) {
+		border: 1px solid var(--color-danger, #dc2626);
+		background: var(--color-surface-hover, #f3f4f6);
+		border-radius: 6px;
+		padding: 8px 12px;
+		margin: 1rem 0;
+		color: var(--color-danger, #dc2626);
+		font-family: ui-monospace, monospace;
+		font-size: 0.92em;
+	}
+	.md-view :global(.mermaid-error code) {
+		background: transparent;
+		padding: 0;
 	}
 </style>
