@@ -16,6 +16,7 @@
 	import CanvasAnnouncer from './controls/CanvasAnnouncer.svelte';
 	import KeyboardHandler from './controls/KeyboardHandler.svelte';
 	import CanvasDropArea from './CanvasDropArea.svelte';
+	import { patchConnectedEdgeType } from '$lib/canvas/edgeOnConnect';
 	import type { CanvasNode, CanvasEdge, NotationType } from '$lib/types/canvas';
 
 	interface Props {
@@ -227,6 +228,36 @@
 		connectSourceId = null;
 	}
 
+	/**
+	 * Issue #69 / BPMN-03: SvelteFlow's drag-handle connections.
+	 *
+	 * xyflow's `Handle.svelte` runs `store.addEdge(connection)` with a
+	 * Connection object that has no `type` field — `defaultEdgeOptions` is
+	 * applied at the renderer layer, not in the bound `edges` array. So the
+	 * just-added edge in `edges` has `type === undefined`, the validator's
+	 * `isSequence(e)` returns false, and `outDeg` for the source stays at 0.
+	 * Net effect: "no outgoing sequence flow" warning persists despite the
+	 * user having drawn the edge — the headline reproducer for issue #69.
+	 *
+	 * This handler runs AFTER xyflow's auto-add (Handle.svelte:108-109 order):
+	 *   1. Patch the just-added edge with the right `type` so downstream
+	 *      consumers (validator, persistence, edge renderer) read it
+	 *      consistently.
+	 *   2. Notify the consumer via `onconnectnodes` so the BPMN shell can
+	 *      POST `/api/relationships` and any non-BPMN consumer can persist
+	 *      its own way.
+	 */
+	function handleSvelteFlowConnect(c: Connection) {
+		if (!c.source || !c.target) return;
+		edges = patchConnectedEdgeType(edges, c, defaultEdgeType);
+		onconnectnodes?.(c.source, c.target);
+		const sourceNode = nodes.find((n) => n.id === c.source);
+		const targetNode = nodes.find((n) => n.id === c.target);
+		announcer?.announce(
+			`Connected ${sourceNode?.data.label ?? 'source'} to ${targetNode?.data.label ?? 'target'}`,
+		);
+	}
+
 	function handleToggleConnect() {
 		if (connectMode) {
 			connectMode = false;
@@ -317,6 +348,7 @@
 			onnodedragstop={(_e: MouseEvent | TouchEvent, n: CanvasNode, _ns: CanvasNode[]) =>
 				onnodedragstop?.(n.id, { x: n.position.x, y: n.position.y })}
 			isValidConnection={onbeforeconnect}
+			onconnect={handleSvelteFlowConnect}
 			proOptions={{ hideAttribution: true }}
 			defaultEdgeOptions={{ type: defaultEdgeType }}
 			nodesDraggable={true}

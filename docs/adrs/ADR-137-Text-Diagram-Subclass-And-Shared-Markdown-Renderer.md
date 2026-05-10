@@ -533,3 +533,29 @@ rendering for Text. The Text-branch render was a duplicate. The
 amendment removes the duplicate; v5.4.0 §D's intent is preserved
 (the trio still renders for Text views in edit mode) by virtue of
 the parent toolbar.
+
+## Amendment 2026-05-10 — v5.7.0: mermaid extension implemented (ADR-149)
+
+The "markdown extensions (mermaid blocks, callouts, footnotes)" line
+in [Out of scope (deferred)](#out-of-scope-deferred) above is **partially
+fulfilled**: ` ```mermaid ` fenced blocks now render as SVG diagrams in
+the shared `MarkdownView` component per
+[ADR-149](ADR-149-Mermaid-In-Markdown-Renderer.md) and
+[SPEC-149-A](specs/SPEC-149-A-Mermaid-Rendering.md). Callouts and
+footnotes remain deferred.
+
+The integration is non-invasive — the existing pipeline at
+`markdownHelpers.ts:82-95` is unchanged. ADR-149 adds:
+
+- A `marked` extension that emits a `<pre class="mermaid-block">`
+  placeholder (registered at module scope in `markdownHelpers.ts`).
+- A separate lazy-loaded runner (`markdownMermaidRender.ts`) that runs
+  inside `MarkdownView.svelte`'s `$effect` after `{@html}` injects the
+  placeholder.
+- A second `DOMPurify` pass on mermaid's output SVG with an explicit
+  `foreignObject` add — necessary for mermaid HTML labels.
+
+The AI Q&A panel (`SetQA.svelte`) keeps its divergent local renderer
+in v5.7.0; its consolidation onto the shared pipeline is tracked as
+[issue #71](https://github.com/cgbarlow/iris/issues/71) and will land
+in a follow-up release.
