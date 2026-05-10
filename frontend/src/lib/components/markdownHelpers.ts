@@ -14,6 +14,13 @@
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { markdownMermaidExtension } from './markdownMermaidExtension';
+
+// ADR-149: ```mermaid fenced blocks become <pre class="mermaid-block">
+// placeholders. The mermaid bundle is NOT imported here — it is
+// lazy-loaded by markdownMermaidRender.ts after {@html} injects the
+// placeholders into the DOM.
+marked.use(markdownMermaidExtension());
 
 export interface ExtractedLink {
 	kind: 'diagram' | 'element';

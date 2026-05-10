@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.7.0] - 2026-05-10
+
+Mermaid diagram rendering in the shared markdown view (ADR-149,
+SPEC-149-A) — un-defers the "markdown extensions" item from ADR-137's
+out-of-scope list.
+
+### Added
+
+- **Mermaid diagrams in Markdown views** (ADR-149, SPEC-149-A).
+  ` ```mermaid ` fenced blocks now render as SVG diagrams in any
+  surface that uses the shared `MarkdownView` component — Text
+  diagram views (`/views/[id]`) and User Guide pages. Supports the
+  full mermaid syntax: flowcharts, sequence, class, state, ER,
+  gantt, etc.
+
+  Implementation highlights:
+  - Custom `marked` extension emits a `<pre class="mermaid-block"
+    data-mermaid-source="<base64>">` placeholder so the markdown
+    pipeline stays synchronous and SSR-safe (`markdownHelpers.ts:23`,
+    `markdownMermaidExtension.ts`).
+  - Lazy-loaded mermaid bundle via dynamic `import('mermaid')` —
+    only fetched when a document actually contains a mermaid block.
+    Vite produces a separate ~525KB chunk that zero-block documents
+    do not pay for (`markdownMermaidRender.ts`).
+  - Two-stage DOMPurify sanitisation (protocol #7): stage 1 on the
+    markdown HTML, stage 2 on mermaid's output SVG (`USE_PROFILES:
+    { svg: true, svgFilters: true }`, plus an explicit
+    `ADD_TAGS: ['foreignObject']` for HTML labels). Mermaid runs in
+    `securityLevel: 'strict'` so user-authored labels cannot inject
+    HTML.
+  - Theme follows Iris's class-based dark mode automatically via a
+    `MutationObserver` on `<html>`.
+  - Per-block error fallback: an invalid mermaid block renders as
+    `<div class="mermaid-error">` with the parser message; the rest
+    of the document still renders.
+
+  Note: AI Q&A panel answers do **not** yet render mermaid — that
+  consolidation is tracked in
+  [issue #71](https://github.com/cgbarlow/iris/issues/71).
+
+### Changed
+
+- **DOMPurify bumped to 3.4.2** (from 3.3.1) — picks up CVE fixes
+  including `ADD_TAGS` short-circuit-evaluation bypass
+  ([GHSA-39q2-94rc-95cp](https://github.com/advisories/GHSA-39q2-94rc-95cp))
+  and other XSS hardening. Iris's existing `markdownHelpers.ts`
+  pipeline and the new SVG sanitiser both inherit the fixes.
+
+### Verification
+
+- 18 new unit tests across `markdownMermaidExtension.test.ts` (7),
+  `markdownMermaidRender.test.ts` (6), and
+  `markdownMermaidSvgSanitise.test.ts` (5) cover placeholder shape,
+  base64 round-trip, lazy-load contract, error fallback, and stage-2
+  sanitisation against `<script>` / event handlers / inside
+  `<foreignObject>`.
+- 4 new Playwright e2e tests in `text-view-mermaid.spec.ts` exercise
+  a Text view with valid + invalid + non-mermaid fences and confirm
+  SVG renders, error fallback works, and the document survives.
+- Frontend full unit suite: 939 pass, 3 unchanged pre-existing
+  baseline failures (extension manager / import idempotency /
+  archimate-format error string — same as v5.6.2).
+- `vite build` confirms mermaid is in a separate chunk (~525KB) that
+  is only fetched on first sight of a mermaid block.
+
 ## [5.6.2] - 2026-05-08
 
 BPMN polish (issue #69) — closes the user-reported drag-connect bug
