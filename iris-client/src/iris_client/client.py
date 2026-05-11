@@ -31,6 +31,7 @@ from iris_client.models.core import (
     LoginResponse,
     Package,
     QAResponse,
+    ScopePromptIndexEntry,
     SearchResponse,
     TokenCreated,
     TokenRecord,
@@ -295,6 +296,15 @@ class IrisClient:
     async def get_collection(self, collection_id: str) -> Collection:
         response = await self._request("GET", f"/api/collections/{collection_id}")
         return Collection.model_validate(response.json())
+
+    # --- Scope prompts (ADR-152) --------------------------------------------
+
+    async def list_scope_prompts(self) -> list[ScopePromptIndexEntry]:
+        """Return one entry per Collection / Set with a non-empty system_prompt."""
+        response = await self._request("GET", "/api/prompts/scope-index")
+        payload = response.json()
+        items = payload["items"] if isinstance(payload, dict) and "items" in payload else payload
+        return [ScopePromptIndexEntry.model_validate(r) for r in items]
 
     # --- Export --------------------------------------------------------------
 

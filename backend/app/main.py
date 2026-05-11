@@ -38,6 +38,7 @@ from app.mnemos.router import router as mnemos_router
 from app.notifications.router import router as notifications_router
 from app.package_relationships.router import router as package_relationships_router
 from app.packages.router import router as packages_router
+from app.prompts.router import router as prompts_router
 from app.recycle_bin.router import router as recycle_bin_router
 from app.relationships.router import router as relationships_router
 from app.scenia.router import router as scenia_router
@@ -189,6 +190,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(package_relationships_router)
     app.include_router(sets_router)
     app.include_router(collections_router)
+    app.include_router(prompts_router)
     app.include_router(batch_router)
     app.include_router(views_router)
     app.include_router(themes_router)

@@ -117,6 +117,22 @@ class Collection(EntityBase):
     pass
 
 
+class ScopePromptIndexEntry(_Permissive):
+    """One entry from `GET /api/prompts/scope-index` (ADR-152, v5.8.3).
+
+    Surfaces every Collection / Set with a non-empty system_prompt.
+    The MCP server maps these into MCP `prompts/list` and `prompts/get`
+    responses so Claude Desktop users can invoke them explicitly.
+    """
+
+    name: str
+    scope_type: Literal["collection", "set"]
+    scope_id: str
+    scope_name: str
+    description: str | None = None
+    body: str
+
+
 class Version(_Permissive):
     version: int
     name: str
