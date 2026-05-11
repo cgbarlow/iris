@@ -22,7 +22,7 @@ class SetUpdate(BaseModel):
     thumbnail_diagram_id: str | None = None
     collection_id: str | None = None
     system_prompt: str | None = None
-    mcp_prompt: str | None = None
+    mcp_system_context: str | None = None
 
 
 class SetResponse(BaseModel):
@@ -45,7 +45,7 @@ class SetResponse(BaseModel):
     thumbnail_diagram_data: dict | None = None
     thumbnail_diagram_type: str | None = None
     system_prompt: str | None = None
-    mcp_prompt: str | None = None
+    mcp_system_context: str | None = None
 
 
 class SetListResponse(BaseModel):

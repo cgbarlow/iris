@@ -29,14 +29,14 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
         "thumbnail_diagram_id": row[8],
         "has_thumbnail_image": has_thumbnail_image,
         "system_prompt": row[10] if len(row) > 10 else None,
-        "mcp_prompt": row[11] if len(row) > 11 else None,
+        "mcp_system_context": row[11] if len(row) > 11 else None,
     }
 
 
 _COLLECTION_COLUMNS = (
     "c.id, c.name, c.description, c.created_at, c.created_by, "
     "c.updated_at, c.is_deleted, c.thumbnail_source, c.thumbnail_diagram_id, "
-    "c.thumbnail_image IS NOT NULL, c.system_prompt, c.mcp_prompt"
+    "c.thumbnail_image IS NOT NULL, c.system_prompt, c.mcp_system_context"
 )
 
 
@@ -77,7 +77,7 @@ async def create_collection(
         "thumbnail_diagram_id": None,
         "has_thumbnail_image": False,
         "system_prompt": None,
-        "mcp_prompt": None,
+        "mcp_system_context": None,
     }
 
 
@@ -191,9 +191,9 @@ async def update_collection(
     thumbnail_source: str | None = None,
     thumbnail_diagram_id: str | None = None,
     system_prompt: str | None = None,
-    mcp_prompt: str | None = None,
+    mcp_system_context: str | None = None,
 ) -> dict[str, object] | None:
-    """Update a collection's name, description, thumbnail, system_prompt, and mcp_prompt.
+    """Update a collection's name, description, thumbnail, system_prompt, and mcp_system_context.
 
     Returns None if not found.
     """
@@ -222,17 +222,17 @@ async def update_collection(
         await db.execute(
             "UPDATE collections SET name = ?, description = ?, updated_at = ?, "
             "thumbnail_source = ?, thumbnail_diagram_id = ?, thumbnail_image = NULL, "
-            "system_prompt = ?, mcp_prompt = ? "
+            "system_prompt = ?, mcp_system_context = ? "
             "WHERE id = ?",
-            (name, description, now, thumbnail_source, thumbnail_diagram_id, system_prompt, mcp_prompt, collection_id),
+            (name, description, now, thumbnail_source, thumbnail_diagram_id, system_prompt, mcp_system_context, collection_id),
         )
     else:
         await db.execute(
             "UPDATE collections SET name = ?, description = ?, updated_at = ?, "
             "thumbnail_source = ?, thumbnail_diagram_id = ?, "
-            "system_prompt = ?, mcp_prompt = ? "
+            "system_prompt = ?, mcp_system_context = ? "
             "WHERE id = ?",
-            (name, description, now, thumbnail_source, thumbnail_diagram_id, system_prompt, mcp_prompt, collection_id),
+            (name, description, now, thumbnail_source, thumbnail_diagram_id, system_prompt, mcp_system_context, collection_id),
         )
     await db.commit()
 

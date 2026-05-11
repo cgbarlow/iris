@@ -17,7 +17,7 @@
 	let name = $state('');
 	let description = $state('');
 	let systemPrompt = $state('');
-	let mcpPrompt = $state('');
+	let mcpSystemContext = $state('');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -43,7 +43,7 @@
 			name = collectionData.name;
 			description = collectionData.description ?? '';
 			systemPrompt = collectionData.system_prompt ?? '';
-			mcpPrompt = (collectionData as IrisCollection & { mcp_prompt?: string | null }).mcp_prompt ?? '';
+			mcpSystemContext = (collectionData as IrisCollection & { mcp_system_context?: string | null }).mcp_system_context ?? '';
 		} catch {
 			error = 'Failed to load collection';
 		}
@@ -62,8 +62,8 @@
 			const sanitizedPrompt = systemPrompt.trim()
 				? DOMPurify.sanitize(systemPrompt.trim())
 				: null;
-			const sanitizedMcpPrompt = mcpPrompt.trim()
-				? DOMPurify.sanitize(mcpPrompt.trim())
+			const sanitizedMcpSystemContext = mcpSystemContext.trim()
+				? DOMPurify.sanitize(mcpSystemContext.trim())
 				: null;
 
 			await apiFetch<IrisCollection>(`/api/collections/${collectionId}`, {
@@ -72,7 +72,7 @@
 					name: sanitizedName,
 					description: sanitizedDesc,
 					system_prompt: sanitizedPrompt,
-					mcp_prompt: sanitizedMcpPrompt,
+					mcp_system_context: sanitizedMcpSystemContext,
 				}),
 			});
 
@@ -174,22 +174,22 @@
 			</p>
 		</div>
 
-		<!-- MCP prompt (ADR-155, v5.10.0): the inverse of system_prompt -->
+		<!-- MCP system context (ADR-156, v5.11.0): data passthrough on get_collection -->
 		<div class="mt-4">
-			<label for="collection-edit-mcp-prompt" class="text-sm font-medium" style="color: var(--color-fg)">
-				MCP prompt
+			<label for="collection-edit-mcp-system-context" class="text-sm font-medium" style="color: var(--color-fg)">
+				MCP system context
 			</label>
 			<textarea
-				id="collection-edit-mcp-prompt"
-				bind:value={mcpPrompt}
+				id="collection-edit-mcp-system-context"
+				bind:value={mcpSystemContext}
 				rows="6"
 				maxlength="20000"
-				placeholder="Optional. Surfaced through MCP as /iris:collection:<uuid>. Not applied in Iris AI."
+				placeholder="Optional. Passed through as data on MCP get_collection responses, so it lands as initial context when an MCP client is browsing this Collection. Not applied in Iris AI."
 				class="mt-1 w-full rounded border px-3 py-2 text-sm"
 				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); font-family: var(--font-mono, monospace)"
 			></textarea>
 			<p class="mt-1 text-xs" style="color: var(--color-muted)">
-				The opposite of System prompt. Sent to MCP clients (Claude Desktop / Claude Code) via the prompt picker. Does NOT auto-apply in Iris AI.
+				Initial context for MCP clients (Claude Desktop / Claude Code) when retrieving this Collection via the iris MCP server. Does NOT auto-apply in Iris AI and is NOT a slash-command prompt.
 			</p>
 		</div>
 
