@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.7.2] - 2026-05-11
+
+Follow-up to v5.7.1: even with the defensive read in place, the
+admin "Save as default" button was silently failing on UAT because
+the `graph_settings` table itself was missing on Supabase (the m039
+SQL migration had never been applied to UAT). The admin saw "Saved"
+on click, but the PUT errored and nothing persisted.
+
+### Fixed
+
+- **`graph_settings` table is now created at Supabase startup**
+  (ADR-117 v5.7.2 amendment). `_initialize_supabase` runs an idempotent
+  `CREATE TABLE IF NOT EXISTS graph_settings (...)` alongside the
+  existing ALTER TABLE patches, then the v5.7.1 seed call inserts the
+  `__global__` row. Subsequent admin PUTs now persist. Mirrors the
+  schema in `backend/app/migrations/supabase/m039_graph_settings.sql`.
+- **`Save as default` button no longer silently swallows errors.** On
+  failure, the button now shows "Save failed" in the danger colour
+  for 4 seconds, sets the error message as the button `title`
+  (tooltip), and logs the full error to the console. Previously the
+  button always showed "Saved" regardless of PUT outcome — masking
+  data-layer failures from admins.
+
 ## [5.7.1] - 2026-05-11
 
 Hotfix: `/api/graph/settings` returns 500 on Supabase deployments
