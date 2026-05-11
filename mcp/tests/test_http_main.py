@@ -42,6 +42,26 @@ class TestInfoRoute:
         assert data["endpoint"] == "/"
         assert data["backend"] == "http://iris-backend.test"
 
+    def test_info_includes_package_version(
+        self, app_with_backend: TestClient,
+    ) -> None:
+        """v5.8.4: /info reports the iris-mcp package version so a deploy
+        can be identified by URL probe rather than behaviour inference.
+
+        Read via importlib.metadata at request time; matches the version
+        set in mcp/pyproject.toml. We don't pin to a specific string
+        because the package version moves with each iris-mcp release —
+        just assert the field exists and looks like a semver-ish string.
+        """
+        resp = app_with_backend.get("/info")
+        data = resp.json()
+        assert "version" in data
+        # Package version source-of-truth is mcp/pyproject.toml; aligned
+        # with iris release versioning from v5.8.4 onwards.
+        assert isinstance(data["version"], str)
+        # At least one dot separator (e.g., "5.8.4", "5.9.0").
+        assert "." in data["version"]
+
 
 class TestFavicon:
     def test_favicon_ico_returns_iris_eye_svg(

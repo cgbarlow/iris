@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.4] - 2026-05-11
+
+### Changed
+
+- **`iris-mcp` package version aligned with Iris release versioning.**
+  Was pinned at `0.1.0` since project start; now tracks Iris releases
+  (`5.8.4` onwards). Lets a `/info` probe identify the running build
+  by URL alone rather than inferring from behaviour.
+
+### Added
+
+- **`version` field on `iris-mcp` `/info` endpoint.** Reads
+  `iris-mcp`'s package metadata via `importlib.metadata` and reports
+  it alongside `service`, `endpoint`, `backend`, `web_url`. Operators
+  can now `curl https://iris-mcp.onrender.com/info` to definitively
+  identify which Iris release is deployed.
+
+### Fixed
+
+- **MCP prompt picker description no longer duplicates the scope
+  name.** A scope whose `description` starts with its own name (e.g.
+  set name "DoView Book", description "DoView Book — published from
+  doview-book repo") was producing the redundant
+  `Set: DoView Book — DoView Book — published from doview-book repo`
+  in Claude Desktop's prompt picker. `_short_description` in
+  `mcp/src/iris_mcp/prompts.py` now strips a leading occurrence of
+  the scope name (case-insensitive) plus any em-dash / hyphen / colon
+  separator that follows it before composing the picker label. If the
+  description IS just the scope name, it's dropped entirely.
+
 ## [5.8.3] - 2026-05-11
 
 ### Added

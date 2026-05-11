@@ -52,16 +52,37 @@ def _short_description(scope_type: str, scope_name: str, scope_description: str 
     """Description shown in the MCP prompt picker.
 
     Format: `{Scope}: {name} — {description}` truncated at 200 chars.
+
+    v5.8.4: when the scope's description already starts with the scope
+    name (common Iris authoring pattern), strip that prefix so the
+    picker reads `Set: DoView Book — published from doview-book repo`
+    rather than the redundant `Set: DoView Book — DoView Book —
+    published from doview-book repo`.
     """
     label = scope_type.title()
     base = f"{label}: {scope_name}"
-    if scope_description and scope_description.strip():
-        combined = f"{base} — {scope_description.strip()}"
-    else:
-        combined = base
+    desc = (scope_description or "").strip()
+    if desc:
+        desc = _strip_redundant_name_prefix(desc, scope_name)
+    combined = f"{base} — {desc}" if desc else base
     if len(combined) > 200:  # noqa: PLR2004
         combined = combined[:197] + "..."
     return combined
+
+
+def _strip_redundant_name_prefix(description: str, scope_name: str) -> str:
+    """If `description` starts with `scope_name` (case-insensitive),
+    return the remainder with any leading separator characters trimmed.
+
+    Returns `""` when the description IS just the scope name (so the
+    caller can drop the description entirely).
+    """
+    if not description.lower().startswith(scope_name.lower()):
+        return description
+    remainder = description[len(scope_name):]
+    # Trim any reasonable separator characters that follow the duplicated
+    # name: em-dash, en-dash, hyphen, colon, surrounding whitespace.
+    return remainder.lstrip(" \t—–-:")
 
 
 async def list_prompts(client: IrisClient) -> list[types.Prompt]:

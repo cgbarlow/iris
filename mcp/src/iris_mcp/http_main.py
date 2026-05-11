@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
@@ -22,6 +23,16 @@ from iris_client import IrisClient
 
 from iris_mcp.asgi import bind_client, build_session_manager, extract_bearer
 from iris_mcp.branding import ICON_SVG
+
+
+def _pkg_version() -> str | None:
+    """v5.8.4: surface iris-mcp package version on /info so a live deploy
+    can be identified by URL probe (e.g., `curl .../info`) rather than
+    behaviour inference. Source of truth is `mcp/pyproject.toml`."""
+    try:
+        return version("iris-mcp")
+    except PackageNotFoundError:
+        return None
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Awaitable, Callable
@@ -76,6 +87,9 @@ def create_app() -> FastAPI:
         # would clash with the protocol.
         return {
             "service": "iris-mcp",
+            # v5.8.4: package version pulled from importlib.metadata so
+            # `curl .../info` definitively identifies the running build.
+            "version": _pkg_version(),
             "endpoint": "/",
             "backend": iris_url,
             # v5.6.1: surface IRIS_WEB_URL in the info payload so an
