@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.1] - 2026-05-11
+
+### Fixed
+
+- **Enable Row Level Security on `graph_settings`** (ADR-095
+  alignment). The table — added in m039 and re-created defensively
+  at runtime in `_initialize_supabase` (v5.7.2 fallback) — was the
+  only post-m030 table without RLS, triggering a Supabase advisor
+  warning. Both locations now run `ALTER TABLE graph_settings
+  ENABLE ROW LEVEL SECURITY` (idempotent). FastAPI continues to
+  read/write via asyncpg's `postgres` role, which bypasses RLS, so
+  the app is unaffected; the embedded anon key in the frontend can
+  no longer query the table directly via PostgREST.
+
 ## [5.8.0] - 2026-05-11
 
 ### Added
