@@ -40,6 +40,28 @@ def web_base() -> str | None:
     return raw.rstrip("/") if raw else None
 
 
+# v5.8.2 (ADR-151): keys that must never leave the MCP boundary as tool
+# data. Currently just `system_prompt` — scope prompts get surfaced to
+# clients via the MCP `prompts` capability instead (ADR-152, v5.8.3).
+_STRIPPED_KEYS: tuple[str, ...] = ("system_prompt",)
+
+
+def _strip_sensitive_keys(item: Any) -> None:
+    """In-place: remove any sensitive keys from a single entity dict."""
+    if not isinstance(item, dict):
+        return
+    for key in _STRIPPED_KEYS:
+        item.pop(key, None)
+
+
+def _strip_sensitive_keys_list(items: Any) -> None:
+    """In-place: apply `_strip_sensitive_keys` to every dict in a list."""
+    if not isinstance(items, list):
+        return
+    for item in items:
+        _strip_sensitive_keys(item)
+
+
 def web_url_for(kind: str, entity_id: str, base: str | None = None) -> str | None:
     """Build a `<base>/<path>/<id>` URL for the given entity, or None if
     the web base or kind is unknown."""
@@ -101,42 +123,54 @@ def with_web_url(payload: str, kind: str) -> str:
     """Decorate a JSON-serialised single-entity tool response.
 
     `kind` is the kind we expect (e.g. "diagram" for `get_diagram`).
-    No-ops when IRIS_WEB_URL is unset or the payload isn't valid JSON.
+    Also strips MCP-sensitive keys (v5.8.2, ADR-151) regardless of
+    whether IRIS_WEB_URL is configured. No-ops on invalid JSON.
     """
-    base = web_base()
-    if not base:
-        return payload
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, TypeError):
         return payload
-    decorate_item(data, kind, base)
+    _strip_sensitive_keys(data)
+    base = web_base()
+    if base:
+        decorate_item(data, kind, base)
     return json.dumps(data)
 
 
 def with_web_urls_list(payload: str, kind: str) -> str:
-    """Decorate a JSON-serialised list-of-entities tool response."""
-    base = web_base()
-    if not base:
-        return payload
+    """Decorate a JSON-serialised list-of-entities tool response.
+
+    Also strips MCP-sensitive keys from each item (v5.8.2, ADR-151)
+    regardless of whether IRIS_WEB_URL is configured.
+    """
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, TypeError):
         return payload
-    decorate_list(data, kind, base)
+    _strip_sensitive_keys_list(data)
+    base = web_base()
+    if base:
+        decorate_list(data, kind, base)
     return json.dumps(data)
 
 
 def with_web_urls_search(payload: str) -> str:
-    """Decorate a JSON-serialised SearchResponse."""
-    base = web_base()
-    if not base:
-        return payload
+    """Decorate a JSON-serialised SearchResponse.
+
+    Also strips MCP-sensitive keys from each result (v5.8.2, ADR-151)
+    regardless of whether IRIS_WEB_URL is configured.
+    """
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, TypeError):
         return payload
-    decorate_search(data, base)
+    if isinstance(data, dict):
+        results = data.get("results")
+        if isinstance(results, list):
+            _strip_sensitive_keys_list(results)
+    base = web_base()
+    if base:
+        decorate_search(data, base)
     return json.dumps(data)
 
 
