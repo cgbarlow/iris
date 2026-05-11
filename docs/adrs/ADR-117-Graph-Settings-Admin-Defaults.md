@@ -60,3 +60,41 @@
 |--------|----------|------|
 | Proposed | Engineering | 2026-04-03 |
 | Approved | Engineering | 2026-04-03 |
+
+---
+
+## Amendment 2026-05-11 — v5.7.1 Supabase resilience
+
+UAT (Supabase mode) returned HTTP 500 from `GET /api/graph/settings`
+for both anonymous and authenticated callers, because the
+`_initialize_supabase` startup path did not call
+`seed_graph_settings_defaults()` (only the SQLite path did) and the
+`get_graph_settings_cascaded` read path raised an unhandled exception
+when the underlying SELECT failed. The frontend's
+`fetchAdminDefaults()` silently caught the error and fell back to
+hard-coded defaults — which is invisible to admins (their
+localStorage carries their saved settings) but observable to
+anonymous users, who see "all on" instead of the admin-saved
+visibility.
+
+**Decisions:**
+
+1. **Defensive reads.** `get_graph_settings_cascaded` and
+   `get_graph_settings` now catch DB-layer exceptions and return
+   hard-coded `GRAPH_SETTINGS_DEFAULTS` (with whatever scope rows
+   were already merged in) rather than propagating to a 500. The
+   endpoint stays alive even with a partially-migrated DB.
+2. **Seed parity.** `_initialize_supabase` now calls
+   `seed_graph_settings_defaults(port)` alongside the SQLite path, so
+   the `__global__` row gets inserted on first Supabase start.
+3. **Defensive seed.** `seed_graph_settings_defaults` also wraps the
+   SELECT/INSERT in a try/except so a missing table or transient DB
+   issue logs-and-skips rather than crashing startup.
+
+**Out of scope (deferred):**
+
+- Telemetry on the defensive-fallback path (count how often it fires
+  in prod) — would help spot recurrences of the underlying issue.
+- A migration that re-applies m039 idempotently from Python startup
+  if the table is missing — currently relies on operator running
+  `scripts/supabase-migrate.sh`.
