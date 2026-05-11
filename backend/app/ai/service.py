@@ -304,6 +304,12 @@ async def ask_question(
     retrieval = await get_retrieval_strategy(db)
     context = await retrieval.retrieve_context(db, question, [set_id])
 
+    # ADR-150: scope-level prepend (collection + set prompts).
+    from app.ai.scope_prompts import build_scope_prompts
+    scope_prepend = await build_scope_prompts(
+        db, set_ids=[set_id], collection_id=None,
+    )
+
     # 3. Build messages
     system_prompt = str(provider.get("system_prompt") or "")
     if system_prompt:
@@ -312,6 +318,15 @@ async def ask_question(
         system_content = (
             "You are an AI assistant helping users understand their architecture models. "
             "Answer questions based on the provided Set context.\n\nContext:\n" + context
+        )
+
+    if scope_prepend:
+        system_content = f"{scope_prepend}\n\n{system_content}"
+    if len(system_content) > 16_000:
+        import logging  # noqa: PLC0415
+        logging.getLogger("app.ai").warning(
+            "[AI_DEBUG] composed system_content is %d chars (>16000)",
+            len(system_content),
         )
 
     messages = [
@@ -490,6 +505,12 @@ async def ask_multi_set_question(
 
     primary_set_id = set_ids[0] if set_ids else None
 
+    # ADR-150: scope-level prepend (collection + set prompts).
+    from app.ai.scope_prompts import build_scope_prompts  # noqa: PLC0415
+    scope_prepend = await build_scope_prompts(
+        db, set_ids=set_ids, collection_id=collection_id,
+    )
+
     has_sets = bool(set_ids)
     has_docref = bool(docref_doc_ids)
     has_files = bool(file_contexts)
@@ -516,6 +537,15 @@ async def ask_multi_set_question(
         system_content = (
             "You are an AI assistant helping users understand their architecture models. "
             "Answer questions based on the provided context from multiple Sets.\n\nContext:\n" + context
+        )
+
+    if scope_prepend:
+        system_content = f"{scope_prepend}\n\n{system_content}"
+    if len(system_content) > 16_000:
+        import logging  # noqa: PLC0415
+        logging.getLogger("app.ai").warning(
+            "[AI_DEBUG] composed system_content is %d chars (>16000)",
+            len(system_content),
         )
 
     messages = [

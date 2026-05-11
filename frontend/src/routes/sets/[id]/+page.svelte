@@ -22,6 +22,7 @@
 	let thumbnailDiagramId = $state<string | null>(null);
 	let thumbnailFile = $state<File | null>(null);
 	let collectionId = $state<string | null>(null);
+	let systemPrompt = $state('');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -49,6 +50,7 @@
 			thumbnailSource = setData.thumbnail_source;
 			thumbnailDiagramId = setData.thumbnail_diagram_id;
 			collectionId = setData.collection_id ?? null;
+			systemPrompt = setData.system_prompt ?? '';
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -64,6 +66,9 @@
 			const sanitizedDesc = description.trim()
 				? DOMPurify.sanitize(description.trim())
 				: null;
+			const sanitizedPrompt = systemPrompt.trim()
+				? DOMPurify.sanitize(systemPrompt.trim())
+				: null;
 
 			await apiFetch<IrisSet>(`/api/sets/${setId}`, {
 				method: 'PUT',
@@ -73,6 +78,7 @@
 					thumbnail_source: thumbnailSource,
 					thumbnail_diagram_id: thumbnailSource === 'model' ? thumbnailDiagramId : null,
 					collection_id: collectionId,
+					system_prompt: sanitizedPrompt,
 				}),
 			});
 
@@ -200,6 +206,25 @@
 				showAll={true}
 				label="Collection"
 			/>
+		</div>
+
+		<!-- System prompt (ADR-150) -->
+		<div class="mt-4">
+			<label for="set-edit-system-prompt" class="text-sm font-medium" style="color: var(--color-fg)">
+				System prompt
+			</label>
+			<textarea
+				id="set-edit-system-prompt"
+				bind:value={systemPrompt}
+				rows="6"
+				maxlength="20000"
+				placeholder="Optional. Prepended to every AI question about this Set."
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); font-family: var(--font-mono, monospace)"
+			></textarea>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				Applied in addition to the parent Collection's system prompt.
+			</p>
 		</div>
 
 		<!-- Thumbnail -->

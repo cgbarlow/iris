@@ -285,6 +285,7 @@ export interface IrisSet {
 	thumbnail_diagram_type?: string;
 	collection_id: string | null;
 	collection_name: string | null;
+	system_prompt?: string | null;
 }
 
 export interface IrisCollection {
@@ -303,6 +304,7 @@ export interface IrisCollection {
 	has_thumbnail_image: boolean;
 	thumbnail_diagram_data?: Record<string, unknown>;
 	thumbnail_diagram_type?: string;
+	system_prompt?: string | null;
 }
 
 export interface BatchResult {

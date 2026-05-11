@@ -418,6 +418,12 @@ async def _ask_streaming(
             retrieval = await get_retrieval_strategy(db)
             context = await retrieval.retrieve_context(db, body.question, [set_id])
 
+            # ADR-150: scope-level prepend (collection then set prompts).
+            from app.ai.scope_prompts import build_scope_prompts
+            scope_prepend = await build_scope_prompts(
+                db, set_ids=[set_id], collection_id=None,
+            )
+
             if body.mode == "creation":
                 from app.ai.creation import build_creation_system_prompt
                 creation_notation = body.notation or "doview"
@@ -441,6 +447,14 @@ async def _ask_streaming(
                         "You are an AI assistant helping users understand their architecture models. "
                         "Answer questions based on the provided Set context.\n\nContext:\n" + context
                     )
+
+            if scope_prepend:
+                system_content = f"{scope_prepend}\n\n{system_content}"
+            if len(system_content) > 16_000:
+                log.warning(
+                    "[AI_DEBUG] composed system_content is %d chars (>16000)",
+                    len(system_content),
+                )
 
             if body.mode == "creation":
                 # Preserve the shipped DoView opener verbatim; for other
@@ -658,6 +672,12 @@ async def _ask_multi_set_streaming(
 
             primary_set_id = set_ids[0] if set_ids else None
 
+            # ADR-150: scope-level prepend (collection + set prompts).
+            from app.ai.scope_prompts import build_scope_prompts
+            scope_prepend = await build_scope_prompts(
+                db, set_ids=set_ids, collection_id=collection_id,
+            )
+
             if body.mode == "creation":
                 from app.ai.creation import build_creation_system_prompt
                 creation_notation = body.notation or "doview"
@@ -698,6 +718,14 @@ async def _ask_multi_set_streaming(
                         "You are an AI assistant helping users understand their architecture models. "
                         "Answer questions based on the provided context from multiple Sets.\n\nContext:\n" + context
                     )
+
+            if scope_prepend:
+                system_content = f"{scope_prepend}\n\n{system_content}"
+            if len(system_content) > 16_000:
+                log.warning(
+                    "[AI_DEBUG] composed system_content is %d chars (>16000)",
+                    len(system_content),
+                )
 
             if body.mode == "creation":
                 # Preserve the shipped DoView opener verbatim; for other

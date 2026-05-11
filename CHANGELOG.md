@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-05-11
+
+### Added
+
+- **Scope-level system prompts for Collections and Sets** (ADR-150,
+  SPEC-150-A). Each Collection and each Set can now carry a
+  free-text `system_prompt` that is prepended to every Ask Iris
+  question (discuss and creation) and every MCP `ask` call that
+  touches the scope. A Set inherits its parent Collection's
+  prompt — composition is additive, never overriding. Multi-set
+  asks dedup collection prompts by id and preserve `set_ids`
+  order. Edit screens (`/collections/[id]`, `/sets/[id]`) gain a
+  "System prompt" textarea. Anonymous AI asks (ADR-123) get scope
+  prompts applied the same way as signed-in asks. A soft warning
+  fires in `[AI_DEBUG]` when the composed system content exceeds
+  16 000 characters; no hard truncation. First phase of a larger
+  Skills feature; full Skills (DB-resident, progressive disclosure
+  via MCP `list_skills` / `get_skill`) land in a follow-up release.
+
 ## [5.7.3] - 2026-05-11
 
 ### Fixed
