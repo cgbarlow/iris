@@ -92,6 +92,71 @@ class TestListPrompts:
         assert len(result[0].description) <= 200
 
     @pytest.mark.asyncio
+    async def test_strips_redundant_scope_name_prefix_from_description(self) -> None:
+        """v5.8.4: avoid 'Set: DoView Book — DoView Book — published from ...'
+
+        When the scope's description already begins with the scope name
+        (common Iris authoring pattern), we'd double up the name in the
+        picker label. Strip the leading scope name + separator so the
+        picker reads 'Set: DoView Book — published from doview-book repo'.
+        """
+        entries = [_entry(
+            scope_name="DoView Book",
+            description="DoView Book — published from doview-book repo",
+        )]
+        client: Any = _StubClient(entries)
+        result = await iris_prompts.list_prompts(client)
+        desc = result[0].description
+        # Name appears exactly once.
+        assert desc.count("DoView Book") == 1
+        # The remainder of the original description is preserved.
+        assert "published from doview-book repo" in desc
+        # Picker label format unchanged for the prefix.
+        assert desc.startswith("Set: DoView Book")
+
+    @pytest.mark.asyncio
+    async def test_strip_is_case_insensitive(self) -> None:
+        """Description starting with 'doview book' (lowercase) still
+        recognised as a duplicate of scope name 'DoView Book'."""
+        entries = [_entry(
+            scope_name="DoView Book",
+            description="doview book — repo",
+        )]
+        client: Any = _StubClient(entries)
+        result = await iris_prompts.list_prompts(client)
+        desc = result[0].description
+        # Only the canonical name from the prefix remains; the lowercase
+        # duplicate is gone.
+        assert desc.lower().count("doview book") == 1
+
+    @pytest.mark.asyncio
+    async def test_drops_description_when_it_is_only_the_scope_name(self) -> None:
+        """If description IS the scope name, drop it entirely rather
+        than emitting 'Set: DoView Book — DoView Book'."""
+        entries = [_entry(
+            scope_name="DoView Book",
+            description="DoView Book",
+        )]
+        client: Any = _StubClient(entries)
+        result = await iris_prompts.list_prompts(client)
+        # No dangling " — " at the end, no second occurrence of the name.
+        desc = result[0].description
+        assert desc == "Set: DoView Book"
+
+    @pytest.mark.asyncio
+    async def test_preserves_description_when_no_redundancy(self) -> None:
+        """Description that doesn't start with the scope name is
+        passed through verbatim."""
+        entries = [_entry(
+            scope_name="DoView Book",
+            description="Outcomes theory companion volume.",
+        )]
+        client: Any = _StubClient(entries)
+        result = await iris_prompts.list_prompts(client)
+        desc = result[0].description
+        assert desc == "Set: DoView Book — Outcomes theory companion volume."
+
+    @pytest.mark.asyncio
     async def test_preserves_order(self) -> None:
         entries = [
             _entry(
