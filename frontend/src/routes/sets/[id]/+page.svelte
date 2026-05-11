@@ -24,6 +24,7 @@
 	let thumbnailFile = $state<File | null>(null);
 	let collectionId = $state<string | null>(null);
 	let systemPrompt = $state('');
+	let mcpPrompt = $state('');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -52,6 +53,7 @@
 			thumbnailDiagramId = setData.thumbnail_diagram_id;
 			collectionId = setData.collection_id ?? null;
 			systemPrompt = setData.system_prompt ?? '';
+			mcpPrompt = (setData as IrisSet & { mcp_prompt?: string | null }).mcp_prompt ?? '';
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -70,6 +72,9 @@
 			const sanitizedPrompt = systemPrompt.trim()
 				? DOMPurify.sanitize(systemPrompt.trim())
 				: null;
+			const sanitizedMcpPrompt = mcpPrompt.trim()
+				? DOMPurify.sanitize(mcpPrompt.trim())
+				: null;
 
 			await apiFetch<IrisSet>(`/api/sets/${setId}`, {
 				method: 'PUT',
@@ -80,6 +85,7 @@
 					thumbnail_diagram_id: thumbnailSource === 'model' ? thumbnailDiagramId : null,
 					collection_id: collectionId,
 					system_prompt: sanitizedPrompt,
+					mcp_prompt: sanitizedMcpPrompt,
 				}),
 			});
 
@@ -224,7 +230,26 @@
 				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); font-family: var(--font-mono, monospace)"
 			></textarea>
 			<p class="mt-1 text-xs" style="color: var(--color-muted)">
-				Applied in addition to the parent Collection's system prompt.
+				Applied in addition to the parent Collection's system prompt. Used by Iris's internal AI flows (discuss / creation). Not sent through MCP.
+			</p>
+		</div>
+
+		<!-- MCP prompt (ADR-155, v5.10.0): the inverse of system_prompt -->
+		<div class="mt-4">
+			<label for="set-edit-mcp-prompt" class="text-sm font-medium" style="color: var(--color-fg)">
+				MCP prompt
+			</label>
+			<textarea
+				id="set-edit-mcp-prompt"
+				bind:value={mcpPrompt}
+				rows="6"
+				maxlength="20000"
+				placeholder="Optional. Surfaced through MCP as /iris:set:<uuid>. Not applied in Iris AI."
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); font-family: var(--font-mono, monospace)"
+			></textarea>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				The opposite of System prompt. Sent to MCP clients (Claude Desktop / Claude Code) via the prompt picker. Does NOT auto-apply in Iris AI.
 			</p>
 		</div>
 

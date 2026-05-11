@@ -111,10 +111,13 @@ class IrisSet(EntityBase):
     """Named `IrisSet` because `Set` collides with builtins."""
 
     collection_id: str | None = None
+    system_prompt: str | None = None
+    mcp_prompt: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
 
 
 class Collection(EntityBase):
-    pass
+    system_prompt: str | None = None
+    mcp_prompt: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
 
 
 class ScopePromptIndexEntry(_Permissive):
