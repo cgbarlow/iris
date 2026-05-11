@@ -20,6 +20,7 @@ class CollectionUpdate(BaseModel):
     thumbnail_source: str | None = None
     thumbnail_diagram_id: str | None = None
     system_prompt: str | None = None
+    mcp_prompt: str | None = None
 
 
 class CollectionResponse(BaseModel):
@@ -41,6 +42,7 @@ class CollectionResponse(BaseModel):
     thumbnail_diagram_data: dict | None = None
     thumbnail_diagram_type: str | None = None
     system_prompt: str | None = None
+    mcp_prompt: str | None = None
 
 
 class CollectionListResponse(BaseModel):

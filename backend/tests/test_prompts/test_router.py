@@ -78,7 +78,7 @@ class TestScopePromptIndex:
         )).json()
         await client.put(
             f"/api/sets/{s['id']}",
-            json={"name": "DoView Book", "system_prompt": "Use outcomes theory framing."},
+            json={"name": "DoView Book", "mcp_prompt": "Use outcomes theory framing."},
             headers=headers,
         )
 
@@ -100,7 +100,7 @@ class TestScopePromptIndex:
         )).json()
         await client.put(
             f"/api/collections/{c['id']}",
-            json={"name": "NZISM", "system_prompt": "Always cite the control number."},
+            json={"name": "NZISM", "mcp_prompt": "Always cite the control number."},
             headers=headers,
         )
         s = (await client.post(
@@ -113,7 +113,7 @@ class TestScopePromptIndex:
             json={
                 "name": "GCSB Set",
                 "collection_id": c["id"],
-                "system_prompt": "Strict GCSB terminology.",
+                "mcp_prompt": "Strict GCSB terminology.",
             },
             headers=headers,
         )
@@ -143,7 +143,7 @@ class TestScopePromptIndex:
         )).json()
         await client.put(
             f"/api/sets/{s['id']}",
-            json={"name": "Whitespace Set", "system_prompt": "   "},
+            json={"name": "Whitespace Set", "mcp_prompt": "   "},
             headers=headers,
         )
 
@@ -158,7 +158,7 @@ class TestScopePromptIndex:
         )).json()
         await client.put(
             f"/api/sets/{s['id']}",
-            json={"name": "Public Set", "system_prompt": "anyone can see this"},
+            json={"name": "Public Set", "mcp_prompt": "anyone can see this"},
             headers=headers,
         )
 

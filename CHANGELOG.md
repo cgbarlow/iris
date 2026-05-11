@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.10.0] - 2026-05-11
+
+### Added
+
+- **`mcp_prompt` column on Collections and Sets** (ADR-155, SPEC-155-A).
+  The orthogonal counterpart to v5.8.0's `system_prompt`. `mcp_prompt`
+  is surfaced via the MCP `prompts` channel as the scope's picker
+  entry (`set:<uuid>` / `collection:<uuid>`) and is **never**
+  auto-applied in Iris AI. `system_prompt` continues to auto-apply in
+  Iris AI server-side composition unchanged but is **no longer**
+  surfaced via MCP. New "MCP prompt" textarea on `/sets/[id]` and
+  `/collections/[id]` edit pages below the existing System prompt.
+
+### Changed (breaking — MCP picker)
+
+- **MCP picker entries for scopes now source their body from
+  `mcp_prompt`, not `system_prompt`.** Existing scopes with a
+  populated `system_prompt` but no `mcp_prompt` will see their MCP
+  picker entry **disappear** until an author populates the new
+  column. To preserve v5.9.x picker behaviour for an existing scope,
+  edit the scope and copy the System prompt body into the new MCP
+  prompt textarea. Iris AI behaviour is unchanged for every scope.
+
+### Fixed
+
+- **`prompts.created_at` / `prompts.updated_at` columns on Supabase
+  converted from `text` to `timestamptz`.** v5.9.0's migration
+  created the columns as `text`, but the Supabase adapter
+  (`backend/app/db/adapter.py:_convert_params`) auto-converts ISO
+  datetime strings to native `datetime` before asyncpg, and asyncpg
+  rejected the `datetime` against `text` columns. User-visible
+  symptom: `DataError: invalid input for query argument $7:
+  datetime.datetime(...)` when creating named prompts on Supabase.
+  Migration `m053_mcp_prompt_and_prompts_timestamps.sql` includes
+  the timestamptz conversion alongside the new `mcp_prompt` column
+  ADD. Re-running `./scripts/supabase-migrate.sh` against an
+  affected UAT DB will fix both.
+
 ## [5.9.1] - 2026-05-11
 
 ### Fixed

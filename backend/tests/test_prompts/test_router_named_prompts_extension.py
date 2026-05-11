@@ -98,7 +98,7 @@ class TestScopeIndexExtension:
         s = (await client.post("/api/sets", json={"name": "Mixed"}, headers=headers)).json()
         await client.put(
             f"/api/sets/{s['id']}",
-            json={"name": "Mixed", "system_prompt": "House rules."},
+            json={"name": "Mixed", "mcp_prompt": "House rules."},
             headers=headers,
         )
         await client.post(
@@ -139,7 +139,7 @@ class TestScopeIndexExtension:
         )
         await client.put(
             f"/api/sets/{s['id']}",
-            json={"name": "Z-set", "system_prompt": "house rules"},
+            json={"name": "Z-set", "mcp_prompt": "house rules"},
             headers=headers,
         )
 
@@ -151,3 +151,73 @@ class TestScopeIndexExtension:
         await _auth_headers(client)
         resp = await client.get("/api/prompts/scope-index")
         assert resp.json() == {"items": []}
+
+    async def test_adr_155_strict_split_system_prompt_alone_does_not_appear(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """ADR-155: a Set with ONLY `system_prompt` (no mcp_prompt) must
+        NOT appear in the MCP scope-index. system_prompt is Iris-AI-only
+        post-v5.10.0. The MCP picker entry only appears when mcp_prompt
+        is populated.
+        """
+        headers = await _auth_headers(client)
+        s = (await client.post(
+            "/api/sets", json={"name": "Iris-only set"}, headers=headers,
+        )).json()
+        # Populate system_prompt (auto-apply in Iris AI) but NOT mcp_prompt.
+        await client.put(
+            f"/api/sets/{s['id']}",
+            json={"name": "Iris-only set", "system_prompt": "Iris-only directive."},
+            headers=headers,
+        )
+
+        items = (await client.get("/api/prompts/scope-index")).json()["items"]
+        # Iris-only system_prompt does NOT surface in the MCP picker.
+        assert items == []
+
+    async def test_adr_155_strict_split_mcp_prompt_alone_appears(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """ADR-155: a Set with ONLY `mcp_prompt` (no system_prompt) MUST
+        appear in the MCP scope-index. mcp_prompt is the MCP-only
+        channel post-v5.10.0.
+        """
+        headers = await _auth_headers(client)
+        s = (await client.post(
+            "/api/sets", json={"name": "MCP-only set"}, headers=headers,
+        )).json()
+        await client.put(
+            f"/api/sets/{s['id']}",
+            json={"name": "MCP-only set", "mcp_prompt": "MCP-only directive."},
+            headers=headers,
+        )
+
+        items = (await client.get("/api/prompts/scope-index")).json()["items"]
+        assert len(items) == 1
+        assert items[0]["body"] == "MCP-only directive."
+        assert items[0]["name"] == f"set:{s['id']}"
+
+    async def test_adr_155_strict_split_both_populated(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """ADR-155: when both columns are populated, MCP picker shows
+        mcp_prompt content (system_prompt continues to auto-apply in
+        Iris AI but is not visible here)."""
+        headers = await _auth_headers(client)
+        s = (await client.post(
+            "/api/sets", json={"name": "Both set"}, headers=headers,
+        )).json()
+        await client.put(
+            f"/api/sets/{s['id']}",
+            json={
+                "name": "Both set",
+                "system_prompt": "Iris-AI directive.",
+                "mcp_prompt": "MCP directive.",
+            },
+            headers=headers,
+        )
+
+        items = (await client.get("/api/prompts/scope-index")).json()["items"]
+        assert len(items) == 1
+        # MCP picker body is mcp_prompt, NOT system_prompt.
+        assert items[0]["body"] == "MCP directive."
