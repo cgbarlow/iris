@@ -99,13 +99,13 @@ class TestGetPromptErrors:
     @pytest.mark.asyncio
     async def test_malformed_name_raises_value_error(self) -> None:
         client: Any = _StubClient([])
-        with pytest.raises(ValueError, match="Invalid Iris scope-prompt name"):
+        with pytest.raises(ValueError, match="Invalid Iris prompt name"):
             await iris_prompts.get_prompt(client, "nope")
 
     @pytest.mark.asyncio
     async def test_wrong_scope_type_in_name_raises(self) -> None:
         client: Any = _StubClient([])
-        with pytest.raises(ValueError, match="Invalid Iris scope-prompt name"):
+        with pytest.raises(ValueError, match="Invalid Iris prompt name"):
             await iris_prompts.get_prompt(
                 client, "iris:diagram:11111111-1111-1111-1111-111111111111",
             )

@@ -4,6 +4,7 @@
 	import { apiFetch } from '$lib/utils/api';
 	import type { IrisCollection, IrisSet } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
 	import DOMPurify from 'dompurify';
 
 	let collection = $state<IrisCollection | null>(null);
@@ -166,6 +167,11 @@
 				Inherited by every Set in this Collection. Applied alongside any Set-level prompt.
 			</p>
 		</div>
+
+		<!-- Named prompts (ADR-154) -->
+		{#if collection}
+			<NamedPromptsSection scope_type="collection" scope_id={collection.id} />
+		{/if}
 
 		<!-- Save button -->
 		<div class="mt-6">

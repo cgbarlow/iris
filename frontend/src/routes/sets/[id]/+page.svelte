@@ -7,6 +7,7 @@
 	import type { IrisSet, IrisCollection, Diagram, PaginatedResponse } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
+	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
 	import DOMPurify from 'dompurify';
 
 	let set = $state<IrisSet | null>(null);
@@ -226,6 +227,11 @@
 				Applied in addition to the parent Collection's system prompt.
 			</p>
 		</div>
+
+		<!-- Named prompts (ADR-154) -->
+		{#if set}
+			<NamedPromptsSection scope_type="set" scope_id={set.id} />
+		{/if}
 
 		<!-- Thumbnail -->
 		<fieldset class="mt-6">
