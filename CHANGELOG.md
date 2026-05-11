@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.7.3] - 2026-05-11
+
+### Fixed
+
+- **Breadcrumb links on `/views/[id]` now route packages to
+  `/packages/<id>`** (previously `/views/<id>`, which 404'd or showed
+  an unrelated view). The breadcrumb's "ancestors" are always packages
+  (a diagram's parent chain walks the packages table — see
+  `backend/app/diagrams/service.py:get_diagram_ancestors`), but the
+  link template hard-coded `/views/<id>`. Extracted a small
+  `viewBreadcrumbHref()` helper that switches on the `type` field
+  returned by `/api/diagrams/{id}/ancestors` so packages route to
+  `/packages/<id>` and any future diagram-typed ancestor would route
+  to `/views/<id>`. Also corrects the local TypeScript shape (the API
+  returns `{id, name, type, parent_package_id}`; the page declared
+  `{id, name, diagram_type}` — wrong field name that happened to type-
+  check because both were `string`). Reported on the live UAT URL
+  `https://iris-uat.chrisbarlow.nz/views/4415adb0-c1db-4627-8952-13f4c911d375`.
+
 ## [5.7.2] - 2026-05-11
 
 Follow-up to v5.7.1: even with the defensive read in place, the
