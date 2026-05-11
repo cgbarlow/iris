@@ -112,12 +112,12 @@ class IrisSet(EntityBase):
 
     collection_id: str | None = None
     system_prompt: str | None = None
-    mcp_prompt: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
+    mcp_system_context: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
 
 
 class Collection(EntityBase):
     system_prompt: str | None = None
-    mcp_prompt: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
+    mcp_system_context: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
 
 
 class ScopePromptIndexEntry(_Permissive):

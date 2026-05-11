@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.11.0] - 2026-05-11
+
+### Changed (breaking — supersedes v5.10.0 picker behaviour)
+
+- **Scope `mcp_prompt` column renamed to `mcp_system_context` and
+  repositioned as data passthrough, not a slash-command prompt**
+  (ADR-156, SPEC-156-A). The v5.10.0 design exposed the column via
+  the MCP `prompts` channel as `/iris:set:<uuid>` /
+  `/iris:collection:<uuid>` slash commands. In use that turned out
+  wrong for the intent: the content authors want attached to a
+  scope is **initial context for an MCP client browsing the
+  scope**, not a directive the user picks. v5.11.0 removes the
+  scope-level slash-command exposure entirely and instead passes
+  `mcp_system_context` through `get_set` / `list_sets` /
+  `get_collection` / `list_collections` MCP tool responses as a
+  regular data field. The MCP picker now contains **named prompts
+  only** (ADR-154 entries unchanged).
+- `system_prompt` continues to auto-apply in Iris AI server-side
+  composition (ADR-150) and continues to be stripped from MCP tool
+  responses (ADR-151). Unchanged.
+- Frontend label and helper text updated to reflect the
+  passthrough role.
+
+### Migration
+
+- SQLite `m050_rename_mcp_prompt_to_mcp_system_context.py` —
+  idempotent column rename on `collections` and `sets`.
+- Supabase `m054_rename_mcp_prompt_to_mcp_system_context.sql` —
+  same. Run `./scripts/supabase-migrate.sh` after deploy. Data
+  authored in v5.10.0 is preserved (rename, not drop).
+
 ## [5.10.0] - 2026-05-11
 
 ### Added
