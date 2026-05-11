@@ -185,10 +185,25 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     await seed_defaults(port)
     await seed_default_themes(port)
     await seed_default_views(port)
-    # ADR-117 v5.7.1 amendment: ensure the `__global__` graph_settings
-    # row exists on Supabase startup (the SQLite path already does this
-    # on line ~139). The seed is idempotent and now also tolerates a
-    # missing graph_settings table.
+    # ADR-117 v5.7.2 amendment: ensure the `graph_settings` table
+    # exists on Supabase deployments that may not have run the m039
+    # SQL migration via supabase-migrate.sh. Idempotent — does nothing
+    # if the table is already there. Without this, the seed below
+    # would log-and-skip (v5.7.1 made it defensive), so no row would
+    # ever be inserted and admin "Save as default" PUTs would fail.
+    await port.execute(
+        "CREATE TABLE IF NOT EXISTS graph_settings ("
+        "  scope_type TEXT NOT NULL CHECK(scope_type IN ('global','collection','set')),"
+        "  scope_id TEXT NOT NULL,"
+        "  settings_json TEXT NOT NULL,"
+        "  updated_at TIMESTAMPTZ,"
+        "  updated_by TEXT,"
+        "  PRIMARY KEY (scope_type, scope_id)"
+        ")"
+    )
+    await port.commit()
+    # ADR-117 v5.7.1 amendment: ensure the `__global__` row exists on
+    # Supabase startup (the SQLite path already does this on line ~139).
     from app.graph.service import seed_graph_settings_defaults  # noqa: PLC0415
     await seed_graph_settings_defaults(port)
     # Bring AI creation prompts to the latest canonical content (ADR-132).

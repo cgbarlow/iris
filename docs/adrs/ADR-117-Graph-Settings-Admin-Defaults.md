@@ -97,4 +97,38 @@ visibility.
   in prod) — would help spot recurrences of the underlying issue.
 - A migration that re-applies m039 idempotently from Python startup
   if the table is missing — currently relies on operator running
-  `scripts/supabase-migrate.sh`.
+  `scripts/supabase-migrate.sh`. *(Closed by v5.7.2 amendment below.)*
+
+---
+
+## Amendment 2026-05-11 — v5.7.2 follow-up
+
+UAT verification surfaced a second gap: even with v5.7.1's defensive
+reads in place, the admin "Save as default" button was silently
+failing because the `graph_settings` table itself was missing on
+the Supabase deployment (the m039 SQL migration had never been
+applied to UAT). The v5.7.1 seed correctly caught the underlying
+"relation does not exist" error and skipped — but that meant no row
+ever got inserted and admin PUTs continued to fail.
+
+**Decisions:**
+
+1. **Inline CREATE TABLE in `_initialize_supabase`.** Mirror the
+   existing pattern for inline schema patches (e.g. the ALTER TABLE
+   blocks for `ai_conversations` and `diagrams.sequence_order`).
+   Idempotent — `CREATE TABLE IF NOT EXISTS graph_settings (...)` is
+   a no-op when the table already exists. This makes the Python
+   startup path independent of whether the operator has run
+   `scripts/supabase-migrate.sh` recently.
+2. **Surface save errors in the UI.** `KnowledgeGraphSettings.svelte`
+   previously caught all errors from `onSaveDefault` and showed
+   "Saved" regardless. Now on failure the button briefly shows
+   "Save failed" with the error tooltip, and logs the full error to
+   the console. Closes the "silent button failure" class of bug
+   identified in this UAT cycle.
+
+**Why both fixes in the same release.** They are the data-layer and
+UI-layer of the same bug. Without (1) the admin can never persist
+defaults on Supabase; without (2) the admin cannot tell when their
+save fails. Shipping them separately would leave one half broken in
+between.

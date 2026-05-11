@@ -159,9 +159,30 @@
 					<button
 						onclick={async (e) => {
 							const btn = e.currentTarget as HTMLButtonElement;
-							try { await onSaveDefault(settings); } catch { /* ignore */ }
-							btn.textContent = 'Saved';
-							setTimeout(() => { btn.textContent = 'Save as default'; }, 1500);
+							const original = 'Save as default';
+							const origBg = btn.style.background;
+							const origBorder = btn.style.borderColor;
+							try {
+								await onSaveDefault(settings);
+								btn.textContent = 'Saved';
+								setTimeout(() => { btn.textContent = original; }, 1500);
+							} catch (err) {
+								// v5.7.2: surface save failures so the admin sees them.
+								// Previously the error was swallowed and the button
+								// always showed "Saved", masking PUT failures.
+								const message = err instanceof Error ? err.message : String(err);
+								btn.textContent = 'Save failed';
+								btn.style.background = 'var(--color-danger, #dc2626)';
+								btn.style.borderColor = 'var(--color-danger, #dc2626)';
+								btn.title = message;
+								console.error('Save as default failed:', err);
+								setTimeout(() => {
+									btn.textContent = original;
+									btn.style.background = origBg;
+									btn.style.borderColor = origBorder;
+									btn.title = '';
+								}, 4000);
+							}
 						}}
 						style="flex: 1; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--color-primary); background: var(--color-primary); color: white; font-size: 0.7rem; cursor: pointer"
 					>Save as default</button>
