@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.2] - 2026-05-11
+
+### Fixed
+
+- **MCP boundary now strips `system_prompt` from tool responses**
+  (ADR-151, SPEC-151-A). v5.8.0 added `system_prompt` to the
+  Set/Collection response models. The four MCP tools that return
+  Set or Collection data (`get_set`, `list_sets`, `get_collection`,
+  `list_collections`) were forwarding it to Claude Desktop as
+  untrusted tool data, where it triggered prompt-injection
+  defenses ("this set has a system prompt attached … I'm flagging
+  it"). The MCP egress helpers (`with_web_url` /
+  `with_web_urls_list` / `with_web_urls_search` in
+  `mcp/src/iris_mcp/links.py`) now redact the field on every tool
+  response. Authoring (REST endpoints + web GUI) and the MCP `ask`
+  tool (which composes the prompt server-side) are unchanged. The
+  spec-compliant channel for invoking a scope's system prompt
+  inside a Claude Desktop conversation arrives in v5.8.3 via the
+  MCP `prompts` capability.
+
 ## [5.8.1] - 2026-05-11
 
 ### Fixed
