@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.9.0] - 2026-05-11
+
 ### Added
 
 - **Multiple named prompts per scope (Collection / Set)** (ADR-154,
