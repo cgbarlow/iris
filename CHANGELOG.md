@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multiple named prompts per scope (Collection / Set)** (ADR-154,
+  SPEC-154-A). New `prompts` table holds zero-or-more named prompts per
+  scope; surfaced via the existing MCP `prompts` channel as
+  `set:<uuid>:<name>` / `collection:<uuid>:<name>` (so Claude clients
+  show them as `/iris:set:<uuid>:<name>` in the prompt picker). Set-
+  scoped names shadow Collection-scoped names per ADR-150 additive
+  inheritance. New `/api/named-prompts*` CRUD endpoints; new
+  `Prompts` section on `/sets/[id]` and `/collections/[id]` edit pages
+  for per-row authoring. Scope-level `system_prompt` (ADR-150) is
+  retained unchanged and continues to auto-apply in Ask Iris and Iris
+  MCP `ask`; named prompts are **picker-invoked only** and never
+  auto-prepend. 43 new tests across migration, backend, iris-client,
+  MCP, and frontend layers; existing v5.8.x tests unchanged. SQLite
+  migration `m048_named_prompts.py`; Supabase mirror
+  `m052_named_prompts.sql` with anonymous-read / authenticated-write
+  RLS posture.
+
+- **DoView Book combined response prompt (Prompt C)** drafted under
+  `docs/prompts/doview-book-prompt-c-iris.md`. Merges Prompt A
+  (outcomes-theory text response) and Prompt B (diagram retrieval)
+  into a single-turn prompt that produces both formal text answer
+  and verbatim mermaid diagrams in one response. Iris-MCP-sourced
+  (set 33032180-d77a-4ce4-88cf-b49cd643e093); intended for upload
+  as a named prompt on the DoView Book Set once v5.9.0 ships.
+
 ## [5.8.5] - 2026-05-11
 
 ### Changed
