@@ -1,6 +1,6 @@
 """ADR-152: MCP `prompts/get` handler.
 
-Resolves an `iris:set:<uuid>` or `iris:collection:<uuid>` name and
+Resolves a `set:<uuid>` or `collection:<uuid>` name and
 returns a single user-role MCP message with the system_prompt body
 preceded by a provenance preamble.
 """
@@ -26,7 +26,7 @@ class _StubClient:
 
 def _entry(**kwargs: Any) -> ScopePromptIndexEntry:
     defaults = {
-        "name": "iris:set:11111111-1111-1111-1111-111111111111",
+        "name": "set:11111111-1111-1111-1111-111111111111",
         "scope_type": "set",
         "scope_id": "11111111-1111-1111-1111-111111111111",
         "scope_name": "DoView Book",
@@ -42,7 +42,7 @@ class TestGetPromptHappyPath:
     async def test_set_returns_single_user_message(self) -> None:
         client: Any = _StubClient([_entry()])
         result = await iris_prompts.get_prompt(
-            client, "iris:set:11111111-1111-1111-1111-111111111111",
+            client, "set:11111111-1111-1111-1111-111111111111",
         )
 
         assert isinstance(result, types.GetPromptResult)
@@ -59,7 +59,7 @@ class TestGetPromptHappyPath:
     @pytest.mark.asyncio
     async def test_collection_returns_user_message(self) -> None:
         entry = _entry(
-            name="iris:collection:22222222-2222-2222-2222-222222222222",
+            name="collection:22222222-2222-2222-2222-222222222222",
             scope_type="collection",
             scope_id="22222222-2222-2222-2222-222222222222",
             scope_name="NZISM",
@@ -67,7 +67,7 @@ class TestGetPromptHappyPath:
         )
         client: Any = _StubClient([entry])
         result = await iris_prompts.get_prompt(
-            client, "iris:collection:22222222-2222-2222-2222-222222222222",
+            client, "collection:22222222-2222-2222-2222-222222222222",
         )
         assert "Always cite the control number." in result.messages[0].content.text
         assert "Collection" in result.messages[0].content.text
@@ -78,7 +78,7 @@ class TestGetPromptHappyPath:
         monkeypatch.setenv("IRIS_WEB_URL", "https://iris-uat.chrisbarlow.nz")
         client: Any = _StubClient([_entry()])
         result = await iris_prompts.get_prompt(
-            client, "iris:set:11111111-1111-1111-1111-111111111111",
+            client, "set:11111111-1111-1111-1111-111111111111",
         )
         text = result.messages[0].content.text
         assert "https://iris-uat.chrisbarlow.nz/sets/11111111-1111-1111-1111-111111111111" in text
@@ -88,7 +88,7 @@ class TestGetPromptHappyPath:
         monkeypatch.delenv("IRIS_WEB_URL", raising=False)
         client: Any = _StubClient([_entry()])
         result = await iris_prompts.get_prompt(
-            client, "iris:set:11111111-1111-1111-1111-111111111111",
+            client, "set:11111111-1111-1111-1111-111111111111",
         )
         text = result.messages[0].content.text
         # No URL anywhere in the preamble.
@@ -115,5 +115,5 @@ class TestGetPromptErrors:
         client: Any = _StubClient([])  # empty index
         with pytest.raises(ValueError, match="not found"):
             await iris_prompts.get_prompt(
-                client, "iris:set:99999999-9999-9999-9999-999999999999",
+                client, "set:99999999-9999-9999-9999-999999999999",
             )

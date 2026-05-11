@@ -28,7 +28,7 @@ async def list_scope_prompts(db: DatabasePort) -> list[dict[str, object]]:
         if not body:
             continue
         items.append({
-            "name": f"iris:collection:{row[0]}",
+            "name": f"collection:{row[0]}",
             "scope_type": "collection",
             "scope_id": str(row[0]),
             "scope_name": str(row[1]),
@@ -46,7 +46,7 @@ async def list_scope_prompts(db: DatabasePort) -> list[dict[str, object]]:
         if not body:
             continue
         items.append({
-            "name": f"iris:set:{row[0]}",
+            "name": f"set:{row[0]}",
             "scope_type": "set",
             "scope_id": str(row[0]),
             "scope_name": str(row[1]),

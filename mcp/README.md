@@ -117,7 +117,9 @@ ADR-123/129).
   diagrams, and conversation history.
 - **Resources** at `iris://diagrams|elements|packages|sets|collections/{id}`
   returning JSON export bundles.
-- **Prompts** (v5.8.3, ADR-152) — every Collection / Set with an
-  attached `system_prompt` appears as `iris:set:<uuid>` or
-  `iris:collection:<uuid>`. Invoking a prompt loads the body into the
+- **Prompts** (v5.8.3, ADR-152; v5.8.5 naming refresh per ADR-153) —
+  every Collection / Set with an attached `system_prompt` appears as
+  `set:<uuid>` or `collection:<uuid>` (MCP clients namespace these
+  under the server name automatically — e.g. Claude Code shows them
+  as `/iris:set:<uuid>`). Invoking a prompt loads the body into the
   conversation as a user-authored directive.

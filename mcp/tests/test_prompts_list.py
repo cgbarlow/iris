@@ -26,7 +26,7 @@ class _StubClient:
 
 def _entry(**kwargs: Any) -> ScopePromptIndexEntry:
     defaults = {
-        "name": "iris:set:00000000-0000-0000-0000-000000000001",
+        "name": "set:00000000-0000-0000-0000-000000000001",
         "scope_type": "set",
         "scope_id": "00000000-0000-0000-0000-000000000001",
         "scope_name": "Test Set",
@@ -47,7 +47,7 @@ class TestListPrompts:
     @pytest.mark.asyncio
     async def test_maps_set_entry(self) -> None:
         entries = [_entry(
-            name="iris:set:11111111-1111-1111-1111-111111111111",
+            name="set:11111111-1111-1111-1111-111111111111",
             scope_id="11111111-1111-1111-1111-111111111111",
             scope_name="DoView Book",
             description="Outcomes theory reference",
@@ -57,7 +57,7 @@ class TestListPrompts:
 
         assert len(result) == 1
         p = result[0]
-        assert p.name == "iris:set:11111111-1111-1111-1111-111111111111"
+        assert p.name == "set:11111111-1111-1111-1111-111111111111"
         # Description includes scope-type label, human name, and description.
         assert "Set" in p.description
         assert "DoView Book" in p.description
@@ -68,7 +68,7 @@ class TestListPrompts:
     @pytest.mark.asyncio
     async def test_maps_collection_entry(self) -> None:
         entries = [_entry(
-            name="iris:collection:22222222-2222-2222-2222-222222222222",
+            name="collection:22222222-2222-2222-2222-222222222222",
             scope_type="collection",
             scope_id="22222222-2222-2222-2222-222222222222",
             scope_name="NZISM",
@@ -79,7 +79,7 @@ class TestListPrompts:
 
         assert len(result) == 1
         p = result[0]
-        assert p.name == "iris:collection:22222222-2222-2222-2222-222222222222"
+        assert p.name == "collection:22222222-2222-2222-2222-222222222222"
         assert "Collection" in p.description
         assert "NZISM" in p.description
 
@@ -160,13 +160,13 @@ class TestListPrompts:
     async def test_preserves_order(self) -> None:
         entries = [
             _entry(
-                name="iris:collection:c1",
+                name="collection:c1",
                 scope_type="collection",
                 scope_id="c1",
                 scope_name="First",
             ),
             _entry(
-                name="iris:set:s1",
+                name="set:s1",
                 scope_type="set",
                 scope_id="s1",
                 scope_name="Second",
@@ -175,6 +175,6 @@ class TestListPrompts:
         client: Any = _StubClient(entries)
         result = await iris_prompts.list_prompts(client)
         assert [p.name for p in result] == [
-            "iris:collection:c1",
-            "iris:set:s1",
+            "collection:c1",
+            "set:s1",
         ]

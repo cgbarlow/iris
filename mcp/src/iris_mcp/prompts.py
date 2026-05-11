@@ -23,8 +23,11 @@ from mcp import types
 if TYPE_CHECKING:
     from iris_client import IrisClient
 
-# `iris:set:<uuid>` and `iris:collection:<uuid>` — anchored.
-_NAME_RE = re.compile(r"^iris:(set|collection):([0-9a-f-]{36})$")
+# `set:<uuid>` and `collection:<uuid>` — anchored. The MCP server name
+# (`iris`) is already prepended by the client when surfacing prompts in
+# its picker (e.g. Claude Code shows `/iris:set:<uuid>`), so we don't
+# bake `iris:` into the name itself. v5.8.5 dropped the prefix; ADR-153.
+_NAME_RE = re.compile(r"^(set|collection):([0-9a-f-]{36})$")
 
 
 def _web_base() -> str | None:
@@ -113,7 +116,7 @@ async def get_prompt(
     """
     match = _NAME_RE.match(name)
     if match is None:
-        msg = f"Invalid Iris scope-prompt name: {name!r}. Expected `iris:set:<uuid>` or `iris:collection:<uuid>`."
+        msg = f"Invalid Iris scope-prompt name: {name!r}. Expected `set:<uuid>` or `collection:<uuid>`."
         raise ValueError(msg)
 
     # Resolve from the index (single backend round-trip already includes
