@@ -1,14 +1,23 @@
-"""Service layer for the scope-prompt index (ADR-152; extended ADR-154).
+"""Service layer for the scope-prompt index (ADR-152; extended ADR-154; ADR-155 strict split).
 
 Returns:
 - one entry per Collection / Set with a non-null, non-empty
-  `system_prompt` (`entry_kind="system_prompt"`)
+  `mcp_prompt` (`entry_kind="system_prompt"`, name `set:<uuid>` /
+  `collection:<uuid>`). v5.10.0 / ADR-155: the scope's MCP picker
+  body now comes from the `mcp_prompt` column, NOT `system_prompt`.
+  `system_prompt` continues to auto-apply in Iris AI server-side
+  composition (ADR-150) but is never surfaced via this endpoint.
 - one entry per named prompt on a Collection / Set
   (`entry_kind="named_prompt"`)
 
-Order: system prompts first (collections then sets, both alphabetical),
-then named prompts (grouped by scope, alphabetical scope name, then
-alphabetical prompt name within each scope).
+Order: scope MCP prompts first (collections then sets, both
+alphabetical), then named prompts.
+
+The `entry_kind` literal stays `"system_prompt"` for backwards-compat
+with iris-client / MCP layer code that already discriminates on it.
+The label is now slightly inaccurate — it refers to the scope's
+single MCP-facing prompt, which v5.10.0 routed to its own column —
+but renaming the literal would be a breaking change to every consumer.
 """
 
 from __future__ import annotations
@@ -20,12 +29,12 @@ if TYPE_CHECKING:
 
 
 async def list_scope_prompts(db: DatabasePort) -> list[dict[str, object]]:
-    """Return scope-prompt index entries (system prompts then named prompts)."""
+    """Return scope-prompt index entries (scope MCP prompts then named prompts)."""
     items: list[dict[str, object]] = []
 
     cursor = await db.execute(
-        "SELECT id, name, description, system_prompt FROM collections "
-        "WHERE is_deleted = 0 AND system_prompt IS NOT NULL "
+        "SELECT id, name, description, mcp_prompt FROM collections "
+        "WHERE is_deleted = 0 AND mcp_prompt IS NOT NULL "
         "ORDER BY name",
     )
     for row in await cursor.fetchall():
@@ -44,8 +53,8 @@ async def list_scope_prompts(db: DatabasePort) -> list[dict[str, object]]:
         })
 
     cursor = await db.execute(
-        "SELECT id, name, description, system_prompt FROM sets "
-        "WHERE is_deleted = 0 AND system_prompt IS NOT NULL "
+        "SELECT id, name, description, mcp_prompt FROM sets "
+        "WHERE is_deleted = 0 AND mcp_prompt IS NOT NULL "
         "ORDER BY name",
     )
     for row in await cursor.fetchall():

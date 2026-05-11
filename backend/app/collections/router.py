@@ -98,6 +98,7 @@ async def update(
             thumbnail_source=body.thumbnail_source,
             thumbnail_diagram_id=body.thumbnail_diagram_id,
             system_prompt=body.system_prompt,
+            mcp_prompt=body.mcp_prompt,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
