@@ -156,6 +156,32 @@ class TestCreate:
         )
         assert resp.status_code == 404, resp.text
 
+    async def test_create_duplicate_409_does_not_swallow_other_errors(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """Regression: the duplicate-name handler must distinguish a
+        UNIQUE-violation 409 from other failures (e.g. UndefinedTable on
+        Supabase before m052 has been applied). UNIQUE violations get a
+        clean 409 message with no driver-exception name leaked."""
+        headers = await _auth_headers(client)
+        s = await _make_set(client, headers, "Set X")
+        first = await client.post(
+            "/api/named-prompts",
+            json=_valid_prompt_body("set", s["id"], name="dup-test"),
+            headers=headers,
+        )
+        assert first.status_code == 201
+
+        second = await client.post(
+            "/api/named-prompts",
+            json=_valid_prompt_body("set", s["id"], name="dup-test"),
+            headers=headers,
+        )
+        assert second.status_code == 409
+        detail = second.json()["detail"]
+        # Clean message, no driver-exception class name leaked.
+        assert detail == "A named prompt with this name already exists on this scope."
+
 
 class TestList:
     async def test_list_filters_by_scope(self, client: httpx.AsyncClient) -> None:

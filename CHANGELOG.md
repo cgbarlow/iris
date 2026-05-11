@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.9.1] - 2026-05-11
+
+### Fixed
+
+- **Named-prompts router no longer reports every create-time error as
+  a duplicate-name 409.** The v5.9.0 handler caught every `Exception`
+  and emitted `"A named prompt with this name already exists on this
+  scope (<ExceptionClass>)"` — surfacing `UndefinedTableError` (raised
+  when the Supabase migration `m052_named_prompts.sql` had not yet
+  been applied) under that misleading message. The handler now
+  distinguishes UNIQUE-constraint violations (409, clean message)
+  from any other failure (500, with the underlying exception class
+  and message). Reminder: Supabase migrations are applied externally
+  via `./scripts/supabase-migrate.sh` — see SPEC-154-A and
+  `backend/app/startup.py` comments.
+
+### Changed
+
+- **Prompt C draft (`docs/prompts/doview-book-prompt-c-iris.md`)
+  reflowed.** Mid-paragraph hard wraps removed; paragraphs now flow
+  as single lines (matching the existing `doview-book-prompt-a.md` /
+  `-b.md` style). No content changes.
+
 ## [5.9.0] - 2026-05-11
 
 ### Added
