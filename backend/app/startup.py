@@ -185,6 +185,12 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     await seed_defaults(port)
     await seed_default_themes(port)
     await seed_default_views(port)
+    # ADR-117 v5.7.1 amendment: ensure the `__global__` graph_settings
+    # row exists on Supabase startup (the SQLite path already does this
+    # on line ~139). The seed is idempotent and now also tolerates a
+    # missing graph_settings table.
+    from app.graph.service import seed_graph_settings_defaults  # noqa: PLC0415
+    await seed_graph_settings_defaults(port)
     # Bring AI creation prompts to the latest canonical content (ADR-132).
     # The m041 Supabase migration seeds the initial rows externally via psql;
     # this call keeps prompt_text fresh on each app restart without a new

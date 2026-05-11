@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.7.1] - 2026-05-11
+
+Hotfix: `/api/graph/settings` returns 500 on Supabase deployments
+(UAT). Anonymous users observed this as "admin-configured knowledge-
+graph defaults not applied" — the frontend's silent fallback to
+hard-coded defaults masked the underlying 500 from authenticated users
+(whose localStorage carried their own saved settings).
+
+### Fixed
+
+- **`/api/graph/settings` no longer 500s on Supabase deployments**
+  (ADR-117 v5.7.1 amendment). Two-pronged fix:
+  - `get_graph_settings()` and `get_graph_settings_cascaded()` now
+    catch DB-level exceptions (e.g. missing table on a partially
+    migrated deployment) and return hard-coded
+    `GRAPH_SETTINGS_DEFAULTS` so the endpoint stays alive
+    (`backend/app/graph/service.py`).
+  - `_initialize_supabase` now calls
+    `seed_graph_settings_defaults(port)` so the `__global__` row gets
+    inserted on first Supabase start — previously only the SQLite
+    startup path did this (`backend/app/startup.py`).
+  - `seed_graph_settings_defaults()` is itself defensive: a missing
+    table logs-and-skips rather than crashing app startup.
+
+### Verification
+
+- 4 new unit tests in `backend/tests/test_graph/test_settings_resilience.py`
+  cover: read returns None on DB error, cascade returns hard-coded
+  defaults on DB error (both unscoped and scoped), seed no-ops on DB
+  error.
+- Local dev (SQLite path) unchanged: `GET /api/graph/settings` returns
+  200 with the seeded defaults.
+
 ## [5.7.0] - 2026-05-10
 
 Mermaid diagram rendering in the shared markdown view (ADR-149,

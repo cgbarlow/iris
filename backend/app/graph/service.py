@@ -7,9 +7,12 @@ relationship types as edges for a scoped set or collection.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections import Counter
 from typing import TYPE_CHECKING, Any
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
@@ -453,19 +456,28 @@ GRAPH_SETTINGS_DEFAULTS: dict[str, Any] = {
 
 
 async def seed_graph_settings_defaults(db: "DatabasePort") -> None:
-    """Insert the global defaults row if it doesn't already exist."""
-    cursor = await db.execute(
-        "SELECT 1 FROM graph_settings WHERE scope_type = 'global' AND scope_id = '__global__'",
-    )
-    if await cursor.fetchone():
-        return
-    await db.execute(
-        "INSERT INTO graph_settings (scope_type, scope_id, settings_json, updated_at) "
-        "VALUES (?, ?, ?, ?)",
-        ["global", "__global__", json.dumps(GRAPH_SETTINGS_DEFAULTS),
-         datetime.now(timezone.utc).isoformat()],
-    )
-    await db.commit()
+    """Insert the global defaults row if it doesn't already exist.
+
+    ADR-117 v5.7.1 amendment: must not crash startup if the
+    `graph_settings` table is missing (e.g. partially migrated Supabase
+    deployment). Logs the failure and skips so other startup steps
+    continue.
+    """
+    try:
+        cursor = await db.execute(
+            "SELECT 1 FROM graph_settings WHERE scope_type = 'global' AND scope_id = '__global__'",
+        )
+        if await cursor.fetchone():
+            return
+        await db.execute(
+            "INSERT INTO graph_settings (scope_type, scope_id, settings_json, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            ["global", "__global__", json.dumps(GRAPH_SETTINGS_DEFAULTS),
+             datetime.now(timezone.utc).isoformat()],
+        )
+        await db.commit()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("seed_graph_settings_defaults skipped: %s", exc)
 
 
 async def get_graph_settings(
@@ -473,13 +485,22 @@ async def get_graph_settings(
     scope_type: str,
     scope_id: str,
 ) -> dict[str, Any] | None:
-    """Return raw settings for a single scope, or None."""
-    cursor = await db.execute(
-        "SELECT settings_json, updated_at, updated_by "
-        "FROM graph_settings WHERE scope_type = ? AND scope_id = ?",
-        [scope_type, scope_id],
-    )
-    row = await cursor.fetchone()
+    """Return raw settings for a single scope, or None on miss or DB error.
+
+    ADR-117 v5.7.1 amendment: DB errors (e.g. missing table on a
+    partially-migrated Supabase deployment) are logged and treated as
+    a miss so callers fall back to defaults rather than 500'ing.
+    """
+    try:
+        cursor = await db.execute(
+            "SELECT settings_json, updated_at, updated_by "
+            "FROM graph_settings WHERE scope_type = ? AND scope_id = ?",
+            [scope_type, scope_id],
+        )
+        row = await cursor.fetchone()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("get_graph_settings(%s, %s) failed: %s", scope_type, scope_id, exc)
+        return None
     if not row:
         return None
     return {
