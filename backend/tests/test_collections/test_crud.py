@@ -136,6 +136,65 @@ class TestUpdateCollection:
         assert resp.json()["description"] == "Updated"
 
 
+class TestSystemPrompt:
+    """ADR-150: collections can carry a free-text system_prompt."""
+
+    async def test_create_defaults_to_null_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/collections", json={"name": "No Prompt Coll"}, headers=headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["system_prompt"] is None
+
+    async def test_put_persists_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/collections", json={"name": "Prompted Coll"}, headers=headers,
+        )
+        collection_id = create_resp.json()["id"]
+        resp = await client.put(
+            f"/api/collections/{collection_id}",
+            json={"name": "Prompted Coll", "system_prompt": "Always cite the control."},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["system_prompt"] == "Always cite the control."
+
+    async def test_get_returns_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/collections", json={"name": "Get Prompt Coll"}, headers=headers,
+        )
+        collection_id = create_resp.json()["id"]
+        await client.put(
+            f"/api/collections/{collection_id}",
+            json={"name": "Get Prompt Coll", "system_prompt": "House rules apply."},
+            headers=headers,
+        )
+        resp = await client.get(f"/api/collections/{collection_id}", headers=headers)
+        assert resp.json()["system_prompt"] == "House rules apply."
+
+    async def test_put_can_clear_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/collections", json={"name": "Clearable Coll"}, headers=headers,
+        )
+        collection_id = create_resp.json()["id"]
+        await client.put(
+            f"/api/collections/{collection_id}",
+            json={"name": "Clearable Coll", "system_prompt": "Temporary."},
+            headers=headers,
+        )
+        resp = await client.put(
+            f"/api/collections/{collection_id}",
+            json={"name": "Clearable Coll", "system_prompt": None},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["system_prompt"] is None
+
+
 class TestDeleteCollection:
     async def test_soft_delete(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)

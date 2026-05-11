@@ -21,6 +21,7 @@ class SetUpdate(BaseModel):
     thumbnail_source: str | None = None
     thumbnail_diagram_id: str | None = None
     collection_id: str | None = None
+    system_prompt: str | None = None
 
 
 class SetResponse(BaseModel):
@@ -42,6 +43,7 @@ class SetResponse(BaseModel):
     has_thumbnail_image: bool = False
     thumbnail_diagram_data: dict | None = None
     thumbnail_diagram_type: str | None = None
+    system_prompt: str | None = None
 
 
 class SetListResponse(BaseModel):

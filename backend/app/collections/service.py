@@ -28,13 +28,14 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
         "thumbnail_source": row[7],
         "thumbnail_diagram_id": row[8],
         "has_thumbnail_image": has_thumbnail_image,
+        "system_prompt": row[10] if len(row) > 10 else None,
     }
 
 
 _COLLECTION_COLUMNS = (
     "c.id, c.name, c.description, c.created_at, c.created_by, "
     "c.updated_at, c.is_deleted, c.thumbnail_source, c.thumbnail_diagram_id, "
-    "c.thumbnail_image IS NOT NULL"
+    "c.thumbnail_image IS NOT NULL, c.system_prompt"
 )
 
 
@@ -74,6 +75,7 @@ async def create_collection(
         "thumbnail_source": None,
         "thumbnail_diagram_id": None,
         "has_thumbnail_image": False,
+        "system_prompt": None,
     }
 
 
@@ -186,8 +188,9 @@ async def update_collection(
     description: str | None,
     thumbnail_source: str | None = None,
     thumbnail_diagram_id: str | None = None,
+    system_prompt: str | None = None,
 ) -> dict[str, object] | None:
-    """Update a collection's name, description, and thumbnail settings.
+    """Update a collection's name, description, thumbnail and system_prompt.
 
     Returns None if not found.
     """
@@ -215,16 +218,18 @@ async def update_collection(
     if thumbnail_source != "image":
         await db.execute(
             "UPDATE collections SET name = ?, description = ?, updated_at = ?, "
-            "thumbnail_source = ?, thumbnail_diagram_id = ?, thumbnail_image = NULL "
+            "thumbnail_source = ?, thumbnail_diagram_id = ?, thumbnail_image = NULL, "
+            "system_prompt = ? "
             "WHERE id = ?",
-            (name, description, now, thumbnail_source, thumbnail_diagram_id, collection_id),
+            (name, description, now, thumbnail_source, thumbnail_diagram_id, system_prompt, collection_id),
         )
     else:
         await db.execute(
             "UPDATE collections SET name = ?, description = ?, updated_at = ?, "
-            "thumbnail_source = ?, thumbnail_diagram_id = ? "
+            "thumbnail_source = ?, thumbnail_diagram_id = ?, "
+            "system_prompt = ? "
             "WHERE id = ?",
-            (name, description, now, thumbnail_source, thumbnail_diagram_id, collection_id),
+            (name, description, now, thumbnail_source, thumbnail_diagram_id, system_prompt, collection_id),
         )
     await db.commit()
 
