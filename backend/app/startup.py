@@ -203,6 +203,11 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
         "  PRIMARY KEY (scope_type, scope_id)"
         ")"
     )
+    # v5.8.1: align graph_settings with the ADR-095 deny-all RLS posture.
+    # PostgreSQL's ENABLE ROW LEVEL SECURITY is idempotent — safe on every
+    # startup. Fixes a Supabase advisor warning where graph_settings was the
+    # only post-m030 table without RLS.
+    await port.execute("ALTER TABLE graph_settings ENABLE ROW LEVEL SECURITY")
     await port.commit()
     # ADR-117 v5.7.1 amendment: ensure the `__global__` row exists on
     # Supabase startup (the SQLite path already does this on line ~139).
