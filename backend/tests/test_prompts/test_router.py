@@ -91,7 +91,7 @@ class TestScopePromptIndex:
         assert entry["scope_id"] == s["id"]
         assert entry["scope_name"] == "DoView Book"
         assert entry["body"] == "Use outcomes theory framing."
-        assert entry["name"] == f"iris:set:{s['id']}"
+        assert entry["name"] == f"set:{s['id']}"
 
     async def test_lists_collection_before_sets(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)
@@ -124,8 +124,8 @@ class TestScopePromptIndex:
             ("collection", "NZISM"),
             ("set", "GCSB Set"),
         ]
-        assert items[0]["name"] == f"iris:collection:{c['id']}"
-        assert items[1]["name"] == f"iris:set:{s['id']}"
+        assert items[0]["name"] == f"collection:{c['id']}"
+        assert items[1]["name"] == f"set:{s['id']}"
 
     async def test_excludes_scopes_with_null_system_prompt(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)

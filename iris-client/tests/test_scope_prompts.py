@@ -20,7 +20,7 @@ class TestListScopePrompts:
             return_value=httpx.Response(200, json={
                 "items": [
                     {
-                        "name": "iris:collection:c-1",
+                        "name": "collection:c-1",
                         "scope_type": "collection",
                         "scope_id": "c-1",
                         "scope_name": "NZISM",
@@ -28,7 +28,7 @@ class TestListScopePrompts:
                         "body": "Cite the control number.",
                     },
                     {
-                        "name": "iris:set:s-1",
+                        "name": "set:s-1",
                         "scope_type": "set",
                         "scope_id": "s-1",
                         "scope_name": "DoView Book",
@@ -44,7 +44,7 @@ class TestListScopePrompts:
         assert route.called
         assert len(result) == 2
         assert result[0].scope_type == "collection"
-        assert result[0].name == "iris:collection:c-1"
+        assert result[0].name == "collection:c-1"
         assert result[1].scope_type == "set"
         assert result[1].body == "Use outcomes theory framing."
 

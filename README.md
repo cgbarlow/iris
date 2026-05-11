@@ -305,7 +305,9 @@ hosts. See [`mcp/README.md`](mcp/README.md) and
 Also surfaces the spec-defined MCP **prompts** capability: every
 Collection and Set with a `system_prompt` (authored on
 `/collections/<id>` or `/sets/<id>`) appears in Claude Desktop's
-prompt picker as `iris:collection:<uuid>` or `iris:set:<uuid>`.
+prompt picker as `collection:<uuid>` or `set:<uuid>` (MCP clients
+namespace these under the server name, so Claude Code surfaces them
+as `/iris:collection:<uuid>` etc.).
 Invoking one loads the system prompt into the conversation as a
 user-authored directive — the spec-compliant alternative to silent
 client-side application, which prompt-injection defense correctly
