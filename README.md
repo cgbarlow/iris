@@ -302,6 +302,16 @@ URL so MCP-using LLMs link back to the live UI without guessing
 hosts. See [`mcp/README.md`](mcp/README.md) and
 [ADR-131](docs/adrs/ADR-131-MCP-Server-Architecture.md).
 
+Also surfaces the spec-defined MCP **prompts** capability: every
+Collection and Set with a `system_prompt` (authored on
+`/collections/<id>` or `/sets/<id>`) appears in Claude Desktop's
+prompt picker as `iris:collection:<uuid>` or `iris:set:<uuid>`.
+Invoking one loads the system prompt into the conversation as a
+user-authored directive — the spec-compliant alternative to silent
+client-side application, which prompt-injection defense correctly
+blocks. See
+[ADR-152](docs/adrs/ADR-152-MCP-Prompts-Capability-for-Scope-System-Prompts.md).
+
 ## Getting Started
 
 ### Prerequisites

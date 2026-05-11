@@ -15,6 +15,7 @@ from iris_client import IrisClient
 from mcp import types
 from mcp.server import Server
 
+from iris_mcp import prompts as iris_prompts
 from iris_mcp import resources as iris_resources
 from iris_mcp import tools as iris_tools
 from iris_mcp.branding import iris_icon
@@ -52,5 +53,15 @@ def build_server(client: IrisClient) -> Server:
     @server.read_resource()
     async def _read_resource(uri: types.AnyUrl) -> str:
         return await iris_resources.resource_read(str(uri), client)
+
+    @server.list_prompts()
+    async def _list_prompts() -> list[types.Prompt]:
+        return await iris_prompts.list_prompts(client)
+
+    @server.get_prompt()
+    async def _get_prompt(
+        name: str, arguments: dict[str, str] | None,
+    ) -> types.GetPromptResult:
+        return await iris_prompts.get_prompt(client, name, arguments)
 
     return server
