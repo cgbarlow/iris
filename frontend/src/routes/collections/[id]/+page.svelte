@@ -15,6 +15,7 @@
 
 	let name = $state('');
 	let description = $state('');
+	let systemPrompt = $state('');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -39,6 +40,7 @@
 			// Initialize form state
 			name = collectionData.name;
 			description = collectionData.description ?? '';
+			systemPrompt = collectionData.system_prompt ?? '';
 		} catch {
 			error = 'Failed to load collection';
 		}
@@ -54,12 +56,16 @@
 			const sanitizedDesc = description.trim()
 				? DOMPurify.sanitize(description.trim())
 				: null;
+			const sanitizedPrompt = systemPrompt.trim()
+				? DOMPurify.sanitize(systemPrompt.trim())
+				: null;
 
 			await apiFetch<IrisCollection>(`/api/collections/${collectionId}`, {
 				method: 'PUT',
 				body: JSON.stringify({
 					name: sanitizedName,
 					description: sanitizedDesc,
+					system_prompt: sanitizedPrompt,
 				}),
 			});
 
@@ -140,6 +146,25 @@
 				class="mt-1 w-full rounded border px-3 py-2 text-sm"
 				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 			></textarea>
+		</div>
+
+		<!-- System prompt (ADR-150) -->
+		<div class="mt-4">
+			<label for="collection-edit-system-prompt" class="text-sm font-medium" style="color: var(--color-fg)">
+				System prompt
+			</label>
+			<textarea
+				id="collection-edit-system-prompt"
+				bind:value={systemPrompt}
+				rows="6"
+				maxlength="20000"
+				placeholder="Optional. Prepended to every AI question about Sets in this Collection."
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); font-family: var(--font-mono, monospace)"
+			></textarea>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				Inherited by every Set in this Collection. Applied alongside any Set-level prompt.
+			</p>
 		</div>
 
 		<!-- Save button -->

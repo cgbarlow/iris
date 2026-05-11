@@ -138,6 +138,46 @@ class TestUpdateSet:
         assert resp.json()["description"] == "Updated"
 
 
+class TestSetSystemPrompt:
+    """ADR-150: sets can carry a free-text system_prompt."""
+
+    async def test_create_defaults_to_null_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/sets", json={"name": "No Prompt Set"}, headers=headers,
+        )
+        assert resp.status_code == 201
+        assert resp.json()["system_prompt"] is None
+
+    async def test_put_persists_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/sets", json={"name": "Prompted Set"}, headers=headers,
+        )
+        set_id = create_resp.json()["id"]
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Prompted Set", "system_prompt": "Use the SREv2 vocabulary."},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["system_prompt"] == "Use the SREv2 vocabulary."
+
+    async def test_get_returns_system_prompt(self, client: httpx.AsyncClient) -> None:
+        headers = await _auth_headers(client)
+        create_resp = await client.post(
+            "/api/sets", json={"name": "Get Prompt Set"}, headers=headers,
+        )
+        set_id = create_resp.json()["id"]
+        await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Get Prompt Set", "system_prompt": "Strict ISO 27001 framing."},
+            headers=headers,
+        )
+        resp = await client.get(f"/api/sets/{set_id}", headers=headers)
+        assert resp.json()["system_prompt"] == "Strict ISO 27001 framing."
+
+
 class TestDeleteSet:
     async def test_delete_empty_set(self, client: httpx.AsyncClient) -> None:
         headers = await _auth_headers(client)

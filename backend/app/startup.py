@@ -51,6 +51,7 @@ from app.migrations.m043_bpmn_notation import up as m043_up
 from app.migrations.m044_text_diagram_class import up as m044_up
 from app.migrations.m045_images import up as m045_up
 from app.migrations.m046_extensions_source import up as m046_up
+from app.migrations.m047_scope_system_prompts import up as m047_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -128,6 +129,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m044_up(main)
     await m045_up(main)
     await m046_up(main)
+    await m047_up(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
