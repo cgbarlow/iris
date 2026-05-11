@@ -3,6 +3,7 @@
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { onDestroy } from 'svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { viewBreadcrumbHref, type BreadcrumbAncestor } from '$lib/utils/viewBreadcrumb';
 	import { exportToSvg, exportToPng, exportToPdf } from '$lib/utils/export';
 	import type { Diagram, DiagramVersion, Bookmark } from '$lib/types/api';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
@@ -158,8 +159,11 @@
 	let showAddParticipant = $state(false);
 	let showAddMessage = $state(false);
 
-	// Hierarchy breadcrumb state
-	let ancestors = $state<{ id: string; name: string; diagram_type: string }[]>([]);
+	// Hierarchy breadcrumb state. Backend returns objects shaped as
+	// { id, name, type, parent_package_id }; ancestors are packages
+	// because a diagram's parent chain walks through the packages table
+	// (see backend/app/diagrams/service.py:get_diagram_ancestors).
+	let ancestors = $state<BreadcrumbAncestor[]>([]);
 
 	// Focus view state
 	let focusMode = $state(false);
@@ -638,7 +642,7 @@
 
 	async function loadAncestors(id: string) {
 		try {
-			ancestors = await apiFetch<{ id: string; name: string; diagram_type: string }[]>(
+			ancestors = await apiFetch<BreadcrumbAncestor[]>(
 				`/api/diagrams/${id}/ancestors`
 			);
 		} catch {
@@ -1936,7 +1940,7 @@
 			{#each ancestors as ancestor}
 				<li class="flex items-baseline gap-1">
 					<span aria-hidden="true">/</span>
-					<a href="/views/{ancestor.id}" style="color: var(--color-primary)">{ancestor.name}</a>
+					<a href={viewBreadcrumbHref(ancestor)} style="color: var(--color-primary)">{ancestor.name}</a>
 				</li>
 			{/each}
 			<li class="flex items-baseline gap-1">
