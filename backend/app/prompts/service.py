@@ -1,23 +1,23 @@
-"""Service layer for the scope-prompt index (ADR-152; extended ADR-154; ADR-155 strict split).
+"""Service layer for the scope-prompt index (ADR-152; ADR-154; ADR-156).
+
+v5.11.0 (ADR-156): scope-level prompt entries (`set:<uuid>` /
+`collection:<uuid>`) are no longer emitted. The scope's MCP
+`mcp_system_context` is now passed through as a data field on
+`get_set` / `get_collection` MCP tool responses (ADR-156
+supersedes ADR-155's slash-command approach), so it no longer
+needs a picker entry. The picker now contains **named prompts
+only** (ADR-154).
+
+`system_prompt` continues to auto-apply in Iris AI server-side
+composition (ADR-150) and is stripped from MCP tool responses
+(ADR-151) — unchanged.
 
 Returns:
-- one entry per Collection / Set with a non-null, non-empty
-  `mcp_prompt` (`entry_kind="system_prompt"`, name `set:<uuid>` /
-  `collection:<uuid>`). v5.10.0 / ADR-155: the scope's MCP picker
-  body now comes from the `mcp_prompt` column, NOT `system_prompt`.
-  `system_prompt` continues to auto-apply in Iris AI server-side
-  composition (ADR-150) but is never surfaced via this endpoint.
 - one entry per named prompt on a Collection / Set
-  (`entry_kind="named_prompt"`)
+  (`entry_kind="named_prompt"`, name `set:<uuid>:<name>` /
+  `collection:<uuid>:<name>`)
 
-Order: scope MCP prompts first (collections then sets, both
-alphabetical), then named prompts.
-
-The `entry_kind` literal stays `"system_prompt"` for backwards-compat
-with iris-client / MCP layer code that already discriminates on it.
-The label is now slightly inaccurate — it refers to the scope's
-single MCP-facing prompt, which v5.10.0 routed to its own column —
-but renaming the literal would be a breaking change to every consumer.
+Ordered by scope_type, then scope_name, then prompt_name.
 """
 
 from __future__ import annotations
@@ -29,51 +29,9 @@ if TYPE_CHECKING:
 
 
 async def list_scope_prompts(db: DatabasePort) -> list[dict[str, object]]:
-    """Return scope-prompt index entries (scope MCP prompts then named prompts)."""
+    """Return MCP-picker index entries — named prompts only (ADR-156)."""
     items: list[dict[str, object]] = []
 
-    cursor = await db.execute(
-        "SELECT id, name, description, mcp_prompt FROM collections "
-        "WHERE is_deleted = 0 AND mcp_prompt IS NOT NULL "
-        "ORDER BY name",
-    )
-    for row in await cursor.fetchall():
-        body = (row[3] or "").strip()
-        if not body:
-            continue
-        items.append({
-            "name": f"collection:{row[0]}",
-            "entry_kind": "system_prompt",
-            "scope_type": "collection",
-            "scope_id": str(row[0]),
-            "scope_name": str(row[1]),
-            "description": row[2],
-            "body": body,
-            "prompt_name": None,
-        })
-
-    cursor = await db.execute(
-        "SELECT id, name, description, mcp_prompt FROM sets "
-        "WHERE is_deleted = 0 AND mcp_prompt IS NOT NULL "
-        "ORDER BY name",
-    )
-    for row in await cursor.fetchall():
-        body = (row[3] or "").strip()
-        if not body:
-            continue
-        items.append({
-            "name": f"set:{row[0]}",
-            "entry_kind": "system_prompt",
-            "scope_type": "set",
-            "scope_id": str(row[0]),
-            "scope_name": str(row[1]),
-            "description": row[2],
-            "body": body,
-            "prompt_name": None,
-        })
-
-    # ADR-154 named prompts. Join to fetch scope_name; exclude entries
-    # whose scope has been soft-deleted (LEFT JOIN + WHERE on scope id).
     cursor = await db.execute(
         """
         SELECT p.id, p.scope_type, p.scope_id, p.name, p.description, p.body,

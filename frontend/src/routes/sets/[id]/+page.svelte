@@ -24,7 +24,7 @@
 	let thumbnailFile = $state<File | null>(null);
 	let collectionId = $state<string | null>(null);
 	let systemPrompt = $state('');
-	let mcpPrompt = $state('');
+	let mcpSystemContext = $state('');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -53,7 +53,7 @@
 			thumbnailDiagramId = setData.thumbnail_diagram_id;
 			collectionId = setData.collection_id ?? null;
 			systemPrompt = setData.system_prompt ?? '';
-			mcpPrompt = (setData as IrisSet & { mcp_prompt?: string | null }).mcp_prompt ?? '';
+			mcpSystemContext = (setData as IrisSet & { mcp_system_context?: string | null }).mcp_system_context ?? '';
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -72,8 +72,8 @@
 			const sanitizedPrompt = systemPrompt.trim()
 				? DOMPurify.sanitize(systemPrompt.trim())
 				: null;
-			const sanitizedMcpPrompt = mcpPrompt.trim()
-				? DOMPurify.sanitize(mcpPrompt.trim())
+			const sanitizedMcpSystemContext = mcpSystemContext.trim()
+				? DOMPurify.sanitize(mcpSystemContext.trim())
 				: null;
 
 			await apiFetch<IrisSet>(`/api/sets/${setId}`, {
@@ -85,7 +85,7 @@
 					thumbnail_diagram_id: thumbnailSource === 'model' ? thumbnailDiagramId : null,
 					collection_id: collectionId,
 					system_prompt: sanitizedPrompt,
-					mcp_prompt: sanitizedMcpPrompt,
+					mcp_system_context: sanitizedMcpSystemContext,
 				}),
 			});
 
@@ -234,22 +234,22 @@
 			</p>
 		</div>
 
-		<!-- MCP prompt (ADR-155, v5.10.0): the inverse of system_prompt -->
+		<!-- MCP system context (ADR-156, v5.11.0): data passthrough on get_set -->
 		<div class="mt-4">
-			<label for="set-edit-mcp-prompt" class="text-sm font-medium" style="color: var(--color-fg)">
-				MCP prompt
+			<label for="set-edit-mcp-system-context" class="text-sm font-medium" style="color: var(--color-fg)">
+				MCP system context
 			</label>
 			<textarea
-				id="set-edit-mcp-prompt"
-				bind:value={mcpPrompt}
+				id="set-edit-mcp-system-context"
+				bind:value={mcpSystemContext}
 				rows="6"
 				maxlength="20000"
-				placeholder="Optional. Surfaced through MCP as /iris:set:<uuid>. Not applied in Iris AI."
+				placeholder="Optional. Passed through as data on MCP get_set responses, so it lands as initial context when an MCP client is browsing this Set. Not applied in Iris AI."
 				class="mt-1 w-full rounded border px-3 py-2 text-sm"
 				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); font-family: var(--font-mono, monospace)"
 			></textarea>
 			<p class="mt-1 text-xs" style="color: var(--color-muted)">
-				The opposite of System prompt. Sent to MCP clients (Claude Desktop / Claude Code) via the prompt picker. Does NOT auto-apply in Iris AI.
+				Initial context for MCP clients (Claude Desktop / Claude Code) when retrieving this Set via the iris MCP server. Does NOT auto-apply in Iris AI and is NOT a slash-command prompt.
 			</p>
 		</div>
 

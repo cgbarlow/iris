@@ -102,7 +102,7 @@ async def update(
             thumbnail_diagram_id=body.thumbnail_diagram_id,
             collection_id=body.collection_id,
             system_prompt=body.system_prompt,
-            mcp_prompt=body.mcp_prompt,
+            mcp_system_context=body.mcp_system_context,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
