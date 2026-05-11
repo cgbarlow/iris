@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.3] - 2026-05-11
+
+### Added
+
+- **MCP `prompts` capability for scope system prompts** (ADR-152,
+  SPEC-152-A). Every Collection and Set with a non-empty
+  `system_prompt` now appears in Claude Desktop's prompt picker
+  as `iris:collection:<uuid>` or `iris:set:<uuid>`. Invoking one
+  loads the system prompt into the conversation as a user-authored
+  directive (single `role: user` message with a provenance
+  preamble), which the model treats as authoritative framing
+  rather than untrusted tool data. This is the spec-compliant
+  channel for invoking scope prompts inside a Claude Desktop
+  conversation — the alternative to silent client-side application,
+  which prompt-injection defense correctly blocks (see ADR-151).
+  New backend endpoint `GET /api/prompts/scope-index`
+  (anonymous-readable, same posture as `list_sets`); new
+  `IrisClient.list_scope_prompts()`; new MCP `prompts.py` module
+  registered via `@server.list_prompts()` and `@server.get_prompt()`.
+  20 new tests across the backend, iris-client, and MCP layers.
+
 ## [5.8.2] - 2026-05-11
 
 ### Fixed
