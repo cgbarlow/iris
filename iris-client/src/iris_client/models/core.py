@@ -118,19 +118,28 @@ class Collection(EntityBase):
 
 
 class ScopePromptIndexEntry(_Permissive):
-    """One entry from `GET /api/prompts/scope-index` (ADR-152, v5.8.3).
+    """One entry from `GET /api/prompts/scope-index` (ADR-152, v5.8.3;
+    extended ADR-154, v5.9.0 to include named prompts).
 
-    Surfaces every Collection / Set with a non-empty system_prompt.
+    Surfaces:
+    - every Collection / Set with a non-empty system_prompt (entry_kind
+      "system_prompt"); name format `set:<uuid>` / `collection:<uuid>`
+    - every named prompt on a Collection / Set (entry_kind "named_prompt");
+      name format `set:<uuid>:<prompt_name>` / `collection:<uuid>:<prompt_name>`
+
     The MCP server maps these into MCP `prompts/list` and `prompts/get`
-    responses so Claude Desktop users can invoke them explicitly.
+    responses so Claude Desktop / Claude Code users can invoke them
+    explicitly.
     """
 
     name: str
+    entry_kind: Literal["system_prompt", "named_prompt"] = "system_prompt"
     scope_type: Literal["collection", "set"]
     scope_id: str
     scope_name: str
     description: str | None = None
     body: str
+    prompt_name: str | None = None  # set only when entry_kind == "named_prompt"
 
 
 class Version(_Permissive):
