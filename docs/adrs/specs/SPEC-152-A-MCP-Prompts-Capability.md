@@ -14,7 +14,7 @@ ADR: [ADR-152](../ADR-152-MCP-Prompts-Capability-for-Scope-System-Prompts.md)
 
 ```python
 class ScopePromptIndexEntry(BaseModel):
-    name: str                                    # "iris:set:<uuid>" | "iris:collection:<uuid>"
+    name: str                                    # "set:<uuid>" | "collection:<uuid>"
     scope_type: Literal["collection", "set"]
     scope_id: str
     scope_name: str
@@ -63,7 +63,7 @@ base.
 ### Module: `mcp/src/iris_mcp/prompts.py`
 
 ```python
-_NAME_RE = re.compile(r"^iris:(set|collection):([0-9a-f-]{36})$")
+_NAME_RE = re.compile(r"^(set|collection):([0-9a-f-]{36})$")
 
 async def list_prompts(client: IrisClient) -> list[types.Prompt]: ...
 async def get_prompt(client: IrisClient, name: str, arguments: dict[str, str] | None = None) -> types.GetPromptResult: ...
@@ -137,7 +137,7 @@ Total: 20 new tests.
 
 1. Author a system_prompt on a Set via `/sets/<id>`.
 2. Configure Claude Desktop with the UAT Iris MCP server; restart it.
-3. Open the prompt picker → confirm `iris:set:<uuid>` appears with
+3. Open the prompt picker → confirm `set:<uuid>` appears with
    "Set: <name> — <description>" visible.
 4. Invoke it → confirm the conversation seeds with the preamble +
    body as a user message. The model treats it as authoritative.

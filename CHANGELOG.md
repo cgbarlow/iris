@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.5] - 2026-05-11
+
+### Changed
+
+- **MCP prompt names dropped the `iris:` prefix** (ADR-153 amending
+  ADR-152). Was `iris:set:<uuid>` / `iris:collection:<uuid>`; now
+  `set:<uuid>` / `collection:<uuid>`. MCP clients prepend the server
+  name automatically, so v5.8.3's prefix produced a redundant doubled
+  `/iris:iris:set:<uuid>` in Claude Code's slash menu. Post-rename it
+  reads cleanly as `/iris:set:<uuid>`. Backend service, MCP regex,
+  iris-client and MCP test fixtures all updated. No data migration —
+  prompt names are enumerated by the client on every `prompts/list`.
+
 ## [5.8.4] - 2026-05-11
 
 ### Changed
