@@ -27,6 +27,22 @@ from app.named_prompts.service import (
 router = APIRouter(prefix="/api/named-prompts", tags=["named-prompts"])
 
 
+def _is_unique_violation(exc: BaseException) -> bool:
+    """Return True iff the exception is a UNIQUE-constraint violation.
+
+    Driver-agnostic: aiosqlite raises `IntegrityError` whose message
+    contains "UNIQUE constraint failed"; asyncpg / psycopg raise
+    classes named `UniqueViolation` / `UniqueViolationError`. We check
+    the class name + message rather than importing both drivers.
+    """
+    name = type(exc).__name__
+    if "Unique" in name:
+        return True
+    if "Integrity" in name and "unique" in str(exc).lower():
+        return True
+    return False
+
+
 @router.post("", response_model=Prompt, status_code=201)
 async def create(
     body: PromptCreate,
@@ -51,10 +67,17 @@ async def create(
             )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        # IntegrityError on (scope_type, scope_id, name) UNIQUE violation.
+        if _is_unique_violation(exc):
+            raise HTTPException(  # noqa: B904
+                status_code=409,
+                detail="A named prompt with this name already exists on this scope.",
+            )
+        # Any other failure — surface the actual cause. Most common
+        # is `UndefinedTableError` when the Supabase migration m052
+        # hasn't been applied (run scripts/supabase-migrate.sh).
         raise HTTPException(  # noqa: B904
-            status_code=409,
-            detail=f"A named prompt with this name already exists on this scope ({type(exc).__name__})",
+            status_code=500,
+            detail=f"Failed to create named prompt: {type(exc).__name__}: {exc}",
         )
     return Prompt(**result)
 
