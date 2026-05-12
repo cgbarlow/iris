@@ -22,19 +22,53 @@ When a user opens or asks about this set, the FIRST response should:
   2. Use iris_package_hierarchy(set_id=<this-set>) — NOT list_packages,
      which paginates and misses older chapters — to list the chapter
      structure (Part A through Part J, with brief one-line descriptions).
-  3. Offer a menu of common next steps and wait for the user to choose.
-     If your client supports a structured multiple-choice question UI
-     (Claude Code's AskUserQuestion, similar affordances in other
-     clients), use it; otherwise present the options as a bulleted list
-     and let the user reply free-form. The menu:
-       - "Pull up a specific chapter or diagram (e.g. J03 - Using AI to
-          Speed Up DoView Planning)"
-       - "Ask a cross-package question (e.g. 'what are the recurring
-          causal-link conventions across the diagrams?')"
-       - "Generate a new DoView outcomes-theory analysis on a topic the
-          user describes, grounded in this handbook, and optionally save
-          it back here"
-       - "Browse a particular chapter's diagrams in detail"
+  3. Offer the user a menu of common next steps and wait for the user
+     to choose. THIS IS MANDATORY. Offer ALL FOUR of the options below.
+     Do not abbreviate to two or three. Do not paraphrase the options
+     into a single sentence. The four options are not equivalent —
+     each leads to a different workflow — so present them as four
+     distinct choices.
+
+  Use a structured question / multi-choice UI if your client has one:
+    - Claude Code: call the AskUserQuestion tool with the four options
+      below as `options`. (One question, multiSelect=false.)
+    - Claude Desktop, claude.ai, generic MCP clients: AskUserQuestion
+      is not in your tool surface; instead, present the four options
+      as a numbered list (1./2./3./4.) with each on its own line so
+      the user can reply by number.
+
+  THE FOUR OPTIONS (use this exact wording, fill in the example):
+
+    1. Pull up a specific chapter or diagram from the handbook
+       (e.g. <suggest one relevant chapter based on what the user
+       said when opening the set, like "J06 - Mathematization of
+       Outcomes Theory and DoView Planning"; otherwise suggest any
+       chapter that looked interesting in the hierarchy).
+
+    2. Ask a cross-package question via Iris AI
+       (e.g. "What are the recurring causal-link conventions across
+       the diagrams?" — uses mcp__iris__ask).
+
+    3. Generate a new DoView outcomes-theory analysis on a topic
+       the user describes, grounded in this handbook, with an
+       option to save it back into this set as a doview_analysis
+       diagram. (Uses the iris_get_response_prompt + compose
+       locally flow described in section A below, NOT
+       mcp__iris__ask.)
+
+    4. Browse a particular chapter's diagrams in detail
+       (uses iris_package_hierarchy filtered to a chapter, then
+       mcp__iris__get_diagram on each diagram in turn).
+
+  After the user picks, proceed with the chosen workflow. DO NOT
+  skip this menu step on the first turn — even if the user's
+  opening request seems to imply action ("open the book"), still
+  orient + offer the four-option menu before doing anything else.
+  If the user's opening request explicitly asks for one of the
+  four (e.g. "open the book and generate me a DoView analysis of
+  X"), present a one-line acknowledgement of the inferred choice
+  and the menu of the other three options in case they want to
+  redirect, then proceed.
 
 DO NOT generate an analysis or fetch a response prompt on the first
 turn unless the user has explicitly asked for one. Open with the menu.
