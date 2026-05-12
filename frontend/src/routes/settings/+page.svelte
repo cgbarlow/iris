@@ -141,6 +141,9 @@
 			<option value="uml">UML — class, object, use case, state, activity</option>
 			<option value="archimate">ArchiMate — business, application, technology layers</option>
 			<option value="c4">C4 — person, software system, container, component</option>
+			<option value="doview">DoView — outcomes-based theory of change</option>
+			<option value="markdown">Markdown — text content with embedded mermaid</option>
+			<option value="bpmn">BPMN — business process model and notation (preview)</option>
 		</select>
 	</div>
 </section>

@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.16.0] - 2026-05-12
+
+### Added
+
+- **MCP entity-creation tools** (ADR-161, SPEC-161-A). Three new
+  MCP tools — `create_collection`, `create_set`, `create_package` —
+  let an MCP client (Claude Desktop, Claude Code) stitch a
+  destination tree in-conversation when the user asks to save
+  something somewhere new. Closes the v5.15.0 workflow cliff where
+  Claude had to ask the user to leave the conversation, create the
+  set manually, copy its id, and paste it back. The three tools
+  wrap the existing `POST /api/{collections,sets,packages}`
+  endpoints (no backend change — already auth-gated and tested).
+- **iris-client gains `create_collection()`, `create_set()`,
+  `create_package()`** mirroring the new MCP tools. Returns the
+  existing permissive `Collection` / `IrisSet` / `Package` models
+  unchanged — same shapes the read methods already use.
+- **Destination-confirmation preamble on every write tool's
+  description.** `save_doview_analysis`, `create_collection`,
+  `create_set`, and `create_package` all carry the same
+  `BEFORE CALLING, confirm with the user where they want this saved`
+  block, instructing the model to offer four options (existing set,
+  new set in existing collection, new collection + new set,
+  optionally + new package) before the save. Pattern applies to
+  every future write tool by copy-paste.
+- **Shared `_auth_required_payload(action)` helper in
+  `mcp/src/iris_mcp/tools.py`** factored out of v5.15.0's
+  `save_doview_analysis` 401 branch. Every write tool now returns
+  the same `auth_required` payload shape, so the pairing-recovery
+  flow handles every tool uniformly.
+
+### Changed
+
+- **`save_doview_analysis` description** now references the new
+  destination-confirmation flow instead of the v5.12.x topic-to-
+  package heuristic. Signature unchanged.
+- **Canonical `doview-book-mcp-system-context.md`** drops the
+  static topic-to-package mapping (which only made sense when the
+  Outcomes Theory Book set was the only destination) in favour of
+  "ask the user where; use the create_* tools if a new container
+  is needed."
+
+### Fixed
+
+- **Default Notation dropdown** on `/settings` now lists all 7
+  notation IDs registered in the backend (added `doview`,
+  `markdown`, `bpmn` — `simple` / `uml` / `archimate` / `c4`
+  were already there). User-spotted: the preference was
+  inconsistent with what's authorable.
+
+### Migration
+
+- **No DB migration.** Backend endpoints already exist.
+- v5.15.0 pairing flow covers the new tools' auth needs unchanged.
+
+### Tests
+
+- 17 net new tests: 7 iris-client (`test_create_endpoints.py`),
+  10 MCP (`test_tools_create.py`), 8 frontend
+  (`settingsNotationDropdown.test.ts` — one per notation + count
+  check). Combined MCP suite now 112 (was 102).
+
 ## [5.15.0] - 2026-05-12
 
 ### Added
