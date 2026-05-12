@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.13.0] - 2026-05-12
+
+### Added
+
+- **Admin AI prompts management** (ADR-158, SPEC-158-A). The
+  `/admin/settings/ai` prompts section gets a full CRUD redesign:
+  - Filter row above the table (purpose / layer / notation /
+    diagram_type / status / search / sort / reset) mirroring the
+    `/views/+page.svelte` inline pattern. URL-state-backed for
+    `purpose` and `layer` (sharable / bookmarkable filtering).
+  - "Purpose" badge column distinguishing creation_format from
+    response_format rows.
+  - "Applies to" column resolving the cascade clearly — e.g.
+    "Any notation × process diagrams" for the previously confusing
+    `(layer=diagram_type, notation=NULL, diagram_type=process)`
+    rows like "ArchiMate Process Layout". Addresses the user-
+    reported confusion about the cascade design.
+  - Status toggle (single click toggles `is_active`).
+  - Per-row Delete with confirm dialog (consistent with the
+    existing providers section).
+  - "+ Add prompt" inline form with live conflict-check ($derived
+    against the loaded list — Save disables when the chosen
+    `(purpose, layer, notation, diagram_type)` already has an
+    active row, with an inline note naming the conflict).
+  - Edit modal extended to allow editing name, description,
+    notation, diagram_type alongside prompt_text. Purpose and layer
+    remain immutable (delete-and-recreate to move between).
+- **Backend `/api/ai/creation-prompts` POST + DELETE + extended PUT**
+  (ADR-158, admin-only). POST validates uniqueness on
+  `(purpose, layer, notation, diagram_type)` for `is_active=true`
+  rows — 409 conflict response names the existing prompt.
+  Inactive rows can coexist on the same tuple (lets admins stage
+  replacements before disabling the current).
+- **`SetResponse.package_count` and `SetResponse.package_count_root`**
+  (ADR-158). Tells MCP clients the structural breadth of a set
+  upfront so they know whether `package_hierarchy` is worth a call
+  or whether `list_packages` will fit in one page.
+- **`iris_package_hierarchy` MCP tool** (ADR-158). Returns the
+  complete package tree for a set as nested `PackageHierarchyNode`
+  objects in a single call. Fixes the user-reported issue where
+  Claude Desktop saw only chapters E-J of a 10-chapter set
+  because `list_packages` paginates and older chapters sort to
+  page 2+ under the default `updated_at DESC` ordering.
+- **`iris-client.list_packages` pagination** — `page`, `page_size`,
+  `parent_package_id` parameters now exposed (the backend already
+  supported them). MCP `list_packages` tool schema gains the same.
+- **`iris-client.diagram_hierarchy` method** — renamed from the
+  previously misnamed `package_hierarchy` (which actually hit
+  `/api/diagrams/hierarchy`). Latent bug; no prior callers, so
+  rename is non-breaking. The new `package_hierarchy` correctly
+  hits `/api/packages/hierarchy`.
+
+### Changed
+
+- `CreationPromptResponse` and the existing `PUT
+  /api/ai/creation-prompts/{id}` endpoint now round-trip the new
+  `purpose` field correctly (was added in v5.12.0 but the response
+  pathway only partially propagated it).
+- MCP `list_packages` tool description rewritten to flag pagination
+  explicitly and cross-reference `package_hierarchy` as the
+  preferred structural-overview tool.
+
+### Documentation
+
+- ADR-158 + SPEC-158-A.
+- `docs/prompts/doview-book-mcp-system-context.md` updated with
+  v5.13.0 hints: prefer `iris_package_hierarchy` over `list_packages`
+  for chapter discovery; offer save-paths to the user (both Iris
+  persistence AND markdown-in-chat).
+
+### Migration
+
+- **No DB migration**. v5.13.0 has no schema changes — it uses
+  existing `is_active`, `purpose`, `notation`, `diagram_type`
+  columns on `ai_creation_prompts` and existing
+  `parent_package_id` / `is_deleted` / `set_id` on `packages`.
+
+### Tests
+
+46 new tests across migration / backend / iris-client / MCP /
+frontend layers; ~430+ tests pass total. Only pre-existing
+`test_no_extra_rls_tables` failure (issue 88 Phase 4 TODO).
+
 ## [5.12.2] - 2026-05-12
 
 ### Fixed

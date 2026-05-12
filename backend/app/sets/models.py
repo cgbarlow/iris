@@ -39,6 +39,9 @@ class SetResponse(BaseModel):
     collection_name: str | None = None
     diagram_count: int = 0
     element_count: int = 0
+    # ADR-158 (v5.13.0): structural breadth signals for MCP clients.
+    package_count: int = 0
+    package_count_root: int = 0
     thumbnail_source: str | None = None
     thumbnail_diagram_id: str | None = None
     has_thumbnail_image: bool = False

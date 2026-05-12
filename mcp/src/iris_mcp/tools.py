@@ -82,8 +82,27 @@ async def _get_package(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _list_packages(c: IrisClient, args: dict[str, Any]) -> str:
-    rows = await c.list_packages(set_id=args.get("set_id"))
+    """ADR-158 (v5.13.0): accepts page/page_size/parent_package_id so
+    a model can walk big sets without missing chapters that paginate
+    onto page 2+."""
+    rows = await c.list_packages(
+        set_id=args.get("set_id"),
+        collection_id=args.get("collection_id"),
+        parent_package_id=args.get("parent_package_id"),
+        page=args.get("page", 1),
+        page_size=args.get("page_size", 50),
+    )
     return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "package")
+
+
+async def _package_hierarchy(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-158 (v5.13.0): return the complete package tree in one call.
+    Prefer this over `list_packages` for structural overview."""
+    nodes = await c.package_hierarchy(
+        set_id=args.get("set_id"),
+        root_id=args.get("root_id"),
+    )
+    return json.dumps([node.model_dump() for node in nodes])
 
 
 async def _list_sets(c: IrisClient, args: dict[str, Any]) -> str:
@@ -230,11 +249,61 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="list_packages",
-        description="List packages, optionally scoped to a set.",
+        description=(
+            "List packages, optionally scoped to a set or collection. "
+            "Paginated — defaults to page=1, page_size=50 (max 100). "
+            "Sets with more than 50 packages REQUIRE iterating pages, "
+            "or you will miss content. For a structural overview of "
+            "an entire set in one call, prefer `package_hierarchy` "
+            "instead. Use `parent_package_id` to filter to direct "
+            "children of a specific package; pass `parent_package_id` "
+            "as omitted to get all packages (including children at "
+            "every depth, in updated_at DESC order). Set's "
+            "`package_count_root` and `package_count` fields on "
+            "`get_set` indicate how many to expect."
+        ),
         input_schema=_schema({
             "set_id": _str_arg("set_id", "Scope to a set", required=False),
+            "collection_id": _str_arg(
+                "collection_id", "Scope to a collection", required=False,
+            ),
+            "parent_package_id": _str_arg(
+                "parent_package_id",
+                "Filter to direct children of this package id",
+                required=False,
+            ),
+            "page": (
+                {"type": "integer", "description": "Page number (1-indexed)", "default": 1, "minimum": 1},
+                False,
+            ),
+            "page_size": (
+                {"type": "integer", "description": "Results per page (max 100)", "default": 50, "minimum": 1, "maximum": 100},
+                False,
+            ),
         }),
         handler=_list_packages,
+    ),
+    Tool(
+        name="package_hierarchy",
+        description=(
+            "Return the complete package tree for a set as nested "
+            "PackageHierarchyNode objects in a SINGLE call (ADR-158, "
+            "v5.13.0). Prefer this over `list_packages` whenever you "
+            "want a structural overview / chapter list / table-of-"
+            "contents — `list_packages` paginates and big sets miss "
+            "older chapters. The response is the list of root nodes; "
+            "each node carries `id`, `name`, `parent_package_id`, "
+            "`children`. Use `root_id` to scope to a sub-tree."
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg("set_id", "Scope to a set", required=False),
+            "root_id": _str_arg(
+                "root_id",
+                "Optional sub-tree root: only return descendants of this package",
+                required=False,
+            ),
+        }),
+        handler=_package_hierarchy,
     ),
     Tool(
         name="get_package",
