@@ -108,6 +108,27 @@ def test_supabase_m055_uses_boolean_literal_for_is_default() -> None:
     )
 
 
+def test_supabase_m055_uses_boolean_literal_for_is_active() -> None:
+    """v5.12.2 regression: `ai_creation_prompts.is_active` is also
+    boolean on Postgres. The three response_format seed INSERTs each
+    pass `TRUE` for is_active (the last value in each VALUES tuple),
+    not `1`."""
+    sql = _read("app/migrations/supabase/m055_response_format_prompts.sql")
+
+    # Three seed rows, each ending its VALUES tuple with `<display_order>,\n    TRUE`.
+    # Look for the exact pattern that closes each INSERT.
+    insert_count = sql.count("INSERT INTO public.ai_creation_prompts")
+    true_count = sql.count("    0,\n    TRUE\n)\nON CONFLICT (id) DO NOTHING;")
+    assert insert_count == 3, (
+        f"Expected 3 INSERTs into ai_creation_prompts, got {insert_count}"
+    )
+    assert true_count == 3, (
+        f"Expected 3 `is_active = TRUE` literals in the seed INSERTs, "
+        f"got {true_count}. is_active must be `TRUE` (boolean), not "
+        f"`1` (integer), on the Postgres-backed Supabase schema."
+    )
+
+
 def test_supabase_m055_seeds_three_response_format_rows() -> None:
     sql = _read("app/migrations/supabase/m055_response_format_prompts.sql")
     for prompt_id in (

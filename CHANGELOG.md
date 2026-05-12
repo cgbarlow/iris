@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.12.2] - 2026-05-12
+
+### Fixed
+
+- **Supabase migration `m055_response_format_prompts.sql` failed
+  again** with `column "is_active" is of type boolean but expression
+  is of type integer` (42804) on the three response_format seed
+  INSERTs. v5.12.1 fixed `is_default` but missed `is_active` —
+  `ai_creation_prompts.is_active` is also `BOOLEAN` on Postgres.
+  Changed each seed INSERT's last `VALUES … 1)` to `VALUES … TRUE)`.
+  Regression test broadened to assert all three INSERTs use the
+  boolean literal. Re-run `./scripts/supabase-migrate.sh` — m055 is
+  idempotent (`ON CONFLICT (id) DO NOTHING`), so v5.12.1's
+  successful operations no-op and only the previously-failed seed
+  INSERTs run.
+
 ## [5.12.1] - 2026-05-12
 
 ### Fixed

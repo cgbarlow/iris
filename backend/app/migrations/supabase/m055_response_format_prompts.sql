@@ -75,7 +75,7 @@ or diagram type:
   reference format with the URL as raw visible plain text.
 $body$,
     0,
-    1
+    TRUE
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -157,7 +157,7 @@ Example: pair code `b16` → `https://doviewplanning.org/b16doviewtool`.
   https://doviewplanning.org/book
 $body$,
     0,
-    1
+    TRUE
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -269,6 +269,6 @@ Before answering, verify:
   knowledge has been used; no diagram has been redrawn from memory.
 $body$,
     0,
-    1
+    TRUE
 )
 ON CONFLICT (id) DO NOTHING;
