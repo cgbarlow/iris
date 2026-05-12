@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.15.0] - 2026-05-12
+
+### Added
+
+- **MCP pairing-code authentication** (ADR-160, SPEC-160-A). Lets a
+  user authenticate the iris-mcp connection from inside Claude
+  Desktop / Claude Code with **two clicks and one paste** — no more
+  editing the MCP client's config JSON to set `IRIS_TOKEN`. Flow:
+  user visits `/settings/mcp-pairing`, clicks **Generate pairing
+  code**, sees a short typeable `IRIS-XXXX-YYYY` code; pastes it
+  into Claude; the new `iris_authenticate` MCP tool exchanges it
+  for a fresh PAT and persists the PAT to `~/.iris-mcp/<hash>.json`
+  (mode 0600). Subsequent write tools (e.g. `save_doview_analysis`)
+  work immediately for ~90 days, revocable any time via the
+  existing PAT management API.
+- New backend endpoints `POST /api/auth/pairing-codes` (auth) and
+  `POST /api/auth/pairing-codes/{code}/exchange` (anonymous,
+  one-shot, 10-minute TTL, 410-on-reuse). Exchange reuses the
+  existing `tokens.service.create_token` machinery so the issued
+  credential is a normal `personal_access_tokens` row — listable,
+  revocable, and audit-trackable through the same surface as any
+  other PAT.
+- New iris-client methods `create_pairing_code()` and
+  `exchange_pairing_code(code)` with the matching response models
+  (`PairingCodeResponse`, `ExchangedPATResponse`).
+- New MCP tool `iris_authenticate(credential)` accepts **either** a
+  pairing code (`IRIS-XXXX-YYYY`) **or** a full pasted PAT
+  (`iris_pat_…`) as a power-user fallback (validated via
+  `/api/auth/me` before persisting). Dispatch by string prefix.
+- New MCP token-storage helper `iris_mcp.token_store` (file under
+  `~/.iris-mcp/` keyed by SHA-256 hash of the Iris URL, so a single
+  install can hold credentials for multiple Iris deployments).
+- iris-mcp `__main__.py` resolves the bearer in precedence order:
+  `IRIS_TOKEN` env > persisted token > anonymous. Source is logged
+  at startup; the token itself is never logged.
+- `save_doview_analysis` now catches 401 and returns structured
+  guidance with the pairing-page URL and the next-step tool name
+  (`iris_authenticate`), giving the model a deterministic recovery
+  path inside the conversation.
+- New user-self frontend page at `/settings/mcp-pairing` with the
+  Generate-code button, a 10-minute live countdown, copy-to-
+  clipboard, and a "Power user: paste a PAT directly" hint. Linked
+  from the existing `/settings` page under a new "MCP Connections"
+  section. User-self (not admin-only) so every signed-in user can
+  pair their own MCP.
+- New `IrisClient.set_token(token)` method updates the underlying
+  httpx client's Authorization header in-place, so the
+  iris_authenticate tool's newly-exchanged PAT takes effect on the
+  next tool call without an MCP-server restart.
+
+### Migration
+
+- **SQLite**: m052_mcp_pairing_codes.py runs automatically on next
+  boot (creates `pairing_codes` table + indexes; idempotent).
+- **Supabase**: apply `m056_mcp_pairing_codes.sql` once. Command:
+  `./scripts/supabase-migrate.sh "$SUPABASE_URL"`.
+
+### Tests
+
+- 32 net new tests across backend (9), iris-client (5), mcp (16),
+  frontend (6). Total Iris test suite still green; no new
+  pre-existing failures.
+
 ## [5.14.0] - 2026-05-12
 
 ### Added

@@ -288,13 +288,22 @@ Drop into Claude Desktop / Claude Code / Cursor:
       "args": ["iris-mcp"],
       "env": {
         "IRIS_URL": "https://iris.example.com",
-        "IRIS_TOKEN": "iris_pat_...",
         "IRIS_WEB_URL": "https://iris.example.com"
       }
     }
   }
 }
 ```
+
+`IRIS_TOKEN` is optional. Read-only tools work anonymously; for
+write-capable tools (e.g. `save_doview_analysis`), authenticate the
+MCP connection in-app via the **pairing flow** (ADR-160, v5.15.0):
+visit `https://iris.example.com/settings/mcp-pairing`, click
+**Generate pairing code**, paste the code into Claude and let the
+new `iris_authenticate` tool exchange it for a token. The token
+persists at `~/.iris-mcp/<hash>.json` (mode 0600) and remains valid
+for ~90 days. Set `IRIS_TOKEN` explicitly only if you want to
+override the persisted credential (e.g. for CI / scripted setups).
 
 Exposes ~19 tools (search, list/get for every entity, export, ask-AI,
 apply-diagram-creation, conversations) plus `iris://` resource URIs

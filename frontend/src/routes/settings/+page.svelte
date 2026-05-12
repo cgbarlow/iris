@@ -166,6 +166,21 @@
      than on the nav so the sidebar "Settings" link stays visible to
      everyone. -->
 <section class="mt-6">
+	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">MCP Connections</h2>
+	<p class="mt-1 text-sm" style="color: var(--color-muted)">
+		Pair an MCP client (Claude Desktop, Claude Code) with Iris without
+		editing config files.
+	</p>
+	<a
+		href="/settings/mcp-pairing"
+		class="mt-3 inline-block rounded border px-4 py-2 text-sm"
+		style="border-color: var(--color-border); color: var(--color-fg); background-color: var(--color-bg)"
+	>
+		Manage MCP pairing →
+	</a>
+</section>
+
+<section class="mt-6">
 	<h2 class="text-lg font-semibold" style="color: var(--color-fg)">Change Password</h2>
 	<p class="mt-1 text-sm" style="color: var(--color-muted)">Update your account password.</p>
 
