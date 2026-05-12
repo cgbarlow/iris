@@ -77,6 +77,8 @@ async def create_set(
         "collection_name": None,
         "diagram_count": 0,
         "element_count": 0,
+        "package_count": 0,
+        "package_count_root": 0,
         "thumbnail_source": None,
         "thumbnail_diagram_id": None,
         "has_thumbnail_image": False,
@@ -115,6 +117,22 @@ async def get_set(
         (set_id,),
     )
     result["element_count"] = (await ec.fetchone())[0]
+
+    # Count packages in this set (ADR-158, v5.13.0): give MCP clients
+    # an upfront signal that pagination matters when calling list_packages
+    # on big sets, and a quick hint of structural breadth.
+    pc = await db.execute(
+        "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
+        (set_id,),
+    )
+    result["package_count"] = (await pc.fetchone())[0]
+
+    pcr = await db.execute(
+        "SELECT COUNT(*) FROM packages "
+        "WHERE set_id = ? AND is_deleted = 0 AND parent_package_id IS NULL",
+        (set_id,),
+    )
+    result["package_count_root"] = (await pcr.fetchone())[0]
 
     return result
 
@@ -156,6 +174,20 @@ async def list_sets(
             (set_id,),
         )
         item["element_count"] = (await ec.fetchone())[0]
+
+        # Package counts (ADR-158, v5.13.0)
+        pc = await db.execute(
+            "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
+            (set_id,),
+        )
+        item["package_count"] = (await pc.fetchone())[0]
+
+        pcr = await db.execute(
+            "SELECT COUNT(*) FROM packages "
+            "WHERE set_id = ? AND is_deleted = 0 AND parent_package_id IS NULL",
+            (set_id,),
+        )
+        item["package_count_root"] = (await pcr.fetchone())[0]
 
         # Include thumbnail diagram data for client-side rendering (DRY)
         thumb_id = row[8]  # thumbnail_diagram_id
