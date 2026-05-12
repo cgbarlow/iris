@@ -41,6 +41,56 @@ def _pairing_url() -> str:
     return base.rstrip("/") + PAIRING_PAGE_PATH
 
 
+def _auth_required_payload(action: str) -> str:
+    """ADR-160 / SPEC-161-A: shared 401 → pairing-recovery payload.
+
+    Every write tool (save_doview_analysis, create_collection,
+    create_set, create_package) returns this exact shape on auth
+    failure so the model can extract the next step uniformly:
+    visit the pairing page, generate a code, call iris_authenticate.
+    """
+    return json.dumps({
+        "success": False,
+        "error": "auth_required",
+        "message": (
+            f"{action} failed — this MCP connection isn't"
+            " authenticated yet.\n\n"
+            "To fix:\n"
+            f"  1. Visit {_pairing_url()}\n"
+            "  2. Click 'Generate pairing code'\n"
+            "  3. Paste the code back here, and I'll call iris_authenticate.\n\n"
+            "(After that, this MCP connection stays authenticated"
+            " for ~90 days on this machine.)"
+        ),
+        "pairing_url": _pairing_url(),
+        "next_tool": "iris_authenticate",
+    })
+
+
+_DESTINATION_PREAMBLE = """
+BEFORE CALLING, confirm with the user where they want this saved.
+
+Options to offer the user (use AskUserQuestion when the client
+supports it; otherwise a numbered list):
+
+  1. An existing set (or set + parent package) the user names.
+     Use list_collections / list_sets / package_hierarchy to
+     resolve human names to ids.
+  2. A new set in an existing collection.
+     Call create_set(name=..., collection_id=<existing>) first,
+     then save against the returned set.id.
+  3. A new collection and a new set.
+     Call create_collection(name=...) then
+     create_set(name=..., collection_id=<new>), then save.
+  4. (Optional) Also nest under a new package.
+     Call create_package(name=..., set_id=<chosen>) and pass its
+     id as parent_package_id.
+
+Only call this save tool once the user has chosen / confirmed a
+destination. Do not pick a destination silently.
+""".strip()
+
+
 @dataclass(frozen=True)
 class Tool:
     name: str
@@ -204,27 +254,49 @@ async def _save_doview_analysis(c: IrisClient, args: dict[str, Any]) -> str:
             description=args.get("description"),
         )
     except IrisAuthError:
-        # ADR-160: render the in-conversation pairing-recovery guidance
-        # instead of a bare 401. The next step is a tool call to
-        # iris_authenticate(code) — keep the structure stable so models
-        # can extract it reliably.
-        return json.dumps({
-            "success": False,
-            "error": "auth_required",
-            "message": (
-                "Save to Iris failed — this MCP connection isn't"
-                " authenticated yet.\n\n"
-                "To fix:\n"
-                f"  1. Visit {_pairing_url()}\n"
-                "  2. Click 'Generate pairing code'\n"
-                "  3. Paste the code back here, and I'll call iris_authenticate.\n\n"
-                "(After that, this MCP connection stays authenticated"
-                " for ~90 days on this machine.)"
-            ),
-            "pairing_url": _pairing_url(),
-            "next_tool": "iris_authenticate",
-        })
+        # ADR-160 / SPEC-161-A: shared pairing-recovery payload.
+        return _auth_required_payload("Save to Iris")
     return diagram.model_dump_json()
+
+
+async def _create_collection(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-161 (v5.16.0): create a new Collection."""
+    try:
+        result = await c.create_collection(
+            name=args["name"],
+            description=args.get("description"),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create collection")
+    return result.model_dump_json()
+
+
+async def _create_set(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-161 (v5.16.0): create a new Set."""
+    try:
+        result = await c.create_set(
+            name=args["name"],
+            collection_id=args.get("collection_id"),
+            description=args.get("description"),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create set")
+    return result.model_dump_json()
+
+
+async def _create_package(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-161 (v5.16.0): create a new Package."""
+    try:
+        result = await c.create_package(
+            name=args["name"],
+            set_id=args.get("set_id"),
+            parent_package_id=args.get("parent_package_id"),
+            description=args.get("description"),
+            metadata=args.get("metadata"),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create package")
+    return result.model_dump_json()
 
 
 async def _iris_authenticate(c: IrisClient, args: dict[str, Any]) -> str:
@@ -651,11 +723,11 @@ TOOLS: list[Tool] = [
         name="save_doview_analysis",
         description=(
             "Persist a generated DoView analysis as a new doview_analysis "
-            "diagram in Iris (ADR-157, v5.12.0). Use after the user "
-            "confirms they want their formal outcomes-theory response saved. "
-            "Body is markdown text (with embedded mermaid blocks where "
-            "applicable). Auth required — needs IRIS_TOKEN configured on "
-            "the MCP server. Returns 401-equivalent error if anonymous."
+            "diagram in Iris (ADR-157, v5.12.0). Body is markdown text "
+            "(with embedded mermaid blocks where applicable). Auth required "
+            "— use the iris_authenticate tool (ADR-160) if a previous call "
+            "returned error=auth_required.\n\n"
+            + _DESTINATION_PREAMBLE
         ),
         input_schema=_schema({
             "set_id": _str_arg("set_id", "Set to save the analysis under"),
@@ -679,6 +751,109 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_save_doview_analysis,
+    ),
+    # ── Entity creation (ADR-161, v5.16.0) ─────────────────────────────
+    Tool(
+        name="create_collection",
+        description=(
+            "Create a new top-level Collection in Iris (ADR-161, v5.16.0). "
+            "Use after the user has confirmed they want a new collection — "
+            "see the destination-confirmation guidance below. Returns the "
+            "new collection's id and metadata; pass the id to "
+            "create_set(collection_id=…) to nest a set inside it. Auth "
+            "required (the v5.15.0 pairing flow covers this).\n\n"
+            + _DESTINATION_PREAMBLE
+        ),
+        input_schema=_schema({
+            "name": _str_arg(
+                "name",
+                "Display name for the new collection (1-255 chars)",
+            ),
+            "description": _str_arg(
+                "description",
+                "Optional short description shown alongside the collection",
+                required=False,
+            ),
+        }),
+        handler=_create_collection,
+    ),
+    Tool(
+        name="create_set",
+        description=(
+            "Create a new Set in Iris (ADR-161, v5.16.0). Pass "
+            "collection_id=… to nest under an existing collection, or "
+            "omit it for a top-level (uncollected) set. Use after the "
+            "user has confirmed they want a new set — see the "
+            "destination-confirmation guidance below. Returns the new "
+            "set's id; pass it as save_doview_analysis(set_id=…) or "
+            "create_package(set_id=…). Auth required.\n\n"
+            + _DESTINATION_PREAMBLE
+        ),
+        input_schema=_schema({
+            "name": _str_arg(
+                "name",
+                "Display name for the new set (1-255 chars)",
+            ),
+            "collection_id": _str_arg(
+                "collection_id",
+                "Optional id of an existing collection to nest the set inside",
+                required=False,
+            ),
+            "description": _str_arg(
+                "description",
+                "Optional short description shown alongside the set",
+                required=False,
+            ),
+        }),
+        handler=_create_set,
+    ),
+    Tool(
+        name="create_package",
+        description=(
+            "Create a new Package in Iris (ADR-161, v5.16.0). A package "
+            "is a folder inside a set used to organise multiple diagrams "
+            "under a shared parent. Pass set_id=<chosen set> and "
+            "parent_package_id=<parent> to nest, or omit parent_package_id "
+            "for a root-level package. Use after the user has confirmed "
+            "they want a new package — see the destination-confirmation "
+            "guidance below. Auth required.\n\n"
+            + _DESTINATION_PREAMBLE
+        ),
+        input_schema=_schema({
+            "name": _str_arg(
+                "name",
+                "Display name for the new package (1-255 chars)",
+            ),
+            "set_id": _str_arg(
+                "set_id",
+                "Set this package belongs to (recommended for navigation)",
+                required=False,
+            ),
+            "parent_package_id": _str_arg(
+                "parent_package_id",
+                "Optional parent package; omit for a root-level package "
+                "within the set",
+                required=False,
+            ),
+            "description": _str_arg(
+                "description",
+                "Optional short description shown alongside the package",
+                required=False,
+            ),
+            "metadata": (
+                {
+                    "type": "object",
+                    "description": (
+                        "Optional metadata blob attached to the package. "
+                        "Free-form; consumers may use 'order' or display "
+                        "hints here."
+                    ),
+                    "additionalProperties": True,
+                },
+                False,
+            ),
+        }),
+        handler=_create_package,
     ),
 ]
 

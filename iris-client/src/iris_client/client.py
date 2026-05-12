@@ -392,6 +392,69 @@ class IrisClient:
         response = await self._request("GET", f"/api/collections/{collection_id}")
         return Collection.model_validate(response.json())
 
+    # --- Entity creation (ADR-161, v5.16.0) ---------------------------------
+
+    async def create_collection(
+        self, name: str, *, description: str | None = None,
+    ) -> Collection:
+        """Create a new top-level Collection. Auth required.
+
+        Backend POST /api/collections (CollectionCreate). The
+        permissive Collection model accepts the returned payload.
+        """
+        body: dict[str, Any] = {"name": name}
+        if description is not None:
+            body["description"] = description
+        response = await self._request("POST", "/api/collections", json=body)
+        return Collection.model_validate(response.json())
+
+    async def create_set(
+        self,
+        name: str,
+        *,
+        collection_id: str | None = None,
+        description: str | None = None,
+    ) -> IrisSet:
+        """Create a new Set. Auth required.
+
+        Pass `collection_id=None` for a top-level (uncollected) set,
+        or a collection's id to nest the set inside it.
+        """
+        body: dict[str, Any] = {"name": name}
+        if collection_id is not None:
+            body["collection_id"] = collection_id
+        if description is not None:
+            body["description"] = description
+        response = await self._request("POST", "/api/sets", json=body)
+        return IrisSet.model_validate(response.json())
+
+    async def create_package(
+        self,
+        name: str,
+        *,
+        set_id: str | None = None,
+        parent_package_id: str | None = None,
+        description: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Package:
+        """Create a new Package. Auth required.
+
+        A package is a folder inside a set. Pass `set_id=` to anchor
+        the package; pass `parent_package_id=` to nest it under
+        another package; omit both for a free-standing root package.
+        """
+        body: dict[str, Any] = {"name": name}
+        if set_id is not None:
+            body["set_id"] = set_id
+        if parent_package_id is not None:
+            body["parent_package_id"] = parent_package_id
+        if description is not None:
+            body["description"] = description
+        if metadata is not None:
+            body["metadata"] = metadata
+        response = await self._request("POST", "/api/packages", json=body)
+        return Package.model_validate(response.json())
+
     # --- Scope prompts (ADR-152) --------------------------------------------
 
     async def list_scope_prompts(self) -> list[ScopePromptIndexEntry]:
