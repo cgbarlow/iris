@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.13.3] - 2026-05-12
+
+### Changed (docs / canonical mcp_system_context content)
+
+- **Made the four-option orient menu mandatory and verbatim.**
+  v5.13.2 instructed the client to "offer a menu of common next
+  steps" but didn't require all four options to appear every time,
+  so Claude paraphrased and offered only 2 ("specific chapter" /
+  "cross-package question"), dropping the analysis-generation and
+  chapter-browse options. The doc now states it's MANDATORY to
+  offer all four, with their exact wording, and explicitly forbids
+  paraphrasing or abbreviating to two/three.
+- **Honest note on AskUserQuestion availability.** AskUserQuestion
+  is a Claude Code tool, not in Claude Desktop / claude.ai / most
+  generic MCP clients today. The doc says: use AskUserQuestion if
+  available; otherwise present a numbered list (1./2./3./4.) with
+  each option on its own line.
+
 ## [5.13.2] - 2026-05-12
 
 ### Changed (docs / canonical mcp_system_context content)
