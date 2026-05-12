@@ -37,10 +37,15 @@ A. ANALYSIS (option 3 above) — written outcomes-theory analysis with embedded 
    - Compose using mcp__iris__search + mcp__iris__get_diagram against this set
    - After producing, offer BOTH save paths:
        (i) iris_save_doview_analysis(set_id, name, content, parent_package_id?) —
-           auth required. Suggest a parent_package_id by topic:
-           AI → J series; evaluation → G; introduction/adoption → I; alignment → C;
-           indicators → D; contracting → E; reporting → H; fundamentals → A;
-           drawing/strategy → B; performance improvement → F.
+           auth required. BEFORE CALLING, ask the user WHERE to save:
+             • an existing set + parent package they name; OR
+             • a new set in an existing collection (call create_set first); OR
+             • a new collection + new set (call create_collection, then create_set); OR
+             • optionally also nest under a new package (call create_package).
+           Use AskUserQuestion when available; numbered list otherwise. Don't
+           pick a destination silently. The v5.16.0 entity-creation tools
+           (create_collection / create_set / create_package, ADR-161) cover
+           the new-container cases without leaving the conversation.
            If the save fails with error="auth_required" (v5.15.0+, ADR-160),
            follow the returned guidance: ask the user to visit
            /settings/mcp-pairing, generate a pairing code, and paste it back.
