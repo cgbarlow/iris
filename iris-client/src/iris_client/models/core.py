@@ -120,6 +120,27 @@ class Collection(EntityBase):
     mcp_system_context: str | None = None  # ADR-155 (v5.10.0): MCP-only directive
 
 
+class ResponseFormatType(_Permissive):
+    """One available response-format type — a (notation, diagram_type)
+    pair that has at least one active response_format prompt row
+    (ADR-157, v5.12.0). Returned by
+    `GET /api/ai/response-prompts/types`."""
+
+    notation: str
+    diagram_type: str | None = None
+    label: str
+    description: str | None = None
+
+
+class ResponsePromptComposed(_Permissive):
+    """Composed response-format cascade body (ADR-157, v5.12.0).
+    Returned by `GET /api/ai/response-prompts/composed`."""
+
+    notation: str
+    diagram_type: str | None = None
+    body: str  # composed cascade body — may be empty if no rows match
+
+
 class ScopePromptIndexEntry(_Permissive):
     """One entry from `GET /api/prompts/scope-index` (ADR-152, v5.8.3;
     extended ADR-154, v5.9.0 to include named prompts).

@@ -17,6 +17,7 @@ import pytest_asyncio
 
 from app.ai.creation import build_creation_system_prompt
 from app.migrations.m028_ai_creation_prompts import up as m028_up
+from app.migrations.m051_response_format_prompts import up as m051_up
 from app.seed.creation_prompts import seed_creation_prompts
 
 # Bundles the expansion must support (SPEC-132-A row inventory).
@@ -37,6 +38,11 @@ async def db() -> aiosqlite.Connection:
     async with aiosqlite.connect(":memory:") as conn:
         await m028_up(conn)
         await seed_creation_prompts(conn)
+        # m051 adds the `purpose` column to ai_creation_prompts so the
+        # composer's WHERE-purpose-filter resolves (ADR-157, v5.12.0).
+        # The registry inserts in m051 are auto-skipped when m020's
+        # registry tables aren't present (test isolation).
+        await m051_up(conn)
         yield conn
 
 
@@ -194,11 +200,25 @@ class TestSeedIdempotency:
     async def test_expected_total_row_count(
         self, db: aiosqlite.Connection
     ) -> None:
-        """After seed: 4 DoView-era rows + 11 new rows = 15 active rows."""
+        """After seed: 4 DoView-era rows + 11 new rows = 15 active
+        creation_format rows (v5.8.0). Plus 3 response_format rows
+        added by m051 (ADR-157, v5.12.0) = 18 total active rows.
+        Verify both counts independently so a regression in either
+        purpose's seed surfaces clearly."""
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM ai_creation_prompts WHERE is_active=1"
+            "SELECT COUNT(*) FROM ai_creation_prompts "
+            "WHERE is_active=1 AND purpose = 'creation_format'"
         )
-        count = (await cursor.fetchone())[0]
-        assert count == 15, (
-            f"Expected 15 active prompt rows after expansion seed, got {count}"
+        creation_count = (await cursor.fetchone())[0]
+        assert creation_count == 15, (
+            f"Expected 15 active creation_format rows, got {creation_count}"
+        )
+
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM ai_creation_prompts "
+            "WHERE is_active=1 AND purpose = 'response_format'"
+        )
+        response_count = (await cursor.fetchone())[0]
+        assert response_count == 3, (
+            f"Expected 3 active response_format rows (ADR-157), got {response_count}"
         )

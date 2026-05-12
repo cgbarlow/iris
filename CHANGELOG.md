@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.12.0] - 2026-05-12
+
+### Added
+
+- **Layered response_format prompts** (ADR-157, SPEC-157-A). New
+  `purpose` discriminator column on `ai_creation_prompts` separates
+  `creation_format` rows (existing v5.8.x diagram-creation prompts;
+  all backfilled to `creation_format`) from `response_format` rows
+  (new — used to shape formal text responses). New
+  `build_response_system_prompt(notation, diagram_type)` composer
+  sibling to `build_creation_system_prompt`; both share a single
+  `_build_layered_prompt(purpose, notation, diagram_type)` cascade
+  implementation (DRY, protocols §13).
+- **`(notation=markdown, diagram_type=doview_analysis)` artefact type**
+  registered as a first-class Iris type: a formal handbook-grounded
+  outcomes-theory analysis. Seeded with three response_format prompt
+  rows (base + notation + diagram_type) encoding the Prompt C output
+  shape — opening sentence, Summary, Full, Diagrams sections,
+  formal style and raw-URL rules.
+- **Two new MCP tools** (anonymous-readable):
+  `list_response_format_types` (discover available pairs) and
+  `get_response_prompt(notation, diagram_type?)` (fetch composed
+  cascade body). Lets a client model in Claude Desktop / Claude
+  Code retrieve the response format as reference material in
+  conversation, no slash-command UX needed.
+- **`save_doview_analysis` MCP tool** (auth-required — reuses
+  existing `IRIS_TOKEN` per-server PAT) — persists a generated
+  analysis as a new `doview_analysis` diagram in Iris.
+- **Two new backend endpoints** under `/api/ai/response-prompts/*`
+  (anonymous-readable): `types` and `composed`.
+- **iris-client methods**: `list_response_format_types()`,
+  `get_response_prompt()`, `create_diagram()`.
+
+### Changed
+
+- `CreationPromptResponse` gains a `purpose: str = "creation_format"`
+  field (backwards-compat default). `list_creation_prompts` accepts
+  an optional `?purpose=` filter.
+- m051's registry inserts (markdown notation, doview_analysis
+  diagram_type, mapping) skip gracefully when those registry tables
+  aren't present — enables clean test isolation.
+
+### Migration
+
+- SQLite `m051_response_format_prompts.py` — adds `purpose` column,
+  backfills, registers markdown + doview_analysis, seeds three
+  response_format rows.
+- Supabase `m055_response_format_prompts.sql` — same. Run
+  `./scripts/supabase-migrate.sh` after deploy. Idempotent.
+
+### Deferred to v5.13+ (per ADR-157 "Out of scope")
+
+- Server-side auto-injection of `build_response_system_prompt` into
+  the Ask Iris pipeline.
+- `applicable_response_types` field on Set/Collection MCP responses.
+- Admin Settings / AI GUI for editing response_format rows (editing
+  works via the existing `PUT /api/ai/creation-prompts/{id}` endpoint
+  with the new `purpose` field round-tripping correctly).
+
 ## [5.11.0] - 2026-05-11
 
 ### Changed (breaking — supersedes v5.10.0 picker behaviour)

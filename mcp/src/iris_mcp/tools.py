@@ -136,6 +136,38 @@ async def _apply_diagram_creation(c: IrisClient, args: dict[str, Any]) -> str:
     return resp.model_dump_json()
 
 
+async def _list_response_format_types(c: IrisClient, _args: dict[str, Any]) -> str:
+    """ADR-157 (v5.12.0): list response-format types available."""
+    items = await c.list_response_format_types()
+    return json.dumps([item.model_dump() for item in items])
+
+
+async def _get_response_prompt(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-157 (v5.12.0): fetch the composed response_format prompt
+    cascade for a (notation, diagram_type) pair."""
+    resp = await c.get_response_prompt(
+        args["notation"],
+        diagram_type=args.get("diagram_type"),
+    )
+    return resp.model_dump_json()
+
+
+async def _save_doview_analysis(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-157 (v5.12.0): persist a generated outcomes-theory analysis
+    as a new `doview_analysis` diagram in Iris. Auth required —
+    requires IRIS_TOKEN to be set on the MCP server."""
+    diagram = await c.create_diagram(
+        diagram_type="doview_analysis",
+        notation="markdown",
+        name=args["name"],
+        data={"content": args["content"]},
+        set_id=args["set_id"],
+        parent_package_id=args.get("parent_package_id"),
+        description=args.get("description"),
+    )
+    return diagram.model_dump_json()
+
+
 async def _list_conversations(c: IrisClient, args: dict[str, Any]) -> str:
     rows = await c.list_conversations(
         args["set_id"], limit=int(args.get("limit", 50)),
@@ -354,6 +386,77 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_list_conversations,
+    ),
+    # ── Response-format prompts (ADR-157, v5.12.0) ──────────────────────
+    Tool(
+        name="list_response_format_types",
+        description=(
+            "List response-format types available — (notation, diagram_type) "
+            "pairs that have authored response_format prompts in Iris. Use "
+            "to discover which formats can be applied to your response "
+            "(e.g. notation='markdown' diagram_type='doview_analysis' for "
+            "the formal handbook-grounded outcomes-theory analysis shape)."
+        ),
+        input_schema=_schema({}),
+        handler=_list_response_format_types,
+    ),
+    Tool(
+        name="get_response_prompt",
+        description=(
+            "Fetch the composed response_format prompt for a "
+            "(notation, diagram_type) pair (ADR-157). Returns the layered "
+            "cascade (base + notation + diagram_type) as `body`. Apply the "
+            "body as reference for shaping your response. Use this when "
+            "the user asks for a formal output style matching one of the "
+            "available types from `list_response_format_types` — for "
+            "DoView outcomes-theory analyses call with notation='markdown' "
+            "diagram_type='doview_analysis'."
+        ),
+        input_schema=_schema({
+            "notation": _str_arg(
+                "notation", "Notation id, e.g. 'markdown', 'doview'",
+            ),
+            "diagram_type": _str_arg(
+                "diagram_type",
+                "Diagram type id, e.g. 'doview_analysis'. Optional — when "
+                "absent, returns the base + notation cascade only.",
+                required=False,
+            ),
+        }),
+        handler=_get_response_prompt,
+    ),
+    Tool(
+        name="save_doview_analysis",
+        description=(
+            "Persist a generated DoView analysis as a new doview_analysis "
+            "diagram in Iris (ADR-157, v5.12.0). Use after the user "
+            "confirms they want their formal outcomes-theory response saved. "
+            "Body is markdown text (with embedded mermaid blocks where "
+            "applicable). Auth required — needs IRIS_TOKEN configured on "
+            "the MCP server. Returns 401-equivalent error if anonymous."
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg("set_id", "Set to save the analysis under"),
+            "name": _str_arg(
+                "name",
+                "Diagram name shown in Iris (e.g. the question or a short title)",
+            ),
+            "content": _str_arg(
+                "content",
+                "Markdown body of the analysis (Summary + Full + Diagrams sections)",
+            ),
+            "parent_package_id": _str_arg(
+                "parent_package_id",
+                "Optional package to nest this diagram under within the set",
+                required=False,
+            ),
+            "description": _str_arg(
+                "description",
+                "Optional short description shown alongside the diagram",
+                required=False,
+            ),
+        }),
+        handler=_save_doview_analysis,
     ),
 ]
 

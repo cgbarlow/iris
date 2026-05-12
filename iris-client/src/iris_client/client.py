@@ -31,6 +31,8 @@ from iris_client.models.core import (
     LoginResponse,
     Package,
     QAResponse,
+    ResponseFormatType,
+    ResponsePromptComposed,
     ScopePromptIndexEntry,
     SearchResponse,
     TokenCreated,
@@ -306,6 +308,28 @@ class IrisClient:
         items = payload["items"] if isinstance(payload, dict) and "items" in payload else payload
         return [ScopePromptIndexEntry.model_validate(r) for r in items]
 
+    # --- Response-format prompts (ADR-157, v5.12.0) -------------------------
+
+    async def list_response_format_types(self) -> list["ResponseFormatType"]:
+        """List distinct (notation, diagram_type) pairs that have at least one
+        active response_format prompt. Anonymous-readable."""
+        response = await self._request("GET", "/api/ai/response-prompts/types")
+        return [ResponseFormatType.model_validate(r) for r in response.json()]
+
+    async def get_response_prompt(
+        self, notation: str, diagram_type: str | None = None,
+    ) -> "ResponsePromptComposed":
+        """Fetch the composed response_format cascade for a (notation,
+        diagram_type) pair. Anonymous-readable. Returns the composed body
+        as the `body` field; empty string if no rows match."""
+        params: dict[str, str] = {"notation": notation}
+        if diagram_type is not None:
+            params["diagram_type"] = diagram_type
+        response = await self._request(
+            "GET", "/api/ai/response-prompts/composed", params=params,
+        )
+        return ResponsePromptComposed.model_validate(response.json())
+
     # --- Export --------------------------------------------------------------
 
     async def export_diagram(
@@ -443,6 +467,39 @@ class IrisClient:
             "POST", "/api/ai/files/extract", files=files,
         )
         return FileExtractResponse.model_validate(response.json())
+
+    async def create_diagram(
+        self,
+        *,
+        diagram_type: str,
+        name: str,
+        notation: str | None = None,
+        data: dict[str, Any] | None = None,
+        set_id: str | None = None,
+        parent_package_id: str | None = None,
+        description: str | None = None,
+    ) -> Diagram:
+        """Create a new diagram (POST /api/diagrams). Auth required.
+
+        Used by the v5.12.0 save-doview-analysis MCP tool (ADR-157) to
+        persist a generated `doview_analysis` markdown document as a
+        first-class Iris artefact.
+        """
+        body: dict[str, Any] = {
+            "diagram_type": diagram_type,
+            "name": name,
+            "data": data or {},
+        }
+        if notation is not None:
+            body["notation"] = notation
+        if set_id is not None:
+            body["set_id"] = set_id
+        if parent_package_id is not None:
+            body["parent_package_id"] = parent_package_id
+        if description is not None:
+            body["description"] = description
+        response = await self._request("POST", "/api/diagrams", json=body)
+        return Diagram.model_validate(response.json())
 
     async def apply_diagram_creation(
         self,

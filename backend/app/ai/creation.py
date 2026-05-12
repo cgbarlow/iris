@@ -20,39 +20,47 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def build_creation_system_prompt(
+async def _build_layered_prompt(
     db: aiosqlite.Connection,
+    *,
+    purpose: str,
     notation: str,
-    diagram_type: str | None = None,
-) -> str:
-    """Compose a system prompt from the layered ai_creation_prompts table.
+    diagram_type: str | None,
+) -> tuple[str, int]:
+    """Compose a layered prompt body filtered by `purpose`.
 
-    Layer priority:
-    - override (notation-specific, active): returned alone — replaces all layers.
-    - base: shared instructions for all AI diagram creation.
-    - notation-specific: methodology for the given notation.
-    - diagram_type-specific: layout rules for the specific diagram type.
+    Used by both `build_creation_system_prompt` (purpose='creation_format')
+    and `build_response_system_prompt` (purpose='response_format'). Layer
+    priority is identical:
 
-    Returns empty string if no active prompts exist.
+    - `override` (notation-specific, active): returned alone — replaces all layers.
+    - `base`: shared instructions for this purpose.
+    - `notation`-specific: methodology / framing for the given notation.
+    - `diagram_type`-specific: output structure / layout rules for the
+      specific diagram type.
+
+    Returns `(composed_text, n_layers_used)`. Composed text is `""` and
+    n_layers is 0 if no active prompts exist for this purpose.
     """
-    # Check for active override for this notation
+    # Check for active override for this notation under this purpose.
     cursor = await db.execute(
         "SELECT prompt_text FROM ai_creation_prompts "
-        "WHERE layer = 'override' AND notation = ? AND is_active = 1 "
+        "WHERE purpose = ? AND layer = 'override' AND notation = ? AND is_active = 1 "
         "ORDER BY display_order LIMIT 1",
-        (notation,),
+        (purpose, notation),
     )
     override_row = await cursor.fetchone()
     if override_row:
-        return override_row[0]
+        return override_row[0], 1
 
     parts: list[str] = []
 
     # Base layer
     cursor = await db.execute(
         "SELECT prompt_text FROM ai_creation_prompts "
-        "WHERE layer = 'base' AND is_active = 1 "
+        "WHERE purpose = ? AND layer = 'base' AND is_active = 1 "
         "ORDER BY display_order",
+        (purpose,),
     )
     for row in await cursor.fetchall():
         parts.append(row[0])
@@ -60,9 +68,9 @@ async def build_creation_system_prompt(
     # Notation layer
     cursor = await db.execute(
         "SELECT prompt_text FROM ai_creation_prompts "
-        "WHERE layer = 'notation' AND notation = ? AND is_active = 1 "
+        "WHERE purpose = ? AND layer = 'notation' AND notation = ? AND is_active = 1 "
         "ORDER BY display_order",
-        (notation,),
+        (purpose, notation),
     )
     for row in await cursor.fetchall():
         parts.append(row[0])
@@ -71,14 +79,28 @@ async def build_creation_system_prompt(
     if diagram_type:
         cursor = await db.execute(
             "SELECT prompt_text FROM ai_creation_prompts "
-            "WHERE layer = 'diagram_type' AND diagram_type = ? AND is_active = 1 "
+            "WHERE purpose = ? AND layer = 'diagram_type' AND diagram_type = ? AND is_active = 1 "
             "ORDER BY display_order",
-            (diagram_type,),
+            (purpose, diagram_type),
         )
         for row in await cursor.fetchall():
             parts.append(row[0])
 
-    result = "\n\n".join(parts)
+    return "\n\n".join(parts), len(parts)
+
+
+async def build_creation_system_prompt(
+    db: aiosqlite.Connection,
+    notation: str,
+    diagram_type: str | None = None,
+) -> str:
+    """Compose the diagram-CREATION system prompt for (notation, diagram_type)."""
+    result, n_layers = await _build_layered_prompt(
+        db,
+        purpose="creation_format",
+        notation=notation,
+        diagram_type=diagram_type,
+    )
 
     # Preamble: when both notation and diagram_type are present, make the
     # user's UI selection explicit so the AI does not re-ask for information
@@ -98,7 +120,37 @@ async def build_creation_system_prompt(
         )
         result = f"{preamble}\n{result}"
 
-    print(f"[AI_CREATION] Built system prompt: {len(parts)} layers, {len(result)} chars", flush=True)
+    print(f"[AI_CREATION] Built system prompt: {n_layers} layers, {len(result)} chars", flush=True)
+    return result
+
+
+async def build_response_system_prompt(
+    db: aiosqlite.Connection,
+    notation: str,
+    diagram_type: str | None = None,
+) -> str:
+    """Compose the response-FORMAT system prompt for (notation, diagram_type).
+
+    Used by:
+    - Iris AI (Ask Iris discuss/creation modes; mcp__iris__ask) — composed
+      server-side into the system content when the conversation context
+      matches a notation+diagram_type with a response_format prompt set
+      (ADR-157).
+    - MCP clients (Claude Desktop / Claude Code) — fetched via the
+      `iris_get_response_prompt` MCP tool and applied client-side as
+      reference for matching questions (lower compliance ceiling but
+      same source of truth).
+
+    Returns empty string if no response_format prompts exist for this
+    (notation, diagram_type) combination.
+    """
+    result, n_layers = await _build_layered_prompt(
+        db,
+        purpose="response_format",
+        notation=notation,
+        diagram_type=diagram_type,
+    )
+    print(f"[AI_RESPONSE] Built response prompt: {n_layers} layers, {len(result)} chars", flush=True)
     return result
 
 
