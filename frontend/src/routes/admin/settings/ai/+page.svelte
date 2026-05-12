@@ -16,7 +16,53 @@
 	};
 
 	type Notation = { id: string; name: string };
-	type DiagramType = { id: string; name: string };
+	// v5.17.0 (ADR-162): keep `notations` so the cascade helpers can
+	// filter diagram_types by their compatible notation_ids without a
+	// second fetch.
+	type NotationMapping = { notation_id: string; notation_name?: string; is_default?: boolean };
+	type DiagramType = { id: string; name: string; notations?: NotationMapping[] };
+
+	// ── Cascade helpers (v5.17.0 / ADR-162) ─────────────────────────────
+	// Notation-agnostic: works the same way for every notation/diagram_type.
+	// Powers the filter row, the create dialog, and the edit dialog.
+	function compatibleDiagramTypes(
+		notationId: string | null,
+		allDts: DiagramType[],
+	): DiagramType[] {
+		if (!notationId) return allDts;
+		return allDts.filter((dt) =>
+			(dt.notations ?? []).some((n) => n.notation_id === notationId),
+		);
+	}
+
+	function compatibleNotations(
+		dtId: string | null,
+		allDts: DiagramType[],
+		allNotations: Notation[],
+	): Notation[] {
+		if (!dtId) return allNotations;
+		const dt = allDts.find((d) => d.id === dtId);
+		if (!dt || !dt.notations || dt.notations.length === 0) return allNotations;
+		const validIds = new Set(dt.notations.map((n) => n.notation_id));
+		return allNotations.filter((n) => validIds.has(n.id));
+	}
+
+	// Inclusion predicate for the row table:
+	// (a) direct match on p.notation, OR
+	// (b) p.diagram_type maps to notationFilter via diagram_type_notations.
+	// Base-layer rows (notation=null, diagram_type=null) are excluded from
+	// notation-specific filters.
+	function isNotationScopeMatch(
+		p: { notation: string | null; diagram_type: string | null },
+		notationFilterValue: string,
+		allDts: DiagramType[],
+	): boolean {
+		if (!notationFilterValue) return true;
+		if ((p.notation ?? '') === notationFilterValue) return true;
+		if (!p.diagram_type) return false;
+		const dt = allDts.find((d) => d.id === p.diagram_type);
+		return !!(dt?.notations ?? []).some((n) => n.notation_id === notationFilterValue);
+	}
 
 	const PURPOSES = ['creation_format', 'response_format'] as const;
 	const LAYERS = ['base', 'notation', 'diagram_type', 'override'] as const;
@@ -321,7 +367,10 @@
 			.filter((p) => {
 				if (purposeFilter && (p.purpose ?? 'creation_format') !== purposeFilter) return false;
 				if (layerFilter && p.layer !== layerFilter) return false;
-				if (notationFilter && (p.notation ?? '') !== notationFilter) return false;
+				// v5.17.0 (ADR-162): notation filter matches direct OR via
+				// diagram_type_notations mapping. Fixes "doview shows only 1
+				// prompt" when diagram_type-layer rows have notation=null.
+				if (!isNotationScopeMatch(p, notationFilter, availableDiagramTypes)) return false;
 				if (diagramTypeFilter && (p.diagram_type ?? '') !== diagramTypeFilter) return false;
 				if (statusFilter === 'active' && !p.is_active) return false;
 				if (statusFilter === 'inactive' && p.is_active) return false;
@@ -787,7 +836,7 @@
 		<div>
 			<h2 class="text-xl font-bold" style="color: var(--color-fg)">AI Prompts</h2>
 			<p class="mt-1 text-sm" style="color: var(--color-muted)">
-				Layered prompts used for diagram creation (ADR-094-B / ADR-132) and response formatting (ADR-157). Filter, edit, enable/disable, add, and delete from this page. The cascade applies in order: override (replaces all) > base > notation > diagram_type.
+				Layered prompts used for diagram creation and response formatting. Filter, edit, enable/disable, add, and delete from this page. The cascade applies in order: override (replaces all) > base > notation > diagram_type.
 			</p>
 		</div>
 		<button
@@ -836,7 +885,7 @@
 			aria-label="Filter by notation"
 		>
 			<option value="">All notations</option>
-			{#each availableNotations as n (n.id)}
+			{#each compatibleNotations(diagramTypeFilter || null, availableDiagramTypes, availableNotations) as n (n.id)}
 				<option value={n.id}>{n.name}</option>
 			{/each}
 		</select>
@@ -847,7 +896,7 @@
 			aria-label="Filter by diagram type"
 		>
 			<option value="">All diagram types</option>
-			{#each availableDiagramTypes as d (d.id)}
+			{#each compatibleDiagramTypes(notationFilter || null, availableDiagramTypes) as d (d.id)}
 				<option value={d.id}>{d.name}</option>
 			{/each}
 		</select>
@@ -932,23 +981,25 @@
 					</select>
 				</label>
 				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
-					Notation (optional)
+					Notation {createForm.layer === 'base' ? '(disabled — base layer applies universally)' : '(optional)'}
 					<select bind:value={createForm.notation}
+						disabled={createForm.layer === 'base'}
 						class="rounded border px-2 py-1 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
 						<option value="">— none —</option>
-						{#each availableNotations as n (n.id)}
+						{#each compatibleNotations(createForm.diagram_type || null, availableDiagramTypes, availableNotations) as n (n.id)}
 							<option value={n.id}>{n.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
-					Diagram type (optional)
+					Diagram type {createForm.layer === 'base' || createForm.layer === 'notation' ? '(disabled)' : '(optional)'}
 					<select bind:value={createForm.diagram_type}
+						disabled={createForm.layer === 'base' || createForm.layer === 'notation'}
 						class="rounded border px-2 py-1 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
 						<option value="">— none —</option>
-						{#each availableDiagramTypes as d (d.id)}
+						{#each compatibleDiagramTypes(createForm.notation || null, availableDiagramTypes) as d (d.id)}
 							<option value={d.id}>{d.name}</option>
 						{/each}
 					</select>
@@ -1080,23 +1131,25 @@
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" />
 				</label>
 				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
-					Notation
+					Notation {editingPrompt?.layer === 'base' ? '(disabled — base layer applies universally)' : ''}
 					<select bind:value={promptEditNotation}
+						disabled={editingPrompt?.layer === 'base'}
 						class="rounded border px-2 py-1 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
 						<option value="">— none —</option>
-						{#each availableNotations as n (n.id)}
+						{#each compatibleNotations(promptEditDiagramType || null, availableDiagramTypes, availableNotations) as n (n.id)}
 							<option value={n.id}>{n.name}</option>
 						{/each}
 					</select>
 				</label>
 				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
-					Diagram type
+					Diagram type {editingPrompt?.layer === 'base' || editingPrompt?.layer === 'notation' ? '(disabled)' : ''}
 					<select bind:value={promptEditDiagramType}
+						disabled={editingPrompt?.layer === 'base' || editingPrompt?.layer === 'notation'}
 						class="rounded border px-2 py-1 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
 						<option value="">— none —</option>
-						{#each availableDiagramTypes as d (d.id)}
+						{#each compatibleDiagramTypes(promptEditNotation || null, availableDiagramTypes) as d (d.id)}
 							<option value={d.id}>{d.name}</option>
 						{/each}
 					</select>

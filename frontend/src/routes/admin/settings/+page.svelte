@@ -176,7 +176,7 @@
 		<div class="rounded border p-4" style="border-color: var(--color-border)">
 			<h2 class="text-lg font-medium" style="color: var(--color-fg)">System Notification Banner</h2>
 			<p class="mt-1 text-sm" style="color: var(--color-muted)">
-				Posts a message to every Iris user, including anonymous visitors. Shown at the top of every page until cleared. Empty to hide (ADR-124).
+				Posts a message to every Iris user, including anonymous visitors. Shown at the top of every page until cleared. Empty to hide.
 			</p>
 			<div class="mt-3">
 				<label for="notification-banner" class="text-sm" style="color: var(--color-fg)">

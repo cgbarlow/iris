@@ -155,3 +155,82 @@ class TestPATPastePath:
         assert body["success"] is False
         assert body["error"] == "pat_invalid"
         assert token_store.load_token(BASE) is None
+
+
+class TestInSessionTokenPropagation:
+    """v5.17.0 (ADR-162) regression test for the v5.15.0 symptom the
+    user reported: `iris_authenticate` succeeded but the next write
+    tool still returned `auth_required`.
+
+    The mechanism (`IrisClient.set_token`) updates the long-lived
+    client's default Authorization header. This test verifies the
+    next outgoing request actually carries the new bearer — closing
+    the gap in v5.15.0's `test_happy_path_persists_and_updates_
+    in_process_token`, which only asserted `client.token == ...` but
+    didn't verify outgoing-header propagation.
+    """
+
+    @pytest.mark.asyncio
+    async def test_pairing_then_create_set_uses_new_pat_in_same_session(
+        self, home: Path, respx_mock: respx.Router,
+    ) -> None:
+        # Long-lived client starts anonymous (mirrors the real flow
+        # where __main__.py constructs the client with no IRIS_TOKEN
+        # and no persisted token).
+        async with IrisClient(url=BASE, token=None) as c:
+            # Mock the pairing exchange.
+            respx_mock.post(
+                f"{BASE}/api/auth/pairing-codes/IRIS-ABCD-EFGH/exchange",
+            ).mock(
+                return_value=httpx.Response(
+                    200,
+                    json={
+                        "token": "iris_pat_freshly_minted",
+                        "prefix": "abcd1234",
+                        "expires_at": "2099-01-01T00:00:00+00:00",
+                        "mode": "pairing_code",
+                    },
+                ),
+            )
+
+            # Mock POST /api/sets — gated on the exchanged PAT.
+            def maybe_unauthorized(request: httpx.Request) -> httpx.Response:
+                auth = request.headers.get("authorization", "")
+                if auth == "Bearer iris_pat_freshly_minted":
+                    return httpx.Response(
+                        201,
+                        json={
+                            "id": "set-1",
+                            "name": "X",
+                            "description": None,
+                            "collection_id": None,
+                            "created_at": "2026-05-12T00:00:00+00:00",
+                            "updated_at": "2026-05-12T00:00:00+00:00",
+                        },
+                    )
+                return httpx.Response(401, json={"detail": "no auth"})
+
+            respx_mock.post(f"{BASE}/api/sets").mock(
+                side_effect=maybe_unauthorized,
+            )
+
+            # Step 1: dispatch iris_authenticate
+            r1 = await tools.dispatch(
+                "iris_authenticate", c, {"credential": "IRIS-ABCD-EFGH"},
+            )
+            r1_body = json.loads(r1[0].text)
+            assert r1_body["success"] is True
+            assert c.token == "iris_pat_freshly_minted"
+
+            # Step 2: dispatch create_set on the SAME long-lived client.
+            # The mock backend will return 401 unless the request carries
+            # the new bearer. If create_set succeeds (201), the in-process
+            # token propagation works end-to-end.
+            r2 = await tools.dispatch("create_set", c, {"name": "X"})
+            r2_body = json.loads(r2[0].text)
+            assert "auth_required" not in r2_body, (
+                "create_set received auth_required even though "
+                "iris_authenticate succeeded — set_token didn't "
+                "propagate to outgoing requests (v5.15.0 symptom)."
+            )
+            assert r2_body["id"] == "set-1"

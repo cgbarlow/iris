@@ -34,7 +34,11 @@ async def _is_ai_debug(db: object) -> bool:
         return False
 
 from app.ai import service
-from app.ai.creation import build_response_system_prompt, create_diagrams_from_ai
+from app.ai.creation import (
+    build_creation_system_prompt,
+    build_response_system_prompt,
+    create_diagrams_from_ai,
+)
 from app.ai.error_mapper import map_provider_error
 from app.ai.models import (
     ActiveProviderResponse,
@@ -869,24 +873,41 @@ async def list_creation_prompts(
 # ---------------------------------------------------------------------------
 
 
+_VALID_PURPOSES = ("response_format", "creation_format")
+
+
 @router.get("/response-prompts/types", response_model=list[ResponseFormatType])
 async def list_response_format_types(
     request: Request,
+    purpose: str = Query(
+        "response_format",
+        description=(
+            "Which purpose to list. 'response_format' (default) for output-"
+            "shape rules, 'creation_format' for the drafting/composition "
+            "rules used when generating diagrams (ADR-162, v5.17.0)."
+        ),
+    ),
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> list[ResponseFormatType]:
     """List distinct (notation, diagram_type) pairs that have at least
-    one active response_format prompt (ADR-157, v5.12.0).
+    one active prompt of the requested purpose (ADR-157, v5.12.0; ADR-162, v5.17.0).
 
     Anonymous-readable. Used by MCP clients (via the
     `applicable_response_types` field on Set/Collection responses) to
     discover what formats can be composed for a given conversation
     context.
     """
+    if purpose not in _VALID_PURPOSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"purpose must be one of {_VALID_PURPOSES}",
+        )
+
     db = request.app.state.db_manager.main_db
 
     # Find every distinct (notation, diagram_type) with at least one
-    # response_format row of layer=notation or layer=diagram_type. The
-    # base layer alone doesn't constitute a usable format.
+    # row of the requested purpose at layer=notation or layer=diagram_type.
+    # The base layer alone doesn't constitute a usable format.
     cursor = await db.execute(
         """
         SELECT DISTINCT
@@ -897,13 +918,14 @@ async def list_response_format_types(
         FROM ai_creation_prompts p
         LEFT JOIN diagram_types dt ON p.diagram_type = dt.id
         LEFT JOIN diagram_type_notations dtn ON p.diagram_type = dtn.diagram_type_id
-        WHERE p.purpose = 'response_format'
+        WHERE p.purpose = ?
           AND p.is_active = 1
           AND p.layer IN ('notation', 'diagram_type', 'override')
           AND COALESCE(p.notation, dtn.notation_id) IS NOT NULL
           AND p.diagram_type IS NOT NULL
         ORDER BY notation, p.diagram_type
         """,
+        (purpose,),
     )
     rows = await cursor.fetchall()
     return [
@@ -922,21 +944,48 @@ async def get_response_prompt_composed(
     request: Request,
     notation: str = Query(..., description="Notation id (e.g. 'markdown', 'doview')"),
     diagram_type: str | None = Query(default=None, description="Optional diagram_type id (e.g. 'doview_analysis')"),
+    purpose: str = Query(
+        "response_format",
+        description=(
+            "Which prompt cascade to compose. 'response_format' (default) "
+            "returns the output-shape rules; 'creation_format' returns the "
+            "drafting/composition rules used by Iris AI when generating a "
+            "diagram (ADR-162, v5.17.0)."
+        ),
+    ),
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> ResponsePromptComposed:
-    """Compose the response_format prompt cascade for a (notation,
-    diagram_type) pair (ADR-157, v5.12.0).
+    """Compose the prompt cascade for a (notation, diagram_type) pair
+    (ADR-157, v5.12.0; ADR-162, v5.17.0).
 
     Anonymous-readable. Returns the composed body as `body`; empty
     string if no rows match. Used by:
 
-    - Iris AI server-side via `build_response_system_prompt` (this
-      endpoint is the HTTP surface for the same composer).
+    - Iris AI server-side via `build_response_system_prompt` /
+      `build_creation_system_prompt` (this endpoint is the HTTP surface
+      for the same composers).
     - MCP clients via the `iris_get_response_prompt` tool to apply
-      the rules client-side as reference for matching questions.
+      the rules client-side as reference for matching questions or for
+      driving local-AI diagram creation (purpose='creation_format').
     """
+    if purpose not in _VALID_PURPOSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"purpose must be one of {_VALID_PURPOSES}",
+        )
+
     db = request.app.state.db_manager.main_db
-    body = await build_response_system_prompt(db, notation, diagram_type)
+    if purpose == "creation_format":
+        # MCP callers want the raw conversational cascade — no
+        # "user selection already confirmed" suppression preamble
+        # (which is only appropriate when Iris AI is called from the
+        # web UI with attached document context). ADR-162.
+        body = await build_creation_system_prompt(
+            db, notation, diagram_type,
+            include_ui_selection_preamble=False,
+        )
+    else:
+        body = await build_response_system_prompt(db, notation, diagram_type)
     return ResponsePromptComposed(
         notation=notation,
         diagram_type=diagram_type,

@@ -19,7 +19,16 @@ interface StoredAuth {
 function loadFromSession(): StoredAuth | null {
 	if (typeof sessionStorage === 'undefined') return null;
 	try {
-		const raw = sessionStorage.getItem(STORAGE_KEY);
+		// v5.17.0 (ADR-162): sessionStorage is per-tab. Fall back to
+		// localStorage if a sibling tab already saved auth there, then
+		// re-seed sessionStorage so this tab caches it going forward.
+		// Fixes "new tab opened from Claude's pairing link sees user as
+		// anonymous" symptom.
+		let raw = sessionStorage.getItem(STORAGE_KEY);
+		if (!raw && typeof localStorage !== 'undefined') {
+			raw = localStorage.getItem(STORAGE_KEY);
+			if (raw) sessionStorage.setItem(STORAGE_KEY, raw);
+		}
 		if (!raw) return null;
 		return JSON.parse(raw) as StoredAuth;
 	} catch {

@@ -6,7 +6,7 @@ Iris indexes every entity name and description for full-text search. The dashboa
 
 ## Global vs scoped
 
-- **Dashboard search bar** is **always global.** Typing on `/` with no URL parameters returns results from every set and every collection. A remembered scope (for counts) does not silently filter search — see ADR-121.
+- **Dashboard search bar** is **always global.** Typing on `/` with no URL parameters returns results from every set and every collection. A remembered scope (for counts) does not silently filter search.
 - **List-page search boxes** (Collections, Sets, Diagrams, Elements) are scoped to that list. They don't filter by the dashboard's remembered scope; each list page has its own type-specific index.
 - **Deep-linked scoped search** — add `?set_id=<id>` or `?collection_id=<id>` to the dashboard URL and the search bar on that page scopes to it. Useful for URL-sharing narrow results.
 
@@ -32,7 +32,7 @@ Simple, prefix-matching:
 
 ## Indexing
 
-Whenever an entity is created, updated, or deleted, its search index entry is updated in-line (the entry is written in the same transaction as the entity's version row — see ADR-125). No manual re-index needed. If the search index ever gets out of sync, admins can force a full rebuild from **Admin → Settings → Rebuild Search Index** (available only in SQLite mode; Postgres has trigger-driven indices that don't need manual rebuild).
+Whenever an entity is created, updated, or deleted, its search index entry is updated in-line — written in the same transaction as the entity's version row. No manual re-index needed. If the search index ever gets out of sync, admins can force a full rebuild from **Admin → Settings → Rebuild Search Index** (available only in SQLite mode; Postgres has trigger-driven indices that don't need manual rebuild).
 
 ## Add to AI context
 

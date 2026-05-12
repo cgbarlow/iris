@@ -93,8 +93,20 @@ async def build_creation_system_prompt(
     db: aiosqlite.Connection,
     notation: str,
     diagram_type: str | None = None,
+    *,
+    include_ui_selection_preamble: bool = True,
 ) -> str:
-    """Compose the diagram-CREATION system prompt for (notation, diagram_type)."""
+    """Compose the diagram-CREATION system prompt for (notation, diagram_type).
+
+    `include_ui_selection_preamble` (default True) controls the
+    "User selection already confirmed in UI" preamble that suppresses
+    re-asking about notation/diagram_type and subject matter. This is
+    correct when called server-side from ``ask(mode='creation')`` —
+    the web UI has the user's selection plus attached document context.
+    It's incorrect when an external MCP client wants the raw cascade
+    including the conversational guidance (ADR-162, v5.17.0); the HTTP
+    endpoint that exposes this composer passes False there.
+    """
     result, n_layers = await _build_layered_prompt(
         db,
         purpose="creation_format",
@@ -105,7 +117,7 @@ async def build_creation_system_prompt(
     # Preamble: when both notation and diagram_type are present, make the
     # user's UI selection explicit so the AI does not re-ask for information
     # it already has (ADR-132). Also remind the AI to use attached context.
-    if diagram_type:
+    if diagram_type and include_ui_selection_preamble:
         preamble = (
             f"## User selection (already confirmed in UI)\n\n"
             f"- Notation: **{notation}**\n"

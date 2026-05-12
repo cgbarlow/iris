@@ -1,11 +1,28 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { setAuth } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL, DB_BACKEND } from '$lib/config.js';
 	import { supabase } from '$lib/supabase.js';
 	import type { AuthTokens, User } from '$lib/types/api.js';
 
 	const isSupabase = DB_BACKEND === 'supabase';
+
+	/** v5.17.0 (ADR-162): after a successful sign-in, return the user to
+	 * where they came from when a ?redirect= query param is present.
+	 * Only honoured for same-origin paths (must start with /, not //,
+	 * no ://, no whitespace) — external/protocol redirects are rejected
+	 * to /. Fixes "sign in from /settings/mcp-pairing bounces to dashboard".
+	 */
+	function safeRedirectTarget(): string {
+		const r = page.url.searchParams.get('redirect');
+		if (!r) return '/';
+		if (!r.startsWith('/')) return '/';
+		if (r.startsWith('//')) return '/';
+		if (r.includes('://')) return '/';
+		if (/\s/.test(r)) return '/';
+		return r;
+	}
 
 	let username = $state('');
 	let password = $state('');
@@ -108,7 +125,7 @@
 				{ access_token: data.session.access_token, refresh_token: data.session.refresh_token },
 				me,
 			);
-			await goto('/');
+			await goto(safeRedirectTarget());
 		} catch {
 			error = 'Unable to connect to server';
 		} finally {
@@ -150,7 +167,7 @@
 			};
 
 			setAuth(tokens, user);
-			await goto('/');
+			await goto(safeRedirectTarget());
 		} catch {
 			error = 'Unable to connect to server';
 		} finally {
