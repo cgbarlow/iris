@@ -11,6 +11,7 @@ import pytest_asyncio
 from app.ai.creation import build_creation_system_prompt, create_diagrams_from_ai
 from app.migrations.m026_ai_providers import up as m026_up
 from app.migrations.m028_ai_creation_prompts import up as m028_up
+from app.migrations.m051_response_format_prompts import up as m051_up
 
 
 async def _minimal_schema(conn: aiosqlite.Connection) -> None:
@@ -120,6 +121,10 @@ async def db():
         await _minimal_schema(conn)
         await m026_up(conn)
         await m028_up(conn)
+        # m051 adds the `purpose` column the composer filters on
+        # (ADR-157, v5.12.0). Registry inserts in m051 are auto-skipped
+        # when their tables aren't present in this minimal fixture.
+        await m051_up(conn)
         yield conn
 
 
