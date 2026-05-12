@@ -456,7 +456,9 @@ async def _search_sqlite(
 
     # Sets
     if not set_id:  # Don't search sets when already filtered to a specific set
-        _SET_COLS = "f.set_id, s.name, s.description, f.rank, c.id, c.name"
+        # ADR-159 (v5.14.0): include s.mcp_system_context so the orient
+        # guidance lands on the search hit, not just on get_set.
+        _SET_COLS = "f.set_id, s.name, s.description, f.rank, c.id, c.name, s.mcp_system_context"
         _SET_JOINS = (
             "FROM sets_fts f "
             "JOIN sets s ON s.id = f.set_id "
@@ -489,6 +491,7 @@ async def _search_sqlite(
                 "set_id": row[0],
                 "set_name": row[1],
                 "collection_name": row[5],
+                "mcp_system_context": row[6],
             }
             for row in set_rows
         )
@@ -496,7 +499,7 @@ async def _search_sqlite(
     # Collections
     if not set_id and not collection_id:
         cursor = await db.execute(
-            "SELECT f.collection_id, c.name, c.description, f.rank "
+            "SELECT f.collection_id, c.name, c.description, f.rank, c.mcp_system_context "
             "FROM collections_fts f "
             "JOIN collections c ON c.id = f.collection_id "
             "WHERE collections_fts MATCH ? "
@@ -513,6 +516,7 @@ async def _search_sqlite(
                 "description": row[2] or None,
                 "rank": float(row[3]),
                 "deep_link": f"/collections",
+                "mcp_system_context": row[4],
             }
             for row in collection_rows
         )
@@ -699,10 +703,12 @@ async def _search_postgres(
 
     # Sets (ADR-125). Skipped when already scoped to a specific set.
     if not set_id:
+        # ADR-159 (v5.14.0): include s.mcp_system_context.
         _PG_SET = (
             "SELECT s.id, s.name, s.description, "
             "ts_rank(s.search_vector, to_tsquery('english', ?)) AS rank, "
-            "col.id AS collection_id, col.name AS collection_name "
+            "col.id AS collection_id, col.name AS collection_name, "
+            "s.mcp_system_context "
             "FROM sets s "
             "LEFT JOIN collections col ON s.collection_id = col.id "
         )
@@ -735,6 +741,7 @@ async def _search_postgres(
                 "set_id": row[0],
                 "set_name": row[1],
                 "collection_name": row[5],
+                "mcp_system_context": row[6],
             }
             for row in set_rows
         )
@@ -743,7 +750,8 @@ async def _search_postgres(
     if not set_id and not collection_id:
         cursor = await db.execute(
             "SELECT c.id, c.name, c.description, "
-            "ts_rank(c.search_vector, to_tsquery('english', ?)) AS rank "
+            "ts_rank(c.search_vector, to_tsquery('english', ?)) AS rank, "
+            "c.mcp_system_context "
             "FROM collections c "
             "WHERE c.search_vector @@ to_tsquery('english', ?) "
             "AND c.is_deleted = FALSE "
@@ -760,6 +768,7 @@ async def _search_postgres(
                 "description": row[2] or None,
                 "rank": float(row[3]),
                 "deep_link": "/collections",
+                "mcp_system_context": row[4],
             }
             for row in collection_rows
         )

@@ -68,6 +68,10 @@ class SearchResult(_Permissive):
     set_id: str | None = None
     set_name: str | None = None
     collection_name: str | None = None
+    # ADR-159 (v5.14.0): only populated for set / collection hits.
+    # Lets MCP clients see the scope's orient guidance immediately on
+    # a search match without a follow-up get_set/get_collection call.
+    mcp_system_context: str | None = None
 
 
 class SearchResponse(_Permissive):
