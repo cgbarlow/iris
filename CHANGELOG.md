@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.17.0] - 2026-05-12
+
+### Added
+
+- **Generic MCP diagram-creation workflow** (ADR-162, SPEC-162-A).
+  Three new MCP tools — `create_diagram`, `list_notations`,
+  `list_diagram_types` — give Claude (or any MCP client) a
+  notation-agnostic path for authoring diagrams locally. The new
+  `create_diagram` tool wraps the existing `POST /api/diagrams`
+  endpoint generically: pass `notation`, `diagram_type`, `name`,
+  `data`, `set_id`, and optional parent_package_id / description.
+  `list_notations` and `list_diagram_types` (the latter carries each
+  diagram_type's compatible notations) let Claude discover what's
+  authorable before composing.
+- **`get_response_prompt` / `list_response_format_types` extended
+  with `purpose` argument.** Default stays `response_format`
+  (backwards-compatible). Pass `purpose='creation_format'` to fetch
+  the layered creation cascade Iris AI uses when generating
+  diagrams — a local-AI MCP client can pull the same Stage 0 setup
+  questions + entity types + layout rules and run the conversation
+  in chat. Backend `/api/ai/response-prompts/{types,composed}` gain
+  the same query parameter.
+- **`build_creation_system_prompt(..., include_ui_selection_preamble=False)`**:
+  the composer can now skip the "User selection already confirmed
+  in UI" suppression preamble. The HTTP endpoint passes False so
+  MCP callers get the raw conversational cascade; `ask(mode='creation')`
+  keeps the suppression (it's correct there).
+- **Workflow guidance lives in the tool description.** The
+  `create_diagram` tool's description carries a creation-flow
+  preamble (discover → fetch creation prompt → guided conversation
+  → confirm destination → compose → save) plus the v5.16.0
+  destination-confirmation preamble. Universal across every MCP
+  client and every scope; no per-scope duplication.
+- **iris-client gains `purpose` kwargs** on `list_response_format_types`
+  and `get_response_prompt`. Defaults preserved.
+
+### Changed
+
+- **Canonical `mcp_system_context` for the Outcomes Theory Book set
+  trimmed.** Removed the path-A (analysis save) and path-B (visual
+  DoView via web UI) step-by-step; both now route through
+  `create_diagram` whose description carries the workflow. ~30
+  lines shorter. Admins on UAT should paste the new content into
+  the set's `mcp_system_context` field.
+- **`save_doview_analysis` deprecated.** Tool description prefixed
+  with a deprecation note pointing at
+  `create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`.
+  Behaviour unchanged in v5.17.0; removal scheduled for v6.0.0.
+
+### Fixed
+
+- **Cross-tab auth lost when a new browser window is opened from
+  Claude's pairing-page link.** `loadFromSession` in
+  `frontend/src/lib/stores/auth.svelte.ts` now falls back to
+  `localStorage` when `sessionStorage` is empty (and re-seeds
+  `sessionStorage` so the new tab caches it going forward). The
+  auth store always wrote to both stores; this closes the read
+  side.
+- **Sign-in from `/settings/mcp-pairing` bounced to dashboard.**
+  `/login` now honours a same-origin `?redirect=` query parameter
+  with strict validation (must start with `/`, not `//`, no `://`,
+  no whitespace). The pairing page's sign-in hint uses
+  `/login?redirect=/settings/mcp-pairing`.
+- **`/admin/settings/ai` filter dropdowns didn't constrain each
+  other.** Cascading: picking a notation filters the diagram_type
+  dropdown to compatible types (via `DiagramTypeRegistry.notations`);
+  picking a diagram_type filters notation likewise. Same logic
+  applied to the create-prompt and edit-prompt dialogs. Setting
+  layer=base disables both pickers.
+- **`/admin/settings/ai` "doview shows only 1 prompt" bug.** The
+  row-inclusion predicate exact-matched `p.notation`, hiding
+  diagram_type-layer rows (e.g. `creation-outcomes-map-v1`) whose
+  `notation` column is null but whose `diagram_type` maps to doview
+  via `diagram_type_notations`. Replaced with a notation-agnostic
+  predicate (`isNotationScopeMatch`) that matches direct OR via the
+  diagram_type→notation mapping.
+- **v5.15.0 in-session token-propagation symptom regression test.**
+  New `test_pairing_then_create_set_uses_new_pat_in_same_session`
+  exercises the exact failing flow the user reported: pairing-code
+  exchange → create_set, with the mock backend gated to return 401
+  unless the request carries the exchanged PAT. Closes the v5.15.0
+  test gap that only asserted `client.token == ...` without
+  verifying outgoing-header propagation.
+
+### Housekeeping
+
+- **Stripped user-visible ADR references from the web UI.** Eight
+  mentions removed from `/admin/settings/ai`, `/admin/settings`,
+  and four guide markdown pages (`dashboard.md`, `search.md`,
+  `collections-sets.md`, `knowledge-graph.md`). Code comments
+  retain their ADR references (developers need them).
+
+### Migration
+
+- **No DB migration.** Backend endpoints already existed.
+- Manual: paste the trimmed canonical content from
+  `docs/prompts/doview-book-mcp-system-context.md` into the
+  Outcomes Theory Book set's `mcp_system_context` field on UAT.
+
+### Tests
+
+- 30+ net new tests: 8 backend (response-prompts purpose query),
+  4 iris-client (purpose kwargs), 11 MCP (create_diagram +
+  list_notations + list_diagram_types + preambles +
+  deprecation-note + v5.15.0-symptom regression), 12 frontend
+  (sessionStorage fallback + login redirect-back + cascade
+  helpers + inclusion predicate). Combined MCP suite now 123
+  (was 112); iris-client 57 (was 53).
+
 ## [5.16.0] - 2026-05-12
 
 ### Added

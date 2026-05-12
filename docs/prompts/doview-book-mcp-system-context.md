@@ -20,46 +20,24 @@ ORIENT FIRST. On the first turn, before doing any other tool action:
     2. Ask a cross-package question via Iris AI
        (e.g. "What are the recurring causal-link conventions?" — uses mcp__iris__ask).
 
-    3. Generate a new DoView outcomes-theory analysis on a topic the user describes,
-       grounded in this handbook, with an option to save it back into this set.
-       Path: iris_get_response_prompt(notation='markdown', diagram_type='doview_analysis')
-       → compose locally → optionally iris_save_doview_analysis. NOT mcp__iris__ask.
+    3. Generate a new DoView outcomes-theory analysis OR a new visual
+       DoView outcomes_map on a topic the user describes. → call
+       iris_create_diagram. The tool's own description carries the
+       full workflow (discover via list_notations / list_diagram_types,
+       fetch the creation prompt cascade via iris_get_response_prompt
+       with purpose='creation_format', run the guided conversation,
+       confirm destination using create_collection / create_set /
+       create_package as needed, save). Do not duplicate that
+       workflow here.
 
     4. Browse a particular chapter's diagrams in detail
        (iris_package_hierarchy filtered to a chapter, then mcp__iris__get_diagram on each).
 
 If the user's opening request explicitly asks for one option, briefly acknowledge it and present the menu of the other three so they can redirect.
 
-PATH DETAILS
-
-A. ANALYSIS (option 3 above) — written outcomes-theory analysis with embedded mermaid:
-   - Fetch rules: iris_get_response_prompt(notation='markdown', diagram_type='doview_analysis')
-   - Compose using mcp__iris__search + mcp__iris__get_diagram against this set
-   - After producing, offer BOTH save paths:
-       (i) iris_save_doview_analysis(set_id, name, content, parent_package_id?) —
-           auth required. BEFORE CALLING, ask the user WHERE to save:
-             • an existing set + parent package they name; OR
-             • a new set in an existing collection (call create_set first); OR
-             • a new collection + new set (call create_collection, then create_set); OR
-             • optionally also nest under a new package (call create_package).
-           Use AskUserQuestion when available; numbered list otherwise. Don't
-           pick a destination silently. The v5.16.0 entity-creation tools
-           (create_collection / create_set / create_package, ADR-161) cover
-           the new-container cases without leaving the conversation.
-           If the save fails with error="auth_required" (v5.15.0+, ADR-160),
-           follow the returned guidance: ask the user to visit
-           /settings/mcp-pairing, generate a pairing code, and paste it back.
-           Then call iris_authenticate(credential=<pasted code>) and retry the save.
-       (ii) Leave the markdown in chat for copy/paste — it IS the markdown.
-
-B. NEW VISUAL DOVIEW DIAGRAM (a notation=doview outcomes_map):
-   The guided creation flow (Stages 0-3, 13 drafting steps, balance checks) is best done in Iris's web UI:
-     https://iris-uat.chrisbarlow.nz/sets/33032180-d77a-4ce4-88cf-b49cd643e093
-   Open the set → New diagram → notation=DoView → diagram_type=outcomes_map. Recommend the web UI for this case.
-
 DISCOVERABILITY
 
-  list_response_format_types — what formats are available
+  list_response_format_types(purpose='response_format'|'creation_format') — what response formats / creation types are available
   iris_package_hierarchy(set_id=<this-set>) — chapter tree, single call
 ```
 
@@ -68,22 +46,22 @@ DISCOVERABILITY
 - **Orient lands on first turn whether Claude calls `search` or `get_set`** — v5.14.0 (ADR-159) extended search results for Set / Collection hits to include `mcp_system_context`. Claude's natural "search → return link" flow now also surfaces this content.
 - **The four options are mandatory and verbatim** — paraphrasing got Claude down to 2 options in v5.13.x. Explicit "all four, every time" + verbatim wording fixes that.
 - **AskUserQuestion is conditional** — Claude Code has it; Claude Desktop / claude.ai / generic MCP clients don't (yet). Numbered list is the fallback.
-- **Routing for "generate analysis" is explicit** — `iris_get_response_prompt`, NOT `mcp__iris__ask`. v5.13.x left this implicit and Claude defaulted to the wrong path.
+- **Workflow logic lives in the `create_diagram` tool description, not here.** v5.17.0 (ADR-162) moved the full creation flow (discover → fetch creation prompt → guided conversation → confirm destination → save) into the tool's description so it travels universally across every MCP client and every scope, not just this set. The scope context just points at the tool.
 
 ## Revision history
 
-- **v5.14.0 (this revision).** Trimmed from ~140 lines to ~50 (target was ~60). Same orient-first-with-four-option-menu intent, far less text. Surfaced through search results too (ADR-159) so the orient lands on first turn regardless of whether Claude calls `get_set` or just `search`.
+- **v5.17.0 (this revision).** Stripped the diagram-creation workflow entirely (paths A and B in v5.16.x) — that lives in `create_diagram`'s tool description now (ADR-162). The web-UI-handoff guidance for visual DoView creation is gone; the generic `create_diagram` flow covers both markdown DoView analyses and visual DoView outcomes_maps. ~30 lines shorter.
+- **v5.14.0.** Trimmed from ~140 lines to ~50 (target was ~60). Same orient-first-with-four-option-menu intent, far less text. Surfaced through search results too (ADR-159) so the orient lands on first turn regardless of whether Claude calls `get_set` or just `search`.
 - **v5.13.3.** Made the four-option menu mandatory and verbatim. Honest note about AskUserQuestion availability.
 - **v5.13.2.** Restored orient-first / offer-menu pattern; explicit analysis-vs-diagram routing; "DO NOT use mcp__iris__ask for analysis flow".
 - **v5.13.0.** Mention `iris_package_hierarchy` (ADR-158) as the preferred chapter-list call.
 - **v5.12.0.** Save-options offer added (Iris save + markdown artefact).
-
-The "offer both save paths" + "orient first" behaviours arguably belong in the `response-format-doview-analysis-v1` row's body so they apply universally, not just on this Set. Until that row is amended via `/admin/settings/ai`, this scope-specific doc is the single source of guidance.
 
 ## See also
 
 - [ADR-156](../adrs/ADR-156-MCP-System-Context-Data-Passthrough.md) — what `mcp_system_context` is for (per-scope context, data passthrough on `get_set` / `get_collection`).
 - [ADR-157](../adrs/ADR-157-Response-Format-Prompts-and-DoView-Analysis-Artefact.md) — where the response_format rules live (universal layered prompts, admin-editable).
 - [ADR-159](../adrs/ADR-159-Scope-Context-In-Search-Results.md) — search results carry `mcp_system_context` so orient lands on first turn.
+- [ADR-162](../adrs/ADR-162-Generic-MCP-Diagram-Creation-Workflow.md) — generic `create_diagram` tool + workflow-in-tool-descriptions pattern.
 - [SPEC-157-A](../adrs/specs/SPEC-157-A-Response-Format-Prompts.md) — schema for the response_format mechanism.
 - [`doview-book-prompt-c-iris.md`](./doview-book-prompt-c-iris.md) — the source content from which the seeded response_format prompts were derived.

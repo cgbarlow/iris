@@ -91,6 +91,30 @@ destination. Do not pick a destination silently.
 """.strip()
 
 
+_CREATION_FLOW_PREAMBLE = """
+Generic save for a new diagram of any (notation, diagram_type) pair.
+
+CREATION FLOW (recommended):
+  1. Discover: call list_notations / list_diagram_types if you don't
+     already know which (notation, diagram_type) the user wants.
+  2. Fetch the creation guidance: get_response_prompt(notation=...,
+     diagram_type=..., purpose='creation_format'). The body carries
+     the layered creation cascade (base + notation + diagram_type)
+     used by Iris AI when generating diagrams. For DoView it includes
+     the Stage 0 setup questions (Q1..Q6), the entity types, the
+     colour palette, and the outcomes_map layout rules.
+  3. Run the guided conversation IN CHAT with the user. Use
+     AskUserQuestion when supported; numbered list otherwise.
+  4. Compose the `data` JSON locally per the creation prompt's rules.
+     For visual diagrams (notation in doview / archimate / c4 / uml /
+     simple / bpmn), data is a Svelte-Flow-shaped {nodes, edges}
+     payload. For markdown diagrams, data is {"content": "<markdown>"}.
+  5. Confirm destination with the user (see destination preamble
+     below).
+  6. Call create_diagram with the composed data.
+""".strip()
+
+
 @dataclass(frozen=True)
 class Tool:
     name: str
@@ -223,18 +247,33 @@ async def _apply_diagram_creation(c: IrisClient, args: dict[str, Any]) -> str:
     return resp.model_dump_json()
 
 
-async def _list_response_format_types(c: IrisClient, _args: dict[str, Any]) -> str:
-    """ADR-157 (v5.12.0): list response-format types available."""
-    items = await c.list_response_format_types()
+async def _list_response_format_types(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-157 (v5.12.0): list response-format / creation-format types.
+
+    `purpose` defaults to `response_format` (existing behaviour);
+    `creation_format` lists the (notation, diagram_type) pairs that
+    have authored creation_format prompts so a local-AI MCP client
+    can pick a target for diagram drafting (ADR-162, v5.17.0).
+    """
+    items = await c.list_response_format_types(
+        purpose=args.get("purpose", "response_format"),
+    )
     return json.dumps([item.model_dump() for item in items])
 
 
 async def _get_response_prompt(c: IrisClient, args: dict[str, Any]) -> str:
-    """ADR-157 (v5.12.0): fetch the composed response_format prompt
-    cascade for a (notation, diagram_type) pair."""
+    """ADR-157 (v5.12.0); ADR-162 (v5.17.0): fetch the composed prompt
+    cascade for a (notation, diagram_type) pair.
+
+    `purpose='response_format'` (default) returns the output-shape
+    rules. `purpose='creation_format'` returns the layered creation
+    cascade — Iris AI uses this server-side when generating diagrams;
+    a local-AI MCP client uses it to drive `create_diagram`.
+    """
     resp = await c.get_response_prompt(
         args["notation"],
         diagram_type=args.get("diagram_type"),
+        purpose=args.get("purpose", "response_format"),
     )
     return resp.model_dump_json()
 
@@ -297,6 +336,47 @@ async def _create_package(c: IrisClient, args: dict[str, Any]) -> str:
     except IrisAuthError:
         return _auth_required_payload("Create package")
     return result.model_dump_json()
+
+
+async def _create_diagram(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-162 (v5.17.0): generic save for a new diagram of any
+    (notation, diagram_type) pair. The caller is expected to have
+    fetched the creation cascade for the chosen pair, run the guided
+    conversation with the user, composed the `data` payload locally,
+    and confirmed a destination. See the tool's description for the
+    full workflow."""
+    try:
+        diagram = await c.create_diagram(
+            diagram_type=args["diagram_type"],
+            notation=args.get("notation"),
+            name=args["name"],
+            data=args.get("data"),
+            set_id=args["set_id"],
+            parent_package_id=args.get("parent_package_id"),
+            description=args.get("description"),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create diagram")
+    return diagram.model_dump_json()
+
+
+async def _list_notations(c: IrisClient, _args: dict[str, Any]) -> str:
+    """ADR-162 (v5.17.0): list the registered notations
+    (simple / uml / archimate / c4 / doview / markdown / bpmn) so a
+    local-AI MCP client can discover what's authorable. Wraps the
+    existing /api/registry/notations endpoint."""
+    response = await c._request("GET", "/api/registry/notations")
+    return json.dumps(response.json())
+
+
+async def _list_diagram_types(c: IrisClient, _args: dict[str, Any]) -> str:
+    """ADR-162 (v5.17.0): list the registered diagram_types with their
+    compatible notation_ids (from diagram_type_notations). Wraps the
+    existing /api/registry/diagram-types endpoint. The `notations`
+    field on each row tells callers which notations are compatible —
+    use this to filter the (notation, diagram_type) pair space."""
+    response = await c._request("GET", "/api/registry/diagram-types")
+    return json.dumps(response.json())
 
 
 async def _iris_authenticate(c: IrisClient, args: dict[str, Any]) -> str:
@@ -663,26 +743,46 @@ TOOLS: list[Tool] = [
     Tool(
         name="list_response_format_types",
         description=(
-            "List response-format types available — (notation, diagram_type) "
-            "pairs that have authored response_format prompts in Iris. Use "
-            "to discover which formats can be applied to your response "
-            "(e.g. notation='markdown' diagram_type='doview_analysis' for "
-            "the formal handbook-grounded outcomes-theory analysis shape)."
+            "List (notation, diagram_type) pairs that have authored prompts "
+            "in Iris (ADR-157, v5.12.0; ADR-162, v5.17.0). Default "
+            "purpose='response_format' returns output-shape pairs (e.g. "
+            "markdown/doview_analysis for formal outcomes-theory analyses). "
+            "Pass purpose='creation_format' to list pairs with authored "
+            "creation rules — pair with create_diagram for local-AI diagram "
+            "creation."
         ),
-        input_schema=_schema({}),
+        input_schema=_schema({
+            "purpose": (
+                {
+                    "type": "string",
+                    "enum": ["response_format", "creation_format"],
+                    "default": "response_format",
+                    "description": (
+                        "Which prompt purpose to list. 'response_format' "
+                        "(default) for output-shape rules; "
+                        "'creation_format' for the drafting/composition "
+                        "rules used when generating diagrams."
+                    ),
+                },
+                False,
+            ),
+        }),
         handler=_list_response_format_types,
     ),
     Tool(
         name="get_response_prompt",
         description=(
-            "Fetch the composed response_format prompt for a "
-            "(notation, diagram_type) pair (ADR-157). Returns the layered "
-            "cascade (base + notation + diagram_type) as `body`. Apply the "
-            "body as reference for shaping your response. Use this when "
-            "the user asks for a formal output style matching one of the "
-            "available types from `list_response_format_types` — for "
-            "DoView outcomes-theory analyses call with notation='markdown' "
-            "diagram_type='doview_analysis'."
+            "Fetch the composed prompt cascade for a (notation, "
+            "diagram_type) pair (ADR-157, v5.12.0; ADR-162, v5.17.0). "
+            "Returns the layered cascade (base + notation + diagram_type) "
+            "as `body`. Default purpose='response_format' returns the "
+            "output-shape rules; pass purpose='creation_format' to get the "
+            "drafting cascade Iris AI uses when generating a diagram — "
+            "use this to drive create_diagram from a local-AI MCP client. "
+            "Example: get_response_prompt(notation='doview', "
+            "diagram_type='outcomes_map', purpose='creation_format') "
+            "returns the Stage 0 setup questions + DoView methodology + "
+            "outcomes_map layout rules."
         ),
         input_schema=_schema({
             "notation": _str_arg(
@@ -693,6 +793,20 @@ TOOLS: list[Tool] = [
                 "Diagram type id, e.g. 'doview_analysis'. Optional — when "
                 "absent, returns the base + notation cascade only.",
                 required=False,
+            ),
+            "purpose": (
+                {
+                    "type": "string",
+                    "enum": ["response_format", "creation_format"],
+                    "default": "response_format",
+                    "description": (
+                        "Which prompt cascade to compose. "
+                        "'response_format' (default) for output-shape "
+                        "rules; 'creation_format' for the drafting / "
+                        "composition rules used when generating a diagram."
+                    ),
+                },
+                False,
             ),
         }),
         handler=_get_response_prompt,
@@ -722,10 +836,14 @@ TOOLS: list[Tool] = [
     Tool(
         name="save_doview_analysis",
         description=(
+            "[Deprecated since v5.17.0 (ADR-162): prefer create_diagram("
+            "notation='markdown', diagram_type='doview_analysis', "
+            "set_id=..., name=..., data={'content': '<markdown>'}, "
+            "parent_package_id=?). Will be removed in v6.0.0.]\n\n"
             "Persist a generated DoView analysis as a new doview_analysis "
-            "diagram in Iris (ADR-157, v5.12.0). Body is markdown text "
+            "diagram in Iris. Body is markdown text "
             "(with embedded mermaid blocks where applicable). Auth required "
-            "— use the iris_authenticate tool (ADR-160) if a previous call "
+            "— use the iris_authenticate tool if a previous call "
             "returned error=auth_required.\n\n"
             + _DESTINATION_PREAMBLE
         ),
@@ -854,6 +972,91 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_create_package,
+    ),
+    # ── Generic diagram creation (ADR-162, v5.17.0) ─────────────────────
+    Tool(
+        name="list_notations",
+        description=(
+            "List the diagram notations registered in Iris (simple, uml, "
+            "archimate, c4, doview, markdown, bpmn). Use to discover what "
+            "the user can pick as a `notation` argument when creating a "
+            "diagram via create_diagram (ADR-162, v5.17.0). Anonymous-"
+            "readable."
+        ),
+        input_schema=_schema({}),
+        handler=_list_notations,
+    ),
+    Tool(
+        name="list_diagram_types",
+        description=(
+            "List the diagram_types registered in Iris with their "
+            "compatible notations. Each entry's `notations` array tells "
+            "you which notation_ids the diagram_type can be authored "
+            "under (e.g. outcomes_map → doview). Use to discover what "
+            "(notation, diagram_type) pair to pass to create_diagram and "
+            "to get_response_prompt(purpose='creation_format') for "
+            "drafting guidance (ADR-162, v5.17.0). Anonymous-readable."
+        ),
+        input_schema=_schema({}),
+        handler=_list_diagram_types,
+    ),
+    Tool(
+        name="create_diagram",
+        description=(
+            _CREATION_FLOW_PREAMBLE
+            + "\n\n"
+            + _DESTINATION_PREAMBLE
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg(
+                "set_id",
+                "Set to save the diagram under (use create_set first if "
+                "the user wants a new set)",
+            ),
+            "name": _str_arg(
+                "name",
+                "Display name for the new diagram (the user's chosen title)",
+            ),
+            "notation": _str_arg(
+                "notation",
+                "Notation id from list_notations (e.g. 'doview', "
+                "'markdown', 'archimate'). Optional but recommended for "
+                "non-trivial diagrams.",
+                required=False,
+            ),
+            "diagram_type": _str_arg(
+                "diagram_type",
+                "Diagram-type id from list_diagram_types compatible with "
+                "the chosen notation (e.g. 'outcomes_map' for doview, "
+                "'doview_analysis' for markdown).",
+            ),
+            "data": (
+                {
+                    "type": "object",
+                    "description": (
+                        "Diagram body. For visual diagrams "
+                        "(doview/archimate/c4/uml/simple/bpmn): "
+                        "Svelte-Flow-shaped {nodes, edges} payload "
+                        "matching the layout rules in the creation "
+                        "prompt. For markdown diagrams: "
+                        "{\"content\": \"<markdown>\"}."
+                    ),
+                    "additionalProperties": True,
+                },
+                False,
+            ),
+            "parent_package_id": _str_arg(
+                "parent_package_id",
+                "Optional package to nest the diagram inside within the set",
+                required=False,
+            ),
+            "description": _str_arg(
+                "description",
+                "Optional short description shown alongside the diagram",
+                required=False,
+            ),
+        }),
+        handler=_create_diagram,
     ),
 ]
 

@@ -22,7 +22,7 @@ Edge types:
 
 ## Hierarchy flow (radial force)
 
-Nodes are laid out in concentric bands around their governing collection centroid (ADR-120 / SPEC-120-A):
+Nodes are laid out in concentric bands around their governing collection centroid:
 
 1. **Collection** at the centre.
 2. **Sets** in a close ring.
@@ -74,7 +74,7 @@ A maximise icon sits in the top-right of the graph area. Click to expand the gra
 
 ## Performance notes
 
-Iris uses a custom radial-layer force (ADR-120) instead of raw d3-force's repulsion. This makes the layout deterministic enough for reliable screenshots and fast enough for sets with hundreds of members. For truly massive datasets (tens of thousands of elements), turn Elements off; the physics stays responsive.
+Iris uses a custom radial-layer force instead of raw d3-force's repulsion. This makes the layout deterministic enough for reliable screenshots and fast enough for sets with hundreds of members. For truly massive datasets (tens of thousands of elements), turn Elements off; the physics stays responsive.
 
 ## Next steps
 

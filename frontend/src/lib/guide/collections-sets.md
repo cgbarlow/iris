@@ -73,7 +73,7 @@ When you scope the app to a collection or set, that choice is **remembered in se
 - Or visit `/` without any URL parameters.
 - Or pick a different collection / set.
 
-The search bar is a deliberate exception to scope: it always runs globally on `/` (see ADR-121).
+The search bar is a deliberate exception to scope: it always runs globally on `/`.
 
 ## Next steps
 
