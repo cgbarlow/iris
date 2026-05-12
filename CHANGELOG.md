@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.13.2] - 2026-05-12
+
+### Changed (docs / canonical mcp_system_context content)
+
+- **Restored the orient-first / offer-menu pattern** in the canonical
+  DoView / Outcomes-Theory Set MCP system context content
+  (`docs/prompts/doview-book-mcp-system-context.md`). The pre-v5.12
+  conversational rhythm of "describe the set, list chapters, offer a
+  menu of next steps, wait for the user to choose" was implicit
+  before the more prescriptive v5.12.0+ guidance got drafted. With
+  the new content, an MCP client opening the set should orient the
+  user before doing any tool action.
+- **Explicit routing for two distinct user-request shapes:**
+  - "Generate a DoView analysis" / "analyse X from an outcomes-
+    theory perspective" / similar text-output requests → fetch
+    `iris_get_response_prompt(notation='markdown',
+    diagram_type='doview_analysis')`, compose locally, offer the two
+    save paths. **Explicit DO NOT use `mcp__iris__ask` for this
+    flow** (was being defaulted to incorrectly).
+  - "Create a new DoView diagram" / "draw an outcomes map" /
+    similar visual-output requests → recommend Iris's web UI for
+    the guided creation flow (Stages 0-3, the 13 drafting steps,
+    balance checks). MCP creation path mentioned but not preferred
+    because the methodology depends on a guided-conversation rhythm
+    that's better-served in the web UI.
+- **Set rename reflected** in prose: the set is now called
+  "Outcomes Theory" in Iris (previously "DoView Book"). File name
+  and Set ID stable.
+
+### Infrastructure
+
+- No code changes. Bump versions to 5.13.2 to mark the meaningful
+  UX-fix nature of this release; CHANGELOG and tag for traceability.
+  Per-scope `mcp_system_context` paste required on UAT — the doc is
+  the canonical source.
+
 ## [5.13.1] - 2026-05-12
 
 ### Fixed
