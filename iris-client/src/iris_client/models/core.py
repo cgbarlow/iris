@@ -55,6 +55,33 @@ class TokenCreated(TokenRecord):
     token: str
 
 
+# --- MCP Pairing (ADR-160) ---------------------------------------------------
+
+class PairingCodeResponse(_Permissive):
+    """Returned from POST /api/auth/pairing-codes.
+
+    `code` is a short typeable string (`IRIS-XXXX-YYYY`); `expires_at`
+    is the wall-clock UTC ISO-8601 when it can no longer be exchanged.
+    """
+
+    code: str
+    expires_at: str
+
+
+class ExchangedPATResponse(_Permissive):
+    """Returned from POST /api/auth/pairing-codes/{code}/exchange.
+
+    Contains the plaintext PAT (one-shot — never retrievable again),
+    its prefix, and its wall-clock UTC expiry. `mode` distinguishes the
+    server-side path used (always `"pairing_code"` for this endpoint).
+    """
+
+    token: str
+    prefix: str
+    expires_at: str
+    mode: str = "pairing_code"
+
+
 # --- Search ------------------------------------------------------------------
 
 class SearchResult(_Permissive):

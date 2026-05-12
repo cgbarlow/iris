@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 
 from iris_client import IrisClient
 from mcp.server import NotificationOptions
@@ -11,11 +12,30 @@ from mcp.server.stdio import stdio_server
 
 from iris_mcp.config import load
 from iris_mcp.server import build_server
+from iris_mcp.token_store import load_token
+
+
+def _resolve_token(env_token: str | None, iris_url: str) -> tuple[str | None, str]:
+    """Resolve the bearer token at startup. Returns (token, source_label).
+
+    Precedence (ADR-160):
+      1. `IRIS_TOKEN` env var — explicit operator override.
+      2. Persisted token from `~/.iris-mcp/<hash>.json`.
+      3. None (anonymous; only read-only tools work).
+    """
+    if env_token:
+        return env_token, "IRIS_TOKEN env var"
+    stored = load_token(iris_url)
+    if stored:
+        return stored, "persisted ~/.iris-mcp/ token"
+    return None, "anonymous"
 
 
 async def run() -> None:
     config = load()
-    async with IrisClient(url=config.url, token=config.token) as client:
+    token, source = _resolve_token(config.token, config.url)
+    print(f"iris-mcp: using {source}", file=sys.stderr)
+    async with IrisClient(url=config.url, token=token) as client:
         server = build_server(client)
         async with stdio_server() as (read, write):
             await server.run(

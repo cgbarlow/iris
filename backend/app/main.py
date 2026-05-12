@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai.router import router as ai_router
 from app.audit.router import router as audit_router
+from app.auth.pairing.router import router as auth_pairing_router
 from app.auth.router import router as auth_router
 from app.batch.router import router as batch_router
 from app.bookmarks.router import router as bookmarks_router
@@ -171,6 +172,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
 
     # Register routers
     app.include_router(auth_router)
+    app.include_router(auth_pairing_router)
     app.include_router(elements_router)
     app.include_router(relationships_router)
     app.include_router(diagrams_router)
