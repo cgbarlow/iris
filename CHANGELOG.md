@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.14.0] - 2026-05-12
+
+### Added
+
+- **Scope `mcp_system_context` in search results** (ADR-159,
+  SPEC-159-A). `GET /api/search` results for `result_type=set` and
+  `result_type=collection` now include the matching scope's
+  `mcp_system_context` field. Diagnoses and fixes the root cause of
+  v5.13.x's "orient instructions don't fire" symptom: when Claude
+  Desktop's natural flow was `search` → return link, it never
+  called `get_set` and the orient guidance never landed. With this
+  change, the orient guidance lands on the search hit itself —
+  whether or not Claude follows up with `get_set`.
+- New `mcp_system_context: str | None` field on:
+  - `backend/app/search/models.py:SearchResult`
+  - `iris-client/src/iris_client/models/core.py:SearchResult`
+  Only populated for set / collection hits; `None` on element /
+  diagram / package hits. The MCP boundary is unchanged — the field
+  is intentionally pass-through per ADR-156, not in `_STRIPPED_KEYS`.
+
+### Changed (docs / canonical mcp_system_context content)
+
+- **Trimmed the canonical Outcomes Theory Set `mcp_system_context`
+  content** from ~140 lines to ~50 (target ~60). Same orient-first
+  with four-option-menu intent, far less text. Verbose flow
+  descriptions can live in the response_format prompt body
+  (admin-editable via `/admin/settings/ai`) where they belong as
+  universal rules, not on every per-scope context field.
+
+### Migration
+
+- **No DB migration.** Schema unchanged — `mcp_system_context`
+  columns on sets / collections already exist (added in m050 / m054
+  per ADR-156).
+
+### Tests
+
+- 8 net new tests (4 backend search, 4 iris-client model). Combined
+  suite ~447+ tests pass; only pre-existing `test_no_extra_rls_tables`
+  + `test_search/test_rebuild.py` fixture failures remain.
+
 ## [5.13.3] - 2026-05-12
 
 ### Changed (docs / canonical mcp_system_context content)
