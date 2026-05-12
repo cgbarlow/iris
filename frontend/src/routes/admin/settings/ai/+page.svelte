@@ -302,13 +302,14 @@
 	}
 
 	async function loadAxes() {
+		// Endpoints live under /api/registry per ADR-079 (admin-only).
 		try {
-			availableNotations = await apiFetch<Notation[]>('/api/notations');
+			availableNotations = await apiFetch<Notation[]>('/api/registry/notations');
 		} catch {
 			availableNotations = [];
 		}
 		try {
-			availableDiagramTypes = await apiFetch<DiagramType[]>('/api/diagram-types');
+			availableDiagramTypes = await apiFetch<DiagramType[]>('/api/registry/diagram-types');
 		} catch {
 			availableDiagramTypes = [];
 		}
