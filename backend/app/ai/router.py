@@ -34,7 +34,7 @@ async def _is_ai_debug(db: object) -> bool:
         return False
 
 from app.ai import service
-from app.ai.creation import create_diagrams_from_ai
+from app.ai.creation import build_response_system_prompt, create_diagrams_from_ai
 from app.ai.error_mapper import map_provider_error
 from app.ai.models import (
     ActiveProviderResponse,
@@ -51,6 +51,8 @@ from app.ai.models import (
     ProviderUpdate,
     QARequest,
     QAResponse,
+    ResponseFormatType,
+    ResponsePromptComposed,
 )
 from app.auth.dependencies import get_current_user, get_optional_user
 
@@ -816,33 +818,129 @@ async def _ask_multi_set_streaming(
 async def list_creation_prompts(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    purpose: str | None = Query(default=None, description="Filter by purpose: 'creation_format' or 'response_format'"),
 ) -> list[CreationPromptResponse]:
-    """List all AI diagram creation prompts. Admin only."""
+    """List all AI creation/response prompts. Admin only.
+
+    Pass `?purpose=creation_format` or `?purpose=response_format` to
+    filter (ADR-157, v5.12.0). Omit for all rows under both purposes.
+    """
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
-    cursor = await db.execute(
-        "SELECT id, name, description, layer, notation, diagram_type, "
+
+    base_query = (
+        "SELECT id, name, description, purpose, layer, notation, diagram_type, "
         "prompt_text, display_order, is_active, created_by, created_at, updated_at "
-        "FROM ai_creation_prompts ORDER BY layer, display_order"
+        "FROM ai_creation_prompts"
     )
+    if purpose is not None:
+        cursor = await db.execute(
+            f"{base_query} WHERE purpose = ? ORDER BY purpose, layer, display_order",
+            (purpose,),
+        )
+    else:
+        cursor = await db.execute(
+            f"{base_query} ORDER BY purpose, layer, display_order",
+        )
     rows = await cursor.fetchall()
     return [
         CreationPromptResponse(
             id=r[0],
             name=r[1],
             description=r[2],
-            layer=r[3],
-            notation=r[4],
-            diagram_type=r[5],
-            prompt_text=r[6],
-            display_order=r[7],
-            is_active=bool(r[8]),
-            created_by=r[9],
-            created_at=r[10],
-            updated_at=r[11],
+            purpose=r[3] or "creation_format",
+            layer=r[4],
+            notation=r[5],
+            diagram_type=r[6],
+            prompt_text=r[7],
+            display_order=r[8],
+            is_active=bool(r[9]),
+            created_by=r[10],
+            created_at=r[11],
+            updated_at=r[12],
         )
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Response-format prompts (ADR-157, v5.12.0)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/response-prompts/types", response_model=list[ResponseFormatType])
+async def list_response_format_types(
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> list[ResponseFormatType]:
+    """List distinct (notation, diagram_type) pairs that have at least
+    one active response_format prompt (ADR-157, v5.12.0).
+
+    Anonymous-readable. Used by MCP clients (via the
+    `applicable_response_types` field on Set/Collection responses) to
+    discover what formats can be composed for a given conversation
+    context.
+    """
+    db = request.app.state.db_manager.main_db
+
+    # Find every distinct (notation, diagram_type) with at least one
+    # response_format row of layer=notation or layer=diagram_type. The
+    # base layer alone doesn't constitute a usable format.
+    cursor = await db.execute(
+        """
+        SELECT DISTINCT
+            COALESCE(p.notation, dtn.notation_id) AS notation,
+            p.diagram_type AS diagram_type,
+            COALESCE(dt.name, p.diagram_type) AS dt_label,
+            dt.description AS dt_desc
+        FROM ai_creation_prompts p
+        LEFT JOIN diagram_types dt ON p.diagram_type = dt.id
+        LEFT JOIN diagram_type_notations dtn ON p.diagram_type = dtn.diagram_type_id
+        WHERE p.purpose = 'response_format'
+          AND p.is_active = 1
+          AND p.layer IN ('notation', 'diagram_type', 'override')
+          AND COALESCE(p.notation, dtn.notation_id) IS NOT NULL
+          AND p.diagram_type IS NOT NULL
+        ORDER BY notation, p.diagram_type
+        """,
+    )
+    rows = await cursor.fetchall()
+    return [
+        ResponseFormatType(
+            notation=r[0],
+            diagram_type=r[1],
+            label=f"{r[2] or r[1]}",
+            description=r[3],
+        )
+        for r in rows
+    ]
+
+
+@router.get("/response-prompts/composed", response_model=ResponsePromptComposed)
+async def get_response_prompt_composed(
+    request: Request,
+    notation: str = Query(..., description="Notation id (e.g. 'markdown', 'doview')"),
+    diagram_type: str | None = Query(default=None, description="Optional diagram_type id (e.g. 'doview_analysis')"),
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> ResponsePromptComposed:
+    """Compose the response_format prompt cascade for a (notation,
+    diagram_type) pair (ADR-157, v5.12.0).
+
+    Anonymous-readable. Returns the composed body as `body`; empty
+    string if no rows match. Used by:
+
+    - Iris AI server-side via `build_response_system_prompt` (this
+      endpoint is the HTTP surface for the same composer).
+    - MCP clients via the `iris_get_response_prompt` tool to apply
+      the rules client-side as reference for matching questions.
+    """
+    db = request.app.state.db_manager.main_db
+    body = await build_response_system_prompt(db, notation, diagram_type)
+    return ResponsePromptComposed(
+        notation=notation,
+        diagram_type=diagram_type,
+        body=body,
+    )
 
 
 @router.put("/creation-prompts/{prompt_id}", response_model=CreationPromptResponse)
@@ -881,7 +979,7 @@ async def update_creation_prompt(
         await db.commit()
 
     cursor = await db.execute(
-        "SELECT id, name, description, layer, notation, diagram_type, "
+        "SELECT id, name, description, purpose, layer, notation, diagram_type, "
         "prompt_text, display_order, is_active, created_by, created_at, updated_at "
         "FROM ai_creation_prompts WHERE id = ?",
         (prompt_id,),
@@ -891,15 +989,16 @@ async def update_creation_prompt(
         id=row[0],
         name=row[1],
         description=row[2],
-        layer=row[3],
-        notation=row[4],
-        diagram_type=row[5],
-        prompt_text=row[6],
-        display_order=row[7],
-        is_active=bool(row[8]),
-        created_by=row[9],
-        created_at=row[10],
-        updated_at=row[11],
+        purpose=row[3] or "creation_format",
+        layer=row[4],
+        notation=row[5],
+        diagram_type=row[6],
+        prompt_text=row[7],
+        display_order=row[8],
+        is_active=bool(row[9]),
+        created_by=row[10],
+        created_at=row[11],
+        updated_at=row[12],
     )
 
 

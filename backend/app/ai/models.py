@@ -162,11 +162,18 @@ class ConversationResponse(BaseModel):
 
 
 class CreationPromptResponse(BaseModel):
-    """Response for a single AI creation prompt."""
+    """Response for a single AI creation or response prompt.
+
+    Despite the name (kept for backwards compat), this model covers
+    both `purpose='creation_format'` and `purpose='response_format'`
+    rows (ADR-157, v5.12.0). The Admin UI uses `purpose` to segment
+    creation-mode prompts from response-format prompts.
+    """
 
     id: str
     name: str
     description: str | None = None
+    purpose: str = "creation_format"  # 'creation_format' | 'response_format'
     layer: str
     notation: str | None = None
     diagram_type: str | None = None
@@ -179,10 +186,40 @@ class CreationPromptResponse(BaseModel):
 
 
 class CreationPromptUpdate(BaseModel):
-    """Request body for updating an AI creation prompt."""
+    """Request body for updating an AI creation or response prompt."""
 
     prompt_text: str | None = None
     is_active: bool | None = None
+
+
+class ResponsePromptComposed(BaseModel):
+    """Composed response-format body for a (notation, diagram_type)
+    cascade (ADR-157, v5.12.0).
+
+    Anonymous-readable: scope content is universal across users; the
+    response_format rules are admin-authored and editable but not
+    sensitive.
+    """
+
+    notation: str
+    diagram_type: str | None = None
+    body: str  # composed cascade body — may be empty if no rows match
+
+
+class ResponseFormatType(BaseModel):
+    """One available response-format type — a (notation, diagram_type)
+    pair that has at least one active response_format prompt row
+    (ADR-157, v5.12.0).
+
+    Surfaced by `GET /api/ai/response-prompts/types` and used by MCP
+    clients (via `applicable_response_types` on Set/Collection
+    responses) to discover what formats can be composed.
+    """
+
+    notation: str
+    diagram_type: str | None = None
+    label: str  # human-friendly UI label (combines notation + diagram_type names)
+    description: str | None = None  # optional description from the diagram_type row
 
 
 class ApplyCreationRequest(BaseModel):
