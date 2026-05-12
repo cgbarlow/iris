@@ -30,6 +30,7 @@ from iris_client.models.core import (
     IrisSet,
     LoginResponse,
     Package,
+    PackageHierarchyNode,
     QAResponse,
     ResponseFormatType,
     ResponsePromptComposed,
@@ -244,11 +245,30 @@ class IrisClient:
     # --- Packages ------------------------------------------------------------
 
     async def list_packages(
-        self, *, set_id: str | None = None,
+        self,
+        *,
+        set_id: str | None = None,
+        collection_id: str | None = None,
+        parent_package_id: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
     ) -> list[Package]:
-        params: dict[str, Any] = {}
+        """List packages. ADR-158 (v5.13.0): supports pagination
+        (`page`, `page_size`) and `parent_package_id` filter so callers
+        can walk the tree level-by-level (`parent_package_id=None` for
+        roots, or a specific package ID for its direct children).
+
+        The backend defaults to `page_size=50, max 100`. For a full
+        structural overview, prefer `package_hierarchy()` — one call
+        returns the entire tree.
+        """
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
         if set_id:
             params["set_id"] = set_id
+        if collection_id:
+            params["collection_id"] = collection_id
+        if parent_package_id is not None:
+            params["parent_package_id"] = parent_package_id
         response = await self._request("GET", "/api/packages", params=params)
         payload = response.json()
         items = payload["items"] if isinstance(payload, dict) and "items" in payload else payload
@@ -260,7 +280,31 @@ class IrisClient:
 
     async def package_hierarchy(
         self, *, set_id: str | None = None, root_id: str | None = None,
+    ) -> list[PackageHierarchyNode]:
+        """Return the complete package hierarchy for a set as a nested
+        tree (ADR-158, v5.13.0). Each node carries `id`, `name`,
+        `parent_package_id`, and `children`. Use this for structural
+        overview instead of paginating `list_packages` repeatedly.
+        """
+        params: dict[str, Any] = {}
+        if set_id:
+            params["set_id"] = set_id
+        if root_id:
+            params["root_id"] = root_id
+        response = await self._request(
+            "GET", "/api/packages/hierarchy", params=params,
+        )
+        payload = response.json()
+        # Endpoint returns a list of root nodes (each with nested children).
+        return [PackageHierarchyNode.model_validate(node) for node in payload]
+
+    async def diagram_hierarchy(
+        self, *, set_id: str | None = None, root_id: str | None = None,
     ) -> dict[str, Any]:
+        """Return the diagram hierarchy (NOT the package hierarchy).
+        Hits `/api/diagrams/hierarchy`. Renamed in v5.13.0 from the
+        misnamed `package_hierarchy`; previously had no callers so the
+        rename is non-breaking."""
         params: dict[str, Any] = {}
         if set_id:
             params["set_id"] = set_id

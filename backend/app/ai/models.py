@@ -185,9 +185,44 @@ class CreationPromptResponse(BaseModel):
     updated_at: str
 
 
-class CreationPromptUpdate(BaseModel):
-    """Request body for updating an AI creation or response prompt."""
+class CreationPromptCreate(BaseModel):
+    """Request body for creating a new AI creation or response prompt.
 
+    Conflict detection (ADR-158, v5.13.0): the server returns 409 if
+    another `is_active=true` row already exists with the same
+    `(purpose, layer, notation, diagram_type)` tuple. Stage a
+    replacement by setting the existing row to `is_active=false`
+    first, OR pick a different combination.
+    """
+
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    purpose: Literal["creation_format", "response_format"] = "creation_format"
+    layer: Literal["base", "notation", "diagram_type", "override"]
+    notation: str | None = None
+    diagram_type: str | None = None
+    prompt_text: str = Field(min_length=1)
+    display_order: int = 0
+    is_active: bool = True
+
+
+class CreationPromptUpdate(BaseModel):
+    """Request body for updating an AI creation or response prompt.
+
+    v5.13.0 (ADR-158): extends the v5.8.x update surface to allow
+    editing `name`, `description`, `notation`, `diagram_type`, and
+    `display_order` in addition to `prompt_text` and `is_active`.
+    Conflict detection re-runs when any of `(purpose, layer, notation,
+    diagram_type)` changes while `is_active=true`. `purpose` and
+    `layer` themselves are immutable once created (use delete + create
+    if you need to move a prompt between purposes or layers).
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    notation: str | None = None
+    diagram_type: str | None = None
+    display_order: int | None = None
     prompt_text: str | None = None
     is_active: bool | None = None
 

@@ -107,6 +107,17 @@ class Package(EntityBase):
     parent_package_id: str | None = None
 
 
+class PackageHierarchyNode(_Permissive):
+    """One node in a package hierarchy tree (ADR-158, v5.13.0).
+    Returned by `IrisClient.package_hierarchy()` and the MCP
+    `iris_package_hierarchy` tool."""
+
+    id: str
+    name: str
+    parent_package_id: str | None = None
+    children: list[PackageHierarchyNode] = Field(default_factory=list)
+
+
 class IrisSet(EntityBase):
     """Named `IrisSet` because `Set` collides with builtins."""
 

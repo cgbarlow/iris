@@ -6,6 +6,7 @@
 		id: string;
 		name: string;
 		description: string | null;
+		purpose: string;  // 'creation_format' | 'response_format' (v5.12.0+)
 		layer: string;
 		notation: string | null;
 		diagram_type: string | null;
@@ -13,6 +14,28 @@
 		display_order: number;
 		is_active: boolean;
 	};
+
+	type Notation = { id: string; name: string };
+	type DiagramType = { id: string; name: string };
+
+	const PURPOSES = ['creation_format', 'response_format'] as const;
+	const LAYERS = ['base', 'notation', 'diagram_type', 'override'] as const;
+
+	function appliesToLabel(p: { layer: string; notation: string | null; diagram_type: string | null }): string {
+		// ADR-158 (v5.13.0): make the cascade behaviour visible — addresses the
+		// "ArchiMate Process Layout has no notation" confusion. Coerce empty
+		// strings to null so the live-preview hint in the create form works
+		// when the user picks "— none —".
+		const n = p.notation || null;
+		const d = p.diagram_type || null;
+		if (p.layer === 'base') return 'Any notation × Any diagram type';
+		if (p.layer === 'override') return n ? `Override: ${n} (replaces all layers)` : 'Override (no notation set — invalid)';
+		if (p.layer === 'notation') return n ? `${n} × any diagram type` : 'Notation layer (no notation set — invalid)';
+		// layer === 'diagram_type'
+		const notationPart = n ?? 'Any notation';
+		const dtPart = d ?? '?';
+		return `${notationPart} × ${dtPart} diagrams`;
+	}
 
 	const PROVIDER_TYPES = ['openai', 'anthropic', 'ollama', 'lmstudio', 'openrouter', 'custom'] as const;
 
@@ -217,16 +240,55 @@
 		}
 	}
 
-	// ── Creation Prompts ───────────────────────────────────────────────────────
+	// ── Creation Prompts (v5.13.0 / ADR-158: filter + CRUD redesign) ──────────
 	let creationPrompts = $state<CreationPrompt[]>([]);
 	let promptsLoading = $state(true);
+	let promptError = $state<string | null>(null);
+	let availableNotations = $state<Notation[]>([]);
+	let availableDiagramTypes = $state<DiagramType[]>([]);
+
+	// Filter state (URL-state-backed for purpose + layer; matches /views convention).
+	const urlPurpose = typeof window !== 'undefined'
+		? new URLSearchParams(window.location.search).get('purpose')
+		: null;
+	const urlLayer = typeof window !== 'undefined'
+		? new URLSearchParams(window.location.search).get('layer')
+		: null;
+	let purposeFilter = $state(urlPurpose ?? '');
+	let layerFilter = $state(urlLayer ?? '');
+	let notationFilter = $state('');
+	let diagramTypeFilter = $state('');
+	let statusFilter = $state(''); // '', 'active', 'inactive'
+	let searchText = $state('');
+	let sortBy = $state<'name' | 'layer' | 'updated'>('layer');
+
+	// Edit / add / delete state.
 	let editingPrompt = $state<CreationPrompt | null>(null);
 	let promptEditText = $state('');
+	let promptEditName = $state('');
+	let promptEditDescription = $state('');
+	let promptEditNotation = $state('');
+	let promptEditDiagramType = $state('');
 	let promptSaving = $state(false);
-	let promptError = $state<string | null>(null);
+
+	let creatingPrompt = $state(false);
+	let createForm = $state({
+		name: '',
+		description: '',
+		purpose: 'creation_format' as 'creation_format' | 'response_format',
+		layer: 'diagram_type' as typeof LAYERS[number],
+		notation: '',
+		diagram_type: '',
+		prompt_text: '',
+	});
+	let createSaving = $state(false);
+	let createError = $state<string | null>(null);
+
+	let deletingPromptId = $state<string | null>(null);
 
 	$effect(() => {
 		loadCreationPrompts();
+		loadAxes();
 	});
 
 	async function loadCreationPrompts() {
@@ -239,9 +301,77 @@
 		promptsLoading = false;
 	}
 
+	async function loadAxes() {
+		try {
+			availableNotations = await apiFetch<Notation[]>('/api/notations');
+		} catch {
+			availableNotations = [];
+		}
+		try {
+			availableDiagramTypes = await apiFetch<DiagramType[]>('/api/diagram-types');
+		} catch {
+			availableDiagramTypes = [];
+		}
+	}
+
+	const filteredPrompts = $derived.by(() => {
+		const q = searchText.toLowerCase().trim();
+		return creationPrompts
+			.filter((p) => {
+				if (purposeFilter && (p.purpose ?? 'creation_format') !== purposeFilter) return false;
+				if (layerFilter && p.layer !== layerFilter) return false;
+				if (notationFilter && (p.notation ?? '') !== notationFilter) return false;
+				if (diagramTypeFilter && (p.diagram_type ?? '') !== diagramTypeFilter) return false;
+				if (statusFilter === 'active' && !p.is_active) return false;
+				if (statusFilter === 'inactive' && p.is_active) return false;
+				if (q) {
+					if (!p.name.toLowerCase().includes(q)
+						&& !(p.description?.toLowerCase().includes(q) ?? false)) {
+						return false;
+					}
+				}
+				return true;
+			})
+			.sort((a, b) => {
+				if (sortBy === 'name') return a.name.localeCompare(b.name);
+				if (sortBy === 'updated') return 0;  // server already returns by purpose, layer, display_order
+				// 'layer'
+				const layerOrder = ['base', 'notation', 'diagram_type', 'override'];
+				const ai = layerOrder.indexOf(a.layer);
+				const bi = layerOrder.indexOf(b.layer);
+				if (ai !== bi) return ai - bi;
+				return a.name.localeCompare(b.name);
+			});
+	});
+
+	function resetFilters() {
+		purposeFilter = '';
+		layerFilter = '';
+		notationFilter = '';
+		diagramTypeFilter = '';
+		statusFilter = '';
+		searchText = '';
+		sortBy = 'layer';
+	}
+
+	// Sync purpose + layer filters to URL params for shareability (matches /views).
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const url = new URL(window.location.href);
+		if (purposeFilter) url.searchParams.set('purpose', purposeFilter);
+		else url.searchParams.delete('purpose');
+		if (layerFilter) url.searchParams.set('layer', layerFilter);
+		else url.searchParams.delete('layer');
+		window.history.replaceState({}, '', url);
+	});
+
 	function openPromptEdit(p: CreationPrompt) {
 		editingPrompt = p;
 		promptEditText = p.prompt_text;
+		promptEditName = p.name;
+		promptEditDescription = p.description ?? '';
+		promptEditNotation = p.notation ?? '';
+		promptEditDiagramType = p.diagram_type ?? '';
 		promptError = null;
 	}
 
@@ -256,7 +386,13 @@
 		try {
 			await apiFetch(`/api/ai/creation-prompts/${editingPrompt.id}`, {
 				method: 'PUT',
-				body: JSON.stringify({ prompt_text: promptEditText }),
+				body: JSON.stringify({
+					name: promptEditName,
+					description: promptEditDescription || null,
+					notation: promptEditNotation,
+					diagram_type: promptEditDiagramType,
+					prompt_text: promptEditText,
+				}),
 			});
 			closePromptEdit();
 			await loadCreationPrompts();
@@ -264,6 +400,88 @@
 			promptError = e instanceof ApiError ? e.message : 'Save failed';
 		}
 		promptSaving = false;
+	}
+
+	async function togglePromptActive(p: CreationPrompt) {
+		try {
+			await apiFetch(`/api/ai/creation-prompts/${p.id}`, {
+				method: 'PUT',
+				body: JSON.stringify({ is_active: !p.is_active }),
+			});
+			await loadCreationPrompts();
+		} catch (e) {
+			promptError = e instanceof ApiError ? e.message : 'Toggle failed';
+		}
+	}
+
+	function openCreatePrompt() {
+		creatingPrompt = true;
+		createForm = {
+			name: '',
+			description: '',
+			purpose: 'creation_format',
+			layer: 'diagram_type',
+			notation: '',
+			diagram_type: '',
+			prompt_text: '',
+		};
+		createError = null;
+	}
+
+	function closeCreatePrompt() {
+		creatingPrompt = false;
+		createError = null;
+	}
+
+	const createConflict = $derived.by(() => {
+		// Live conflict check: does an active row already cover this (purpose, layer, notation, diagram_type)?
+		if (!creatingPrompt) return null;
+		const conflict = creationPrompts.find((p) =>
+			p.is_active
+			&& (p.purpose ?? 'creation_format') === createForm.purpose
+			&& p.layer === createForm.layer
+			&& (p.notation ?? '') === createForm.notation
+			&& (p.diagram_type ?? '') === createForm.diagram_type
+		);
+		return conflict ? conflict.name : null;
+	});
+
+	async function saveCreatePrompt() {
+		createSaving = true;
+		createError = null;
+		try {
+			const body: Record<string, unknown> = {
+				name: createForm.name,
+				description: createForm.description || null,
+				purpose: createForm.purpose,
+				layer: createForm.layer,
+				prompt_text: createForm.prompt_text,
+				is_active: true,
+			};
+			if (createForm.notation) body.notation = createForm.notation;
+			if (createForm.diagram_type) body.diagram_type = createForm.diagram_type;
+			await apiFetch('/api/ai/creation-prompts', {
+				method: 'POST',
+				body: JSON.stringify(body),
+			});
+			closeCreatePrompt();
+			await loadCreationPrompts();
+		} catch (e) {
+			createError = e instanceof ApiError ? e.message : 'Create failed';
+		}
+		createSaving = false;
+	}
+
+	async function confirmDeletePrompt() {
+		if (!deletingPromptId) return;
+		try {
+			await apiFetch(`/api/ai/creation-prompts/${deletingPromptId}`, { method: 'DELETE' });
+			deletingPromptId = null;
+			await loadCreationPrompts();
+		} catch (e) {
+			promptError = e instanceof ApiError ? e.message : 'Delete failed';
+			deletingPromptId = null;
+		}
 	}
 </script>
 
@@ -562,44 +780,248 @@
 	</div>
 {/if}
 
-<!-- ── Creation Prompts Section ──────────────────────────────────────────── -->
+<!-- ── Creation / Response Prompts Section (ADR-158, v5.13.0) ─────────── -->
 <div class="mt-10">
-	<h2 class="mb-1 text-xl font-bold" style="color: var(--color-fg)">Creation Prompts</h2>
-	<p class="mb-4 text-sm" style="color: var(--color-muted)">
-		Layered system prompts used for AI diagram creation. Base layer applies to all; notation and diagram-type layers stack on top.
-	</p>
+	<div class="mb-3 flex items-center justify-between">
+		<div>
+			<h2 class="text-xl font-bold" style="color: var(--color-fg)">AI Prompts</h2>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">
+				Layered prompts used for diagram creation (ADR-094-B / ADR-132) and response formatting (ADR-157). Filter, edit, enable/disable, add, and delete from this page. The cascade applies in order: override (replaces all) > base > notation > diagram_type.
+			</p>
+		</div>
+		<button
+			onclick={openCreatePrompt}
+			class="rounded px-4 py-2 text-sm text-white"
+			style="background-color: var(--color-primary); white-space: nowrap"
+		>
+			+ Add prompt
+		</button>
+	</div>
+
+	{#if promptError}
+		<div role="alert" class="mb-3 rounded border p-3 text-sm"
+			style="border-color: var(--color-danger); color: var(--color-danger)">{promptError}</div>
+	{/if}
+
+	<!-- Filter row (mirrors /views inline pattern) -->
+	<div class="mb-3 flex flex-wrap items-center gap-2 rounded border p-3"
+		style="border-color: var(--color-border); background: var(--color-surface)">
+		<select
+			bind:value={purposeFilter}
+			class="rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			aria-label="Filter by purpose"
+		>
+			<option value="">All purposes</option>
+			{#each PURPOSES as p}
+				<option value={p}>{p}</option>
+			{/each}
+		</select>
+		<select
+			bind:value={layerFilter}
+			class="rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			aria-label="Filter by layer"
+		>
+			<option value="">All layers</option>
+			{#each LAYERS as l}
+				<option value={l}>{l}</option>
+			{/each}
+		</select>
+		<select
+			bind:value={notationFilter}
+			class="rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			aria-label="Filter by notation"
+		>
+			<option value="">All notations</option>
+			{#each availableNotations as n (n.id)}
+				<option value={n.id}>{n.name}</option>
+			{/each}
+		</select>
+		<select
+			bind:value={diagramTypeFilter}
+			class="rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			aria-label="Filter by diagram type"
+		>
+			<option value="">All diagram types</option>
+			{#each availableDiagramTypes as d (d.id)}
+				<option value={d.id}>{d.name}</option>
+			{/each}
+		</select>
+		<select
+			bind:value={statusFilter}
+			class="rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			aria-label="Filter by status"
+		>
+			<option value="">All statuses</option>
+			<option value="active">Active only</option>
+			<option value="inactive">Inactive only</option>
+		</select>
+		<input
+			type="text"
+			bind:value={searchText}
+			placeholder="Search name + description..."
+			class="flex-1 rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); min-width: 200px"
+			aria-label="Search prompts"
+		/>
+		<select
+			bind:value={sortBy}
+			class="rounded border px-2 py-1 text-sm"
+			style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			aria-label="Sort by"
+		>
+			<option value="layer">Sort: layer</option>
+			<option value="name">Sort: name</option>
+		</select>
+		<button
+			onclick={resetFilters}
+			class="text-sm underline"
+			style="color: var(--color-muted)"
+		>
+			Reset filters
+		</button>
+		<span class="ml-auto text-xs" style="color: var(--color-muted)">
+			{filteredPrompts.length} of {creationPrompts.length}
+		</span>
+	</div>
+
+	{#if creatingPrompt}
+		<div class="mb-3 rounded border p-4"
+			style="border-color: var(--color-border); background: var(--color-surface)">
+			<h3 class="mb-3 text-base font-semibold" style="color: var(--color-fg)">New prompt</h3>
+			{#if createError}
+				<div role="alert" class="mb-3 rounded border p-3 text-sm"
+					style="border-color: var(--color-danger); color: var(--color-danger)">{createError}</div>
+			{/if}
+			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Name
+					<input type="text" bind:value={createForm.name}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" />
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Description (optional)
+					<input type="text" bind:value={createForm.description}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" />
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Purpose
+					<select bind:value={createForm.purpose}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+						{#each PURPOSES as p}
+							<option value={p}>{p}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Layer
+					<select bind:value={createForm.layer}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+						{#each LAYERS as l}
+							<option value={l}>{l}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Notation (optional)
+					<select bind:value={createForm.notation}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+						<option value="">— none —</option>
+						{#each availableNotations as n (n.id)}
+							<option value={n.id}>{n.name}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Diagram type (optional)
+					<select bind:value={createForm.diagram_type}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+						<option value="">— none —</option>
+						{#each availableDiagramTypes as d (d.id)}
+							<option value={d.id}>{d.name}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+			<label class="mt-3 flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+				Prompt text
+				<textarea bind:value={createForm.prompt_text} rows="10"
+					class="rounded border px-2 py-1 font-mono text-xs"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); resize: vertical"></textarea>
+			</label>
+			<p class="mt-2 text-xs" style="color: var(--color-muted)">
+				Will apply to: <strong>{appliesToLabel({ layer: createForm.layer, notation: createForm.notation || null, diagram_type: createForm.diagram_type || null })}</strong>
+			</p>
+			{#if createConflict}
+				<p class="mt-2 text-xs" style="color: var(--color-danger)">
+					An active prompt already exists for this combination: <strong>{createConflict}</strong>. Disable that prompt first or pick a different combination.
+				</p>
+			{/if}
+			<div class="mt-3 flex justify-end gap-3">
+				<button onclick={closeCreatePrompt}
+					class="rounded border px-4 py-2 text-sm"
+					style="border-color: var(--color-border); color: var(--color-fg)">
+					Cancel
+				</button>
+				<button onclick={saveCreatePrompt} disabled={createSaving || !createForm.name || !createForm.prompt_text || createConflict !== null}
+					class="rounded px-4 py-2 text-sm text-white disabled:opacity-50"
+					style="background-color: var(--color-primary)">
+					{createSaving ? 'Saving…' : 'Create'}
+				</button>
+			</div>
+		</div>
+	{/if}
 
 	{#if promptsLoading}
 		<p style="color: var(--color-muted)">Loading…</p>
-	{:else if creationPrompts.length === 0}
-		<p class="text-sm" style="color: var(--color-muted)">No creation prompts found.</p>
+	{:else if filteredPrompts.length === 0}
+		<p class="text-sm" style="color: var(--color-muted)">
+			{creationPrompts.length === 0 ? 'No prompts found.' : 'No prompts match these filters.'}
+		</p>
 	{:else}
 		<div class="overflow-x-auto rounded border" style="border-color: var(--color-border)">
 			<table class="w-full text-sm" style="color: var(--color-fg)">
 				<thead>
 					<tr style="background: var(--color-surface); border-bottom: 1px solid var(--color-border)">
 						<th class="px-4 py-2 text-left font-medium">Name</th>
+						<th class="px-4 py-2 text-left font-medium">Purpose</th>
 						<th class="px-4 py-2 text-left font-medium">Layer</th>
-						<th class="px-4 py-2 text-left font-medium">Notation</th>
-						<th class="px-4 py-2 text-left font-medium">Diagram type</th>
+						<th class="px-4 py-2 text-left font-medium">Applies to</th>
 						<th class="px-4 py-2 text-left font-medium">Status</th>
 						<th class="px-4 py-2 text-right font-medium">Actions</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each creationPrompts as p (p.id)}
-						<tr style="border-bottom: 1px solid var(--color-border)">
+					{#each filteredPrompts as p (p.id)}
+						<tr style="border-bottom: 1px solid var(--color-border); opacity: {p.is_active ? '1' : '0.55'}">
 							<td class="px-4 py-2">
 								<div class="font-medium">{p.name}</div>
 								{#if p.description}
 									<div class="text-xs" style="color: var(--color-muted)">{p.description}</div>
 								{/if}
 							</td>
+							<td class="px-4 py-2 font-mono text-xs">{p.purpose ?? 'creation_format'}</td>
 							<td class="px-4 py-2 font-mono text-xs">{p.layer}</td>
-							<td class="px-4 py-2 text-xs">{p.notation ?? '—'}</td>
-							<td class="px-4 py-2 text-xs">{p.diagram_type ?? '—'}</td>
-							<td class="px-4 py-2 text-xs" style="color: {p.is_active ? 'var(--color-success, #16a34a)' : 'var(--color-muted)'}">
-								{p.is_active ? 'active' : 'inactive'}
+							<td class="px-4 py-2 text-xs">{appliesToLabel(p)}</td>
+							<td class="px-4 py-2 text-xs">
+								<button
+									onclick={() => togglePromptActive(p)}
+									class="rounded px-2 py-1 text-xs"
+									style="border: 1px solid var(--color-border); color: {p.is_active ? 'var(--color-success, #16a34a)' : 'var(--color-muted)'}; background: var(--color-bg)"
+									aria-label="Toggle active status"
+								>
+									{p.is_active ? '● active' : '○ inactive'}
+								</button>
 							</td>
 							<td class="px-4 py-2 text-right">
 								<button
@@ -608,6 +1030,13 @@
 									style="border: 1px solid var(--color-border); color: var(--color-fg)"
 								>
 									Edit
+								</button>
+								<button
+									onclick={() => { deletingPromptId = p.id; }}
+									class="ml-2 rounded px-2 py-1 text-xs"
+									style="border: 1px solid var(--color-border); color: var(--color-danger)"
+								>
+									Delete
 								</button>
 							</td>
 						</tr>
@@ -618,18 +1047,17 @@
 	{/if}
 </div>
 
-<!-- Edit prompt modal -->
+<!-- Edit prompt modal (ADR-158, v5.13.0: extended to edit name/description/notation/diagram_type) -->
 {#if editingPrompt}
-	<div role="dialog" aria-modal="true" aria-label="Edit creation prompt"
+	<div role="dialog" aria-modal="true" aria-label="Edit AI prompt"
 		class="fixed inset-0 z-50 flex items-center justify-center"
 		style="background: rgba(0,0,0,0.5)">
-		<div class="w-full max-w-2xl overflow-y-auto rounded border p-6 shadow-xl"
+		<div class="w-full max-w-3xl overflow-y-auto rounded border p-6 shadow-xl"
 			style="max-height: 90vh; background: var(--color-bg); border-color: var(--color-border)">
-			<h2 class="mb-1 text-lg font-semibold" style="color: var(--color-fg)">{editingPrompt.name}</h2>
+			<h2 class="mb-1 text-lg font-semibold" style="color: var(--color-fg)">Edit prompt</h2>
 			<p class="mb-4 text-xs" style="color: var(--color-muted)">
-				layer: {editingPrompt.layer}
-				{#if editingPrompt.notation} · notation: {editingPrompt.notation}{/if}
-				{#if editingPrompt.diagram_type} · diagram_type: {editingPrompt.diagram_type}{/if}
+				purpose: {editingPrompt.purpose ?? 'creation_format'} · layer: {editingPrompt.layer}
+				(both immutable — delete and re-create to move between purposes/layers)
 			</p>
 
 			{#if promptError}
@@ -637,7 +1065,44 @@
 					style="border-color: var(--color-danger); color: var(--color-danger)">{promptError}</div>
 			{/if}
 
-			<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Name
+					<input type="text" bind:value={promptEditName}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" />
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Description
+					<input type="text" bind:value={promptEditDescription}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" />
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Notation
+					<select bind:value={promptEditNotation}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+						<option value="">— none —</option>
+						{#each availableNotations as n (n.id)}
+							<option value={n.id}>{n.name}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+					Diagram type
+					<select bind:value={promptEditDiagramType}
+						class="rounded border px-2 py-1 text-sm"
+						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+						<option value="">— none —</option>
+						{#each availableDiagramTypes as d (d.id)}
+							<option value={d.id}>{d.name}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+
+			<label class="mt-4 flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
 				Prompt text
 				<textarea
 					bind:value={promptEditText}
@@ -646,6 +1111,10 @@
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); resize: vertical"
 				></textarea>
 			</label>
+
+			<p class="mt-2 text-xs" style="color: var(--color-muted)">
+				Will apply to: <strong>{appliesToLabel({ layer: editingPrompt.layer, notation: promptEditNotation || null, diagram_type: promptEditDiagramType || null })}</strong>
+			</p>
 
 			<div class="mt-4 flex justify-end gap-3">
 				<button onclick={closePromptEdit}
@@ -657,6 +1126,34 @@
 					class="rounded px-4 py-2 text-sm text-white disabled:opacity-50"
 					style="background-color: var(--color-primary)">
 					{promptSaving ? 'Saving…' : 'Save'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete prompt confirmation (ADR-158, v5.13.0) -->
+{#if deletingPromptId}
+	{@const pp = creationPrompts.find(x => x.id === deletingPromptId)}
+	<div role="dialog" aria-modal="true" aria-label="Confirm delete prompt"
+		class="fixed inset-0 z-50 flex items-center justify-center"
+		style="background: rgba(0,0,0,0.5)">
+		<div class="rounded border p-6 shadow-xl"
+			style="background: var(--color-bg); border-color: var(--color-border); min-width: 360px">
+			<h2 class="mb-2 text-base font-semibold" style="color: var(--color-fg)">Delete prompt?</h2>
+			<p class="mb-4 text-sm" style="color: var(--color-muted)">
+				Delete <strong>{pp?.name}</strong>? This is a hard delete. To preserve content while suppressing it from the cascade, use the inactive toggle instead.
+			</p>
+			<div class="flex justify-end gap-3">
+				<button onclick={() => { deletingPromptId = null; }}
+					class="rounded border px-4 py-2 text-sm"
+					style="border-color: var(--color-border); color: var(--color-fg)">
+					Cancel
+				</button>
+				<button onclick={confirmDeletePrompt}
+					class="rounded px-4 py-2 text-sm text-white"
+					style="background-color: var(--color-danger)">
+					Delete
 				</button>
 			</div>
 		</div>

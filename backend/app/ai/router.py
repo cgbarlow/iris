@@ -41,6 +41,7 @@ from app.ai.models import (
     ApplyCreationRequest,
     ApplyCreationResponse,
     ConversationResponse,
+    CreationPromptCreate,
     CreationPromptResponse,
     CreationPromptUpdate,
     FileExtractResponse,
@@ -950,18 +951,59 @@ async def update_creation_prompt(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> CreationPromptResponse:
-    """Update an AI creation prompt. Admin only."""
+    """Update an AI creation prompt. Admin only.
+
+    v5.13.0 (ADR-158): extended to accept name/description/notation/
+    diagram_type/display_order in addition to prompt_text/is_active.
+    Re-validates the conflict tuple on update if any of (notation,
+    diagram_type) change while is_active=true.
+    """
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
 
     cursor = await db.execute(
-        "SELECT id FROM ai_creation_prompts WHERE id = ?", (prompt_id,)
+        "SELECT purpose, layer, notation, diagram_type, is_active "
+        "FROM ai_creation_prompts WHERE id = ?", (prompt_id,),
     )
-    if await cursor.fetchone() is None:
+    existing = await cursor.fetchone()
+    if existing is None:
         raise HTTPException(status_code=404, detail="Creation prompt not found")
+
+    # Resolve final tuple values (post-update) for conflict detection.
+    final_purpose = existing[0] or "creation_format"
+    final_layer = existing[1]
+    final_notation = body.notation if body.notation is not None else existing[2]
+    final_diagram_type = body.diagram_type if body.diagram_type is not None else existing[3]
+    final_is_active = body.is_active if body.is_active is not None else bool(existing[4])
+
+    # Conflict check: if the final row would be active, ensure no OTHER
+    # active row already exists with the same (purpose, layer, notation,
+    # diagram_type) tuple.
+    if final_is_active:
+        await _ensure_no_active_conflict(
+            db, prompt_id=prompt_id,
+            purpose=final_purpose, layer=final_layer,
+            notation=final_notation, diagram_type=final_diagram_type,
+        )
 
     updates: list[str] = []
     params: list[Any] = []
+    if body.name is not None:
+        updates.append("name = ?")
+        params.append(body.name)
+    if body.description is not None:
+        updates.append("description = ?")
+        params.append(body.description)
+    if body.notation is not None:
+        # Treat empty string as "clear to NULL"
+        updates.append("notation = ?")
+        params.append(body.notation if body.notation else None)
+    if body.diagram_type is not None:
+        updates.append("diagram_type = ?")
+        params.append(body.diagram_type if body.diagram_type else None)
+    if body.display_order is not None:
+        updates.append("display_order = ?")
+        params.append(body.display_order)
     if body.prompt_text is not None:
         updates.append("prompt_text = ?")
         params.append(body.prompt_text)
@@ -1000,6 +1042,151 @@ async def update_creation_prompt(
         created_at=row[11],
         updated_at=row[12],
     )
+
+
+# ── ADR-158 (v5.13.0): POST + DELETE for creation prompts ──────────────
+
+
+def _slugify(name: str) -> str:
+    """Produce an id-safe slug from a human-readable name."""
+    import re
+    slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-")
+    return slug or "prompt"
+
+
+async def _ensure_no_active_conflict(
+    db: Any,
+    *,
+    prompt_id: str | None,
+    purpose: str,
+    layer: str,
+    notation: str | None,
+    diagram_type: str | None,
+) -> None:
+    """Raise 409 if another is_active=true row has the same
+    (purpose, layer, notation, diagram_type) tuple. `prompt_id` is
+    excluded from the check (so a PUT on the row itself doesn't
+    self-conflict)."""
+    query = (
+        "SELECT id, name FROM ai_creation_prompts "
+        "WHERE purpose = ? AND layer = ? AND is_active = 1 "
+        "AND COALESCE(notation, '') = COALESCE(?, '') "
+        "AND COALESCE(diagram_type, '') = COALESCE(?, '') "
+    )
+    params: list[Any] = [purpose, layer, notation, diagram_type]
+    if prompt_id is not None:
+        query += "AND id != ? "
+        params.append(prompt_id)
+    query += "LIMIT 1"
+
+    cursor = await db.execute(query, tuple(params))
+    row = await cursor.fetchone()
+    if row is not None:
+        msg = (
+            f"An active prompt already exists for "
+            f"(purpose={purpose}, layer={layer}, "
+            f"notation={notation or 'NULL'}, "
+            f"diagram_type={diagram_type or 'NULL'}): "
+            f"'{row[1]}' ({row[0]}). Disable that prompt first or pick "
+            f"a different combination."
+        )
+        raise HTTPException(status_code=409, detail=msg)
+
+
+@router.post("/creation-prompts", response_model=CreationPromptResponse, status_code=201)
+async def create_creation_prompt(
+    body: CreationPromptCreate,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> CreationPromptResponse:
+    """Create a new AI creation or response prompt (ADR-158, v5.13.0). Admin only."""
+    _require_admin(current_user)
+    db = request.app.state.db_manager.main_db
+
+    # Conflict check (only when the new row is active).
+    if body.is_active:
+        await _ensure_no_active_conflict(
+            db, prompt_id=None,
+            purpose=body.purpose, layer=body.layer,
+            notation=body.notation, diagram_type=body.diagram_type,
+        )
+
+    # Auto-generate a slug-based id with collision suffix if needed.
+    base_slug = _slugify(body.name)
+    prompt_id = base_slug
+    suffix = 1
+    while True:
+        cursor = await db.execute(
+            "SELECT 1 FROM ai_creation_prompts WHERE id = ?", (prompt_id,),
+        )
+        if (await cursor.fetchone()) is None:
+            break
+        suffix += 1
+        prompt_id = f"{base_slug}-{suffix}"
+
+    now = datetime.now(tz=UTC).isoformat()
+    await db.execute(
+        "INSERT INTO ai_creation_prompts "
+        "(id, name, description, purpose, layer, notation, diagram_type, "
+        "prompt_text, display_order, is_active, created_by, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            prompt_id,
+            body.name,
+            body.description,
+            body.purpose,
+            body.layer,
+            body.notation,
+            body.diagram_type,
+            body.prompt_text,
+            body.display_order,
+            body.is_active,
+            current_user.get("id"),
+            now,
+            now,
+        ),
+    )
+    await db.commit()
+
+    return CreationPromptResponse(
+        id=prompt_id,
+        name=body.name,
+        description=body.description,
+        purpose=body.purpose,
+        layer=body.layer,
+        notation=body.notation,
+        diagram_type=body.diagram_type,
+        prompt_text=body.prompt_text,
+        display_order=body.display_order,
+        is_active=body.is_active,
+        created_by=current_user.get("id"),
+        created_at=now,
+        updated_at=now,
+    )
+
+
+@router.delete("/creation-prompts/{prompt_id}", status_code=204)
+async def delete_creation_prompt(
+    prompt_id: str,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> None:
+    """Hard-delete an AI creation/response prompt (ADR-158, v5.13.0). Admin only.
+
+    No foreign keys point at this row. To preserve content while
+    suppressing it from the cascade, use PUT with `{is_active: false}`
+    instead.
+    """
+    _require_admin(current_user)
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "SELECT id FROM ai_creation_prompts WHERE id = ?", (prompt_id,),
+    )
+    if (await cursor.fetchone()) is None:
+        raise HTTPException(status_code=404, detail="Creation prompt not found")
+
+    await db.execute("DELETE FROM ai_creation_prompts WHERE id = ?", (prompt_id,))
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------
