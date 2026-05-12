@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.12.1] - 2026-05-12
+
+### Fixed
+
+- **Supabase migration `m055_response_format_prompts.sql` failed with
+  `column "is_default" is of type boolean but expression is of type
+  integer` (42804)** when run against the Supabase Postgres schema.
+  `diagram_type_notations.is_default` is `BOOLEAN` on Postgres but
+  `INTEGER` on SQLite; v5.12.0's m055 used `1` (the SQLite
+  convention) without casting. Changed to `TRUE` to match every
+  other Supabase migration's convention (m020 / m028 / m044 etc.).
+  Added a regression test that pins this. Re-run
+  `./scripts/supabase-migrate.sh` against the UAT DB; idempotent —
+  the failed v5.12.0 row insert will now succeed.
+
 ## [5.12.0] - 2026-05-12
 
 ### Added

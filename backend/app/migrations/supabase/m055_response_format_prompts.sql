@@ -33,8 +33,9 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- Postgres `is_default` is boolean (Supabase schema); SQLite uses 1.
 INSERT INTO public.diagram_type_notations (diagram_type_id, notation_id, is_default)
-VALUES ('doview_analysis', 'markdown', 1)
+VALUES ('doview_analysis', 'markdown', TRUE)
 ON CONFLICT (diagram_type_id, notation_id) DO NOTHING;
 
 -- 3. Seed response_format prompt rows. Bodies match the SQLite seed
