@@ -37,10 +37,14 @@ A. ANALYSIS (option 3 above) — written outcomes-theory analysis with embedded 
    - Compose using mcp__iris__search + mcp__iris__get_diagram against this set
    - After producing, offer BOTH save paths:
        (i) iris_save_doview_analysis(set_id, name, content, parent_package_id?) —
-           auth required (IRIS_TOKEN). Suggest a parent_package_id by topic:
+           auth required. Suggest a parent_package_id by topic:
            AI → J series; evaluation → G; introduction/adoption → I; alignment → C;
            indicators → D; contracting → E; reporting → H; fundamentals → A;
            drawing/strategy → B; performance improvement → F.
+           If the save fails with error="auth_required" (v5.15.0+, ADR-160),
+           follow the returned guidance: ask the user to visit
+           /settings/mcp-pairing, generate a pairing code, and paste it back.
+           Then call iris_authenticate(credential=<pasted code>) and retry the save.
        (ii) Leave the markdown in chat for copy/paste — it IS the markdown.
 
 B. NEW VISUAL DOVIEW DIAGRAM (a notation=doview outcomes_map):

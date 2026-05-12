@@ -8,11 +8,13 @@ adding/removing a capability is a one-line diff.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from iris_client import IrisClient
+from iris_client.exceptions import IrisAuthError, IrisHTTPError
 from mcp import types
 
 from iris_mcp.errors import format_error
@@ -21,6 +23,22 @@ from iris_mcp.links import (
     with_web_urls_list,
     with_web_urls_search,
 )
+from iris_mcp.token_store import save_token
+
+
+PAIRING_PAGE_PATH = "/settings/mcp-pairing"
+
+
+def _pairing_url() -> str:
+    """Return the user-facing URL of the MCP pairing page.
+
+    Prefers IRIS_WEB_URL (the public web UI base) over IRIS_URL (the
+    API base) when the two differ.
+    """
+    base = os.environ.get("IRIS_WEB_URL") or os.environ.get(
+        "IRIS_URL", "http://localhost:8000",
+    )
+    return base.rstrip("/") + PAIRING_PAGE_PATH
 
 
 @dataclass(frozen=True)
@@ -175,16 +193,129 @@ async def _save_doview_analysis(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-157 (v5.12.0): persist a generated outcomes-theory analysis
     as a new `doview_analysis` diagram in Iris. Auth required —
     requires IRIS_TOKEN to be set on the MCP server."""
-    diagram = await c.create_diagram(
-        diagram_type="doview_analysis",
-        notation="markdown",
-        name=args["name"],
-        data={"content": args["content"]},
-        set_id=args["set_id"],
-        parent_package_id=args.get("parent_package_id"),
-        description=args.get("description"),
-    )
+    try:
+        diagram = await c.create_diagram(
+            diagram_type="doview_analysis",
+            notation="markdown",
+            name=args["name"],
+            data={"content": args["content"]},
+            set_id=args["set_id"],
+            parent_package_id=args.get("parent_package_id"),
+            description=args.get("description"),
+        )
+    except IrisAuthError:
+        # ADR-160: render the in-conversation pairing-recovery guidance
+        # instead of a bare 401. The next step is a tool call to
+        # iris_authenticate(code) — keep the structure stable so models
+        # can extract it reliably.
+        return json.dumps({
+            "success": False,
+            "error": "auth_required",
+            "message": (
+                "Save to Iris failed — this MCP connection isn't"
+                " authenticated yet.\n\n"
+                "To fix:\n"
+                f"  1. Visit {_pairing_url()}\n"
+                "  2. Click 'Generate pairing code'\n"
+                "  3. Paste the code back here, and I'll call iris_authenticate.\n\n"
+                "(After that, this MCP connection stays authenticated"
+                " for ~90 days on this machine.)"
+            ),
+            "pairing_url": _pairing_url(),
+            "next_tool": "iris_authenticate",
+        })
     return diagram.model_dump_json()
+
+
+async def _iris_authenticate(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-160 (v5.15.0): authenticate this MCP connection.
+
+    Accepts either:
+      - a pairing code (`IRIS-XXXX-YYYY`) generated at /settings/mcp-pairing
+      - a full PAT (`iris_pat_...`) created at /settings/tokens
+
+    On success, persists the credential to `~/.iris-mcp/<hash>.json`
+    (mode 0600) and updates the in-process IrisClient so subsequent
+    tool calls in this MCP session use the new token immediately.
+    """
+    credential = (args.get("credential") or "").strip()
+    if not credential:
+        return json.dumps({
+            "success": False,
+            "error": "invalid_credential",
+            "message": (
+                "iris_authenticate requires a `credential` argument: "
+                "either a pairing code (IRIS-XXXX-YYYY) or a PAT "
+                "(iris_pat_...)."
+            ),
+        })
+
+    iris_url = c.url
+
+    if credential.startswith("iris_pat_"):
+        # PAT-paste path: validate via /api/auth/me before persisting.
+        async with IrisClient(url=iris_url, token=credential) as validator:
+            try:
+                await validator.whoami()
+            except IrisAuthError:
+                return json.dumps({
+                    "success": False,
+                    "error": "pat_invalid",
+                    "message": (
+                        "PAT is invalid or revoked. Verify it at "
+                        f"{_pairing_url().replace(PAIRING_PAGE_PATH, '/settings/tokens')}."
+                    ),
+                })
+        save_token(iris_url, credential, expires_at=None)
+        c.set_token(credential)
+        return json.dumps({
+            "success": True,
+            "mode": "pat_paste",
+            "message": (
+                "PAT validated and persisted. Future MCP tool calls"
+                " will use this token until the PAT expires or is revoked."
+            ),
+        })
+
+    code = credential.upper()
+    if not code.startswith("IRIS-"):
+        return json.dumps({
+            "success": False,
+            "error": "invalid_credential",
+            "message": (
+                "Credential must be a pairing code (IRIS-XXXX-YYYY) or a "
+                "PAT (iris_pat_...). Generate a pairing code at "
+                f"{_pairing_url()}."
+            ),
+        })
+
+    # Pairing-code path: anonymous exchange.
+    async with IrisClient(url=iris_url, token=None) as exchanger:
+        try:
+            resp = await exchanger.exchange_pairing_code(code)
+        except IrisHTTPError as exc:
+            if exc.status_code == 410:  # noqa: PLR2004 — backend uses 410 Gone for invalid/expired/exchanged
+                return json.dumps({
+                    "success": False,
+                    "error": "pairing_code_unusable",
+                    "message": (
+                        "Pairing code is unknown, expired, or already"
+                        f" exchanged. Generate a new one at {_pairing_url()}."
+                    ),
+                })
+            raise
+    save_token(iris_url, resp.token, expires_at=resp.expires_at)
+    c.set_token(resp.token)
+    return json.dumps({
+        "success": True,
+        "mode": "pairing_code",
+        "expires_at": resp.expires_at,
+        "message": (
+            f"Authenticated and persisted. Future MCP tool calls will"
+            f" use this token until {resp.expires_at}. Revoke any time"
+            f" at {_pairing_url().replace(PAIRING_PAGE_PATH, '/settings/tokens')}."
+        ),
+    })
 
 
 async def _list_conversations(c: IrisClient, args: dict[str, Any]) -> str:
@@ -493,6 +624,28 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_get_response_prompt,
+    ),
+    Tool(
+        name="iris_authenticate",
+        description=(
+            "Authenticate this Iris MCP connection (ADR-160, v5.15.0). "
+            "Pass either a pairing code from Iris's web UI "
+            "(/settings/mcp-pairing — short typeable IRIS-XXXX-YYYY form) "
+            "or a full Personal Access Token (iris_pat_..., from "
+            "/settings/tokens). The token is persisted at "
+            "~/.iris-mcp/<hash>.json (mode 0600) and applied immediately "
+            "to this MCP session — no client restart required. Use this "
+            "tool when a write-capable Iris tool (e.g. save_doview_analysis) "
+            "reports auth_required, or proactively if the user provides a "
+            "pairing code."
+        ),
+        input_schema=_schema({
+            "credential": _str_arg(
+                "credential",
+                "Pairing code (IRIS-XXXX-YYYY) or PAT (iris_pat_...).",
+            ),
+        }),
+        handler=_iris_authenticate,
     ),
     Tool(
         name="save_doview_analysis",
