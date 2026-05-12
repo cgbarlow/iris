@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.13.1] - 2026-05-12
+
+### Fixed
+
+- **Admin AI prompts page — Notation and Diagram type filter
+  dropdowns were empty.** v5.13.0 called `/api/notations` and
+  `/api/diagram-types`; the registry endpoints actually live at
+  `/api/registry/notations` and `/api/registry/diagram-types` per
+  ADR-079. `apiFetch` returned 404, the catch swallowed the error,
+  and the dropdowns rendered with only the placeholder option.
+  Frontend now hits the correct paths.
+
 ## [5.13.0] - 2026-05-12
 
 ### Added
