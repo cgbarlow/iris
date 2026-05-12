@@ -123,6 +123,10 @@ No changes in v5.12.0. Admin Settings / AI GUI extension for `response_format` r
 
 Pre-existing `test_no_extra_rls_tables` failure (issue 88 Phase 4 TODO, caps at m029) remains the only acceptable failure in the suite.
 
+## Deployment / UAT setup
+
+Beyond the migration, one manual step is required on each scope that should advertise the response_format workflow to MCP clients: paste a short pointer into the **MCP system context** field. Canonical content for the DoView Book Set is in [`docs/prompts/doview-book-mcp-system-context.md`](../../prompts/doview-book-mcp-system-context.md).
+
 ## End-to-end verification
 
 ```bash
