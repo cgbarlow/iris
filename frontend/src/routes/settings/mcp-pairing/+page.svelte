@@ -92,7 +92,8 @@
 {#if !isAuthenticated()}
 	<section class="mt-6 rounded border px-4 py-3 text-sm"
 		style="border-color: var(--color-border); color: var(--color-muted); background-color: var(--color-bg)">
-		Sign in first to generate a pairing code.
+		<a href="/login?redirect=/settings/mcp-pairing" style="color: var(--color-primary)">Sign in</a>
+		first to generate a pairing code.
 	</section>
 {:else}
 	<section class="mt-6">

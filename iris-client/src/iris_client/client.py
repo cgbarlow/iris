@@ -466,19 +466,37 @@ class IrisClient:
 
     # --- Response-format prompts (ADR-157, v5.12.0) -------------------------
 
-    async def list_response_format_types(self) -> list["ResponseFormatType"]:
-        """List distinct (notation, diagram_type) pairs that have at least one
-        active response_format prompt. Anonymous-readable."""
-        response = await self._request("GET", "/api/ai/response-prompts/types")
+    async def list_response_format_types(
+        self, *, purpose: str = "response_format",
+    ) -> list["ResponseFormatType"]:
+        """List distinct (notation, diagram_type) pairs that have at least
+        one active prompt of the requested purpose. Anonymous-readable.
+
+        `purpose` defaults to ``response_format`` (backwards-compatible).
+        Pass ``creation_format`` to discover diagram-creation-capable
+        pairs (ADR-162, v5.17.0)."""
+        response = await self._request(
+            "GET", "/api/ai/response-prompts/types",
+            params={"purpose": purpose},
+        )
         return [ResponseFormatType.model_validate(r) for r in response.json()]
 
     async def get_response_prompt(
-        self, notation: str, diagram_type: str | None = None,
+        self,
+        notation: str,
+        diagram_type: str | None = None,
+        *,
+        purpose: str = "response_format",
     ) -> "ResponsePromptComposed":
-        """Fetch the composed response_format cascade for a (notation,
+        """Fetch the composed prompt cascade for a (notation,
         diagram_type) pair. Anonymous-readable. Returns the composed body
-        as the `body` field; empty string if no rows match."""
-        params: dict[str, str] = {"notation": notation}
+        as the `body` field; empty string if no rows match.
+
+        `purpose` defaults to ``response_format`` for backwards
+        compatibility. Pass ``creation_format`` to get the layered
+        creation cascade Iris AI uses when generating diagrams — used
+        by MCP clients to drive local-AI diagram creation (ADR-162)."""
+        params: dict[str, str] = {"notation": notation, "purpose": purpose}
         if diagram_type is not None:
             params["diagram_type"] = diagram_type
         response = await self._request(

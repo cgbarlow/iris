@@ -30,7 +30,7 @@ The graph has its own settings panel (top-right of the graph area) for spread, l
 
 ## Search
 
-The search bar sits beneath the graph. Unlike the counts panel, **the search bar is always global** — typing on `/` with no URL parameters searches every collection and every set. A remembered scope does not silently filter search (fixed in v4.1.3; see ADR-121).
+The search bar sits beneath the graph. Unlike the counts panel, **the search bar is always global** — typing on `/` with no URL parameters searches every collection and every set. A remembered scope does not silently filter search.
 
 Results appear inline with type badges; each result has a deep-link to the entity detail page plus an **Add to AI context** button — see [Search](search) and [Ask AI](ask-ai).
 

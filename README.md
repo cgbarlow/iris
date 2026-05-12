@@ -305,11 +305,16 @@ persists at `~/.iris-mcp/<hash>.json` (mode 0600) and remains valid
 for ~90 days. Set `IRIS_TOKEN` explicitly only if you want to
 override the persisted credential (e.g. for CI / scripted setups).
 
-Exposes ~22 tools (search, list/get for every entity, export, ask-AI,
+Exposes ~30 tools (search, list/get for every entity, export, ask-AI,
 apply-diagram-creation, conversations, plus `create_collection` /
 `create_set` / `create_package` for organising destinations from
-v5.16.0, and `iris_authenticate` for in-app credential setup from
-v5.15.0) plus `iris://` resource URIs for JSON export bundles. When `IRIS_WEB_URL` is set, every tool
+v5.16.0, `iris_authenticate` for in-app credential setup from
+v5.15.0, and `create_diagram` / `list_notations` / `list_diagram_types`
+for the generic local-AI diagram-creation workflow from v5.17.0).
+The legacy `save_doview_analysis` tool is deprecated in v5.17.0
+(prefer `create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`)
+and will be removed in v6.0.0. Plus `iris://` resource URIs for
+JSON export bundles. When `IRIS_WEB_URL` is set, every tool
 response that carries an entity id also carries a resolved front-end
 URL so MCP-using LLMs link back to the live UI without guessing
 hosts. See [`mcp/README.md`](mcp/README.md) and
