@@ -64,6 +64,8 @@ The default self-hosted mode requires no external services. The optional Render 
 | **BPMN 2.0** *(preview, WIP)* | 14 base types across Activities, Events, Gateways, Swimlanes, Data, Artifacts via discriminator fields | Sequence Flow (default + conditional), Message Flow, Association, Data Association |
 | **Sequence** *(UML diagram type)* | Participants with lifelines | Sync, Async, Reply messages with activation boxes |
 
+> **DoView and outcomes theory.** For a complete one-page implementation overview — DoView notation, the AI creation methodology, the handbook content held as an Iris dataset, the response-format mechanism for formal handbook-grounded analyses, and how all of it is reached over MCP — see [**DoView and Outcomes Theory in Iris**](docs/DOVIEW-AND-OUTCOMES-THEORY-IN-IRIS.md). Written for Dr Paul Duignan (the originator of outcomes theory and the DoView methodology) and anyone else wanting to understand how the body of work is realised in code.
+
 ### Keyboard Accessibility
 
 All canvas operations have keyboard equivalents:
