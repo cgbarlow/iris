@@ -95,6 +95,19 @@ def test_supabase_m055_registers_markdown_and_doview_analysis() -> None:
     assert "ON CONFLICT (id) DO NOTHING" in sql
 
 
+def test_supabase_m055_uses_boolean_literal_for_is_default() -> None:
+    """v5.12.1 regression: `diagram_type_notations.is_default` is boolean
+    on Postgres (Supabase). Using `1` (integer, SQLite convention)
+    triggers `column "is_default" is of type boolean but expression is
+    of type integer`. The Supabase migration must use TRUE/FALSE."""
+    sql = _read("app/migrations/supabase/m055_response_format_prompts.sql")
+    # The doview_analysis ↔ markdown mapping must use a boolean literal.
+    assert "VALUES ('doview_analysis', 'markdown', TRUE)" in sql, (
+        "is_default must be `TRUE` (boolean), not `1` (integer), "
+        "on the Postgres-backed Supabase schema."
+    )
+
+
 def test_supabase_m055_seeds_three_response_format_rows() -> None:
     sql = _read("app/migrations/supabase/m055_response_format_prompts.sql")
     for prompt_id in (
