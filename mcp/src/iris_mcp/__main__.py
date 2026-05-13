@@ -12,6 +12,7 @@ from mcp.server.stdio import stdio_server
 
 from iris_mcp.config import load
 from iris_mcp.server import build_server
+from iris_mcp.server_instructions import fetch_server_instructions
 from iris_mcp.token_store import load_token
 
 
@@ -35,8 +36,13 @@ async def run() -> None:
     config = load()
     token, source = _resolve_token(config.token, config.url)
     print(f"iris-mcp: using {source}", file=sys.stderr)
+    # ADR-163 (v5.18.0): fetch the admin-editable orient-first
+    # protocol from Iris and pass it through to the MCP server's
+    # `instructions` field. Falls back to a hardcoded baseline if
+    # the backend is unreachable.
+    instructions = await fetch_server_instructions(config.url)
     async with IrisClient(url=config.url, token=token) as client:
-        server = build_server(client)
+        server = build_server(client, instructions=instructions)
         async with stdio_server() as (read, write):
             await server.run(
                 read,

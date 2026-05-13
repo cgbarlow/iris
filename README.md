@@ -314,7 +314,17 @@ for the generic local-AI diagram-creation workflow from v5.17.0).
 The legacy `save_doview_analysis` tool is deprecated in v5.17.0
 (prefer `create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`)
 and will be removed in v6.0.0. Plus `iris://` resource URIs for
-JSON export bundles. When `IRIS_WEB_URL` is set, every tool
+JSON export bundles.
+
+**Server-wide orient-first protocol** (v5.18.0 / ADR-163). On every
+session, iris-mcp surfaces an admin-editable orient-first protocol
++ discovery catalogue via the MCP `instructions` channel (returned
+in the InitializeResult to every connected MCP client). Admins
+edit the body at `/admin/settings/ai` filtering by
+`purpose=mcp_server_instructions`; the next MCP session picks up
+the change. iris-mcp falls back to a hardcoded baseline if the
+Iris backend is unreachable at startup, so write tools stay
+usable in degraded states. When `IRIS_WEB_URL` is set, every tool
 response that carries an entity id also carries a resolved front-end
 URL so MCP-using LLMs link back to the live UI without guessing
 hosts. See [`mcp/README.md`](mcp/README.md) and
