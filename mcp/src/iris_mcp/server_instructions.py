@@ -48,6 +48,30 @@ async def fetch_server_instructions(iris_url: str) -> str:
 
     Falls back to `_FALLBACK_INSTRUCTIONS` on any network error,
     HTTP error, malformed JSON, or empty body. Never raises.
+
+    Used by the lifespan startup fetch — the caller wants a usable
+    body in hand before serving the first request, so falling back to
+    the hardcoded baseline is the right behaviour. The refresh-loop
+    variant `try_fetch_server_instructions` returns `None` instead, so
+    a transient backend failure mid-loop doesn't clobber a previously-
+    fetched admin-edited body with the baseline (ADR-166, v6.0.5).
+    """
+    body = await try_fetch_server_instructions(iris_url)
+    return body if body is not None else _FALLBACK_INSTRUCTIONS
+
+
+async def try_fetch_server_instructions(iris_url: str) -> str | None:
+    """GET /api/ai/server-instructions and return its body, or None.
+
+    Returns `None` on any failure mode that `fetch_server_instructions`
+    falls back from — network error, HTTP error, malformed JSON, empty
+    body, whitespace-only body. Never raises.
+
+    Used by the v6.0.5 refresh loop (ADR-166): if the backend is
+    transiently unavailable mid-loop, the caller preserves the last
+    good body rather than overwriting it with the hardcoded fallback.
+    The lifespan startup path uses `fetch_server_instructions` so the
+    very first request still sees a non-`None` body.
     """
     try:
         async with httpx.AsyncClient(base_url=iris_url, timeout=5.0) as c:
@@ -57,6 +81,6 @@ async def fetch_server_instructions(iris_url: str) -> str:
             body = payload.get("body") if isinstance(payload, dict) else None
             if isinstance(body, str) and body.strip():
                 return body
-            return _FALLBACK_INSTRUCTIONS
+            return None
     except (httpx.HTTPError, ValueError):
-        return _FALLBACK_INSTRUCTIONS
+        return None
