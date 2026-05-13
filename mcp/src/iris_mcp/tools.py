@@ -291,7 +291,13 @@ async def _get_response_prompt(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _create_collection(c: IrisClient, args: dict[str, Any]) -> str:
-    """ADR-161 (v5.16.0): create a new Collection."""
+    """ADR-161 (v5.16.0): create a new Collection.
+
+    v6.0.15 (ADR-175): response decorated with `web_url` via
+    `with_web_url` so the model can link the user straight to the new
+    entity in the Iris UI. Previously, the create_* tools returned the
+    bare entity dict and the model had to guess the host.
+    """
     try:
         result = await c.create_collection(
             name=args["name"],
@@ -299,11 +305,13 @@ async def _create_collection(c: IrisClient, args: dict[str, Any]) -> str:
         )
     except IrisAuthError:
         return _auth_required_payload("Create collection")
-    return result.model_dump_json()
+    return with_web_url(result.model_dump_json(), "collection")
 
 
 async def _create_set(c: IrisClient, args: dict[str, Any]) -> str:
-    """ADR-161 (v5.16.0): create a new Set."""
+    """ADR-161 (v5.16.0): create a new Set.
+
+    v6.0.15 (ADR-175): response decorated with `web_url`."""
     try:
         result = await c.create_set(
             name=args["name"],
@@ -312,11 +320,13 @@ async def _create_set(c: IrisClient, args: dict[str, Any]) -> str:
         )
     except IrisAuthError:
         return _auth_required_payload("Create set")
-    return result.model_dump_json()
+    return with_web_url(result.model_dump_json(), "set")
 
 
 async def _create_package(c: IrisClient, args: dict[str, Any]) -> str:
-    """ADR-161 (v5.16.0): create a new Package."""
+    """ADR-161 (v5.16.0): create a new Package.
+
+    v6.0.15 (ADR-175): response decorated with `web_url`."""
     try:
         result = await c.create_package(
             name=args["name"],
@@ -327,7 +337,7 @@ async def _create_package(c: IrisClient, args: dict[str, Any]) -> str:
         )
     except IrisAuthError:
         return _auth_required_payload("Create package")
-    return result.model_dump_json()
+    return with_web_url(result.model_dump_json(), "package")
 
 
 async def _create_diagram(c: IrisClient, args: dict[str, Any]) -> str:
@@ -336,7 +346,9 @@ async def _create_diagram(c: IrisClient, args: dict[str, Any]) -> str:
     fetched the creation cascade for the chosen pair, run the guided
     conversation with the user, composed the `data` payload locally,
     and confirmed a destination. See the tool's description for the
-    full workflow."""
+    full workflow.
+
+    v6.0.15 (ADR-175): response decorated with `web_url`."""
     try:
         diagram = await c.create_diagram(
             diagram_type=args["diagram_type"],
@@ -349,7 +361,7 @@ async def _create_diagram(c: IrisClient, args: dict[str, Any]) -> str:
         )
     except IrisAuthError:
         return _auth_required_payload("Create diagram")
-    return diagram.model_dump_json()
+    return with_web_url(diagram.model_dump_json(), "diagram")
 
 
 async def _list_notations(c: IrisClient, _args: dict[str, Any]) -> str:
