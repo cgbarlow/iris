@@ -131,17 +131,94 @@ class TestAuthorizationEndpointFromIrisWebUrl:
             "https://web.example.com/oauth/authorize"
         )
 
-    async def test_authorization_endpoint_falls_back_to_api_when_unset(
+    async def test_authorization_endpoint_falls_back_to_api_when_all_unset(
         self,
         client: httpx.AsyncClient,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Dev environments without a separately-running frontend get
-        the API host fallback — produces a 404 if the user actually
-        clicks through, but the metadata document is at least
-        well-formed."""
+        """Last-resort fallback: dev environments with neither
+        IRIS_WEB_URL nor a non-localhost CORS_ORIGINS entry get the
+        API host. The metadata is well-formed even though the URL
+        won't actually serve a consent page."""
         monkeypatch.delenv("IRIS_WEB_URL", raising=False)
+        monkeypatch.setenv(
+            "IRIS_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:3000",
+        )
         resp = await client.get("/.well-known/oauth-authorization-server")
         meta = resp.json()
         issuer = meta["issuer"]
         assert meta["authorization_endpoint"] == f"{issuer}/oauth/authorize"
+
+
+class TestAuthorizationEndpointFromCorsOrigins:
+    """v6.0.12 (ADR-172): `IRIS_CORS_ORIGINS` first non-localhost entry
+    is the auto-derived fallback when `IRIS_WEB_URL` isn't set. This
+    sidesteps Render's Blueprint-sync gotcha: env-var additions in
+    `render.yaml` don't auto-apply to existing services, but
+    `IRIS_CORS_ORIGINS` has been set since v6.0.0 (or earlier) and is
+    guaranteed to contain the public frontend URL — the frontend
+    couldn't call iris-api otherwise.
+    """
+
+    async def test_uses_first_non_localhost_cors_origin(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("IRIS_WEB_URL", raising=False)
+        monkeypatch.setenv(
+            "IRIS_CORS_ORIGINS",
+            "http://localhost:5173,https://iris-uat.chrisbarlow.nz",
+        )
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        assert meta["authorization_endpoint"] == (
+            "https://iris-uat.chrisbarlow.nz/oauth/authorize"
+        )
+
+    async def test_iris_web_url_wins_over_cors(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Explicit env var wins over the auto-derived fallback."""
+        monkeypatch.setenv("IRIS_WEB_URL", "https://explicit.example.com")
+        monkeypatch.setenv(
+            "IRIS_CORS_ORIGINS", "https://cors.example.com",
+        )
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        assert meta["authorization_endpoint"] == (
+            "https://explicit.example.com/oauth/authorize"
+        )
+
+    async def test_skips_localhost_127_0_0_1(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("IRIS_WEB_URL", raising=False)
+        monkeypatch.setenv(
+            "IRIS_CORS_ORIGINS",
+            "http://127.0.0.1:5173,https://prod.example.com",
+        )
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        assert meta["authorization_endpoint"] == (
+            "https://prod.example.com/oauth/authorize"
+        )
+
+    async def test_strips_trailing_slash_from_cors_entry(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv("IRIS_WEB_URL", raising=False)
+        monkeypatch.setenv(
+            "IRIS_CORS_ORIGINS", "https://web.example.com/",
+        )
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        assert meta["authorization_endpoint"] == (
+            "https://web.example.com/oauth/authorize"
+        )

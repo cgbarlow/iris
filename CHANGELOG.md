@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.12] - 2026-05-13
+
+### Fixed
+
+- **OAuth `authorization_endpoint` now derives from `IRIS_CORS_ORIGINS`
+  when `IRIS_WEB_URL` isn't set (ADR-172).** v6.0.11 wired the endpoint
+  through `IRIS_WEB_URL` and added the env var to `render.yaml`. Render
+  Blueprint-sync gotcha: env-var additions in `render.yaml` don't
+  auto-apply to existing services — they only take effect on initial
+  service creation or via manual Blueprint re-sync. The same issue hit
+  `IRIS_MCP_PUBLIC_URL` on iris-mcp in v6.0.9. Live iris-api still
+  served the API host as `authorization_endpoint` post-v6.0.11 deploy
+  because the new env var didn't propagate.
+- v6.0.12 makes the code robust to that: if `IRIS_WEB_URL` is unset, it
+  derives the frontend URL from the first non-localhost entry in
+  `IRIS_CORS_ORIGINS` (which has been set since v6.0.0 and is
+  guaranteed to be present — the frontend can't call iris-api without
+  it). Resolution order: `IRIS_WEB_URL` → `IRIS_CORS_ORIGINS` (first
+  non-localhost) → API issuer URL.
+
+### Added
+
+- 4 new regression tests in `backend/tests/test_oauth/test_metadata.py`:
+  - Uses first non-localhost CORS origin when `IRIS_WEB_URL` is unset.
+  - `IRIS_WEB_URL` wins over the CORS-origin fallback.
+  - Skips `http://localhost:*` and `http://127.0.0.1:*` entries.
+  - Strips trailing slashes.
+- 40/40 backend OAuth tests pass.
+
+### User-visible after deploy
+
+- `curl https://iris-api-gtb3.onrender.com/.well-known/oauth-authorization-server`
+  now reports
+  `authorization_endpoint: https://iris-uat.chrisbarlow.nz/oauth/authorize`
+  even if the new env var was never synced — auto-derived from the
+  long-existing `IRIS_CORS_ORIGINS`.
+- The OAuth flow continues from claude.ai → SvelteKit consent page →
+  Allow → redirect with code → token → bearer → write tools succeed.
+
+### See also
+
+- [ADR-172](docs/adrs/ADR-172-Derive-Frontend-URL-From-CORS-Origins.md)
+- [ADR-171](docs/adrs/ADR-171-OAuth-Authorization-Endpoint-Points-At-Frontend.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — nine-
+  revision fix history.
+
 ## [6.0.11] - 2026-05-13
 
 ### Fixed
