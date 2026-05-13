@@ -65,21 +65,23 @@ class TestExport:
         assert result[0].text == "# Overview\n"
 
 
-class TestAsk:
+class TestAskRemoved:
+    """v6.0.8 (ADR-168): the `ask` tool was removed from the MCP
+    surface. When iris-mcp is consumed by a capable LLM client
+    (claude.ai / Claude Desktop / Claude Code / Cursor), routing
+    cross-scope questions to Iris' server-side AI is redundant — the
+    local model walks the data itself via the read-only tools."""
+
+    def test_ask_not_in_tool_definitions(self) -> None:
+        names = {t.name for t in tools.tool_definitions()}
+        assert "ask" not in names
+
     @pytest.mark.asyncio
-    async def test_ask_passes_set_ids(
-        self, client: IrisClient, respx_mock: respx.Router,
+    async def test_ask_dispatch_returns_unknown_tool_error(
+        self, client: IrisClient,
     ) -> None:
-        route = respx_mock.post(f"{BASE}/api/ai/ask").mock(
-            return_value=httpx.Response(200, json={
-                "answer": "42", "conversation_id": "c-1",
-            }),
-        )
-        await tools.dispatch(
-            "ask", client, {"question": "?", "set_ids": ["s1", "s2"]},
-        )
-        body = route.calls.last.request.read().decode()
-        assert '"set_ids":["s1","s2"]' in body
+        result = await tools.dispatch("ask", client, {"question": "?"})
+        assert result[0].text.startswith("ERROR: unknown tool")
 
 
 class TestUnknownTool:

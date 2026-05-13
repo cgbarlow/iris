@@ -13,10 +13,17 @@ Structural overview call: package_hierarchy(set_id=<this-set>) — lists Part A 
 
 MENU (verbatim, all four):
   1. Pull up a specific chapter or diagram from the handbook (e.g. J06 — Mathematization of Outcomes Theory).
-  2. Ask a cross-package question via Iris AI (e.g. "What are the recurring causal-link conventions?" — uses mcp__iris__ask).
-  3. Generate a new DoView outcomes-theory analysis OR a new visual DoView outcomes_map → call create_diagram.
+  2. Ask a cross-package, cross-set, or cross-collection question about the material (e.g. "What are the recurring causal-link conventions?").
+  3. Generate a new DoView outcomes-theory analysis or a new visual DoView outcomes_map.
   4. Browse a particular chapter's diagrams in detail.
 ```
+
+## v6.0.8 menu changes (paste required)
+
+The menu above is the **v6.0.8** revision. If your live deployment is on the v5.18.0 / v6.0.0 menu — which mentions `uses mcp__iris__ask` and `→ call create_diagram` — paste the new content over it:
+
+- Option 2: dropped "via Iris AI" and the `mcp__iris__ask` tool reference. The `ask` tool was removed from the MCP surface in v6.0.8 (ADR-168). Cross-scope questions are now fulfilled by the local AI reading data directly via `search` / `get_*` / `package_hierarchy`. The option scope broadened from "cross-package" to "cross-package, cross-set, or cross-collection".
+- Option 3: dropped the `→ call create_diagram` implementation tag — it was author-reference noise that the model surfaced verbatim to end-users. The local AI drafts the analysis or map using its own reasoning + the creation_format cascade, and persists via `create_diagram` (single) or `apply_diagram_creation` (batch). The model is steered to this in the orient wrapper; the menu copy stays user-facing.
 
 ## Why this works
 
@@ -26,7 +33,8 @@ MENU (verbatim, all four):
 
 ## Revision history
 
-- **v5.18.0 (this revision).** Stripped ORIENT-FIRST protocol and DISCOVERY catalogue — now in server-wide MCP instructions (ADR-163). Down from ~30 lines (v5.17.0) to ~12.
+- **v6.0.8.** Dropped `mcp__iris__ask` reference (the `ask` tool was removed from MCP — ADR-168). Dropped the `→ call create_diagram` implementation tag from option 3. Broadened option 2 from "cross-package" to "cross-package, cross-set, or cross-collection".
+- **v5.18.0.** Stripped ORIENT-FIRST protocol and DISCOVERY catalogue — now in server-wide MCP instructions (ADR-163). Down from ~30 lines (v5.17.0) to ~12.
 - **v5.17.0.** Stripped diagram-creation workflow — now in `create_diagram`'s tool description (ADR-162).
 - **v5.14.0.** Trimmed from ~140 lines to ~50. Surfaced through search results too (ADR-159).
 - **v5.13.3.** Made the four-option menu mandatory and verbatim.
