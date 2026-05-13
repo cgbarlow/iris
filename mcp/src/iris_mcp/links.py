@@ -79,18 +79,39 @@ def _orient_wrapper(kind: str, entity_id: str) -> str:
         f"This scope is a {kind} ({id_kw}). The orient sheet below names a "
         f"structural-overview call AND a numbered menu. Before responding "
         f"to the user, you MUST, in order:\n"
+        f"\n"
         f"  1. Briefly describe the scope (one sentence based on its name "
         f"and description).\n"
+        f"\n"
         f"  2. INVOKE the structural-overview call named below, passing "
         f"this scope's {id_kw}. The TOC is mandatory, not optional. If the "
         f"named tool is not currently in your toolset, request a tool-load "
         f"first — do NOT skip this step.\n"
-        f"  3. Offer the menu options below via AskUserQuestion (if your "
-        f"client supports it) or a numbered list, IN ORDER, VERBATIM. "
-        f"Do not paraphrase, do not silently drop options.\n"
+        f"     FORMAT: render the result as a markdown bullet list, ONE "
+        f"ENTRY PER LINE, with each entry as a clickable markdown link "
+        f"using the node's `web_url` field as the target. Example: \n"
+        f"       - [Part A — DoView Planning Fundamentals (5 chapters)]"
+        f"(https://iris-uat.chrisbarlow.nz/packages/abc...)\n"
+        f"       - [Part B — DoView Drawing and Strategy Principles "
+        f"(25 chapters)](https://iris-uat.chrisbarlow.nz/packages/def...)\n"
+        f"     Show the URL as the link target only — do NOT also print "
+        f"the bare URL alongside. Each node has `name`, `web_url`, and "
+        f"`children` fields; the chapter count is `len(children)`.\n"
+        f"\n"
+        f"  3. Offer the menu options below to the user. The four options "
+        f"are LITERAL TEXT — copy each one CHARACTER-BY-CHARACTER from the "
+        f"orient sheet's MENU section into your response. Do NOT summarise. "
+        f"Do NOT shorten. Do NOT drop parenthetical examples like "
+        f"\"(e.g. J06 — Mathematization of Outcomes Theory)\" or tool "
+        f"references like \"uses mcp__iris__ask\". If an option says "
+        f"\"Generate a new DoView outcomes-theory analysis OR a new visual "
+        f"DoView outcomes_map → call create_diagram\", the user must see "
+        f"EXACTLY that text — every word, including OR / →. Long options "
+        f"are intentional.\n"
         f"\n"
         f"Do NOT ask \"want me to load the table of contents?\" — load it "
-        f"yourself. Do NOT respond with just the menu and skip the TOC.\n"
+        f"yourself. Do NOT respond with just the menu and skip the TOC. "
+        f"Do NOT respond with just the TOC and skip the menu.\n"
         f"\n"
         f"---\n"
         f"\n"
@@ -176,6 +197,31 @@ def decorate_list(items: list[Any], kind: str, base: str | None = None) -> None:
         return
     for item in items:
         decorate_item(item, kind, resolved_base)
+
+
+def decorate_tree(
+    nodes: list[Any], kind: str, base: str | None = None,
+) -> None:
+    """v6.0.7: in-place recursive web_url decoration for tree-shaped
+    responses (e.g. `package_hierarchy`).
+
+    `decorate_list` only walks the top level; package_hierarchy returns
+    nested `children` arrays that also need web_urls so the model can
+    render each Part / chapter as a clickable markdown link. Same kind
+    applies at every depth — package_hierarchy is homogeneously packages
+    all the way down.
+    """
+    if not isinstance(nodes, list):
+        return
+    resolved_base = base if base is not None else web_base()
+    if not resolved_base:
+        return
+    for node in nodes:
+        decorate_item(node, kind, resolved_base)
+        if isinstance(node, dict):
+            children = node.get("children")
+            if isinstance(children, list):
+                decorate_tree(children, kind, resolved_base)
 
 
 def decorate_search(payload: dict[str, Any], base: str | None = None) -> None:
@@ -277,10 +323,31 @@ __all__ = [
     "decorate_item",
     "decorate_list",
     "decorate_search",
+    "decorate_tree",
     "web_base",
     "web_url_for",
     "with_web_url",
     "with_web_urls_list",
     "with_web_urls_search",
+    "with_web_urls_tree",
     "wrap_orient",
 ]
+
+
+def with_web_urls_tree(payload: str, kind: str) -> str:
+    """v6.0.7: decorate a JSON-serialised tree response (e.g.
+    `package_hierarchy`) recursively, so every node at every depth
+    carries a `web_url`. Strips sensitive keys at the top level only
+    (children inherit the homogeneous kind, no per-level scrub needed
+    for the current schema). No-ops on invalid JSON.
+    """
+    try:
+        data = json.loads(payload)
+    except (json.JSONDecodeError, TypeError):
+        return payload
+    if isinstance(data, list):
+        _strip_sensitive_keys_list(data)
+    base = web_base()
+    if base:
+        decorate_tree(data, kind, base)
+    return json.dumps(data)

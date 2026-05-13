@@ -22,6 +22,7 @@ from iris_mcp.links import (
     with_web_url,
     with_web_urls_list,
     with_web_urls_search,
+    with_web_urls_tree,
 )
 def _resource_metadata_url() -> str:
     """Return the iris-mcp Protected Resource metadata URL.
@@ -189,12 +190,20 @@ async def _list_packages(c: IrisClient, args: dict[str, Any]) -> str:
 
 async def _package_hierarchy(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-158 (v5.13.0): return the complete package tree in one call.
-    Prefer this over `list_packages` for structural overview."""
+    Prefer this over `list_packages` for structural overview.
+
+    v6.0.7: each node (and every child recursively) is decorated with
+    `web_url` via `with_web_urls_tree` so the model can render each
+    Part / chapter as a clickable markdown link.
+    """
     nodes = await c.package_hierarchy(
         set_id=args.get("set_id"),
         root_id=args.get("root_id"),
     )
-    return json.dumps([node.model_dump() for node in nodes])
+    return with_web_urls_tree(
+        json.dumps([node.model_dump() for node in nodes]),
+        "package",
+    )
 
 
 async def _list_sets(c: IrisClient, args: dict[str, Any]) -> str:

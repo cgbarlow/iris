@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.7] - 2026-05-13
+
+### Fixed
+
+- **TOC now renders as a markdown bullet list with clickable links per
+  Part / chapter (issue #119 polish).** v6.0.6 got claude.ai to invoke
+  `package_hierarchy` and present the parts, but the model rendered the
+  result as a wall of text without links. Two underlying causes:
+  - `package_hierarchy` tool output was not decorated with `web_url`
+    fields (`with_web_urls_list` only walks the top level; the nested
+    `children` arrays were left bare).
+  - The orient wrapper said only "Surface the resulting tree" — no
+    formatting prescription, so the model defaulted to a paragraph.
+- New `decorate_tree(nodes, kind, base)` walks a homogeneous tree
+  recursively and attaches `web_url` at every depth. `_package_hierarchy`
+  now wraps its output with `with_web_urls_tree`. Every Part and chapter
+  in the response carries `web_url`, so the model can render `[name](url)`
+  markdown links directly.
+- Orient wrapper now spells out the TOC format explicitly: "render the
+  result as a markdown bullet list, ONE ENTRY PER LINE, with each entry
+  as a clickable markdown link using the node's `web_url` field". Includes
+  a concrete two-line example so the model has a pattern to mimic.
+
+- **Menu options now stay verbatim (issue #119 polish).** v6.0.6 said
+  "do not paraphrase" but the model still dropped parenthetical examples
+  ("(e.g. J06 — Mathematization of Outcomes Theory)"), tool references
+  ("uses mcp__iris__ask"), and "→ call create_diagram" — and even reworded
+  "outcomes-theory analysis" to "outcomes map".
+- Orient wrapper now demands "CHARACTER-BY-CHARACTER" copying with explicit
+  negations: "Do NOT summarise. Do NOT shorten. Do NOT drop parenthetical
+  examples like '(e.g. J06 — Mathematization of Outcomes Theory)' or tool
+  references like 'uses mcp__iris__ask'. ... Long options are intentional."
+
+### Added
+
+- New `decorate_tree` and `with_web_urls_tree` helpers in `links.py`.
+  Exported from `__all__`.
+- 5 new regression tests (`TestPackageHierarchyTreeDecoration`,
+  `TestOrientWrapperFormattingDirectives`) pinning the recursive
+  decoration and the strengthened wrapper wording.
+
+### Why this matters
+
+- Users opening an authored scope now see the TOC as a navigable list
+  with one-click access to each Part / chapter — restoring the click-to-
+  open affordance the 5.x UI had via the dashboard. Matches the user's
+  visual request in issue #119 follow-up.
+- The four menu options match the admin-authored body exactly. Admins
+  iterating on the menu copy in `/admin/settings/ai` see their edits
+  reach claude.ai unmodified.
+
+### See also
+
+- ADR-167 — Orient directive in tool response (updated to cover the
+  TOC formatting + character-by-character menu wording).
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — five-revision
+  fix history: v6.0.4 (wire), v6.0.5 (refresh), v6.0.6 (embed), v6.0.7
+  (TOC format + verbatim menu).
+
 ## [6.0.6] - 2026-05-13
 
 ### Fixed
