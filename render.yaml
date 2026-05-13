@@ -70,6 +70,15 @@ services:
         sync: false
       - key: SUPABASE_JWT_SECRET
         sync: false
+      - key: IRIS_JWT_SECRET
+        # v6.0.14 (ADR-174): HS256 signing secret for iris-issued JWTs.
+        # The /oauth/token endpoint mints OAuth bearers signed with this
+        # secret; _get_current_user_supabase validates them using the
+        # same. Without this set, the code falls back to a dev default
+        # string baked into config.py — which is in the public repo and
+        # would let anyone with the iris-api URL forge tokens.
+        # Generate with: openssl rand -hex 32
+        sync: false
       - key: IRIS_CORS_ORIGINS
         sync: false
       - key: IRIS_DEBUG

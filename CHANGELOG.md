@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.14] - 2026-05-13
+
+### Fixed
+
+- **OAuth-issued JWTs now validate in Supabase deployment mode
+  (ADR-174).** v6.0.13 got the connector to "Connected" — token
+  exchange returned 200 — but the very first authenticated API call
+  the connector made got 401, and every subsequent write call too.
+  Root cause: `_get_current_user_supabase` only validates JWTs with
+  the **Supabase** signing key (ES256 via JWKS or HS256 with
+  `SUPABASE_JWT_SECRET`). iris-OAuth tokens are signed by
+  `app.oauth.service.issue_access_token` with the **iris** JWT secret
+  via `config.auth.jwt_secret`. Two different keys → signature
+  validation always fails → 401.
+- The bug existed from v6.0.0 (when OAuth shipped) but was hidden
+  because the existing OAuth tests run in SQLite mode, where
+  `_get_current_user_sqlite` validates with the iris JWT secret and
+  everything works.
+- Fix: hybrid validation in `_get_current_user_supabase`. JWTs with
+  `aud="iris-mcp"` (the canonical OAuth audience) route through the
+  iris HS256 validator using `config.auth.jwt_secret`; everything
+  else stays on the Supabase validation path. Audience-claim routing
+  with strict per-issuer signature validation — no fall-through (a
+  token claiming `aud="iris-mcp"` with the wrong signature gets 401,
+  not a second chance with the Supabase secret).
+- Profile lookup unchanged: both paths use the same
+  `get_profile(db, user_id)` because the OAuth `sub` claim IS the
+  Supabase auth.users UUID (consent screen captured it from this
+  same function pre-issue).
+
+### Security
+
+- **`IRIS_JWT_SECRET` is now required in production.** The dev
+  default in `config.py` is a hardcoded string in the public repo
+  — anyone reading the repo can forge OAuth-issued JWTs against any
+  deployment that hasn't overridden the secret. v6.0.14 adds
+  `IRIS_JWT_SECRET` to `render.yaml` with `sync: false`; the
+  operator generates a per-deployment secret
+  (`openssl rand -hex 32`) and pastes it into the Render dashboard
+  for the `iris-api` service. **This does NOT auto-apply** (Render
+  Blueprint-sync limitation — same gotcha as `IRIS_MCP_PUBLIC_URL`
+  in v6.0.9 and `IRIS_WEB_URL` in v6.0.11). Operator action
+  required.
+
+### Added
+
+- 3 new regression tests in `tests/test_auth/test_supabase_mode_oauth_token.py`:
+  - iris-OAuth token (correct signature) validates via iris path →
+    returns user dict.
+  - iris-OAuth token with wrong signature → 401 (no fall-through to
+    Supabase validation).
+  - Supabase-shaped token (no `aud="iris-mcp"`) routes through
+    Supabase path → returns user dict.
+- 120/120 OAuth + auth tests pass.
+
+### Operator action required after deploy
+
+1. **Set `IRIS_JWT_SECRET` on the iris-api service in the Render
+   dashboard.** Generate the value with `openssl rand -hex 32`. Save;
+   the service restarts.
+2. **Disconnect + reconnect the Iris connector in claude.ai.** Old
+   bearers signed with the dev-default secret will no longer
+   validate; a fresh OAuth flow will mint bearers with the new
+   secret.
+
+### User-visible after that
+
+- claude.ai → Sign in on Iris connector → consent → Allow → connector
+  goes to **Connected** → write tools (`create_collection`,
+  `create_set`, etc.) succeed.
+
+### See also
+
+- [ADR-174](docs/adrs/ADR-174-Hybrid-JWT-Validation-In-Supabase-Mode.md)
+- [ADR-164](docs/adrs/ADR-164-OAuth-2.1-for-MCP.md) — original OAuth
+  design that introduced the dual-key situation.
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — eleven-
+  revision fix history (v6.0.4 → v6.0.14).
+
 ## [6.0.13] - 2026-05-13
 
 ### Fixed
