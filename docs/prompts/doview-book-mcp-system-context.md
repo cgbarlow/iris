@@ -9,7 +9,7 @@ Canonical paste-ready content for the **MCP system context** field on the Outcom
 ```text
 This set is the visual companion to Dr Paul Duignan's outcomes-theory body of work and DoView outcomes-mapping methodology.
 
-Structural overview call: iris_package_hierarchy(set_id=<this-set>) — lists Part A through Part J with one-line descriptions.
+Structural overview call: package_hierarchy(set_id=<this-set>) — lists Part A through Part J with one-line descriptions.
 
 MENU (verbatim, all four):
   1. Pull up a specific chapter or diagram from the handbook (e.g. J06 — Mathematization of Outcomes Theory).
