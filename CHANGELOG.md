@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.9] - 2026-05-13
+
+### Fixed
+
+- **OAuth metadata pointed at the wrong host, silently breaking
+  claude.ai's auto-sign-in (ADR-169).** The Protected Resource metadata
+  at `iris-mcp.../.well-known/oauth-protected-resource` advertised
+  `https://iris-uat.chrisbarlow.nz` (the frontend host) as the
+  Authorization Server. The frontend is a SvelteKit SPA that returns
+  HTTP 200 with its `index.html` for any unknown path — including
+  `/.well-known/oauth-authorization-server` — so claude.ai's MCP
+  client couldn't parse OAuth metadata from the HTML body and fell
+  back to surfacing the tool-layer `auth_required` error. v6.0.0 →
+  v6.0.8 all shipped this bug.
+- v6.0.9 sources `authorization_server` from `IRIS_API_URL` (where the
+  RFC 8414 AS metadata document and `/oauth/{authorize,token,register,
+  revoke}` endpoints actually live). `resource` falls back to
+  `IRIS_API_URL` too when `IRIS_MCP_PUBLIC_URL` isn't set. `IRIS_WEB_URL`
+  is no longer read by the OAuth metadata path — its purpose is link
+  decoration only.
+- `render.yaml` for the `iris-mcp` service now sets
+  `IRIS_MCP_PUBLIC_URL = https://iris-mcp.onrender.com` so the live
+  deployment's `resource` field correctly identifies the iris-mcp
+  service (rather than falling back to the API host).
+- Tool-layer `auth_required` payload + canonical
+  `mcp_server_instructions` body refined: the previous wording
+  ("Configure → enable OAuth") assumed claude.ai's connector UI exposes
+  a manual OAuth toggle, but the actual flow auto-detects OAuth from
+  Protected Resource metadata and offers a "Sign in" button. The new
+  wording reflects that users do NOT enter `client_id` / `secret` and
+  that re-adding the connector forces metadata re-discovery if no
+  sign-in button appears.
+
+### Added
+
+- **Introduction and Conclusion in the Outcomes Theory Book TOC.** The
+  set has two root-level markdown diagrams (`parent_package_id=null`)
+  that bracket Part A through Part J; v6.0.7's `package_hierarchy` call
+  alone missed them. The canonical `doview-book-mcp-system-context.md`
+  paste-doc now names two structural-overview calls
+  (`package_hierarchy` + `list_diagrams` filtered to root) so the model
+  fetches both packages and root-level diagrams. The orient sheet
+  instructs the model to render Introduction first, the parts, then
+  Conclusion last.
+- Two new regression tests in `test_oauth_resource.py` pinning the
+  v6.0.9 metadata correctness: `authorization_server` points at
+  `IRIS_API_URL`; `resource` falls back to `IRIS_API_URL` (not
+  `IRIS_WEB_URL`) when `IRIS_MCP_PUBLIC_URL` is unset.
+- 164/164 MCP tests pass.
+
+### Admin action required after deploy
+
+After Render reports `6.0.9` on `/info`:
+
+1. **Re-paste** the v6.0.9 menu from
+   [`docs/prompts/doview-book-mcp-system-context.md`](docs/prompts/doview-book-mcp-system-context.md)
+   into the Outcomes Theory Book set's `mcp_system_context` field at
+   `/sets/33032180-d77a-4ce4-88cf-b49cd643e093`.
+2. **Re-paste** the v6.0.9 auth-recovery body from
+   [`docs/prompts/mcp-server-instructions.md`](docs/prompts/mcp-server-instructions.md)
+   into the `mcp_server_instructions` row at `/admin/settings/ai`.
+3. **Remove and re-add** the Iris connector in claude.ai so the MCP
+   client re-discovers the now-correct OAuth metadata. After that,
+   clicking "Sign in" on the connector should open a browser tab for
+   you to sign in to Iris (no `client_id` / `secret` entry).
+
+The v6.0.5 TTL refresh propagates both paste edits to claude.ai within
+60 seconds. No Render restart required for either.
+
+### See also
+
+- [ADR-169](docs/adrs/ADR-169-OAuth-Metadata-URL-Fix.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119)
+
 ## [6.0.8] - 2026-05-13
 
 ### Removed

@@ -9,7 +9,11 @@ Canonical paste-ready content for the **MCP system context** field on the Outcom
 ```text
 This set is the visual companion to Dr Paul Duignan's outcomes-theory body of work and DoView outcomes-mapping methodology.
 
-Structural overview call: package_hierarchy(set_id=<this-set>) — lists Part A through Part J with one-line descriptions.
+Structural overview calls (make BOTH so the TOC is complete):
+  - package_hierarchy(set_id=<this-set>) — lists Part A through Part J packages.
+  - list_diagrams(set_id=<this-set>), then filter to entries with parent_package_id == null — these are the root-level Introduction and Conclusion markdown diagrams that bracket the parts.
+
+In the TOC you present, show Introduction first, then Part A through Part J, then Conclusion last. Render each entry as a clickable markdown link using its web_url.
 
 MENU (verbatim, all four):
   1. Pull up a specific chapter or diagram from the handbook (e.g. J06 — Mathematization of Outcomes Theory).
@@ -33,6 +37,7 @@ The menu above is the **v6.0.8** revision. If your live deployment is on the v5.
 
 ## Revision history
 
+- **v6.0.9.** Added Introduction + Conclusion to the TOC. The set has two root-level markdown diagrams (parent_package_id=null) that bracket Part A through Part J; v6.0.7's `package_hierarchy` call alone misses them. Orient sheet now names two structural-overview calls so the model fetches both packages and root-level diagrams.
 - **v6.0.8.** Dropped `mcp__iris__ask` reference (the `ask` tool was removed from MCP — ADR-168). Dropped the `→ call create_diagram` implementation tag from option 3. Broadened option 2 from "cross-package" to "cross-package, cross-set, or cross-collection".
 - **v5.18.0.** Stripped ORIENT-FIRST protocol and DISCOVERY catalogue — now in server-wide MCP instructions (ADR-163). Down from ~30 lines (v5.17.0) to ~12.
 - **v5.17.0.** Stripped diagram-creation workflow — now in `create_diagram`'s tool description (ADR-162).

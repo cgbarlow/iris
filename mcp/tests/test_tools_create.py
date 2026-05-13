@@ -95,7 +95,7 @@ class TestCreateCollection:
         assert body["error"] == "auth_required"
         # v6.0.0 (ADR-164): OAuth-setup-guidance payload — no more
         # next_tool/pairing_url; instead next_step + oauth_resource_metadata_url.
-        assert body["next_step"] == "configure_oauth_in_connector_settings"
+        assert body["next_step"] == "user_signs_in_via_mcp_client_connector_ui"
         assert "/.well-known/oauth-protected-resource" in body["oauth_resource_metadata_url"]
 
 
