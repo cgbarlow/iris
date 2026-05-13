@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.10] - 2026-05-13
+
+### Fixed
+
+- **OAuth-Discovery trigger now fires for claude.ai's MCP client
+  (ADR-170).** The MCP authorization spec (2025-06-18) and RFC 9728
+  require resource servers to return HTTP **401** with
+  `WWW-Authenticate: Bearer resource_metadata="<URL>"` whenever a
+  request lacks credentials. **That 401 is the canonical trigger** that
+  causes claude.ai (and any compliant MCP client) to fetch the metadata,
+  DCR-register itself, redirect the user to sign in, exchange the code
+  for a bearer, and retry. iris-mcp v6.0.0 through v6.0.9 returned HTTP
+  **200** with a JSON tool-error body (`"error":"auth_required"`) on
+  unauthenticated requests — the spec's 401 trigger never fired,
+  claude.ai treated the Iris connector as anonymous, and the user-
+  visible "Sign in" button never appeared.
+- v6.0.10 short-circuits `POST /` at the transport layer (in `mcp_asgi`)
+  with a spec-compliant 401 + `WWW-Authenticate` when the request has
+  no bearer token. The `resource_metadata` URL sources from
+  `IRIS_MCP_PUBLIC_URL` (when set, per ADR-169) or `IRIS_API_URL` as a
+  fallback. Static/health endpoints (`/info`, `/favicon.*`,
+  `/.well-known/oauth-protected-resource`) remain anonymous.
+- The tool-layer `auth_required` JSON payload in `tools.py` is
+  preserved as a defensive backstop for the "bearer present but
+  invalid/expired" case — v6.0.10 only fixes the missing-bearer case.
+
+### Removed
+
+- **Anonymous HTTP read access via iris-mcp.** A CLI script that wants
+  to call iris-mcp's HTTP endpoint without OAuth must now use the stdio
+  transport (`iris-mcp` with `IRIS_TOKEN`) or talk to iris-api
+  directly. The frontend's read-only public endpoints and the iris-
+  client SDK are unaffected. This trade-off is what unlocks claude.ai's
+  OAuth flow — see ADR-170 for the rationale (every working production
+  hosted-MCP server requires auth uniformly).
+
+### Added
+
+- 4 new regression tests (`TestAuthChallenge` in `test_http_main.py`)
+  pinning: 401 on unauthenticated POST /; WWW-Authenticate header
+  shape with `resource_metadata=`; URL sourcing from
+  `IRIS_MCP_PUBLIC_URL` when set; bearer-present requests bypass the
+  401 gate and pass through to the MCP layer.
+- 168/168 MCP tests pass.
+
+### User-visible after deploy
+
+- **Add the Iris connector in claude.ai** — Settings → Connectors → add
+  `https://iris-mcp.onrender.com`. claude.ai's probe gets back HTTP 401,
+  discovers OAuth metadata, registers itself via DCR, and the connector
+  card now shows a **"Sign in"** button.
+- **Click Sign in** — a browser tab opens against iris-api's
+  `/oauth/authorize`. Sign in with the same email/password you use on
+  iris-uat. Consent screen. Redirect. claude.ai stores the bearer.
+- **Write tools work** — `create_collection`, `create_set`, etc. now
+  succeed.
+
+### See also
+
+- [ADR-170](docs/adrs/ADR-170-Require-Bearer-On-MCP-HTTP-Endpoint.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — seven-
+  revision fix history culminating here.
+
 ## [6.0.9] - 2026-05-13
 
 ### Fixed

@@ -103,7 +103,12 @@ class TestFavicon:
 class TestRootMount:
     def test_post_root_does_not_307(self, app_with_backend: TestClient) -> None:
         """ADR-134 follow-up: MCP is mounted at /, so the user pastes the bare
-        service URL. No /mcp suffix means no slash-redirect to chase."""
+        service URL. No /mcp suffix means no slash-redirect to chase.
+
+        v6.0.10 (ADR-170): unauthenticated POST / now returns 401 with
+        WWW-Authenticate (per MCP spec); previously returned 200 with a
+        JSON tool error. Either way, NOT 307 or 405. The 401 is what
+        triggers claude.ai to start the OAuth flow."""
         resp = app_with_backend.post(
             "/",
             headers={"accept": "application/json, text/event-stream"},
@@ -113,6 +118,106 @@ class TestRootMount:
         # Response is a real MCP error/result, not a 405 from FastAPI —
         # confirms the ASGI mount is the one handling it.
         assert resp.status_code != 405
+
+
+class TestAuthChallenge:
+    """ADR-170 (v6.0.10): the MCP HTTP endpoint MUST return HTTP 401
+    with `WWW-Authenticate: Bearer resource_metadata="..."` when a
+    request lacks a bearer token. That response is the canonical OAuth-
+    Discovery trigger per MCP 2025-06-18 + RFC 9728; without it,
+    claude.ai's MCP client treats the connector as anonymous and never
+    offers the user a "Sign in" button."""
+
+    def test_post_root_without_bearer_returns_401(
+        self, app_with_backend: TestClient,
+    ) -> None:
+        resp = app_with_backend.post(
+            "/",
+            headers={"accept": "application/json, text/event-stream"},
+            content=(
+                b'{"jsonrpc":"2.0","id":1,"method":"initialize",'
+                b'"params":{"protocolVersion":"2024-11-05",'
+                b'"capabilities":{},"clientInfo":{"name":"t","version":"0"}}}'
+            ),
+        )
+        assert resp.status_code == 401
+
+    def test_401_includes_www_authenticate_with_resource_metadata(
+        self, app_with_backend: TestClient,
+    ) -> None:
+        resp = app_with_backend.post(
+            "/",
+            headers={"accept": "application/json, text/event-stream"},
+            content=b"{}",
+        )
+        assert resp.status_code == 401
+        # Header is case-insensitive per HTTP spec but the value shape
+        # is specific: `Bearer resource_metadata="<url>", ...`.
+        auth = resp.headers.get("www-authenticate", "")
+        assert auth.startswith("Bearer ")
+        assert "resource_metadata=" in auth
+        assert (
+            "/.well-known/oauth-protected-resource" in auth
+        ), "resource_metadata must point at the RFC 9728 PR metadata endpoint"
+
+    def test_401_resource_metadata_url_uses_public_url_when_set(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        respx_mock: respx.Router,
+    ) -> None:
+        """Operators set IRIS_MCP_PUBLIC_URL to the canonical iris-mcp
+        public URL. The WWW-Authenticate resource_metadata pointer must
+        use that, not the API URL fallback — otherwise claude.ai goes
+        looking for resource metadata on the wrong host."""
+        monkeypatch.setenv("IRIS_API_URL", "https://api.example.com")
+        monkeypatch.setenv(
+            "IRIS_MCP_PUBLIC_URL", "https://iris-mcp.example.com",
+        )
+        monkeypatch.setenv("IRIS_MCP_INSTRUCTIONS_REFRESH_S", "0")
+        respx_mock.get(
+            "https://api.example.com/api/ai/server-instructions",
+        ).mock(return_value=httpx.Response(200, json={"body": "X"}))
+        from iris_mcp.http_main import create_app
+
+        app = create_app()
+        with TestClient(app) as client:
+            resp = client.post(
+                "/",
+                headers={"accept": "application/json, text/event-stream"},
+                content=b"{}",
+            )
+        assert resp.status_code == 401
+        auth = resp.headers["www-authenticate"]
+        assert (
+            'resource_metadata="https://iris-mcp.example.com'
+            "/.well-known/oauth-protected-resource\""
+        ) in auth
+
+    def test_post_root_with_bogus_bearer_passes_through_to_mcp_layer(
+        self, app_with_backend: TestClient,
+    ) -> None:
+        """v6.0.10 only gates on the PRESENCE of a bearer at the HTTP
+        layer — token validity is checked downstream by iris-api. A
+        bogus bearer makes it past the 401 gate so the MCP layer can
+        process the request (and downstream will respond appropriately
+        when it tries to use the bad token). This separation avoids
+        coupling iris-mcp to backend token-introspection logic."""
+        resp = app_with_backend.post(
+            "/",
+            headers={
+                "accept": "application/json, text/event-stream",
+                "authorization": "Bearer bogus_token_xyz",
+            },
+            content=(
+                b'{"jsonrpc":"2.0","id":1,"method":"initialize",'
+                b'"params":{"protocolVersion":"2024-11-05",'
+                b'"capabilities":{},"clientInfo":{"name":"t","version":"0"}}}'
+            ),
+        )
+        # NOT 401 — bearer is present, so we don't short-circuit. The
+        # actual response shape depends on the MCP layer (200 OK for
+        # initialize since that doesn't hit the backend).
+        assert resp.status_code != 401
 
 
 class TestCreateAppFetchesInstructions:
