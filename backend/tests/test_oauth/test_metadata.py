@@ -93,3 +93,55 @@ class TestAuthorizationServerMetadata:
         # No Authorization header.
         resp = await client.get("/.well-known/oauth-authorization-server")
         assert resp.status_code == 200
+
+
+class TestAuthorizationEndpointFromIrisWebUrl:
+    """v6.0.11 (ADR-171): the `authorization_endpoint` must point at the
+    SvelteKit frontend page (where the consent screen lives), NOT at the
+    API host. The token / registration / revocation endpoints stay on
+    the API host."""
+
+    async def test_authorization_endpoint_uses_iris_web_url(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("IRIS_WEB_URL", "https://web.example.com")
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        assert meta["authorization_endpoint"] == (
+            "https://web.example.com/oauth/authorize"
+        )
+        # Machine endpoints stay on the API host (the issuer).
+        issuer = meta["issuer"]
+        assert meta["token_endpoint"] == f"{issuer}/oauth/token"
+        assert meta["registration_endpoint"] == f"{issuer}/oauth/register"
+        assert meta["revocation_endpoint"] == f"{issuer}/oauth/revoke"
+
+    async def test_authorization_endpoint_strips_trailing_slash(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("IRIS_WEB_URL", "https://web.example.com/")
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        # No double-slash even when operator's env var has a trailing slash.
+        assert meta["authorization_endpoint"] == (
+            "https://web.example.com/oauth/authorize"
+        )
+
+    async def test_authorization_endpoint_falls_back_to_api_when_unset(
+        self,
+        client: httpx.AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Dev environments without a separately-running frontend get
+        the API host fallback — produces a 404 if the user actually
+        clicks through, but the metadata document is at least
+        well-formed."""
+        monkeypatch.delenv("IRIS_WEB_URL", raising=False)
+        resp = await client.get("/.well-known/oauth-authorization-server")
+        meta = resp.json()
+        issuer = meta["issuer"]
+        assert meta["authorization_endpoint"] == f"{issuer}/oauth/authorize"

@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.11] - 2026-05-13
+
+### Fixed
+
+- **OAuth `authorization_endpoint` pointed at the wrong host, 404'ing
+  the consent flow (ADR-171).** v6.0.10 unblocked claude.ai's OAuth
+  trigger — tapping "Sign in" on the Iris connector finally initiated
+  the flow. But the browser then redirected to the AS-metadata-
+  advertised `authorization_endpoint` and landed on a hard
+  `{"detail":"Not Found"}` 404. The metadata advertised the API host:
+
+  ```
+  authorization_endpoint: https://iris-api-gtb3.onrender.com/oauth/authorize
+  ```
+
+  But iris-api has no GET handler at `/oauth/authorize`. The user-
+  facing consent screen is a SvelteKit page on the frontend at
+  `https://iris-uat.chrisbarlow.nz/oauth/authorize`. The OAuth 2.1
+  authorization endpoint is a **browser** endpoint — its job is to
+  show login + consent UI and redirect back to the client's
+  redirect_uri with an authorization code. v6.0.0 → v6.0.10 advertised
+  the wrong host for that endpoint.
+- v6.0.11 sources `authorization_endpoint` from `IRIS_WEB_URL` (the
+  frontend host) in `app.oauth.router.authorization_server_metadata`.
+  Token / registration / revocation endpoints stay on the API host —
+  those are machine-to-machine endpoints (no browser involved).
+  `render.yaml` adds `IRIS_WEB_URL=https://iris-uat.chrisbarlow.nz` to
+  the iris-api service so the live deployment knows where the
+  frontend lives.
+- Falls back to the API host when `IRIS_WEB_URL` is unset (dev
+  convenience — the metadata is well-formed, even though the URL
+  won't actually serve a consent page).
+
+### Added
+
+- 3 new regression tests in `backend/tests/test_oauth/test_metadata.py`:
+  - `authorization_endpoint` uses `IRIS_WEB_URL` when set.
+  - Trailing slashes on `IRIS_WEB_URL` are stripped (no double-slash
+    in the URL).
+  - Falls back to issuer when `IRIS_WEB_URL` is unset.
+  - Token / registration / revocation endpoints stay on the API host
+    regardless.
+- 36/36 backend OAuth tests pass.
+
+### User-visible after deploy
+
+- `https://iris-api-gtb3.onrender.com/.well-known/oauth-authorization-server`
+  now reports
+  `authorization_endpoint: https://iris-uat.chrisbarlow.nz/oauth/authorize`.
+- claude.ai → tap Sign in on Iris connector → browser opens the
+  SvelteKit consent page (not a 404) → user signs in to Iris if not
+  already signed in → consent screen → tap Allow → redirected back to
+  claude.ai with an auth code → bearer issued → write tools work.
+
+### See also
+
+- [ADR-171](docs/adrs/ADR-171-OAuth-Authorization-Endpoint-Points-At-Frontend.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — eight-
+  revision fix history.
+
 ## [6.0.10] - 2026-05-13
 
 ### Fixed
