@@ -23,6 +23,7 @@ from iris_client import IrisClient
 
 from iris_mcp.asgi import bind_client, build_session_manager, extract_bearer
 from iris_mcp.branding import ICON_SVG
+from iris_mcp.oauth_resource import build_resource_metadata
 
 
 def _pkg_version() -> str | None:
@@ -78,6 +79,21 @@ def create_app() -> FastAPI:
     @app.get("/favicon.svg", include_in_schema=False)
     async def _favicon() -> Response:
         return Response(content=ICON_SVG, media_type="image/svg+xml")
+
+    @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+    async def _protected_resource_metadata() -> dict[str, Any]:
+        """RFC 9728 Protected Resource metadata (ADR-164, v6.0.0).
+
+        Anonymous-readable. MCP clients fetch this on a 401 response's
+        `WWW-Authenticate: Bearer resource_metadata="..."` hint and
+        learn which Authorization Server to start an OAuth dance with.
+        """
+        public_url = os.environ.get("IRIS_MCP_PUBLIC_URL", "").rstrip("/")
+        web_url = os.environ.get("IRIS_WEB_URL", iris_url).rstrip("/")
+        return build_resource_metadata(
+            resource=public_url or web_url,
+            authorization_server=web_url,
+        )
 
     @app.get("/info", include_in_schema=False)
     async def _info() -> dict[str, Any]:
