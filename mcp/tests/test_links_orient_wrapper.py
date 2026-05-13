@@ -23,14 +23,126 @@ from __future__ import annotations
 import json
 
 from iris_mcp.links import (
+    decorate_tree,
     with_web_url,
     with_web_urls_list,
     with_web_urls_search,
+    with_web_urls_tree,
     wrap_orient,
 )
 
 WEB = "https://iris-uat.chrisbarlow.nz"
 _MARKER = "[ORIENT"
+
+
+class TestPackageHierarchyTreeDecoration:
+    """v6.0.7: package_hierarchy returns a nested tree; every node at
+    every depth must get a `web_url` so the model can render the TOC as
+    clickable markdown links. `decorate_list` only walks the top level —
+    `decorate_tree` recurses through children."""
+
+    def test_decorate_tree_attaches_web_url_at_root(
+        self, monkeypatch,
+    ) -> None:  # type: ignore[no-untyped-def]
+        monkeypatch.setenv("IRIS_WEB_URL", WEB)
+        nodes = [
+            {"id": "part-a", "name": "Part A", "children": []},
+            {"id": "part-b", "name": "Part B", "children": []},
+        ]
+        decorate_tree(nodes, "package")
+        assert nodes[0]["web_url"] == f"{WEB}/packages/part-a"
+        assert nodes[1]["web_url"] == f"{WEB}/packages/part-b"
+
+    def test_decorate_tree_recurses_into_children(
+        self, monkeypatch,
+    ) -> None:  # type: ignore[no-untyped-def]
+        monkeypatch.setenv("IRIS_WEB_URL", WEB)
+        nodes = [{
+            "id": "part-a", "name": "Part A",
+            "children": [
+                {"id": "chap-1", "name": "A01", "children": []},
+                {"id": "chap-2", "name": "A02", "children": []},
+            ],
+        }]
+        decorate_tree(nodes, "package")
+        assert nodes[0]["web_url"] == f"{WEB}/packages/part-a"
+        children = nodes[0]["children"]
+        assert children[0]["web_url"] == f"{WEB}/packages/chap-1"
+        assert children[1]["web_url"] == f"{WEB}/packages/chap-2"
+
+    def test_decorate_tree_handles_arbitrary_depth(
+        self, monkeypatch,
+    ) -> None:  # type: ignore[no-untyped-def]
+        monkeypatch.setenv("IRIS_WEB_URL", WEB)
+        nodes = [{
+            "id": "a", "name": "A", "children": [{
+                "id": "a1", "name": "A1", "children": [{
+                    "id": "a1.1", "name": "A1.1", "children": [],
+                }],
+            }],
+        }]
+        decorate_tree(nodes, "package")
+        assert nodes[0]["web_url"] == f"{WEB}/packages/a"
+        assert nodes[0]["children"][0]["web_url"] == f"{WEB}/packages/a1"
+        assert nodes[0]["children"][0]["children"][0]["web_url"] == (
+            f"{WEB}/packages/a1.1"
+        )
+
+    def test_decorate_tree_noop_without_iris_web_url(
+        self, monkeypatch,
+    ) -> None:  # type: ignore[no-untyped-def]
+        monkeypatch.delenv("IRIS_WEB_URL", raising=False)
+        nodes = [{"id": "a", "name": "A", "children": []}]
+        decorate_tree(nodes, "package")
+        assert "web_url" not in nodes[0]
+
+    def test_with_web_urls_tree_round_trips_json(
+        self, monkeypatch,
+    ) -> None:  # type: ignore[no-untyped-def]
+        monkeypatch.setenv("IRIS_WEB_URL", WEB)
+        payload = json.dumps([
+            {"id": "p1", "name": "P1", "children": [
+                {"id": "p1.1", "name": "P1.1", "children": []},
+            ]},
+        ])
+        out = json.loads(with_web_urls_tree(payload, "package"))
+        assert out[0]["web_url"] == f"{WEB}/packages/p1"
+        assert out[0]["children"][0]["web_url"] == f"{WEB}/packages/p1.1"
+
+
+class TestOrientWrapperFormattingDirectives:
+    """v6.0.7: the wrapper must spell out TOC formatting and menu
+    verbatim copying explicitly — the v6.0.6 wording was too soft and
+    the model kept paraphrasing both."""
+
+    def test_wrapper_names_markdown_link_format_for_toc(self) -> None:
+        item = {
+            "id": "s1",
+            "mcp_system_context": "original",
+        }
+        wrap_orient(item, "set")
+        ctx = item["mcp_system_context"]
+        # Explicit instruction on TOC presentation shape.
+        assert "markdown bullet list" in ctx
+        assert "ONE ENTRY PER LINE" in ctx
+        assert "clickable markdown link" in ctx
+        assert "web_url" in ctx
+        # Example present so the model has a concrete pattern.
+        assert "Part A" in ctx
+        assert "https://iris-uat.chrisbarlow.nz/packages/" in ctx
+
+    def test_wrapper_demands_character_by_character_menu_copy(self) -> None:
+        item = {"id": "s1", "mcp_system_context": "x"}
+        wrap_orient(item, "set")
+        ctx = item["mcp_system_context"]
+        assert "CHARACTER-BY-CHARACTER" in ctx
+        assert "Do NOT summarise" in ctx
+        assert "Do NOT shorten" in ctx
+        # Negate the specific paraphrasing failures observed in the
+        # v6.0.6 trace.
+        assert "parenthetical examples" in ctx
+        assert "mcp__iris__ask" in ctx
+        assert "create_diagram" in ctx
 
 
 class TestWrapOrient:
@@ -55,7 +167,7 @@ class TestWrapOrient:
         # The strong directives are present.
         assert "INVOKE" in ctx
         assert "TOC is mandatory" in ctx
-        assert "Do not paraphrase" in ctx
+        assert "CHARACTER-BY-CHARACTER" in ctx  # v6.0.7 strengthened
         assert "want me to load" in ctx  # explicit anti-pattern call-out
 
     def test_wraps_collection_with_collection_id_kw(self) -> None:
