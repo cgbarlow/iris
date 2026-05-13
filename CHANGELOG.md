@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.2] - 2026-05-13
+
+### Fixed
+
+- **Per-scope `mcp_system_context` still carried `iris_package_hierarchy`**
+  (issue #115 follow-up). v6.0.1's m055/m059 fixed the server-wide
+  `mcp_server_instructions` singleton row, but the **per-scope
+  content** on `sets.mcp_system_context` (and `collections.mcp_system_context`)
+  was pasted during v5.18.0 / v6.0.0 admin setup with the wrong tool
+  name. Live-data testing confirmed: search results for the Outcomes
+  Theory Book still surfaced `iris_package_hierarchy(set_id=)` in
+  the scope content, defeating v6.0.1's protocol fix.
+- **m056 (SQLite) + m060 (Supabase)** surgically REPLACE() the wrong
+  substring in `sets.mcp_system_context` AND `collections.mcp_system_context`
+  for every row that's non-NULL. Admin customisations elsewhere in
+  each body are preserved. Idempotent.
+
+### Migration
+
+- **SQLite m056** runs automatically on next boot. No manual paste.
+- **Supabase m060**: apply once via `./scripts/supabase-migrate.sh`.
+
+### Tests
+
+- 4 new migration-parser tests (REPLACE shape on both tables, guards,
+  NULL-skip, Supabase mirror). End-to-end smoke against an in-memory
+  SQLite fixture confirms the REPLACE fixes stale rows and is
+  idempotent.
+
 ## [6.0.1] - 2026-05-13
 
 ### Fixed

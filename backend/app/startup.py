@@ -59,6 +59,7 @@ from app.migrations.m051_response_format_prompts import up as m051_up
 from app.migrations.m053_mcp_server_instructions_seed import up as m053_up
 from app.migrations.m054_oauth_tables import up as m054_up
 from app.migrations.m055_fix_orient_protocol_tool_name import up as m055_up
+from app.migrations.m056_fix_scope_context_tool_name import up as m056_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -144,7 +145,8 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     # m052 (pairing_codes) superseded by m054 (drops the table) — ADR-164, v6.0.0.
     await m053_up(main)
     await m054_up(main)
-    await m055_up(main)  # issue #115, v6.0.1: fix iris_package_hierarchy → package_hierarchy
+    await m055_up(main)  # issue #115, v6.0.1: fix iris_package_hierarchy → package_hierarchy (server-wide)
+    await m056_up(main)  # issue #115, v6.0.2: same fix for per-scope mcp_system_context
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
