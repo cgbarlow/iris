@@ -278,19 +278,44 @@ command emits machine-parsable output. See
 uv tool install --from ./mcp iris-mcp
 ```
 
-Two transports, two auth paths (ADR-164, v6.0.0):
+Two transports, two auth paths:
 
 **HTTP transport (claude.ai connectors, claude.ai-style hosted MCP)** —
-iris-mcp implements OAuth 2.1 (RFC 8414 + RFC 9728 + RFC 7591 + PKCE).
-The user adds iris-mcp's URL as a connector; the MCP client performs
-DCR + OAuth handshake automatically; the user signs in to Iris on a
-consent screen; the MCP client stores the bearer and includes it on
-every subsequent request. There is no `IRIS_TOKEN` or `iris_authenticate`
-ceremony — the OAuth handshake is the auth path.
+iris-mcp implements OAuth 2.1 (RFC 8414 + RFC 9728 + RFC 7591 + PKCE)
+per ADR-164 (v6.0.0), with the discovery chain hardened across
+ADR-169 → ADR-174 (v6.0.9–v6.0.14). The user adds iris-mcp's URL as
+a connector; iris-mcp's first 401 + `WWW-Authenticate: Bearer
+resource_metadata="..."` (ADR-170) triggers the MCP client's OAuth
+flow; the client performs Dynamic Client Registration; the user signs
+in to Iris on the SvelteKit consent screen (ADR-171); the bearer is
+exchanged via `/oauth/token` and stored by the client for every
+subsequent request. There is no `IRIS_TOKEN` ceremony — the OAuth
+handshake IS the auth path. **All HTTP-transport MCP requests require
+a bearer** (anonymous read access via HTTP was removed in v6.0.10 to
+make the OAuth-discovery trigger spec-compliant).
+
+For a self-hosted production iris-api the operator must set:
+- `IRIS_WEB_URL=https://<frontend-host>` — where the OAuth consent
+  page lives (ADR-171). Falls back to a CORS-derived value when
+  unset (ADR-172) but explicit is cleaner.
+- `IRIS_JWT_SECRET` — HS256 signing key for iris-issued OAuth bearers
+  (ADR-174). Generate with `openssl rand -hex 32` and paste into the
+  deploy environment without echoing the value back into chats or
+  commits. The `config.py` dev default is a public-repo string and
+  must never be used in production.
+
+For iris-mcp:
+- `IRIS_API_URL=https://<api-host>` — backend URL (required).
+- `IRIS_MCP_PUBLIC_URL=https://<mcp-host>` — canonical iris-mcp URL,
+  used as `resource` in the Protected Resource metadata (ADR-169 /
+  ADR-172).
+- `IRIS_WEB_URL` — entity-link decoration; optional.
 
 **Stdio transport (Claude Desktop with the local iris-mcp binary)** —
 operators set `IRIS_TOKEN` env var to a Personal Access Token issued
-from `/settings/tokens` in the web UI.
+from `/settings/tokens` in the web UI. Anonymous-read use is
+supported on stdio (omit `IRIS_TOKEN`) because the trigger-on-401
+behaviour only applies to the HTTP transport.
 
 ```json
 {
@@ -308,31 +333,45 @@ from `/settings/tokens` in the web UI.
 }
 ```
 
-`IRIS_TOKEN` is optional. Read-only tools work anonymously; for
-write-capable tools, either configure OAuth (HTTP transport) or set
-`IRIS_TOKEN` (stdio transport).
+Exposes ~27 tools (search, list/get for every entity, export,
+conversations, plus `create_collection` / `create_set` /
+`create_package` for organising destinations, `create_diagram` /
+`apply_diagram_creation` / `list_notations` / `list_diagram_types`
+for the generic local-AI diagram-creation workflow). Plus `iris://`
+resource URIs for JSON export bundles.
 
-Exposes ~28 tools (search, list/get for every entity, export, ask-AI,
-apply-diagram-creation, conversations, plus `create_collection` /
-`create_set` / `create_package` for organising destinations,
-`create_diagram` / `list_notations` / `list_diagram_types` for the
-generic local-AI diagram-creation workflow). Plus `iris://` resource
-URIs for JSON export bundles. **Removed in v6.0.0** (ADR-164):
-`iris_authenticate` (replaced by OAuth handshake), `save_doview_analysis`
-(use `create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`).
+**Removed in v6.0.0** (ADR-164): `iris_authenticate` (replaced by OAuth
+handshake), `save_doview_analysis` (use
+`create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`).
+**Removed in v6.0.8** (ADR-168): `ask` (the server-side AI question
+tool) — cross-package, cross-set, and cross-collection questions are
+fulfilled by the local AI walking the read-only MCP tools (`search`,
+`get_*`, `list_*`, `package_hierarchy`) and reasoning over the data
+in its own voice. `iris-client.IrisClient.ask(...)` SDK method is
+kept for non-MCP consumers.
 
-**Server-wide orient-first protocol** (v5.18.0 / ADR-163). On every
-session, iris-mcp surfaces an admin-editable orient-first protocol
-+ discovery catalogue via the MCP `instructions` channel (returned
-in the InitializeResult to every connected MCP client). Admins
-edit the body at `/admin/settings/ai` filtering by
-`purpose=mcp_server_instructions`; the next MCP session picks up
-the change. iris-mcp falls back to a hardcoded baseline if the
-Iris backend is unreachable at startup, so write tools stay
-usable in degraded states. When `IRIS_WEB_URL` is set, every tool
-response that carries an entity id also carries a resolved front-end
-URL so MCP-using LLMs link back to the live UI without guessing
-hosts. See [`mcp/README.md`](mcp/README.md) and
+**Server-wide orient-first protocol** (v5.18.0 / ADR-163, refined
+through v6.0.4–v6.0.7). Two delivery channels for the orient-first
+protocol:
+
+- MCP `Server(instructions=...)` field, returned in the
+  InitializeResult to every connected client. The body is
+  admin-editable at `/admin/settings/ai` filtering by
+  `purpose=mcp_server_instructions`; iris-mcp re-fetches every 60s
+  (ADR-166) so admin edits propagate without a redeploy.
+- A per-scope orient wrapper prepended to `mcp_system_context` in
+  every search/list/get response containing a Set or Collection
+  (ADR-167). claude.ai's hosted MCP integration doesn't reliably
+  surface `Server.instructions` to the model; the tool-response
+  wrapper is belt-and-suspenders.
+
+When `IRIS_WEB_URL` is set, every tool response that carries an
+entity id also carries a resolved front-end URL so MCP-using LLMs
+link back to the live UI without guessing hosts. `package_hierarchy`
+responses are decorated recursively (ADR-167 / v6.0.7) so each Part
+and chapter renders as a clickable markdown link.
+
+See [`mcp/README.md`](mcp/README.md) and
 [ADR-131](docs/adrs/ADR-131-MCP-Server-Architecture.md).
 
 Also surfaces the spec-defined MCP **prompts** capability: every
