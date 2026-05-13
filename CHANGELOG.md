@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.3] - 2026-05-13
+
+### Fixed
+
+- **Stale `iris_authenticate` references in `mcp_server_instructions`
+  seed body** (issue #115 follow-up). The v5.18.0 seed (m053) shipped
+  two sentences referencing the v5.15.0 `iris_authenticate` flow —
+  one in WORKFLOW GUIDANCE, one in AUTH RECOVERY. v6.0.0 (ADR-164)
+  removed that tool and rewrote the canonical doc + iris-mcp fallback
+  constant, but the **seed body** was never updated. Live deployments
+  seeded with v5.18.0 carried the stale references through v6.0.0 →
+  v6.0.2 even after m055/m056 fixed the unrelated `iris_package_hierarchy`
+  typo. Discovered during the regression-test inventory for this release.
+- **m057 (SQLite) + m061 (Supabase)** surgically REPLACE() the two
+  stale sentences in the singleton `mcp_server_instructions` row with
+  their v6.0.0 OAuth-aligned text. Admin customisations elsewhere in
+  the body are preserved. Idempotent.
+- The seed bodies themselves (m053 SQLite + m057 Supabase) are also
+  updated so fresh installs converge with migrated installs.
+
+### Added
+
+- **Regression test** `test_no_unregistered_iris_tool_refs.py` walks
+  every live-data source (seeded migration bodies, iris-mcp source
+  files, canonical paste-ready docs) and asserts every `iris_<word>`
+  token references a registered MCP tool (parsed statically from
+  `tools.py`) or is in a small non-tool allowlist (env vars, the
+  server name, etc.). Specific regression assertions for
+  `iris_package_hierarchy` (issue #115 root cause) and
+  `iris_authenticate` (v6.0.0-removed tool) being absent from all
+  seed bodies. Caught one stale historical-comment reference in
+  `tools.py` that the v6.0.3 inventory had missed.
+
+### Migration
+
+- **SQLite m057** runs automatically on next boot. No manual paste.
+- **Supabase m061**: apply once via `./scripts/supabase-migrate.sh`.
+
+### Tests
+
+- 12 new regression tests (`test_no_unregistered_iris_tool_refs.py`)
+  + 5 new migration tests (`test_stale_auth_recovery_fix.py`).
+
 ## [6.0.2] - 2026-05-13
 
 ### Fixed
