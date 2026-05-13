@@ -203,6 +203,63 @@ def create_app() -> FastAPI:
         if scope["type"] != "http":
             return
         token = extract_bearer(scope.get("headers") or [])
+
+        # ADR-170 (v6.0.10): MCP authorization spec (2025-06-18) and
+        # RFC 9728 require the resource server to return HTTP 401 with
+        # `WWW-Authenticate: Bearer resource_metadata="..."` whenever a
+        # request lacks credentials. claude.ai (and every compliant MCP
+        # client) treats THAT specific response as the trigger to start
+        # an OAuth Authorization Code Flow — fetch the metadata URL,
+        # DCR-register itself, redirect the user to sign in, exchange
+        # the code for a bearer, retry the request.
+        #
+        # v6.0.0 → v6.0.9 returned HTTP 200 with a JSON tool-error body
+        # for auth failures (the auth_required payload assembled by
+        # tools.py). The spec's 401 trigger never fired; claude.ai
+        # silently treated the connector as anonymous and never offered
+        # the user a "Sign in" button. The user-visible symptom: write
+        # tools surface an "auth_required" message to the model with no
+        # path forward, exactly as reported in issue #119.
+        #
+        # The simplest spec-compliant fix is to require a bearer on the
+        # MCP HTTP endpoint at the transport layer. Anonymous reads via
+        # HTTP go away — clients that need that path should use the
+        # stdio transport (`iris-mcp` with `IRIS_TOKEN`). Anonymous
+        # reads via the iris-api SDK or the frontend's public endpoints
+        # are unaffected.
+        if not token:
+            metadata_url = (
+                os.environ.get("IRIS_MCP_PUBLIC_URL", iris_url).rstrip("/")
+                + "/.well-known/oauth-protected-resource"
+            )
+            # HTTP header values are latin-1 only — keep the prose ASCII.
+            header = (
+                f'Bearer resource_metadata="{metadata_url}", '
+                'error="invalid_token", '
+                'error_description="MCP requests require an OAuth 2.1 '
+                "access token. Sign in to Iris via your MCP client's "
+                'connector UI; Dynamic Client Registration (RFC 7591) '
+                'handles client setup automatically (no client_id or '
+                'client_secret required)."'
+            )
+            await send({
+                "type": "http.response.start",
+                "status": 401,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"www-authenticate", header.encode("latin-1")),
+                ],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": (
+                    b'{"error":"unauthorized",'
+                    b'"error_description":"Sign in to Iris via your '
+                    b'MCP client connector to use this resource."}'
+                ),
+            })
+            return
+
         async with IrisClient(url=iris_url, token=token) as client, bind_client(client):
             await session_manager.handle_request(scope, receive, send)
 
