@@ -73,6 +73,10 @@ class TestHttpMainEndpointMounted:
         from iris_mcp.http_main import create_app
         monkeypatch.setenv("IRIS_API_URL", "https://iris-backend.example.com")
         monkeypatch.setenv("IRIS_MCP_PUBLIC_URL", "https://iris-mcp.example.com")
+        # ADR-169 (v6.0.9): IRIS_WEB_URL must NOT appear in the OAuth
+        # metadata. Set it to a known wrong value so the test would fail
+        # if the v6.0.0–v6.0.8 buggy behaviour re-emerged.
+        monkeypatch.setenv("IRIS_WEB_URL", "https://wrong-host.example.com")
         app = create_app()
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -80,4 +84,37 @@ class TestHttpMainEndpointMounted:
         assert resp.status_code == 200
         body = resp.json()
         assert body["resource"] == "https://iris-mcp.example.com"
-        assert body["authorization_servers"] == ["https://iris-backend.example.com"]
+        # ADR-169 (v6.0.9): the Authorization Server URL must point at
+        # the API (where /oauth/* and /.well-known/oauth-authorization-server
+        # actually live), NOT at the frontend (which serves a SvelteKit
+        # SPA and returns index.html for unknown paths — silently breaking
+        # the OAuth discovery chain).
+        assert body["authorization_servers"] == [
+            "https://iris-backend.example.com",
+        ]
+        assert "wrong-host" not in body["authorization_servers"][0]
+        assert "wrong-host" not in body["resource"]
+
+    @pytest.mark.asyncio
+    async def test_metadata_falls_back_to_api_url_without_public_url(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """ADR-169: without `IRIS_MCP_PUBLIC_URL`, both `resource` and
+        `authorization_server` fall back to `IRIS_API_URL` (same host,
+        consistent with the AS-and-resource-co-located dev setup). The
+        v6.0.0–v6.0.8 buggy fallback used `IRIS_WEB_URL` for both,
+        which broke OAuth discovery."""
+        import httpx
+        from iris_mcp.http_main import create_app
+        monkeypatch.setenv("IRIS_API_URL", "https://iris-backend.example.com")
+        monkeypatch.delenv("IRIS_MCP_PUBLIC_URL", raising=False)
+        monkeypatch.setenv("IRIS_WEB_URL", "https://wrong-host.example.com")
+        app = create_app()
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            resp = await c.get("/.well-known/oauth-protected-resource")
+        body = resp.json()
+        assert body["resource"] == "https://iris-backend.example.com"
+        assert body["authorization_servers"] == [
+            "https://iris-backend.example.com",
+        ]

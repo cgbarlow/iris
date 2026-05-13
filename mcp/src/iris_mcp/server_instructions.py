@@ -39,7 +39,7 @@ WORKFLOW GUIDANCE.
 Each tool's description carries its own workflow. For diagram creation, see `create_diagram` (it explains the full discover → fetch creation cascade → guided conversation → confirm destination → save flow).
 
 AUTH RECOVERY.
-If a write tool returns error="auth_required" (HTTP transport), advise the user to configure OAuth in their MCP client's connector settings (e.g. claude.ai → Connectors → Iris → Configure → enable OAuth). The browser opens a consent screen, the user signs in to Iris, and writes work from then on. Don't call any auth-related tool yourself — the OAuth handshake is between the MCP client and Iris, not via tool calls.
+If a write tool returns error="auth_required", the user needs to sign in to Iris in their MCP client. Tell them: in claude.ai go to Settings → Connectors → Iris and click "Connect" / "Sign in"; a browser tab opens for sign-in and consent. They will NOT be asked for a client_id or secret — Dynamic Client Registration (RFC 7591) handles that automatically. If no sign-in button appears, try removing and re-adding the connector. Read tools (search, get_*, list_*, package_hierarchy) work without sign-in; only writes (create_*, update_*) need it. Don't call any auth-related tool yourself — the OAuth handshake is between the MCP client and Iris.
 """
 
 

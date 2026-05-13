@@ -155,12 +155,25 @@ def create_app() -> FastAPI:
         Anonymous-readable. MCP clients fetch this on a 401 response's
         `WWW-Authenticate: Bearer resource_metadata="..."` hint and
         learn which Authorization Server to start an OAuth dance with.
+
+        v6.0.9 (ADR-169): `authorization_server` now points at the iris
+        API URL (`IRIS_API_URL`), not the frontend URL (`IRIS_WEB_URL`).
+        The RFC 8414 Authorization Server metadata document and the
+        `/oauth/{authorize,token,register,revoke}` endpoints all live
+        on the API host. The frontend host serves a SvelteKit SPA and
+        returns its index.html (HTTP 200) for unknown paths — including
+        `/.well-known/oauth-authorization-server` — which silently
+        broke the OAuth discovery chain. `resource` falls back to the
+        API URL too (instead of the frontend URL) so it stays on the
+        same host as the AS, matching the JWT `aud` semantics.
+        Operators set `IRIS_MCP_PUBLIC_URL` to override `resource` with
+        the canonical iris-mcp public URL when one exists.
         """
         public_url = os.environ.get("IRIS_MCP_PUBLIC_URL", "").rstrip("/")
-        web_url = os.environ.get("IRIS_WEB_URL", iris_url).rstrip("/")
+        as_url = iris_url.rstrip("/")
         return build_resource_metadata(
-            resource=public_url or web_url,
-            authorization_server=web_url,
+            resource=public_url or as_url,
+            authorization_server=as_url,
         )
 
     @app.get("/info", include_in_schema=False)

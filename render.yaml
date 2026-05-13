@@ -104,3 +104,11 @@ services:
         # instead of guessing the host. Optional — when unset the MCP
         # omits `web_url` from tool responses.
         value: https://iris-uat.chrisbarlow.nz
+      - key: IRIS_MCP_PUBLIC_URL
+        # v6.0.9 (ADR-169): canonical iris-mcp public URL. Used as the
+        # `resource` field in the RFC 9728 Protected Resource metadata
+        # document at /.well-known/oauth-protected-resource. MCP clients
+        # use this to identify the resource server when starting an
+        # OAuth dance. Without this env var, `resource` falls back to
+        # IRIS_API_URL, which works but isn't the actual MCP endpoint.
+        value: https://iris-mcp.onrender.com

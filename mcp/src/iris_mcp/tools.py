@@ -39,31 +39,42 @@ def _resource_metadata_url() -> str:
 
 
 def _auth_required_payload(action: str) -> str:
-    """ADR-164 / SPEC-164-A: shared 401 → OAuth-setup-guidance payload.
+    """ADR-164 / ADR-169: shared OAuth-setup-guidance payload.
 
-    Every write tool returns this exact shape on auth failure so the
-    model can extract the next step uniformly: advise the user to
-    configure OAuth in their MCP client's connector settings.
+    Every write tool returns this exact shape when iris-mcp gets a 401
+    from the backend, so the model can guide the user uniformly.
 
-    There is NO in-conversation auth dance — the OAuth handshake is
-    between the MCP client and Iris, not via tool calls.
+    The OAuth handshake is fully automatic in MCP — the client (e.g.
+    claude.ai) reads the RFC 9728 Protected Resource metadata at
+    `/.well-known/oauth-protected-resource`, performs RFC 7591 Dynamic
+    Client Registration with the Authorization Server, and pops a
+    browser window for the user to sign in. There is **no manual
+    client_id/secret entry** on the user's side. If the user is seeing
+    this message instead of an automatic sign-in popup, the client
+    hasn't initiated the OAuth flow yet — usually a one-click "Connect"
+    button in the client's connector UI triggers it.
     """
     return json.dumps({
         "success": False,
         "error": "auth_required",
         "message": (
-            f"{action} failed — this MCP connector isn't"
-            " authenticated.\n\n"
-            "Advise the user to configure OAuth in their MCP client's"
-            " connector settings (e.g. claude.ai → Connectors →"
-            " Iris → Configure → enable OAuth). The browser will open"
-            " a consent screen, the user signs in to Iris, and writes"
-            " work from then on.\n\n"
-            "Do NOT call any auth-related tool yourself — the OAuth"
-            " handshake is between the MCP client and Iris, not via"
-            " tool calls."
+            f"{action} requires that you (the user) sign in to Iris.\n\n"
+            "Tell the user: in your MCP client's connector list, find "
+            "the Iris connector and click \"Connect\" / \"Sign in\" "
+            "(in claude.ai: Settings → Connectors → Iris). A browser "
+            "tab will open for you to sign in to Iris and approve "
+            "access. You will NOT be asked for a client_id or secret "
+            "— the MCP client registers itself automatically via "
+            "Dynamic Client Registration (RFC 7591).\n\n"
+            "If no sign-in button appears, try removing and re-adding "
+            "the connector to force re-discovery of the OAuth metadata.\n\n"
+            "Do NOT call any auth-related tool yourself — the OAuth "
+            "handshake is between the MCP client and Iris, not via "
+            "tool calls. Read tools (search, get_*, list_*, "
+            "package_hierarchy) work without sign-in; only writes "
+            "(create_*, update_*) need it."
         ),
-        "next_step": "configure_oauth_in_connector_settings",
+        "next_step": "user_signs_in_via_mcp_client_connector_ui",
         "oauth_resource_metadata_url": _resource_metadata_url(),
     })
 
