@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.5] - 2026-05-13
+
+### Fixed
+
+- **MCP server instructions now refresh from the backend on a TTL —
+  admin edits propagate without a Render redeploy (issue #119 final
+  follow-up, ADR-166).** v6.0.4 (ADR-165) wired the orient-first
+  protocol body through the HTTP transport at lifespan startup, but
+  iris-mcp continued serving the body it fetched at boot for the
+  entire lifetime of the process. Admins editing the
+  `mcp_server_instructions` row in `/admin/settings/ai` had to wait
+  for a manual Render "Manual Deploy" before the new body reached
+  claude.ai. That defeated the "admin-editable" promise of ADR-163.
+- The HTTP-transport lifespan now spawns an `asyncio` background task
+  that re-fetches `/api/ai/server-instructions` every
+  `IRIS_MCP_INSTRUCTIONS_REFRESH_S` seconds (default **60**) and
+  updates `session_manager.app.instructions` if the body has changed.
+  The MCP SDK reads `Server.instructions` per request, so the next
+  claude.ai session that connects after the tick sees the fresh body.
+- **Transient backend failures preserve the last good value.** A new
+  helper `try_fetch_server_instructions(iris_url) -> str | None`
+  returns `None` on every failure mode `fetch_server_instructions`
+  falls back from (network error, HTTP error, malformed JSON, empty
+  body). The refresh loop only writes when it gets a fresh real body,
+  so a 30-second backend hiccup doesn't silently revert admin
+  customisations to the hardcoded fallback. The startup fetch still
+  uses `fetch_server_instructions` so the first request never sees
+  `instructions=None`.
+- **Background task is cancelled cleanly on lifespan shutdown.** No
+  hung tasks, no leaked exceptions when iris-mcp restarts.
+
+### Added
+
+- New env var `IRIS_MCP_INSTRUCTIONS_REFRESH_S` (default 60, set 0 to
+  disable the loop). Tunable for prompt-engineering iteration (shorter
+  interval) or quiet production (longer interval / disabled).
+- 7 new regression tests:
+  - `test_server_instructions.py::TestTryFetchServerInstructions` (7
+    cases) — `try_fetch` returns body on happy path; `None` on every
+    failure mode the canonical variant falls back from.
+  - `test_http_main.py::TestRefreshLoop` (3 cases) — refresh picks up
+    an updated body within the TTL window; preserves last-good body
+    on transient failure; disabled when interval is 0.
+
+### Why this matters
+
+- Admins iterating on the orient protocol from `/admin/settings/ai`
+  now see edits propagate to claude.ai within ≤ 60 seconds (default).
+  No Render dashboard required, no commit-and-deploy cycle. This is
+  what ADR-163's "admin-editable" promise has meant all along; v6.0.5
+  is the last gap closed.
+
+### See also
+
+- [ADR-166](docs/adrs/ADR-166-MCP-Server-Instructions-TTL-Refresh.md)
+- [SPEC-166-A](docs/adrs/specs/SPEC-166-A-MCP-Server-Instructions-TTL-Refresh.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119)
+
 ## [6.0.4] - 2026-05-13
 
 ### Fixed

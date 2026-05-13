@@ -11,6 +11,7 @@ Run: `uvicorn iris_mcp.http_main:create_app --factory --host 0.0.0.0`.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -24,7 +25,14 @@ from iris_client import IrisClient
 from iris_mcp.asgi import bind_client, build_session_manager, extract_bearer
 from iris_mcp.branding import ICON_SVG
 from iris_mcp.oauth_resource import build_resource_metadata
-from iris_mcp.server_instructions import fetch_server_instructions
+from iris_mcp.server_instructions import (
+    fetch_server_instructions,
+    try_fetch_server_instructions,
+)
+
+# ADR-166 (v6.0.5): default 60s between refresh ticks. Tunable via
+# IRIS_MCP_INSTRUCTIONS_REFRESH_S; set to 0 to disable the loop entirely.
+REFRESH_DEFAULT_S = 60.0
 
 
 def _pkg_version() -> str | None:
@@ -70,6 +78,31 @@ def create_app() -> FastAPI:
     # the app inside an existing event loop).
     session_manager = build_session_manager()
 
+    # ADR-166 (v6.0.5): how often the background refresh loop re-fetches
+    # `/api/ai/server-instructions` so admin edits propagate without a
+    # Render redeploy. 0 disables the loop.
+    refresh_interval = float(
+        os.environ.get(
+            "IRIS_MCP_INSTRUCTIONS_REFRESH_S",
+            str(REFRESH_DEFAULT_S),
+        ),
+    )
+
+    async def _refresh_loop() -> None:
+        """Periodic refresh. Preserves last-good on transient backend
+        failures — `try_fetch_server_instructions` returns None instead
+        of the fallback baseline, so we only write when we got a fresh
+        real body."""
+        while True:
+            await asyncio.sleep(refresh_interval)
+            fresh = await try_fetch_server_instructions(iris_url)
+            if (
+                fresh is not None
+                and fresh != session_manager.app.instructions
+            ):
+                session_manager.app.instructions = fresh
+                logger.info("iris-mcp: refreshed server instructions body")
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         # Mirrors the stdio wiring in __main__.py (ADR-163). Falls back
@@ -79,11 +112,24 @@ def create_app() -> FastAPI:
         session_manager.app.instructions = await fetch_server_instructions(
             iris_url,
         )
-        # StreamableHTTPSessionManager.run() owns the anyio task group
-        # the request handler depends on; entering it for the lifetime
-        # of the app is the supported pattern.
-        async with session_manager.run():
-            yield
+
+        refresh_task: asyncio.Task[None] | None = None
+        if refresh_interval > 0:
+            refresh_task = asyncio.create_task(_refresh_loop())
+
+        try:
+            # StreamableHTTPSessionManager.run() owns the anyio task
+            # group the request handler depends on; entering it for the
+            # lifetime of the app is the supported pattern.
+            async with session_manager.run():
+                yield
+        finally:
+            if refresh_task is not None:
+                refresh_task.cancel()
+                try:
+                    await refresh_task
+                except asyncio.CancelledError:
+                    pass
 
     app = FastAPI(
         title="iris-mcp",
