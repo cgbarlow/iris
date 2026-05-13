@@ -709,7 +709,7 @@ TOOLS: list[Tool] = [
         }),
         handler=_get_response_prompt,
     ),
-    # v6.0.0 (ADR-164): iris_authenticate tool removed — OAuth replaces it.
+    # v6.0.0 (ADR-164): _iris_authenticate tool removed — OAuth replaces it.
     # v6.0.0 (ADR-164): save_doview_analysis removed — use create_diagram.
     # ── Entity creation (ADR-161, v5.16.0) ─────────────────────────────
     Tool(
