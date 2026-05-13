@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.18.0] - 2026-05-13
+
+### Added
+
+- **Centralised, admin-editable MCP server instructions**
+  (ADR-163, SPEC-163-A). The universal ORIENT-FIRST protocol and
+  DISCOVERY catalogue that v5.13.x → v5.17.x had embedded in every
+  authored scope's `mcp_system_context` are lifted into a single
+  server-wide channel: the MCP spec's `Server(instructions=...)`
+  field, returned in the InitializeResult to every connected MCP
+  client. Universal across every scope. Three clean layers now:
+  per-tool workflow (in tool descriptions), server-wide orient
+  (this), scope-specific menu (per-scope `mcp_system_context`).
+- **New `purpose='mcp_server_instructions'`** on
+  `ai_creation_prompts`. Singleton row at layer=base, seeded by
+  m053 (SQLite) + m057 (Supabase). Admin-editable from
+  `/admin/settings/ai` filtering by the new purpose value —
+  consistent with creation_format and response_format prompts.
+- **New backend endpoint `GET /api/ai/server-instructions`**
+  (anonymous-readable). Returns the singleton row body.
+- **New iris-mcp module `iris_mcp/server_instructions.py`** with
+  `fetch_server_instructions(iris_url)` + a hardcoded fallback
+  baseline. iris-mcp fetches once at startup and passes the body
+  through `build_server(client, instructions=...)` to the MCP SDK.
+  Falls back gracefully if the backend is unreachable / errors /
+  returns empty.
+- **Frontend admin polish.** `PURPOSES` const extended; new
+  `appliesToLabel()` branch renders the singleton row as
+  "Server-wide (MCP instructions)" in the row table and live
+  preview.
+
+### Changed
+
+- **Canonical `doview-book-mcp-system-context.md` trimmed again**
+  to ~12 lines (was ~30 in v5.17.0, ~50 in v5.14.0, ~140 in v5.13.x).
+  The orient-first protocol and discovery catalogue moved to the
+  new server-wide channel. The scope content now carries only
+  what's actually scope-specific: a one-sentence description, the
+  structural-overview call name, and the menu options verbatim.
+  Admin must paste the new shorter content into the Outcomes
+  Theory Book set's `mcp_system_context` field on UAT.
+- **New `docs/prompts/mcp-server-instructions.md`** as the
+  canonical paste-ready content for the new singleton row.
+
+### Migration
+
+- **SQLite**: m053_mcp_server_instructions_seed.py runs
+  automatically on next boot (idempotent INSERT OR IGNORE).
+- **Supabase**: apply `m057_mcp_server_instructions_seed.sql`
+  once. Command: `./scripts/supabase-migrate.sh "$SUPABASE_URL"`.
+- **Manual**: paste the trimmed canonical content from
+  `docs/prompts/doview-book-mcp-system-context.md` into the
+  Outcomes Theory Book set's `mcp_system_context` field on UAT.
+
+### Tests
+
+- ~18 net new tests: 10 backend (endpoint + migration parser +
+  Pydantic Literal extension), 11 MCP (fetch happy path + 6
+  failure-mode fallbacks + 3 wiring), 7 frontend (PURPOSES + 5
+  appliesToLabel branches). Combined MCP suite now 134 (was 123).
+
 ## [5.17.0] - 2026-05-12
 
 ### Added
