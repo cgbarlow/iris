@@ -46,6 +46,87 @@ def web_base() -> str | None:
 _STRIPPED_KEYS: tuple[str, ...] = ("system_prompt",)
 
 
+# v6.0.6 (ADR-167): orient wrapper marker. Used both as the prefix the
+# wrapper produces AND as the idempotency check ("starts with this →
+# already wrapped, don't re-wrap"). Keep these in sync.
+_ORIENT_MARKER = "[ORIENT — DO THESE STEPS BEFORE RESPONDING TO THE USER]"
+
+
+def _orient_wrapper(kind: str, entity_id: str) -> str:
+    """Build the imperative orient prefix for a single scope.
+
+    v6.0.6 (ADR-167): claude.ai's hosted MCP integration does not
+    reliably surface `InitializeResult.instructions` to the model —
+    verified post-v6.0.5 when the strong canonical body was confirmed
+    on the wire but the model still skipped the structural-overview
+    call. The orient-first directive is therefore re-embedded into the
+    tool RESPONSE itself, prepended to any non-empty `mcp_system_context`
+    field. The model has been consistently shown to read tool-response
+    bodies; this puts the directive where it definitely lands.
+
+    The wrapper pre-fills the scope's id (`set_id="..."` /
+    `collection_id="..."`) so the model has the exact tool-call
+    signature in hand — no inference needed.
+    """
+    if kind == "set":
+        id_kw = f'set_id="{entity_id}"'
+    elif kind == "collection":
+        id_kw = f'collection_id="{entity_id}"'
+    else:
+        id_kw = f'id="{entity_id}"'
+    return (
+        f"{_ORIENT_MARKER}\n"
+        f"This scope is a {kind} ({id_kw}). The orient sheet below names a "
+        f"structural-overview call AND a numbered menu. Before responding "
+        f"to the user, you MUST, in order:\n"
+        f"  1. Briefly describe the scope (one sentence based on its name "
+        f"and description).\n"
+        f"  2. INVOKE the structural-overview call named below, passing "
+        f"this scope's {id_kw}. The TOC is mandatory, not optional. If the "
+        f"named tool is not currently in your toolset, request a tool-load "
+        f"first — do NOT skip this step.\n"
+        f"  3. Offer the menu options below via AskUserQuestion (if your "
+        f"client supports it) or a numbered list, IN ORDER, VERBATIM. "
+        f"Do not paraphrase, do not silently drop options.\n"
+        f"\n"
+        f"Do NOT ask \"want me to load the table of contents?\" — load it "
+        f"yourself. Do NOT respond with just the menu and skip the TOC.\n"
+        f"\n"
+        f"---\n"
+        f"\n"
+    )
+
+
+def wrap_orient(item: Any, kind: str) -> None:  # noqa: ANN401
+    """In-place: prepend the orient directive to `item["mcp_system_context"]`
+    when the field is set on a scope (set or collection).
+
+    No-op when:
+    - `item` isn't a dict.
+    - The field is missing, None, empty, or whitespace-only.
+    - The entity has no resolvable `id` (we'd produce an incomplete
+      tool-call signature otherwise).
+    - The field already starts with the orient marker (idempotent —
+      reprocessing the same payload doesn't double-wrap).
+    - `kind` is anything other than "set" or "collection". Other entity
+      kinds don't carry scope-orient semantics; even if a rogue server
+      set the field on a diagram, we leave it alone.
+    """
+    if not isinstance(item, dict):
+        return
+    if kind not in ("set", "collection"):
+        return
+    ctx = item.get("mcp_system_context")
+    if not isinstance(ctx, str) or not ctx.strip():
+        return
+    if ctx.startswith(_ORIENT_MARKER):
+        return
+    entity_id = item.get("id")
+    if not isinstance(entity_id, str) or not entity_id:
+        return
+    item["mcp_system_context"] = _orient_wrapper(kind, entity_id) + ctx
+
+
 def _strip_sensitive_keys(item: Any) -> None:
     """In-place: remove any sensitive keys from a single entity dict."""
     if not isinstance(item, dict):
@@ -124,13 +205,17 @@ def with_web_url(payload: str, kind: str) -> str:
 
     `kind` is the kind we expect (e.g. "diagram" for `get_diagram`).
     Also strips MCP-sensitive keys (v5.8.2, ADR-151) regardless of
-    whether IRIS_WEB_URL is configured. No-ops on invalid JSON.
+    whether IRIS_WEB_URL is configured. v6.0.6 (ADR-167) additionally
+    prepends the orient directive to `mcp_system_context` on set /
+    collection responses, regardless of IRIS_WEB_URL. No-ops on
+    invalid JSON.
     """
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, TypeError):
         return payload
     _strip_sensitive_keys(data)
+    wrap_orient(data, kind)
     base = web_base()
     if base:
         decorate_item(data, kind, base)
@@ -141,13 +226,18 @@ def with_web_urls_list(payload: str, kind: str) -> str:
     """Decorate a JSON-serialised list-of-entities tool response.
 
     Also strips MCP-sensitive keys from each item (v5.8.2, ADR-151)
-    regardless of whether IRIS_WEB_URL is configured.
+    regardless of whether IRIS_WEB_URL is configured. v6.0.6 (ADR-167)
+    additionally prepends the orient directive to every set / collection
+    item's `mcp_system_context` field.
     """
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, TypeError):
         return payload
     _strip_sensitive_keys_list(data)
+    if isinstance(data, list):
+        for item in data:
+            wrap_orient(item, kind)
     base = web_base()
     if base:
         decorate_list(data, kind, base)
@@ -158,7 +248,11 @@ def with_web_urls_search(payload: str) -> str:
     """Decorate a JSON-serialised SearchResponse.
 
     Also strips MCP-sensitive keys from each result (v5.8.2, ADR-151)
-    regardless of whether IRIS_WEB_URL is configured.
+    regardless of whether IRIS_WEB_URL is configured. v6.0.6 (ADR-167)
+    additionally prepends the orient directive to set / collection
+    results that carry a non-empty `mcp_system_context` — pre-filling
+    the scope's id in the tool-call signature so the model has the
+    exact `package_hierarchy(set_id="...")` call in hand.
     """
     try:
         data = json.loads(payload)
@@ -168,6 +262,11 @@ def with_web_urls_search(payload: str) -> str:
         results = data.get("results")
         if isinstance(results, list):
             _strip_sensitive_keys_list(results)
+            for r in results:
+                if isinstance(r, dict):
+                    kind = r.get("result_type")
+                    if isinstance(kind, str):
+                        wrap_orient(r, kind)
     base = web_base()
     if base:
         decorate_search(data, base)
@@ -183,4 +282,5 @@ __all__ = [
     "with_web_url",
     "with_web_urls_list",
     "with_web_urls_search",
+    "wrap_orient",
 ]

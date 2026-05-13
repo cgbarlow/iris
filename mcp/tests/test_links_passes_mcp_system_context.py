@@ -8,9 +8,11 @@ opposite intent: it is *meant* to flow through MCP tool responses as
 initial context for the model when a user is browsing the scope. The
 v5.8.2 strip must therefore NOT touch this column.
 
-These tests pin the contract: `mcp_system_context` survives the
-links.py boundary unchanged in the same payload shapes the
-`system_prompt` tests cover.
+v6.0.6 (ADR-167) prepends an orient directive to the field when the
+entity is a set or collection — but the original content must still
+land at the tail of the wrapped body, intact. These tests pin both:
+the wrapper is applied AND the original passthrough content is
+preserved at the end of the wrapped body.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import json
 from iris_mcp.links import with_web_url, with_web_urls_list, with_web_urls_search
 
 WEB = "https://iris-uat.chrisbarlow.nz"
+_MARKER = "[ORIENT"
 
 
 class TestMcpSystemContextPassesThrough:
@@ -34,8 +37,11 @@ class TestMcpSystemContextPassesThrough:
         out = json.loads(with_web_url(payload, "set"))
         # system_prompt is stripped (ADR-151)…
         assert "system_prompt" not in out
-        # …but mcp_system_context passes through (ADR-156).
-        assert out["mcp_system_context"] == "MCP browsing context for DoView Book."
+        # …mcp_system_context passes through (ADR-156), wrapped with
+        # the v6.0.6 orient directive (ADR-167) on a set.
+        ctx = out["mcp_system_context"]
+        assert ctx.startswith(_MARKER)
+        assert ctx.endswith("MCP browsing context for DoView Book.")
 
     def test_with_web_url_keeps_mcp_system_context_on_collection(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", WEB)
@@ -46,7 +52,9 @@ class TestMcpSystemContextPassesThrough:
         })
         out = json.loads(with_web_url(payload, "collection"))
         assert "system_prompt" not in out
-        assert out["mcp_system_context"] == "MCP browsing context for NZISM."
+        ctx = out["mcp_system_context"]
+        assert ctx.startswith(_MARKER)
+        assert ctx.endswith("MCP browsing context for NZISM.")
 
     def test_with_web_urls_list_keeps_mcp_system_context_per_item(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", WEB)
@@ -60,10 +68,13 @@ class TestMcpSystemContextPassesThrough:
             {"id": "s3", "name": "C"},  # neither column populated
         ])
         out = json.loads(with_web_urls_list(payload, "set"))
-        # system_prompt stripped on all, mcp_system_context preserved.
+        # system_prompt stripped on all, mcp_system_context preserved
+        # (wrapped with the v6.0.6 orient directive on sets).
         assert all("system_prompt" not in item for item in out)
-        assert out[0]["mcp_system_context"] == "mcp-A"
-        assert out[1]["mcp_system_context"] == "mcp-B"
+        assert out[0]["mcp_system_context"].startswith(_MARKER)
+        assert out[0]["mcp_system_context"].endswith("mcp-A")
+        assert out[1]["mcp_system_context"].startswith(_MARKER)
+        assert out[1]["mcp_system_context"].endswith("mcp-B")
         # Item without the column is unaffected.
         assert "mcp_system_context" not in out[2]
 
@@ -83,5 +94,7 @@ class TestMcpSystemContextPassesThrough:
         out = json.loads(with_web_urls_search(payload))
         for r in out["results"]:
             assert "system_prompt" not in r
-        assert out["results"][0]["mcp_system_context"] == "mcp-passthrough"
-        assert out["results"][1]["mcp_system_context"] == "coll-passthrough"
+        assert out["results"][0]["mcp_system_context"].startswith(_MARKER)
+        assert out["results"][0]["mcp_system_context"].endswith("mcp-passthrough")
+        assert out["results"][1]["mcp_system_context"].startswith(_MARKER)
+        assert out["results"][1]["mcp_system_context"].endswith("coll-passthrough")

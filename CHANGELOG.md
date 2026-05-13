@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.6] - 2026-05-13
+
+### Fixed
+
+- **Orient-first protocol now reaches claude.ai's hosted MCP integration
+  (issue #119, ADR-167).** v6.0.4 (ADR-165) wired the protocol through
+  `Server.instructions` on the HTTP transport; v6.0.5 (ADR-166) kept it
+  fresh via a TTL refresh. Both were verified working on the wire — the
+  strong canonical body was delivered in every `InitializeResult` claude.ai
+  received. But claude.ai's model **still skipped the `package_hierarchy`
+  call and paraphrased the menu**. Three rounds of fixes confirmed the
+  channel works; the conclusion: **claude.ai does not reliably surface
+  `InitializeResult.instructions` to the model.**
+- v6.0.6's pragmatic fix re-embeds the orient directive **directly into
+  the tool response**, where the model has been consistently shown to
+  read it. `iris-mcp`'s `links.py` now prepends a hardcoded imperative
+  prefix to any non-empty `mcp_system_context` field on set / collection
+  responses (`search`, `list_*`, `get_*`). The prefix pre-fills the
+  scope's id in the tool-call signature (`set_id="..."` /
+  `collection_id="..."`) so the model has the exact `package_hierarchy`
+  call ready — no inference needed, just execute.
+- The prefix is hardcoded in `iris-mcp` source (universal protocol, not
+  scope-specific content). Admin-edits to per-scope `mcp_system_context`
+  stay focused on the scope's menu. The existing `Server.instructions`
+  channel is preserved as belt-and-suspenders for MCP clients that do
+  surface it reliably (Claude Desktop, Claude Code, Cursor).
+- The wrapper is **idempotent** via a marker check and **always-on**
+  regardless of `IRIS_WEB_URL` (the web-URL decoration is env-gated; the
+  orient wrapper is universal).
+
+### Added
+
+- New `wrap_orient(item, kind)` primitive in `links.py`. Pre-fills the
+  scope's id in the tool-call signature, applies only to sets and
+  collections, idempotent, no-op when the field is missing/empty.
+- **18 new regression tests** (`test_links_orient_wrapper.py`) across
+  five classes: primitive behaviour (wrap, no-ops, idempotency),
+  search-response application, list-response application, single-entity
+  application, IRIS_WEB_URL independence.
+- 4 v5.11.0 / ADR-156 passthrough tests updated: the wrapped body must
+  still end with the original admin-authored content (the v5.11.0
+  contract evolves; ADR-167 strengthens it).
+
+### Why this matters
+
+- **claude.ai users now see the v5.x flow restored**: opening the
+  Outcomes Theory Book auto-loads the TOC, presents the four-option
+  menu via `AskUserQuestion`, no "want me to load it?" preamble.
+- The fix doesn't depend on any future claude.ai-side change. The orient
+  directive is in the tool response data, which every MCP client surfaces
+  to its model unconditionally.
+
+### See also
+
+- [ADR-167](docs/adrs/ADR-167-Orient-Directive-In-Tool-Response.md)
+- [SPEC-167-A](docs/adrs/specs/SPEC-167-A-Orient-Directive-In-Tool-Response.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — four-revision
+  fix history: v6.0.4 (wire), v6.0.5 (refresh), v6.0.6 (embed in
+  response).
+
 ## [6.0.5] - 2026-05-13
 
 ### Fixed
