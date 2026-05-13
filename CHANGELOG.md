@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.15] - 2026-05-13
+
+### Fixed
+
+- **`create_*` MCP tool responses now include `web_url` so the model
+  can link the user straight to the new entity (ADR-175).** Pre-
+  v6.0.15, every read tool was decorated with `web_url` via
+  `links.with_web_url(...)`, but the create_* tools returned a bare
+  `model_dump_json()`. The model had no link to surface and had to
+  guess the host. Concrete v6.0.14 failure:
+  ```
+  User: link me to it
+  Claude: https://iris.chrisbarlow.nz/sets/df7aa9df-...   ← wrong host
+  ```
+  v6.0.15 wraps the return of `_create_collection`, `_create_set`,
+  `_create_package`, and `_create_diagram` with
+  `with_web_url(result.model_dump_json(), "<kind>")`. The model now
+  surfaces the real frontend URL.
+- `apply_diagram_creation` is unchanged — its batch response shape
+  (`{diagram_ids: [...], primary_diagram_id: ...}`) of bare id
+  strings needs a different decoration approach; deferred.
+
+### Added
+
+- 5 regression tests in `tests/test_create_tools_web_url_decoration.py`:
+  - Each create_* tool's response includes a correctly-shaped
+    `web_url` when `IRIS_WEB_URL` is set.
+  - Absent `IRIS_WEB_URL` → response passes through unchanged (no
+    `web_url` key), behaviour parity with read tools.
+- 173/173 MCP tests pass.
+
+### See also
+
+- [ADR-175](docs/adrs/ADR-175-Web-URL-Decoration-On-Create-Tools.md)
+- [SPEC-175-A](docs/adrs/specs/SPEC-175-A-Web-URL-Decoration-On-Create-Tools.md)
+
 ## [6.0.14] - 2026-05-13
 
 ### Fixed
