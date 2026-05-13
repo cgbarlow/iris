@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.13] - 2026-05-13
+
+### Fixed
+
+- **OAuth token exchange crashed on Postgres with a SQLite/Postgres
+  bool-vs-int type mismatch (ADR-173).** The connector dance reached
+  the final step in v6.0.12 — user signed in to Iris, tapped Allow on
+  consent, was redirected back to claude.ai with an authorization
+  code — and the token exchange at `POST /oauth/token` blew up with:
+
+  ```
+  asyncpg.exceptions.DatatypeMismatchError:
+    column "revoked" is of type boolean but expression is of type integer
+  ```
+
+  claude.ai surfaced the failure as `mcp_token_exchange_failed`. Live
+  Render logs pointed at `oauth/service.py:260` in
+  `create_refresh_token`.
+- Root cause: `oauth_refresh_tokens.revoked` is `BOOLEAN` on Postgres
+  (Supabase) but `INTEGER` on SQLite. Three call sites in
+  `app/oauth/service.py` used bare-int SQL literals (`VALUES (..., 0)`,
+  `SET revoked = 1`). SQLite accepts both, Postgres is strict. The
+  existing 40 OAuth tests all passed against SQLite, so the bug went
+  undetected from v6.0.0 until live production testing.
+- Fix: parameterise as Python `bool` so the DB adapter coerces to the
+  right SQL type on either backend.
+
+### Added
+
+- **Static regression guard** (`test_postgres_bool_int_compatibility.py`)
+  scans the OAuth service source for bare-int literals on boolean
+  columns. Catches future drift on SQLite-only test runs without
+  needing a Postgres test fixture. 4 new test cases.
+- 44/44 OAuth tests pass (40 existing + 4 new).
+
+### User-visible after deploy
+
+- claude.ai mobile → tap Sign in on Iris connector → consent page →
+  Allow → connector goes to "Connected" (no more
+  `mcp_token_exchange_failed`).
+- Write tools (`create_collection`, `create_set`, etc.) now succeed
+  with the issued bearer.
+
+### See also
+
+- [ADR-173](docs/adrs/ADR-173-OAuth-Boolean-Column-Parameterisation.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — ten-
+  revision fix history.
+
 ## [6.0.12] - 2026-05-13
 
 ### Fixed

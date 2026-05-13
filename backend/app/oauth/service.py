@@ -257,12 +257,18 @@ async def create_refresh_token(
     family = family_id or str(uuid.uuid4())
     now_iso = _utcnow_iso()
     expires_at = (datetime.now(tz=UTC) + REFRESH_TOKEN_TTL).isoformat()
+    # v6.0.13 (ADR-173): `revoked` is BOOLEAN on Postgres (Supabase),
+    # INTEGER on SQLite. A bare `0` SQL literal is rejected by Postgres
+    # (`column "revoked" is of type boolean but expression is of type
+    # integer`) — the token endpoint crashed there during OAuth code
+    # exchange. Parameterise as a Python bool so the DB adapter coerces
+    # to the right type on either backend.
     await db.execute(
         "INSERT INTO oauth_refresh_tokens ("
         "  id, client_id, user_id, family_id,"
         "  expires_at, created_at, revoked"
-        ") VALUES (?, ?, ?, ?, ?, ?, 0)",
-        (token_value, client_id, user_id, family, expires_at, now_iso),
+        ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (token_value, client_id, user_id, family, expires_at, now_iso, False),
     )
     await db.commit()
     return token_value, family
@@ -306,10 +312,11 @@ async def rotate_refresh_token(
     # reserved for explicit revocation via /oauth/revoke or family
     # cascade) so this branch fires on every replay.
     if used_at is not None:
+        # v6.0.13 (ADR-173): parameterise the bool (see create_refresh_token).
         await db.execute(
-            "UPDATE oauth_refresh_tokens SET revoked = 1"
+            "UPDATE oauth_refresh_tokens SET revoked = ?"
             " WHERE family_id = ?",
-            (family_id,),
+            (True, family_id),
         )
         await db.commit()
         return None
@@ -344,10 +351,11 @@ async def revoke_refresh_token(
     to the client and was updated (idempotent on already-revoked tokens).
     RFC 7009 says revoke is always 200 OK regardless of success — the
     caller maps to that."""
+    # v6.0.13 (ADR-173): parameterise the bool (see create_refresh_token).
     cursor = await db.execute(
-        "UPDATE oauth_refresh_tokens SET revoked = 1"
+        "UPDATE oauth_refresh_tokens SET revoked = ?"
         " WHERE id = ? AND client_id = ?",
-        (token, client_id),
+        (True, token, client_id),
     )
     await db.commit()
     return cursor.rowcount > 0
