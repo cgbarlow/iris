@@ -56,11 +56,11 @@ class TestInventoryAndDescriptions:
         # Destination preamble (v5.16.0)
         assert "BEFORE CALLING, confirm with the user" in desc
 
-    def test_save_doview_analysis_description_carries_deprecation_note(self) -> None:
+    def test_save_doview_analysis_removed_in_v6(self) -> None:
+        # v6.0.0 (ADR-164): save_doview_analysis removed; use
+        # create_diagram(notation='markdown', diagram_type='doview_analysis', ...).
         defs = {t.name: t for t in tools.tool_definitions()}
-        desc = defs["save_doview_analysis"].description
-        assert "Deprecated" in desc
-        assert "create_diagram" in desc
+        assert "save_doview_analysis" not in defs
 
     def test_get_response_prompt_accepts_purpose_argument(self) -> None:
         defs = {t.name: t for t in tools.tool_definitions()}
@@ -157,7 +157,10 @@ class TestCreateDiagram:
         body = json.loads(result[0].text)
         assert body["success"] is False
         assert body["error"] == "auth_required"
-        assert body["next_tool"] == "iris_authenticate"
+        # v6.0.0 (ADR-164): OAuth-setup-guidance — no more next_tool/pairing_url;
+        # instead next_step + oauth_resource_metadata_url.
+        assert body["next_step"] == "configure_oauth_in_connector_settings"
+        assert "/.well-known/oauth-protected-resource" in body["oauth_resource_metadata_url"]
 
 
 class TestListNotations:

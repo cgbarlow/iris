@@ -278,7 +278,19 @@ command emits machine-parsable output. See
 uv tool install --from ./mcp iris-mcp
 ```
 
-Drop into Claude Desktop / Claude Code / Cursor:
+Two transports, two auth paths (ADR-164, v6.0.0):
+
+**HTTP transport (claude.ai connectors, claude.ai-style hosted MCP)** —
+iris-mcp implements OAuth 2.1 (RFC 8414 + RFC 9728 + RFC 7591 + PKCE).
+The user adds iris-mcp's URL as a connector; the MCP client performs
+DCR + OAuth handshake automatically; the user signs in to Iris on a
+consent screen; the MCP client stores the bearer and includes it on
+every subsequent request. There is no `IRIS_TOKEN` or `iris_authenticate`
+ceremony — the OAuth handshake is the auth path.
+
+**Stdio transport (Claude Desktop with the local iris-mcp binary)** —
+operators set `IRIS_TOKEN` env var to a Personal Access Token issued
+from `/settings/tokens` in the web UI.
 
 ```json
 {
@@ -288,7 +300,8 @@ Drop into Claude Desktop / Claude Code / Cursor:
       "args": ["iris-mcp"],
       "env": {
         "IRIS_URL": "https://iris.example.com",
-        "IRIS_WEB_URL": "https://iris.example.com"
+        "IRIS_WEB_URL": "https://iris.example.com",
+        "IRIS_TOKEN": "iris_pat_..."
       }
     }
   }
@@ -296,25 +309,17 @@ Drop into Claude Desktop / Claude Code / Cursor:
 ```
 
 `IRIS_TOKEN` is optional. Read-only tools work anonymously; for
-write-capable tools (e.g. `save_doview_analysis`), authenticate the
-MCP connection in-app via the **pairing flow** (ADR-160, v5.15.0):
-visit `https://iris.example.com/settings/mcp-pairing`, click
-**Generate pairing code**, paste the code into Claude and let the
-new `iris_authenticate` tool exchange it for a token. The token
-persists at `~/.iris-mcp/<hash>.json` (mode 0600) and remains valid
-for ~90 days. Set `IRIS_TOKEN` explicitly only if you want to
-override the persisted credential (e.g. for CI / scripted setups).
+write-capable tools, either configure OAuth (HTTP transport) or set
+`IRIS_TOKEN` (stdio transport).
 
-Exposes ~30 tools (search, list/get for every entity, export, ask-AI,
+Exposes ~28 tools (search, list/get for every entity, export, ask-AI,
 apply-diagram-creation, conversations, plus `create_collection` /
-`create_set` / `create_package` for organising destinations from
-v5.16.0, `iris_authenticate` for in-app credential setup from
-v5.15.0, and `create_diagram` / `list_notations` / `list_diagram_types`
-for the generic local-AI diagram-creation workflow from v5.17.0).
-The legacy `save_doview_analysis` tool is deprecated in v5.17.0
-(prefer `create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`)
-and will be removed in v6.0.0. Plus `iris://` resource URIs for
-JSON export bundles.
+`create_set` / `create_package` for organising destinations,
+`create_diagram` / `list_notations` / `list_diagram_types` for the
+generic local-AI diagram-creation workflow). Plus `iris://` resource
+URIs for JSON export bundles. **Removed in v6.0.0** (ADR-164):
+`iris_authenticate` (replaced by OAuth handshake), `save_doview_analysis`
+(use `create_diagram(notation='markdown', diagram_type='doview_analysis', ...)`).
 
 **Server-wide orient-first protocol** (v5.18.0 / ADR-163). On every
 session, iris-mcp surfaces an admin-editable orient-first protocol

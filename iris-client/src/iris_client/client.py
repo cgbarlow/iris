@@ -25,14 +25,12 @@ from iris_client.models.core import (
     Conversation,
     Diagram,
     Element,
-    ExchangedPATResponse,
     FileContext,
     FileExtractResponse,
     IrisSet,
     LoginResponse,
     Package,
     PackageHierarchyNode,
-    PairingCodeResponse,
     QAResponse,
     ResponseFormatType,
     ResponsePromptComposed,
@@ -110,21 +108,9 @@ class IrisClient:
     def is_anonymous(self) -> bool:
         return self.token is None
 
-    def set_token(self, token: str | None) -> None:
-        """Update the bearer token used for subsequent requests in-place.
-
-        The underlying httpx client caches headers set at construction
-        time; this method also rewrites the Authorization header on the
-        live client so newly-authenticated callers (e.g. the iris-mcp
-        `iris_authenticate` tool) take effect without reconstructing
-        the client. (ADR-160.)
-        """
-        self.token = token
-        if token is None:
-            self._client.headers.pop("Authorization", None)
-        else:
-            for key, value in bearer_headers(token).items():
-                self._client.headers[key] = value
+    # v6.0.0 (ADR-164): set_token removed. The HTTP transport gets the
+    # bearer from request headers per-request; the stdio transport sets
+    # it once at IrisClient construction from IRIS_TOKEN env var.
 
     # --- Private helpers -----------------------------------------------------
 
@@ -184,36 +170,8 @@ class IrisClient:
     async def revoke_token(self, token_id: str) -> None:
         await self._request("DELETE", f"/api/users/me/tokens/{token_id}")
 
-    # --- MCP Pairing (ADR-160) ----------------------------------------------
-
-    async def create_pairing_code(
-        self, *, client_hint: str | None = None,
-    ) -> PairingCodeResponse:
-        """Mint a one-shot pairing code for the authenticated user (JWT or PAT).
-
-        Used by Iris's web UI on `/settings/mcp-pairing`; the returned
-        code is exchanged anonymously via `exchange_pairing_code` to
-        produce a fresh PAT.
-        """
-        body: dict[str, Any] = {}
-        if client_hint is not None:
-            body["client_hint"] = client_hint
-        response = await self._request(
-            "POST", "/api/auth/pairing-codes", json=body,
-        )
-        return PairingCodeResponse.model_validate(response.json())
-
-    async def exchange_pairing_code(self, code: str) -> ExchangedPATResponse:
-        """Exchange a pairing code for a freshly minted PAT.
-
-        Anonymous (no bearer required). Returns the PAT plaintext exactly
-        once. 410 from the server means the code is unknown, expired, or
-        already exchanged.
-        """
-        response = await self._request(
-            "POST", f"/api/auth/pairing-codes/{code}/exchange",
-        )
-        return ExchangedPATResponse.model_validate(response.json())
+    # v6.0.0 (ADR-164): pairing-code methods (create_pairing_code,
+    # exchange_pairing_code) removed. OAuth replaces the pairing flow.
 
     # --- Search --------------------------------------------------------------
 

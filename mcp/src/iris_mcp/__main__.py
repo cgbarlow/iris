@@ -13,28 +13,15 @@ from mcp.server.stdio import stdio_server
 from iris_mcp.config import load
 from iris_mcp.server import build_server
 from iris_mcp.server_instructions import fetch_server_instructions
-from iris_mcp.token_store import load_token
-
-
-def _resolve_token(env_token: str | None, iris_url: str) -> tuple[str | None, str]:
-    """Resolve the bearer token at startup. Returns (token, source_label).
-
-    Precedence (ADR-160):
-      1. `IRIS_TOKEN` env var — explicit operator override.
-      2. Persisted token from `~/.iris-mcp/<hash>.json`.
-      3. None (anonymous; only read-only tools work).
-    """
-    if env_token:
-        return env_token, "IRIS_TOKEN env var"
-    stored = load_token(iris_url)
-    if stored:
-        return stored, "persisted ~/.iris-mcp/ token"
-    return None, "anonymous"
 
 
 async def run() -> None:
     config = load()
-    token, source = _resolve_token(config.token, config.url)
+    # v6.0.0 (ADR-164): stdio bearer comes from IRIS_TOKEN env var only.
+    # The v5.15.0 pairing-flow file fallback (~/.iris-mcp/<hash>.json)
+    # is gone — HTTP transport uses OAuth, stdio uses env var.
+    token = config.token or None
+    source = "IRIS_TOKEN env var" if token else "anonymous"
     print(f"iris-mcp: using {source}", file=sys.stderr)
     # ADR-163 (v5.18.0): fetch the admin-editable orient-first
     # protocol from Iris and pass it through to the MCP server's
