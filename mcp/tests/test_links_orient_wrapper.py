@@ -141,8 +141,27 @@ class TestOrientWrapperFormattingDirectives:
         # Negate the specific paraphrasing failures observed in the
         # v6.0.6 trace.
         assert "parenthetical examples" in ctx
-        assert "mcp__iris__ask" in ctx
+        # v6.0.8: the wrapper no longer references mcp__iris__ask — the
+        # `ask` tool has been removed entirely. The wrapper now steers
+        # the model to fulfill cross-scope questions using its own
+        # reasoning over the read-only tools.
+        assert "mcp__iris__ask" not in ctx
+        assert "There is no \"ask Iris AI\" tool" in ctx
         assert "create_diagram" in ctx
+
+    def test_wrapper_steers_analysis_to_local_ai(self) -> None:
+        """v6.0.8: the wrapper must explicitly tell the model that
+        outcomes-theory analyses and diagrams are drafted by it (using
+        its own reasoning + creation cascade prompts), not by a separate
+        AI tool. v6.0.7 testing showed the model called `ask` to do
+        analysis — that path no longer exists."""
+        item = {"id": "s1", "mcp_system_context": "x"}
+        wrap_orient(item, "set")
+        ctx = item["mcp_system_context"]
+        assert "YOU do the work, not a separate AI" in ctx
+        assert "drafted by YOU using your own reasoning" in ctx
+        assert "creation_format" in ctx
+        assert "Do NOT look for a separate AI-analysis tool" in ctx
 
 
 class TestWrapOrient:

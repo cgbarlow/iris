@@ -237,18 +237,6 @@ async def _export(
     return content.decode("utf-8")
 
 
-async def _ask(c: IrisClient, args: dict[str, Any]) -> str:
-    resp = await c.ask(
-        args["question"],
-        set_ids=args.get("set_ids"),
-        collection_id=args.get("collection_id"),
-        mode=args.get("mode", "discuss"),
-        notation=args.get("notation"),
-        thread_id=args.get("thread_id"),
-    )
-    return resp.model_dump_json()
-
-
 async def _apply_diagram_creation(c: IrisClient, args: dict[str, Any]) -> str:
     resp = await c.apply_diagram_creation(
         args["set_id"], args["diagrams_json"], package_id=args.get("package_id"),
@@ -583,49 +571,32 @@ TOOLS: list[Tool] = [
         }),
         handler=lambda c, a: _export(c, a, "collection"),
     ),
-    Tool(
-        name="ask",
-        description=(
-            "Ask the Iris AI a question about one or more sets. Use for "
-            "cross-package queries ('what services depend on Payments?'), "
-            "summaries, and architectural questions that span many entities. "
-            "Pair with `search` to locate entities first, or with "
-            "`apply_diagram_creation` when mode='creation'."
-        ),
-        input_schema=_schema({
-            "question": _str_arg("question", "The question"),
-            "set_ids": (
-                {"type": "array", "items": {"type": "string"},
-                 "description": "Scope the answer to these set ids"},
-                False,
-            ),
-            "collection_id": _str_arg(
-                "collection_id", "Scope to a collection", required=False,
-            ),
-            "mode": (
-                {"type": "string", "enum": ["discuss", "creation"],
-                 "default": "discuss"},
-                False,
-            ),
-            "notation": _str_arg(
-                "notation", "Diagram notation for creation mode", required=False,
-            ),
-            "thread_id": _str_arg(
-                "thread_id", "Continue a prior conversation", required=False,
-            ),
-        }),
-        handler=_ask,
-    ),
+    # v6.0.8 (ADR-168): the `ask` tool — which routed cross-scope
+    # questions to Iris' server-side AI — has been removed from the MCP
+    # surface. When iris-mcp is consumed by a client that has its own
+    # capable LLM (claude.ai / Claude Desktop / Claude Code / Cursor),
+    # routing analysis to a second AI is redundant and confusing. The
+    # local model now fulfils cross-package, cross-set, and
+    # cross-collection questions by reading the data directly via
+    # `search`, `get_*`, `list_*`, and `package_hierarchy`. The orient
+    # wrapper in `links.py` explicitly steers the model to do this.
     Tool(
         name="apply_diagram_creation",
         description=(
-            "Apply an AI-generated diagram bundle to a set. Use after calling "
-            "`ask` with mode='creation' and receiving a diagrams JSON string."
+            "Apply a local-AI-generated diagram bundle to a set. The client "
+            "drafts the diagrams JSON (one entry per diagram, matching the "
+            "creation_format cascade returned by "
+            "`get_response_prompt(purpose='creation_format', notation=..., "
+            "diagram_type=...)`) and posts it here for persistence. "
+            "Prefer `create_diagram` for single-diagram creation; this tool "
+            "is for batch saves."
         ),
         input_schema=_schema({
             "set_id": _str_arg("set_id", "Target set"),
             "diagrams_json": _str_arg(
-                "diagrams_json", "JSON payload returned by `ask` in creation mode",
+                "diagrams_json",
+                "JSON payload of diagrams drafted locally per the creation "
+                "cascade.",
             ),
             "package_id": _str_arg(
                 "package_id", "Parent package to nest the new diagrams under",

@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.8] - 2026-05-13
+
+### Removed
+
+- **`ask` tool removed from the MCP surface (ADR-168).** When iris-mcp
+  is consumed by a capable-LLM client (claude.ai / Claude Desktop /
+  Claude Code / Cursor), routing the model's question to Iris' server-
+  side AI is redundant and breaks tone continuity. Concretely, v6.0.7
+  testing surfaced the failure: the user picked "Generate a new DoView
+  outcomes-theory analysis" and the model called `ask` to do it — the
+  analysis came back in a different voice from a different conversation,
+  with no follow-through path. Cross-scope questions are fulfilled
+  equally well by the local model reading the data directly through
+  `search`, `get_*`, `list_*`, and `package_hierarchy`.
+- iris-client's `IrisClient.ask(...)` SDK method is **kept**. Scripts,
+  jobs, iris-cli, and any non-MCP consumer that genuinely needs Iris AI
+  inference can still call it. The boundary is drawn at the MCP surface.
+
+### Changed
+
+- **`apply_diagram_creation` description rewritten.** Previously read
+  "Use after calling `ask` with mode='creation'..." — referenced the
+  removed `ask` path. Now reads: "The client drafts the diagrams JSON
+  (one entry per diagram, matching the creation_format cascade returned
+  by `get_response_prompt(...)`) and posts it here for persistence.
+  Prefer `create_diagram` for single-diagram creation; this tool is for
+  batch saves." Reflects the local-AI-as-author model.
+- **Orient wrapper strengthened (ADR-167 follow-up).** Two new short
+  paragraphs make explicit:
+  - Cross-package / cross-set / cross-collection questions are
+    fulfilled by the local model reading data via the read-only MCP
+    tools. "There is no 'ask Iris AI' tool — it has been removed."
+  - DoView outcomes-theory analyses + visual outcomes_map diagrams are
+    drafted by the local AI using its own reasoning + the creation_format
+    cascade; persistence is via `create_diagram` / `apply_diagram_creation`.
+    "Do NOT look for a separate AI-analysis tool — none exists."
+- **Canonical `doview-book-mcp-system-context.md` paste-doc updated.**
+  Option 2 broadens from "Ask a cross-package question via Iris AI —
+  uses mcp__iris__ask" to "Ask a cross-package, cross-set, or
+  cross-collection question about the material". Option 3 drops the
+  "→ call create_diagram" implementation tag. Admin must re-paste from
+  the doc into `/admin/settings/ai` on UAT to apply the new menu.
+
+### Tests
+
+- `TestAsk` class replaced with `TestAskRemoved` (2 cases): `ask` not
+  in `tool_definitions()`; dispatching to `"ask"` returns the standard
+  unknown-tool error.
+- `test_links_orient_wrapper.py` updated: asserts `mcp__iris__ask` is
+  NOT in the wrapper text, and adds `TestWrapperStepsAnalysisToLocalAI`
+  pinning the new "YOU do the work" steering.
+- 163/163 MCP tests pass.
+
+### Admin action required after deploy
+
+Paste the v6.0.8 content from
+[`docs/prompts/doview-book-mcp-system-context.md`](docs/prompts/doview-book-mcp-system-context.md)
+into the Outcomes Theory Book's `mcp_system_context` field on
+`/admin/settings/ai`. The TTL refresh (v6.0.5, ADR-166) propagates the
+change to claude.ai within 60s without a redeploy.
+
+### See also
+
+- [ADR-168](docs/adrs/ADR-168-Remove-Ask-Tool-From-MCP-Surface.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119) — six-revision
+  fix history: v6.0.4 (wire), v6.0.5 (refresh), v6.0.6 (embed), v6.0.7
+  (TOC format + verbatim menu), v6.0.8 (drop ask, route analysis local).
+
 ## [6.0.7] - 2026-05-13
 
 ### Fixed
