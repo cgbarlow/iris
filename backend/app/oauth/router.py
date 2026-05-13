@@ -15,6 +15,7 @@ helpers:
 
 from __future__ import annotations
 
+import os
 from typing import Any
 from urllib.parse import urlencode
 
@@ -40,6 +41,32 @@ def _issuer(request: Request) -> str:
     return f"{request.url.scheme}://{request.url.netloc}"
 
 
+def _authorization_endpoint(api_base: str) -> str:
+    """Build the user-facing authorization-endpoint URL.
+
+    The OAuth 2.1 authorization endpoint is a **browser** endpoint —
+    the OAuth client redirects the user's browser there, the user is
+    shown a login + consent screen, and the page redirects back to
+    the client's `redirect_uri` with an authorization code.
+
+    In Iris's split-service deployment the user-facing UI lives on the
+    SvelteKit frontend (`IRIS_WEB_URL`), NOT on the FastAPI backend.
+    The backend has `/api/oauth/authorize/{prepare,decision}` JSON
+    endpoints that the frontend page calls — but the *browser* should
+    only ever hit the frontend page at `<IRIS_WEB_URL>/oauth/authorize`.
+
+    v6.0.0 → v6.0.10 advertised this endpoint on the API host, causing
+    a hard `{"detail":"Not Found"}` 404 when claude.ai redirected the
+    user's browser there (FastAPI has no GET `/oauth/authorize`).
+    v6.0.11 (ADR-171) reads `IRIS_WEB_URL` and points the metadata at
+    the SvelteKit page. Falls back to the API host so dev environments
+    where the frontend isn't separately running still load *something*
+    (a 404, but the metadata is at least well-formed).
+    """
+    web_url = os.environ.get("IRIS_WEB_URL", "").rstrip("/")
+    return f"{web_url or api_base}/oauth/authorize"
+
+
 @router.get(
     "/.well-known/oauth-authorization-server",
     response_model=AuthorizationServerMetadata,
@@ -51,11 +78,17 @@ async def authorization_server_metadata(
 
     Anonymous-readable. iris-mcp's protected-resource metadata points
     here so MCP clients can discover the AS.
+
+    v6.0.11 (ADR-171): `authorization_endpoint` is sourced from
+    `IRIS_WEB_URL` (the SvelteKit frontend host) because that's where
+    the user-facing consent screen actually lives. The token /
+    registration / revocation endpoints stay on the API host — those
+    are machine endpoints, not browser endpoints.
     """
     base = _issuer(request)
     return AuthorizationServerMetadata(
         issuer=base,
-        authorization_endpoint=f"{base}/oauth/authorize",
+        authorization_endpoint=_authorization_endpoint(base),
         token_endpoint=f"{base}/oauth/token",
         registration_endpoint=f"{base}/oauth/register",
         revocation_endpoint=f"{base}/oauth/revoke",

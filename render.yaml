@@ -74,6 +74,13 @@ services:
         sync: false
       - key: IRIS_DEBUG
         value: "false"
+      - key: IRIS_WEB_URL
+        # v6.0.11 (ADR-171): sourced for the OAuth `authorization_endpoint`
+        # in the RFC 8414 AS metadata. The user-facing consent screen
+        # is a SvelteKit page at <IRIS_WEB_URL>/oauth/authorize, NOT a
+        # FastAPI route on the API host. Without this, claude.ai
+        # redirected user browsers to the API host and got HTTP 404.
+        value: https://iris-uat.chrisbarlow.nz
       # v5.5.7 (issue #55 follow-up): GitHub PAT used by
       # POST /api/extensions/{id}/check-update to query releases.
       # Without it, requests are unauthenticated (60/hr per IP) and
