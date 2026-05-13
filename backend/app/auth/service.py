@@ -112,9 +112,19 @@ def create_access_token(
 def decode_access_token(
     token: str, config: AuthConfig
 ) -> dict[str, Any]:
-    """Decode and validate a JWT access token."""
+    """Decode and validate a JWT access token.
+
+    `verify_aud=False` (ADR-164, v6.0.0) so OAuth-issued access tokens
+    (which carry `aud="iris-mcp"` per the OAuth 2.1 spec) decode the
+    same way as legacy /api/auth/login JWTs (no aud claim). The
+    signature is the security boundary; aud is informational and the
+    same JWT_SECRET signs both kinds.
+    """
     payload: dict[str, Any] = jwt.decode(
-        token, config.jwt_secret, algorithms=[config.jwt_algorithm]
+        token,
+        config.jwt_secret,
+        algorithms=[config.jwt_algorithm],
+        options={"verify_aud": False},
     )
     return payload
 

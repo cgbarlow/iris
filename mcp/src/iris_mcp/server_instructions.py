@@ -36,10 +36,10 @@ DISCOVERY TOOLS.
   iris_package_hierarchy(set_id=...) — full tree in one call
 
 WORKFLOW GUIDANCE.
-Each tool's description carries its own workflow. For diagram creation, see `create_diagram` (it explains the full discover → fetch creation cascade → guided conversation → confirm destination → save flow). For authentication, see `iris_authenticate`.
+Each tool's description carries its own workflow. For diagram creation, see `create_diagram` (it explains the full discover → fetch creation cascade → guided conversation → confirm destination → save flow).
 
 AUTH RECOVERY.
-Write tools that return error="auth_required" can be unblocked by the iris_authenticate flow — never tell the user to restart their MCP client.
+If a write tool returns error="auth_required" (HTTP transport), advise the user to configure OAuth in their MCP client's connector settings (e.g. claude.ai → Connectors → Iris → Configure → enable OAuth). The browser opens a consent screen, the user signs in to Iris, and writes work from then on. Don't call any auth-related tool yourself — the OAuth handshake is between the MCP client and Iris, not via tool calls.
 """
 
 

@@ -47,11 +47,11 @@ class TestInventory:
 
 
 class TestDestinationPreamble:
-    def test_preamble_in_save_doview_analysis_description(self) -> None:
+    def test_save_doview_analysis_removed_in_v6(self) -> None:
+        # v6.0.0 (ADR-164): save_doview_analysis removed; use
+        # create_diagram(notation='markdown', diagram_type='doview_analysis', ...).
         defs = {t.name: t for t in tools.tool_definitions()}
-        assert "BEFORE CALLING, confirm with the user" in defs[
-            "save_doview_analysis"
-        ].description
+        assert "save_doview_analysis" not in defs
 
     def test_preamble_in_each_create_tool_description(self) -> None:
         defs = {t.name: t for t in tools.tool_definitions()}
@@ -93,8 +93,10 @@ class TestCreateCollection:
         body = json.loads(result[0].text)
         assert body["success"] is False
         assert body["error"] == "auth_required"
-        assert body["next_tool"] == "iris_authenticate"
-        assert "/settings/mcp-pairing" in body["pairing_url"]
+        # v6.0.0 (ADR-164): OAuth-setup-guidance payload — no more
+        # next_tool/pairing_url; instead next_step + oauth_resource_metadata_url.
+        assert body["next_step"] == "configure_oauth_in_connector_settings"
+        assert "/.well-known/oauth-protected-resource" in body["oauth_resource_metadata_url"]
 
 
 class TestCreateSet:

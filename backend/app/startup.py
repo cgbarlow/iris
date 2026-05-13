@@ -56,8 +56,8 @@ from app.migrations.m048_named_prompts import up as m048_up
 from app.migrations.m049_mcp_prompt_column import up as m049_up
 from app.migrations.m050_rename_mcp_prompt_to_mcp_system_context import up as m050_up
 from app.migrations.m051_response_format_prompts import up as m051_up
-from app.migrations.m052_mcp_pairing_codes import up as m052_up
 from app.migrations.m053_mcp_server_instructions_seed import up as m053_up
+from app.migrations.m054_oauth_tables import up as m054_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -140,8 +140,9 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m049_up(main)
     await m050_up(main)
     await m051_up(main)
-    await m052_up(main)
+    # m052 (pairing_codes) superseded by m054 (drops the table) — ADR-164, v6.0.0.
     await m053_up(main)
+    await m054_up(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-05-13
+
+### Breaking changes
+
+- **`iris_authenticate` MCP tool removed.** Was added in v5.15.0 to
+  authenticate write tools from inside a conversation; broke
+  fundamentally in HTTP-streamable mode (claude.ai connectors)
+  because the v5.15.0 design assumed stdio's long-lived client.
+- **`save_doview_analysis` MCP tool removed.** Deprecated since
+  v5.17.0; use `create_diagram(notation='markdown',
+  diagram_type='doview_analysis', set_id=..., name=...,
+  data={'content': '<markdown>'}, parent_package_id=?)`.
+- **`/settings/mcp-pairing` page removed.** The "MCP Connections"
+  section on `/settings` is also gone.
+- **`/api/auth/pairing-codes` endpoints removed.** `pairing_codes`
+  table is dropped by migration m054 (SQLite) / m058 (Supabase).
+- **iris-client methods removed**: `create_pairing_code`,
+  `exchange_pairing_code`, `set_token`. The `PairingCodeResponse`
+  and `ExchangedPATResponse` models are also gone.
+- **iris-mcp `~/.iris-mcp/<hash>.json` token store removed.** The
+  `token_store.py` module is deleted.
+- **iris-mcp stdio token resolution** simplified to "IRIS_TOKEN env
+  var or anonymous" — no more file fallback.
+
+### Added
+
+- **OAuth 2.1 Authorization Server on iris-backend** (ADR-164,
+  SPEC-164-A). RFC 8414 metadata + RFC 7591 DCR + RFC 7636 PKCE +
+  RFC 7009 revocation. Endpoints:
+  - `GET /.well-known/oauth-authorization-server` (anonymous)
+  - `POST /oauth/register` (anonymous; open DCR)
+  - `POST /oauth/token` (authorization_code + refresh_token grants)
+  - `POST /oauth/revoke`
+  - Frontend `/oauth/authorize` consent screen with helpers
+    `POST /api/oauth/authorize/prepare` + `/decision`.
+- **Three new DB tables**: `oauth_clients`, `oauth_authorization_codes`,
+  `oauth_refresh_tokens` (with family-id rotation + theft detection
+  mirroring the v5.x `refresh_tokens` pattern).
+- **JWT access tokens** signed with the existing `JWT_SECRET` (HS256);
+  flow through the existing `get_current_user` dependency unchanged
+  thanks to `verify_aud=False` (the `aud="iris-mcp"` claim is
+  informational; signature is the security boundary).
+- **Refresh tokens** are opaque DB-stored strings with 14-day
+  lifetime, single-use rotation, and family-wide kill switch on
+  replay (theft detection).
+- **iris-mcp Protected Resource metadata** at
+  `/.well-known/oauth-protected-resource` (RFC 9728). MCP clients
+  fetch this on a 401 response's `WWW-Authenticate: Bearer
+  resource_metadata="..."` hint and start an OAuth dance.
+- **Frontend `/oauth/authorize` consent screen** with DOMPurify-
+  sanitised `client_name`, Allow/Deny buttons, redirect-back via
+  the existing `safeRedirectTarget` flow.
+
+### Changed
+
+- **`get_current_user` accepts OAuth-issued JWTs.** The existing
+  bearer-prefix detection (`iris_pat_` vs JWT) is unchanged; OAuth
+  JWTs carry `aud="iris-mcp"`, `azp=<client_id>`, `scope="iris"`,
+  `role` claims. PATs (`iris_pat_*`) continue to coexist for CLI/
+  scripted use unchanged.
+- **`decode_access_token`** gains `verify_aud=False` so OAuth-
+  issued JWTs and legacy `/api/auth/login` JWTs both pass through
+  uniformly.
+- **iris-mcp `_auth_required_payload` rewritten.** New shape:
+  `{success: False, error: "auth_required", next_step:
+  "configure_oauth_in_connector_settings",
+  oauth_resource_metadata_url: ...}`. No more `next_tool` /
+  `pairing_url` fields.
+- **Server-wide MCP `instructions` AUTH RECOVERY section** rewritten
+  for OAuth. Admins on UAT should paste the trimmed
+  `docs/prompts/mcp-server-instructions.md` content into the
+  singleton row.
+- **PATs kept** for CLI / scripted use. No changes to
+  `/api/users/me/tokens`, `verify_pat`, or `iris_pat_*` bearer
+  detection.
+
+### Migration
+
+- **SQLite m054** runs automatically on next boot. Drops
+  `pairing_codes`, creates `oauth_clients` + `oauth_authorization_codes`
+  + `oauth_refresh_tokens`.
+- **Supabase m058**: apply once via `./scripts/supabase-migrate.sh`.
+- **Manual on UAT**: paste the rewritten `mcp-server-instructions.md`
+  content into the `mcp_server_instructions` singleton row (admins).
+- **HTTP/claude.ai users**: remove the v5.15.0 pairing-code
+  configuration and reconfigure the connector to use OAuth. The
+  connector setup wizard will run the OAuth dance automatically.
+- **Stdio operators** with `IRIS_TOKEN` env var: no action needed.
+
+### Tests
+
+- ~33 net new backend tests (OAuth metadata, register, authorize,
+  token PKCE, refresh rotation, revoke, get_current_user OAuth-JWT
+  acceptance, migration schema parsers).
+- ~6 iris-mcp tests (resource metadata + WWW-Authenticate helpers +
+  HTTP endpoint mount).
+- ~6 frontend tests (consent screen sanitisation + pairing-page
+  removal regression checks).
+- ~22 tests deleted (pairing-code tests across backend / iris-mcp
+  / iris-client / frontend).
+- Combined: backend 215 pass, MCP 123 pass, iris-client 52 pass,
+  frontend (v5.15-v6.0 sweep) clean.
+
 ## [5.18.0] - 2026-05-13
 
 ### Added
