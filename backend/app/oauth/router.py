@@ -50,21 +50,51 @@ def _authorization_endpoint(api_base: str) -> str:
     the client's `redirect_uri` with an authorization code.
 
     In Iris's split-service deployment the user-facing UI lives on the
-    SvelteKit frontend (`IRIS_WEB_URL`), NOT on the FastAPI backend.
-    The backend has `/api/oauth/authorize/{prepare,decision}` JSON
-    endpoints that the frontend page calls — but the *browser* should
-    only ever hit the frontend page at `<IRIS_WEB_URL>/oauth/authorize`.
+    SvelteKit frontend, NOT on the FastAPI backend. The backend has
+    `/api/oauth/authorize/{prepare,decision}` JSON endpoints that the
+    frontend page calls — but the *browser* should only ever hit the
+    frontend page at `<frontend>/oauth/authorize`.
 
-    v6.0.0 → v6.0.10 advertised this endpoint on the API host, causing
-    a hard `{"detail":"Not Found"}` 404 when claude.ai redirected the
-    user's browser there (FastAPI has no GET `/oauth/authorize`).
-    v6.0.11 (ADR-171) reads `IRIS_WEB_URL` and points the metadata at
-    the SvelteKit page. Falls back to the API host so dev environments
-    where the frontend isn't separately running still load *something*
-    (a 404, but the metadata is at least well-formed).
+    Resolution order (v6.0.12, ADR-172 refines ADR-171):
+
+    1. `IRIS_WEB_URL` env var — explicit, operator-controlled.
+    2. First non-localhost entry in `IRIS_CORS_ORIGINS` — auto-derived
+       fallback. The frontend host MUST be in CORS_ORIGINS because the
+       frontend talks to this API, so it's a reliable proxy for "where
+       the frontend lives". This eliminates the env-var-sync gotcha:
+       on Render, env-var additions in `render.yaml` don't auto-apply
+       to existing services. The IRIS_CORS_ORIGINS env var was set in
+       v6.0.0 (or earlier) and is guaranteed to be present.
+    3. `api_base` — last-resort fallback for dev environments running
+       iris-api alone. Produces a 404 if the user actually clicks
+       through, but the metadata document is at least well-formed.
+
+    v6.0.0 → v6.0.10 advertised the endpoint on the API host directly,
+    causing a hard `{"detail":"Not Found"}` 404 when claude.ai
+    redirected user browsers there (FastAPI has no GET `/oauth/authorize`).
     """
     web_url = os.environ.get("IRIS_WEB_URL", "").rstrip("/")
+    if not web_url:
+        web_url = _frontend_from_cors_origins()
     return f"{web_url or api_base}/oauth/authorize"
+
+
+def _frontend_from_cors_origins() -> str:
+    """Return the first non-localhost entry in `IRIS_CORS_ORIGINS`,
+    rstrip-ed of trailing slashes. Empty string when none found.
+
+    CORS origins are comma-separated. Localhost entries (`http://localhost:*`,
+    `http://127.0.0.1:*`) are skipped — those are dev-only fallbacks that
+    don't reflect the public frontend URL.
+    """
+    raw = os.environ.get("IRIS_CORS_ORIGINS", "")
+    for origin in (s.strip() for s in raw.split(",")):
+        if not origin:
+            continue
+        if origin.startswith(("http://localhost", "http://127.0.0.1")):
+            continue
+        return origin.rstrip("/")
+    return ""
 
 
 @router.get(
