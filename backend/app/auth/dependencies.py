@@ -107,22 +107,64 @@ async def _get_current_user_supabase(
     request: Request,
     token: str,
 ) -> dict[str, Any]:
-    """Validate Supabase JWT and check profiles table (Supabase mode)."""
+    """Validate JWT and check profiles table (Supabase deployment mode).
+
+    Two JWT issuers are accepted on the same header:
+
+    1. **iris-OAuth tokens** — signed by our `/oauth/token` endpoint with
+       `IRIS_JWT_SECRET` (HS256). Identified by `aud="iris-mcp"` claim.
+       v6.0.14 (ADR-174). Without this branch, every OAuth-issued
+       bearer 401'd in production because Supabase's JWT secret never
+       matches the iris JWT secret, so the signature validation failed.
+    2. **Supabase-issued tokens** — signed by Supabase itself (ES256 via
+       JWKS or HS256 with `SUPABASE_JWT_SECRET`). The standard
+       login-via-Supabase path.
+
+    Both resolve through the same `profiles` table lookup — the `sub`
+    claim is the Supabase auth.users UUID in either case, and the OAuth
+    consent screen captures `current_user["id"]` (which already came
+    from this same function before re-validation), so the `sub` in our
+    OAuth-issued token IS the profile id.
+    """
+    from app.auth.service import decode_access_token  # noqa: PLC0415
     from app.auth.supabase_service import (  # noqa: PLC0415
         decode_supabase_jwt,
         fetch_jwks,
         get_profile,
     )
+    from jose import jwt as _jose_jwt  # noqa: PLC0415
 
     config = request.app.state.config
     if config.supabase is None:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
+    payload: dict[str, Any] | None = None
+
+    # 1. Route iris-OAuth tokens via the iris JWT secret. Peek at the
+    #    unverified `aud` claim first — that's safe because we still
+    #    validate the signature below before trusting any other claim.
     try:
-        jwks = await fetch_jwks(config.supabase.url)
-        payload = decode_supabase_jwt(token, config.supabase.jwt_secret, jwks)
+        unverified = _jose_jwt.get_unverified_claims(token)
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")  # noqa: B904
+        unverified = {}
+    if unverified.get("aud") == "iris-mcp":
+        try:
+            payload = decode_access_token(token, config.auth)
+        except JWTError as e:
+            raise HTTPException(  # noqa: B904
+                status_code=401,
+                detail="Invalid iris-OAuth token",
+            ) from e
+
+    # 2. Fall through to Supabase validation for everything else.
+    if payload is None:
+        try:
+            jwks = await fetch_jwks(config.supabase.url)
+            payload = decode_supabase_jwt(
+                token, config.supabase.jwt_secret, jwks,
+            )
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Invalid token")  # noqa: B904
 
     user_id = payload.get("sub")
     if not user_id:
