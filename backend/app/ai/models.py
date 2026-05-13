@@ -197,7 +197,9 @@ class CreationPromptCreate(BaseModel):
 
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
-    purpose: Literal["creation_format", "response_format"] = "creation_format"
+    purpose: Literal[
+        "creation_format", "response_format", "mcp_server_instructions",
+    ] = "creation_format"
     layer: Literal["base", "notation", "diagram_type", "override"]
     notation: str | None = None
     diagram_type: str | None = None
@@ -239,6 +241,17 @@ class ResponsePromptComposed(BaseModel):
     notation: str
     diagram_type: str | None = None
     body: str  # composed cascade body — may be empty if no rows match
+
+
+class ServerInstructionsResponse(BaseModel):
+    """Singleton MCP-server-instructions body (ADR-163, v5.18.0).
+
+    Returned by `GET /api/ai/server-instructions`. iris-mcp fetches
+    this at startup and passes it to the MCP SDK `Server(instructions=…)`
+    constructor so every MCP client receives it in the InitializeResult.
+    """
+
+    body: str  # may be empty if no active singleton row exists
 
 
 class ResponseFormatType(BaseModel):

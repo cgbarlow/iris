@@ -28,10 +28,23 @@ def _package_version() -> str | None:
         return None
 
 
-def build_server(client: IrisClient) -> Server:
+def build_server(
+    client: IrisClient,
+    *,
+    instructions: str | None = None,
+) -> Server:
+    """Build the iris-mcp MCP server.
+
+    `instructions` (ADR-163, v5.18.0): the server-wide MCP
+    `instructions` text returned in the InitializeResult to every
+    connected MCP client. Typically the body fetched from the Iris
+    backend's `GET /api/ai/server-instructions`. None disables the
+    field (clients see no server-level instructions).
+    """
     server: Server = Server(
         "iris-mcp",
         version=_package_version(),
+        instructions=instructions,
         website_url="https://github.com/cgbarlow/iris",
         icons=[iris_icon()],
     )

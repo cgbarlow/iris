@@ -64,10 +64,17 @@
 		return !!(dt?.notations ?? []).some((n) => n.notation_id === notationFilterValue);
 	}
 
-	const PURPOSES = ['creation_format', 'response_format'] as const;
+	// v5.18.0 (ADR-163): added `mcp_server_instructions` — singleton row
+	// loaded by iris-mcp at startup and surfaced via the MCP server
+	// `instructions` field to every connected MCP client.
+	const PURPOSES = ['creation_format', 'response_format', 'mcp_server_instructions'] as const;
 	const LAYERS = ['base', 'notation', 'diagram_type', 'override'] as const;
 
-	function appliesToLabel(p: { layer: string; notation: string | null; diagram_type: string | null }): string {
+	function appliesToLabel(p: { purpose?: string; layer: string; notation: string | null; diagram_type: string | null }): string {
+		// v5.18.0 (ADR-163): mcp_server_instructions is a server-wide
+		// singleton (layer=base, no notation, no diagram_type). Surface
+		// that explicitly so admins know what they're editing.
+		if (p.purpose === 'mcp_server_instructions') return 'Server-wide (MCP instructions)';
 		// ADR-158 (v5.13.0): make the cascade behaviour visible — addresses the
 		// "ArchiMate Process Layout has no notation" confusion. Coerce empty
 		// strings to null so the live-preview hint in the create form works
@@ -1012,7 +1019,7 @@
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg); resize: vertical"></textarea>
 			</label>
 			<p class="mt-2 text-xs" style="color: var(--color-muted)">
-				Will apply to: <strong>{appliesToLabel({ layer: createForm.layer, notation: createForm.notation || null, diagram_type: createForm.diagram_type || null })}</strong>
+				Will apply to: <strong>{appliesToLabel({ purpose: createForm.purpose, layer: createForm.layer, notation: createForm.notation || null, diagram_type: createForm.diagram_type || null })}</strong>
 			</p>
 			{#if createConflict}
 				<p class="mt-2 text-xs" style="color: var(--color-danger)">
@@ -1167,7 +1174,7 @@
 			</label>
 
 			<p class="mt-2 text-xs" style="color: var(--color-muted)">
-				Will apply to: <strong>{appliesToLabel({ layer: editingPrompt.layer, notation: promptEditNotation || null, diagram_type: promptEditDiagramType || null })}</strong>
+				Will apply to: <strong>{appliesToLabel({ purpose: editingPrompt.purpose, layer: editingPrompt.layer, notation: promptEditNotation || null, diagram_type: promptEditDiagramType || null })}</strong>
 			</p>
 
 			<div class="mt-4 flex justify-end gap-3">

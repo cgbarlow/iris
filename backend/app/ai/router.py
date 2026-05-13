@@ -58,6 +58,7 @@ from app.ai.models import (
     QAResponse,
     ResponseFormatType,
     ResponsePromptComposed,
+    ServerInstructionsResponse,
 )
 from app.auth.dependencies import get_current_user, get_optional_user
 
@@ -873,7 +874,7 @@ async def list_creation_prompts(
 # ---------------------------------------------------------------------------
 
 
-_VALID_PURPOSES = ("response_format", "creation_format")
+_VALID_PURPOSES = ("response_format", "creation_format", "mcp_server_instructions")
 
 
 @router.get("/response-prompts/types", response_model=list[ResponseFormatType])
@@ -991,6 +992,32 @@ async def get_response_prompt_composed(
         diagram_type=diagram_type,
         body=body,
     )
+
+
+@router.get("/server-instructions", response_model=ServerInstructionsResponse)
+async def get_mcp_server_instructions(
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> ServerInstructionsResponse:
+    """Return the singleton mcp_server_instructions row body (ADR-163,
+    v5.18.0). Anonymous-readable; iris-mcp fetches at startup to
+    populate the MCP server `instructions` field surfaced to every
+    connected MCP client.
+
+    Empty body if no active row exists — iris-mcp falls back to its
+    hardcoded baseline in that case.
+    """
+    db = request.app.state.db_manager.main_db
+    cursor = await db.execute(
+        "SELECT prompt_text FROM ai_creation_prompts"
+        " WHERE purpose = 'mcp_server_instructions'"
+        "   AND is_active = 1"
+        " ORDER BY display_order ASC, id ASC LIMIT 1",
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return ServerInstructionsResponse(body="")
+    return ServerInstructionsResponse(body=row[0])
 
 
 @router.put("/creation-prompts/{prompt_id}", response_model=CreationPromptResponse)
