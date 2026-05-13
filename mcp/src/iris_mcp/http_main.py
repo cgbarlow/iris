@@ -24,6 +24,7 @@ from iris_client import IrisClient
 from iris_mcp.asgi import bind_client, build_session_manager, extract_bearer
 from iris_mcp.branding import ICON_SVG
 from iris_mcp.oauth_resource import build_resource_metadata
+from iris_mcp.server_instructions import fetch_server_instructions
 
 
 def _pkg_version() -> str | None:
@@ -57,10 +58,27 @@ def create_app() -> FastAPI:
         )
         raise RuntimeError(msg)
 
+    # ADR-165 (v6.0.4): the orient-first protocol body (ADR-163) is
+    # fetched in the lifespan startup hook below, before the first
+    # request arrives. Build the session manager up front with no
+    # instructions; the lifespan mutates the wrapped server's
+    # `instructions` attribute once the body is in hand. Mutation is
+    # safe because the MCP SDK reads `Server.instructions` per request
+    # when constructing the InitializeResult — not at server-construct
+    # time. Doing the fetch in the lifespan keeps create_app() sync-
+    # callable from any context (including async test cases that build
+    # the app inside an existing event loop).
     session_manager = build_session_manager()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # Mirrors the stdio wiring in __main__.py (ADR-163). Falls back
+        # to the hardcoded baseline on any failure (see
+        # server_instructions.py) so the HTTP transport never advertises
+        # `instructions=None` in production.
+        session_manager.app.instructions = await fetch_server_instructions(
+            iris_url,
+        )
         # StreamableHTTPSessionManager.run() owns the anyio task group
         # the request handler depends on; entering it for the lifetime
         # of the app is the supported pattern.
@@ -72,6 +90,10 @@ def create_app() -> FastAPI:
         description="Standalone Streamable-HTTP MCP server for iris (ADR-131 / ADR-133 / ADR-134).",
         lifespan=lifespan,
     )
+    # Expose the session manager on app.state so the v6.0.4 regression
+    # tests (SPEC-165-A) can verify `instructions` reached the wrapped
+    # MCP server without walking private FastAPI route internals.
+    app.state.session_manager = session_manager
 
     # Favicons must be added before the root mount, otherwise the
     # /favicon.* paths get swallowed by the catch-all ASGI app.

@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.4] - 2026-05-13
+
+### Fixed
+
+- **MCP orient-first protocol over HTTP transport (issue #119, ADR-165).**
+  v5.18.0 (ADR-163) lifted the universal ORIENT-FIRST protocol into the
+  MCP `Server(instructions=...)` channel and wired it through the stdio
+  entry point. The parallel wiring for the HTTP transport
+  (`asgi.py:build_session_manager`, `http_main.py:create_app`) was
+  missed, so every claude.ai connection — which uses HTTP via the OAuth
+  connector introduced in v6.0.0 — received `InitializeResult` with no
+  `instructions` body. Without that directive in scope ("INVOKE the
+  structural-overview call... NOT as a follow-up 'want me to load it?'
+  prompt"), opening an authored set produced a paraphrased text menu
+  instead of the 5.x flow: auto-loaded TOC + four-option `AskUserQuestion`
+  widget.
+- `build_session_manager()` gains an `instructions: str | None = None`
+  keyword argument that forwards to `build_server(..., instructions=...)`.
+  `create_app()` builds the manager up front, then fetches the orient
+  body in the FastAPI lifespan startup and mutates
+  `session_manager.app.instructions` before the first request arrives.
+  Mutation is safe — the MCP SDK reads `Server.instructions` per request
+  when constructing the InitializeResult, not at server-construct time.
+- Fallback semantics are inherited from `fetch_server_instructions`:
+  any network error, HTTP error, malformed JSON, or empty body yields
+  the hardcoded baseline. The HTTP transport therefore never advertises
+  `instructions=None` in production.
+- Prior fixes (v6.0.1 m055, v6.0.2 m056, v6.0.3) targeted a separate
+  bug — the `iris_package_hierarchy` → `package_hierarchy` tool-name
+  substitution — which is unrelated and remains fixed.
+
+### Added
+
+- **Regression tests** (`test_server_instructions_wiring.py::TestBuildSessionManagerInstructionsWiring`,
+  `test_http_main.py::TestCreateAppFetchesInstructions`) pin the HTTP
+  transport's `instructions` wiring end-to-end. The wiring tests round-
+  trip an arbitrary body through `build_session_manager`; the http_main
+  tests verify the lifespan fetches `/api/ai/server-instructions` and
+  falls back gracefully on backend errors. Closes the test gap that let
+  the v5.18.0 regression land unnoticed.
+- `app.state.session_manager` exposed on the FastAPI app so regression
+  tests can introspect the wrapped MCP server's instructions without
+  walking private route internals.
+
+### Why this matters
+
+- claude.ai users opening any authored scope (e.g. the Outcomes Theory
+  Book set) now see the full ORIENT-FIRST flow: TOC auto-loaded,
+  four-option menu offered via `AskUserQuestion`, no "want me to load
+  it?" preamble. Matches the 5.x.previous flow captured in issue #119.
+
+### See also
+
+- [ADR-165](docs/adrs/ADR-165-MCP-Server-Instructions-Over-HTTP-Transport.md)
+- [SPEC-165-A](docs/adrs/specs/SPEC-165-A-MCP-Server-Instructions-Over-HTTP-Transport.md)
+- Issue [#119](https://github.com/cgbarlow/iris/issues/119)
+
 ## [6.0.3] - 2026-05-13
 
 ### Fixed

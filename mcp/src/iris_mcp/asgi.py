@@ -76,7 +76,10 @@ async def bind_client(client: "IrisClient") -> "AsyncIterator[None]":
         _current_client.reset(token)
 
 
-def build_session_manager() -> StreamableHTTPSessionManager:
+def build_session_manager(
+    *,
+    instructions: str | None = None,
+) -> StreamableHTTPSessionManager:
     """Build a stateless Streamable HTTP session manager.
 
     The wrapped MCP server reads its IrisClient from the ContextVar that
@@ -84,10 +87,20 @@ def build_session_manager() -> StreamableHTTPSessionManager:
     level session affinity — fine for our read-only + AI workload, and
     avoids the in-memory session table that would otherwise need
     eviction logic.
+
+    `instructions` (ADR-165, v6.0.4): forwarded to `build_server(...)`
+    and exposed on the MCP `InitializeResult.instructions` field
+    returned to every connected client. Mirrors the stdio wiring in
+    `__main__.py` so the orient-first protocol (ADR-163) reaches HTTP
+    clients too — without this kwarg, claude.ai connects and sees no
+    server-level instructions (issue #119).
     """
     # _LazyClientServer reads IrisClient from the ContextVar at dispatch
     # time, so we can build the server before any request arrives.
-    server = build_server(_LazyClient())  # type: ignore[arg-type]
+    server = build_server(
+        _LazyClient(),  # type: ignore[arg-type]
+        instructions=instructions,
+    )
     # json_response=True forces a single JSON response per request rather
     # than an open SSE stream — better for stateless mode and avoids
     # hung connections in clients that don't keep the SSE channel open.
