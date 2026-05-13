@@ -117,7 +117,7 @@ class Package(EntityBase):
 class PackageHierarchyNode(_Permissive):
     """One node in a package hierarchy tree (ADR-158, v5.13.0).
     Returned by `IrisClient.package_hierarchy()` and the MCP
-    `iris_package_hierarchy` tool."""
+    `package_hierarchy` tool."""
 
     id: str
     name: str

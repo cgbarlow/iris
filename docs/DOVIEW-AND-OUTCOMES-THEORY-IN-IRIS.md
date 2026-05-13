@@ -186,7 +186,7 @@ Dr Duignan's handbook content is loaded into Iris as a regular Iris Set. On the 
 
 The pair convention lets the AI distinguish "what is this tool asking?" (the question diagram) from "how does it work?" (the tool diagram with its mermaid flowchart). In the diagram description: `kind: question · pair: <code>` vs `kind: tool · pair: <code>`. Iris's MCP `get_diagram` tool returns this whole markdown body as `data.content`, so an external AI can both quote the prose and embed the mermaid flowchart verbatim in a response. **Verbatim** is important — the system explicitly forbids redrawing or simplifying handbook diagrams.
 
-The chapter packages organise tools by section (J = AI applications, I = introducing DoView into organisations, H = reporting frameworks, G = evaluation methods, F = performance improvement, E = social investment, D and below = earlier chapters of the handbook). When an external client calls `iris_package_hierarchy(set_id)`, it gets the entire chapter tree in one response (ADR-158).
+The chapter packages organise tools by section (J = AI applications, I = introducing DoView into organisations, H = reporting frameworks, G = evaluation methods, F = performance improvement, E = social investment, D and below = earlier chapters of the handbook). When an external client calls `package_hierarchy(set_id)`, it gets the entire chapter tree in one response (ADR-158).
 
 ---
 

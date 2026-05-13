@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.1] - 2026-05-13
+
+### Fixed
+
+- **MCP orient-flow TOC step missing in v6** (issue #115). When a
+  user opened the Outcomes Theory Book in Iris via the claude.ai
+  connector, the v5.x flow returned a brief description **plus a
+  package hierarchy (the TOC, Part A–Part J)** plus the four-option
+  menu. v6.0.0 dropped the TOC step — the model offered "Want me to
+  load the package hierarchy?" as a follow-up instead of surfacing
+  it as part of the orient.
+
+  Root cause: the canonical mcp_server_instructions content (seeded
+  in v5.18.0 / ADR-163) and the canonical Outcomes Theory Book
+  `mcp_system_context` (since v5.13.0 / ADR-158) both referenced the
+  structural-overview tool as `iris_package_hierarchy`, but the
+  actual MCP-registered tool name is `package_hierarchy`. claude.ai
+  v5-era hosted-MCP behaviour translated the wrong name (or kept the
+  full toolset loaded); the stricter v6-era behaviour does not. The
+  orient step 2 silently no-op'd.
+
+  Two fixes:
+  1. Corrected the tool name in all five canonical sources (server
+     instructions seed m053, server instructions Supabase seed m057,
+     server-instructions iris-mcp fallback constant, canonical doc,
+     Outcomes Theory Book scope context doc).
+  2. Strengthened the orient-protocol step 2 to require invocation
+     before the menu: "INVOKE the structural-overview call ... NOT
+     as a follow-up 'want me to load it?' prompt. If your MCP client
+     lazy-loads tools and the named tool isn't currently in your
+     toolset, request/load it before continuing. The TOC is part of
+     the orient, not optional."
+
+### Migration
+
+- **SQLite m055** runs automatically on next boot. Surgically
+  `REPLACE()`s `iris_package_hierarchy` → `package_hierarchy` in the
+  live `mcp_server_instructions` singleton row's `prompt_text`.
+  Preserves any admin customisations elsewhere in the body.
+- **Supabase m059**: apply once via `./scripts/supabase-migrate.sh`.
+- No manual paste needed — the migration fixes the live row directly.
+
+### Tests
+
+- 5 new migration-parser tests verifying the REPLACE() shape and
+  that the underlying m053/m057 seeds also use the correct name
+  (so fresh installs don't regress).
+
 ## [6.0.0] - 2026-05-13
 
 ### Breaking changes
