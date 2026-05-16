@@ -115,6 +115,17 @@ ADR-123/129).
   packages + sets + collections, export (JSON + Markdown), ask-AI
   (single and multi-set), file extraction, applying AI-generated
   diagrams, and conversation history.
+- **Write tools** for full lifecycle (ADR-161, ADR-178):
+  - `create_*` for collection / set / package / diagram
+  - `update_*` for collection / set / package / diagram / element
+    (partial updates — pass only the fields you want to change)
+  - `move_*` for diagram / package / set (in-scope re-parenting;
+    cross-set moves of packages/diagrams deferred to a future ADR)
+- **Render tools** (v6.2.0, ADR-179):
+  - `render_diagram(diagram_id, format)` and
+    `render_markdown(markdown, title, format)` — produce md/docx/pdf
+    artefacts stored at `/api/artefacts/{id}` and return a
+    downloadable `web_url`.
 - **Resources** at `iris://diagrams|elements|packages|sets|collections/{id}`
   returning JSON export bundles.
 - **Prompts** (v5.8.3, ADR-152; v5.8.5 naming refresh per ADR-153) —

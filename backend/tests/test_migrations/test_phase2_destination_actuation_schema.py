@@ -79,10 +79,16 @@ def test_seed_destination_body_no_longer_contains_docx_fallback() -> None:
     assert "render_markdown" in seed
 
 
-def test_seed_destination_body_still_contains_move_fallback() -> None:
-    """The cross-set move fallback stays until Phase 3 ships move_* tools."""
+def test_seed_destination_body_drops_move_fallback_after_phase3() -> None:
+    """Phase 2 (v6.2.0) only dropped the docx/pdf fallback; Phase 3
+    (v6.3.0) drops the cross-set move fallback too. After Phase 3
+    lands the seed no longer contains either fallback string.
+    """
     seed = _read("app/seed/creation_prompts.py")
-    assert "v6.3.0 ships move_* tools" in seed
+    # Move fallback gone after Phase 3.
+    assert "v6.3.0 ships move_* tools" not in seed
+    # Move-tool guidance present instead.
+    assert "move_diagram" in seed
 
 
 def test_doc_destination_body_aligned_with_seed() -> None:
@@ -91,4 +97,7 @@ def test_doc_destination_body_aligned_with_seed() -> None:
     doc = _read_repo("docs/prompts/creation-cascade-destination.md")
     assert "Docx and PDF generation ships in" not in doc
     assert "render_markdown" in doc
-    assert "v6.3.0 ships" in doc
+    # After Phase 3 the move-tools guidance replaces the v6.3.0
+    # promise text — assert the move tools are mentioned (Phase 3
+    # actuation), not the placeholder.
+    assert "move_diagram" in doc

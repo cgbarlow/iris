@@ -434,6 +434,164 @@ async def _render_diagram(c: IrisClient, args: dict[str, Any]) -> str:
     return json.dumps(body)
 
 
+# ── Phase 3 update_* + move_* tools (ADR-178, v6.3.0) ────────────────
+
+
+async def _put_merge_partial(
+    c: IrisClient, kind_path: str, entity_id: str,
+    partial: dict[str, Any], updatable_fields: tuple[str, ...],
+) -> Any:
+    """PUT to /api/<kind_path>/<id> with a full body assembled from the
+    current entity + caller-supplied partial overrides.
+
+    Backend update endpoints do FULL-replace (omitting a field sets it
+    to NULL), so a true partial update needs a GET + merge first. We
+    fetch the current entity, copy the listed `updatable_fields`, then
+    apply any non-None override from `partial`. None means "don't
+    change" — to explicitly clear a field, callers need a separate
+    affordance (out of scope for Phase 3).
+
+    Costs one extra GET per update. Trade-off for partial-update UX
+    without a backend PATCH refactor.
+    """
+    current_resp = await c._request("GET", f"/api/{kind_path}/{entity_id}")
+    current = current_resp.json()
+    body: dict[str, Any] = {}
+    for field in updatable_fields:
+        if field in partial and partial[field] is not None:
+            body[field] = partial[field]
+        elif field in current:
+            body[field] = current[field]
+    return await c._request("PUT", f"/api/{kind_path}/{entity_id}", json=body)
+
+
+_COLLECTION_UPDATE_FIELDS = (
+    "name", "description", "thumbnail_source", "thumbnail_diagram_id",
+    "system_prompt", "mcp_system_context",
+)
+_SET_UPDATE_FIELDS = (
+    "name", "description", "thumbnail_source", "thumbnail_diagram_id",
+    "collection_id", "system_prompt", "mcp_system_context",
+)
+_SET_METADATA_FIELDS = tuple(f for f in _SET_UPDATE_FIELDS if f != "collection_id")
+_PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
+_DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
+_ELEMENT_UPDATE_FIELDS = ("name", "description", "data")
+
+
+async def _update_collection(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): update a Collection's metadata."""
+    try:
+        resp = await _put_merge_partial(
+            c, "collections", args["collection_id"],
+            args, _COLLECTION_UPDATE_FIELDS,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update collection")
+    return with_web_url(json.dumps(resp.json()), "collection")
+
+
+async def _update_set(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): update a Set's metadata (excluding
+    collection_id — use `move_set` for cross-collection moves)."""
+    try:
+        resp = await _put_merge_partial(
+            c, "sets", args["set_id"],
+            args, _SET_METADATA_FIELDS,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update set")
+    return with_web_url(json.dumps(resp.json()), "set")
+
+
+async def _update_package(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): update a Package's metadata."""
+    try:
+        resp = await _put_merge_partial(
+            c, "packages", args["package_id"],
+            args, _PACKAGE_UPDATE_FIELDS,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update package")
+    return with_web_url(json.dumps(resp.json()), "package")
+
+
+async def _update_diagram(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): update a Diagram's metadata or canvas data.
+    Versioned — every successful update increments current_version."""
+    try:
+        resp = await _put_merge_partial(
+            c, "diagrams", args["diagram_id"],
+            args, _DIAGRAM_UPDATE_FIELDS,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update diagram")
+    return with_web_url(json.dumps(resp.json()), "diagram")
+
+
+async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): update an Element's metadata or data."""
+    try:
+        resp = await _put_merge_partial(
+            c, "elements", args["element_id"],
+            args, _ELEMENT_UPDATE_FIELDS,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update element")
+    return with_web_url(json.dumps(resp.json()), "element")
+
+
+async def _move_diagram(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): re-parent a Diagram within its current set.
+    parent_package_id=None moves it to the set's root."""
+    try:
+        resp = await c._request(
+            "PUT", f"/api/diagrams/{args['diagram_id']}/parent",
+            json={"parent_package_id": args.get("parent_package_id")},
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Move diagram")
+    return with_web_url(json.dumps(resp.json()), "diagram")
+
+
+async def _move_package(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): re-parent a Package within its current set.
+    parent_package_id=None moves it to the set's root. Backend
+    cycle-checks."""
+    try:
+        resp = await c._request(
+            "PUT", f"/api/packages/{args['package_id']}/parent",
+            json={"parent_package_id": args.get("parent_package_id")},
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Move package")
+    return with_web_url(json.dumps(resp.json()), "package")
+
+
+async def _move_set(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.3.0): move a Set to a different (or no) Collection.
+
+    `collection_id=None` un-groups the set. Special-cased because the
+    partial-merge helper drops None overrides — for move_set, None is
+    a meaningful "no collection" value, not "leave unchanged".
+    """
+    set_id = args["set_id"]
+    try:
+        current = await c._request("GET", f"/api/sets/{set_id}")
+        current_json = current.json()
+        body: dict[str, Any] = {}
+        for field in _SET_UPDATE_FIELDS:
+            if field == "collection_id":
+                # Always overlay collection_id, even if None.
+                body["collection_id"] = args.get("collection_id")
+            elif field in current_json:
+                body[field] = current_json[field]
+        resp = await c._request("PUT", f"/api/sets/{set_id}", json=body)
+    except IrisAuthError:
+        return _auth_required_payload("Move set")
+    return with_web_url(json.dumps(resp.json()), "set")
+
+
 async def _render_markdown(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-179 (v6.2.0): render ad-hoc markdown content to md/docx/pdf
     and store as an artefact in Iris. Used by the creation cascade
@@ -1016,6 +1174,215 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_render_markdown,
+    ),
+    # ── Phase 3 update_* tools (ADR-178, v6.3.0) ─────────────────────
+    Tool(
+        name="update_collection",
+        description=(
+            "Update a Collection's metadata. All fields except "
+            "collection_id are optional — pass only what you want to "
+            "change. The backend does a full-replace under the hood; "
+            "this tool fetches the current entity and merges in your "
+            "partial overrides so unspecified fields are preserved. "
+            "Returns the updated entity dict with web_url."
+        ),
+        input_schema=_schema({
+            "collection_id": _str_arg("collection_id", "Collection id"),
+            "name": _str_arg("name", "New name", required=False),
+            "description": _str_arg("description", "New description", required=False),
+            "system_prompt": _str_arg(
+                "system_prompt",
+                "Per-collection system prompt for Iris AI (admin-edited)",
+                required=False,
+            ),
+            "mcp_system_context": _str_arg(
+                "mcp_system_context",
+                "Orient sheet body surfaced to MCP clients on read",
+                required=False,
+            ),
+            "thumbnail_source": _str_arg(
+                "thumbnail_source", "image / diagram / none", required=False,
+            ),
+            "thumbnail_diagram_id": _str_arg(
+                "thumbnail_diagram_id",
+                "Diagram id to use as thumbnail (when source=diagram)",
+                required=False,
+            ),
+        }),
+        handler=_update_collection,
+    ),
+    Tool(
+        name="update_set",
+        description=(
+            "Update a Set's metadata. All fields except set_id are "
+            "optional — pass only what you want to change. To move a "
+            "set between collections, use `move_set` (this tool "
+            "deliberately excludes the collection_id field). Returns "
+            "the updated entity dict with web_url."
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg("set_id", "Set id"),
+            "name": _str_arg("name", "New name", required=False),
+            "description": _str_arg("description", "New description", required=False),
+            "system_prompt": _str_arg(
+                "system_prompt", "Per-set system prompt", required=False,
+            ),
+            "mcp_system_context": _str_arg(
+                "mcp_system_context", "Orient sheet body", required=False,
+            ),
+            "thumbnail_source": _str_arg(
+                "thumbnail_source", "image / diagram / none", required=False,
+            ),
+            "thumbnail_diagram_id": _str_arg(
+                "thumbnail_diagram_id", "Thumbnail diagram id", required=False,
+            ),
+        }),
+        handler=_update_set,
+    ),
+    Tool(
+        name="update_package",
+        description=(
+            "Update a Package's metadata. Pass only the fields you "
+            "want to change. To re-parent a package, use `move_package`."
+        ),
+        input_schema=_schema({
+            "package_id": _str_arg("package_id", "Package id"),
+            "name": _str_arg("name", "New name", required=False),
+            "description": _str_arg("description", "New description", required=False),
+            "metadata": (
+                {
+                    "type": "object",
+                    "description": "Arbitrary metadata blob",
+                    "additionalProperties": True,
+                },
+                False,
+            ),
+        }),
+        handler=_update_package,
+    ),
+    Tool(
+        name="update_diagram",
+        description=(
+            "Update a Diagram's metadata and/or canvas data. "
+            "Versioned — every successful update increments "
+            "current_version. To re-parent a diagram, use "
+            "`move_diagram`. To validate edits to `data`, the backend "
+            "applies the same checks as create_diagram."
+        ),
+        input_schema=_schema({
+            "diagram_id": _str_arg("diagram_id", "Diagram id"),
+            "name": _str_arg("name", "New name", required=False),
+            "description": _str_arg("description", "New description", required=False),
+            "data": (
+                {
+                    "type": "object",
+                    "description": (
+                        "Replacement canvas data — same shape as "
+                        "create_diagram (Svelte-Flow {nodes, edges} "
+                        "for visual notations; {\"content\": \"<md>\"} "
+                        "for markdown)."
+                    ),
+                    "additionalProperties": True,
+                },
+                False,
+            ),
+            "metadata": (
+                {"type": "object", "additionalProperties": True},
+                False,
+            ),
+            "change_summary": _str_arg(
+                "change_summary",
+                "Optional human-readable summary of what changed",
+                required=False,
+            ),
+        }),
+        handler=_update_diagram,
+    ),
+    Tool(
+        name="update_element",
+        description=(
+            "Update an Element's metadata and/or data. Note: elements "
+            "are owned by their parent diagram and cannot be moved "
+            "between diagrams — this is a design invariant, see ADR-178."
+        ),
+        input_schema=_schema({
+            "element_id": _str_arg("element_id", "Element id"),
+            "name": _str_arg("name", "New name", required=False),
+            "description": _str_arg("description", "New description", required=False),
+            "data": (
+                {"type": "object", "additionalProperties": True},
+                False,
+            ),
+        }),
+        handler=_update_element,
+    ),
+    # ── Phase 3 move_* tools (ADR-178, v6.3.0) ───────────────────────
+    Tool(
+        name="move_diagram",
+        description=(
+            "Re-parent a diagram within its current set. Pass "
+            "parent_package_id=null to move the diagram to the set's "
+            "root. Cross-set moves are NOT supported in this version "
+            "— for cross-set, save into the target set directly via "
+            "create_diagram. The backend cycle-checks."
+        ),
+        input_schema=_schema({
+            "diagram_id": _str_arg("diagram_id", "Diagram id"),
+            "parent_package_id": (
+                {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Target package id (must be in the same set), "
+                        "or null to move to set root"
+                    ),
+                },
+                False,
+            ),
+        }),
+        handler=_move_diagram,
+    ),
+    Tool(
+        name="move_package",
+        description=(
+            "Re-parent a package within its current set. Pass "
+            "parent_package_id=null to move the package to the set's "
+            "root. Backend cycle-checks. Cross-set moves NOT supported."
+        ),
+        input_schema=_schema({
+            "package_id": _str_arg("package_id", "Package id"),
+            "parent_package_id": (
+                {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Target package id (must be in the same set), "
+                        "or null to move to set root"
+                    ),
+                },
+                False,
+            ),
+        }),
+        handler=_move_package,
+    ),
+    Tool(
+        name="move_set",
+        description=(
+            "Move a set to a different (or no) collection. Pass "
+            "collection_id=null to un-group the set so it sits at the "
+            "top level. Other set metadata is preserved."
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg("set_id", "Set id"),
+            "collection_id": (
+                {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Target collection id, or null to un-group"
+                    ),
+                },
+                False,
+            ),
+        }),
+        handler=_move_set,
     ),
 ]
 
