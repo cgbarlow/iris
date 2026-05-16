@@ -298,14 +298,22 @@ def diagrams_versions(diagram_id: str) -> None:
 @elements_app.command("list")
 def elements_list(
     set_id: str | None = typer.Option(None, "--set"),
+    package_id: str | None = typer.Option(
+        None, "--package-id",
+        help="Filter by package. Pass 'null' to list elements with no package.",
+    ),
     page: int = typer.Option(1, "--page", min=1),
     page_size: int = typer.Option(50, "--page-size", min=1, max=200),
 ) -> None:
     async def _do() -> list[Any]:
         async with _client() as c:
-            return await c.list_elements(
-                set_id=set_id, page=page, page_size=page_size,
-            )
+            params: dict[str, Any] = {"page": page, "page_size": page_size}
+            if set_id is not None:
+                params["set_id"] = set_id
+            if package_id is not None:
+                params["package_id"] = package_id
+            resp = await c._request("GET", "/api/elements", params=params)
+            return resp.json().get("items", [])
 
     rows = _run(_do())
     if state.as_json:
@@ -347,6 +355,33 @@ def packages_list(set_id: str | None = typer.Option(None, "--set")) -> None:
         output.print_json(rows)
     else:
         output.print_table(rows, columns=["id", "name", "parent_package_id"], title="Packages")
+
+
+@packages_app.command("list-elements")
+def packages_list_elements_cmd(
+    package_id: str = typer.Argument(...),
+    page: int = typer.Option(1, "--page", min=1),
+    page_size: int = typer.Option(50, "--page-size", min=1, max=200),
+) -> None:
+    """List elements that belong to a package (ADR-184)."""
+    async def _do() -> list[Any]:
+        async with _client() as c:
+            resp = await c._request(
+                "GET",
+                f"/api/packages/{package_id}/elements",
+                params={"page": page, "page_size": page_size},
+            )
+            return resp.json().get("items", [])
+
+    rows = _run(_do())
+    if state.as_json:
+        output.print_json(rows)
+    else:
+        output.print_table(
+            rows,
+            columns=["id", "name", "element_type", "notation", "updated_at"],
+            title=f"Elements in package {package_id} ({len(rows)})",
+        )
 
 
 @packages_app.command("get")
@@ -575,6 +610,10 @@ def _resolve_null(value: str) -> str | None:
     return None if value.lower() == "null" else value
 
 
+# Sentinel for "do not touch" on tri-state CLI flags (e.g. --package-id).
+_UNSET: Any = object()
+
+
 async def _put_merge_partial(
     c: IrisClient, kind_path: str, entity_id: str,
     partial: dict[str, Any], updatable_fields: tuple[str, ...],
@@ -653,6 +692,10 @@ def create_element_cmd(
     name: str = typer.Option(..., "--name"),
     element_type: str = typer.Option(..., "--element-type"),
     set_id: str | None = typer.Option(None, "--set-id"),
+    package_id: str | None = typer.Option(
+        None, "--package-id",
+        help="Optional package membership for the new element (ADR-184).",
+    ),
     notation: str | None = typer.Option(None, "--notation"),
     description: str | None = typer.Option(None, "--description"),
     data_json: str | None = typer.Option(None, "--data-json"),
@@ -670,6 +713,8 @@ def create_element_cmd(
     }
     if set_id is not None:
         body["set_id"] = set_id
+    if package_id is not None:
+        body["package_id"] = package_id
     if notation is not None:
         body["notation"] = notation
     if description is not None:
@@ -725,7 +770,7 @@ _SET_METADATA_FIELDS = (
 )
 _PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
 _DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
-_ELEMENT_UPDATE_FIELDS = ("name", "description", "data")
+_ELEMENT_UPDATE_FIELDS = ("name", "description", "data", "package_id")
 
 
 @update_app.command("collection")
@@ -837,19 +882,47 @@ def update_element_cmd(
     name: str | None = typer.Option(None, "--name"),
     description: str | None = typer.Option(None, "--description"),
     data_json: str | None = typer.Option(None, "--data-json"),
+    package_id: str | None = typer.Option(
+        None, "--package-id",
+        help=(
+            "Set or clear the element's package membership. Pass a "
+            "UUID to set, the literal 'null' to clear, or omit to leave "
+            "unchanged (ADR-184). Cannot move elements between diagrams "
+            "(ADR-178 invariant)."
+        ),
+    ),
 ) -> None:
     """Update an Element. Note: elements cannot be moved between
     diagrams — they travel with their parent diagram (ADR-178 invariant)."""
-    partial = {
+    partial: dict[str, Any] = {
         "name": name, "description": description,
         "data": _parse_json_opt(data_json, "--data-json"),
     }
+    # package_id is tri-state at the PUT body level: include the key to
+    # set (string) or clear (null), omit to leave untouched. The
+    # _put_merge_partial helper strips None so we wire package_id by
+    # hand.
+    raw_package_id = _resolve_null(package_id) if package_id is not None else _UNSET
 
     async def _do() -> Any:
         async with _client() as c:
-            return await _put_merge_partial(
-                c, "elements", element_id, partial, _ELEMENT_UPDATE_FIELDS,
+            # Build the body from the GET-then-merge path, then graft
+            # package_id on if the user passed --package-id.
+            current_resp = await c._request("GET", f"/api/elements/{element_id}")
+            current = current_resp.json()
+            body: dict[str, Any] = {}
+            for field in ("name", "description", "data"):
+                if field in partial and partial[field] is not None:
+                    body[field] = partial[field]
+                elif field in current:
+                    body[field] = current[field]
+            if raw_package_id is not _UNSET:
+                body["package_id"] = raw_package_id
+            headers = {"If-Match": str(current.get("current_version", 1))}
+            resp = await c._request(
+                "PUT", f"/api/elements/{element_id}", json=body, headers=headers,
             )
+            return resp.json()
     output.print_json(_run(_do()))
 
 

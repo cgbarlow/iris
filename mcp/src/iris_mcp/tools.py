@@ -196,8 +196,19 @@ async def _get_element(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _list_elements(c: IrisClient, args: dict[str, Any]) -> str:
-    rows = await c.list_elements(set_id=args.get("set_id"))
-    return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "element")
+    """ADR-184 (v6.7.0): adds ``package_id`` three-valued filter.
+
+    Bypasses the typed client to forward ``package_id="null"`` verbatim
+    (the iris-client typed method doesn't yet support the sentinel).
+    """
+    params: dict[str, Any] = {}
+    if args.get("set_id"):
+        params["set_id"] = args["set_id"]
+    if "package_id" in args and args["package_id"] is not None:
+        params["package_id"] = args["package_id"]
+    resp = await c._request("GET", "/api/elements", params=params)
+    items = resp.json().get("items", [])
+    return with_web_urls_list(json.dumps(items), "element")
 
 
 async def _get_package(c: IrisClient, args: dict[str, Any]) -> str:
@@ -521,6 +532,9 @@ _SET_METADATA_FIELDS = tuple(f for f in _SET_UPDATE_FIELDS if f != "collection_i
 _PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
 _DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
 _ELEMENT_UPDATE_FIELDS = ("name", "description", "data")
+_ELEMENT_UPDATE_FIELDS_WITH_PACKAGE = (
+    "name", "description", "data", "package_id",
+)
 
 
 async def _update_collection(c: IrisClient, args: dict[str, Any]) -> str:
@@ -574,15 +588,57 @@ async def _update_diagram(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
-    """ADR-178 (v6.3.0): update an Element's metadata or data."""
+    """ADR-178 (v6.3.0): update an Element's metadata or data.
+
+    ADR-184 (v6.7.0): also accepts ``package_id`` (set / clear via JSON
+    null). Because the standard ``_put_merge_partial`` helper drops
+    ``None`` overrides, ``package_id`` is wired through a small special
+    case so the caller can explicitly clear membership.
+    """
     try:
-        resp = await _put_merge_partial(
-            c, "elements", args["element_id"],
-            args, _ELEMENT_UPDATE_FIELDS,
-        )
+        # Special-case ``package_id``: only forward to the body if the
+        # caller actually supplied the key (including JSON null).
+        if "package_id" in args:
+            current_resp = await c._request(
+                "GET", f"/api/elements/{args['element_id']}",
+            )
+            current = current_resp.json()
+            body: dict[str, Any] = {}
+            for field in _ELEMENT_UPDATE_FIELDS:
+                if field in args and args[field] is not None:
+                    body[field] = args[field]
+                elif field in current:
+                    body[field] = current[field]
+            body["package_id"] = args["package_id"]
+            resp = await c._request(
+                "PUT", f"/api/elements/{args['element_id']}", json=body,
+            )
+        else:
+            resp = await _put_merge_partial(
+                c, "elements", args["element_id"],
+                args, _ELEMENT_UPDATE_FIELDS,
+            )
     except IrisAuthError:
         return _auth_required_payload("Update element")
     return with_web_url(json.dumps(resp.json()), "element")
+
+
+async def _list_package_elements(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-184 (v6.7.0): list elements that belong to a package."""
+    try:
+        resp = await c._request(
+            "GET",
+            f"/api/packages/{args['package_id']}/elements",
+            params={
+                "page": int(args.get("page", 1)),
+                "page_size": int(args.get("limit", 50)),
+            },
+        )
+    except IrisAuthError:
+        return _auth_required_payload("List package elements")
+    return with_web_urls_list(
+        json.dumps(resp.json().get("items", [])), "element",
+    )
 
 
 async def _move_diagram(c: IrisClient, args: dict[str, Any]) -> str:
@@ -728,11 +784,39 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="list_elements",
-        description="List elements, optionally scoped to a set.",
+        description=(
+            "List elements, optionally scoped to a set and/or a package "
+            "(ADR-184). Pass package_id=\"null\" to list elements with no "
+            "package membership."
+        ),
         input_schema=_schema({
             "set_id": _str_arg("set_id", "Scope to a set", required=False),
+            "package_id": _str_arg(
+                "package_id",
+                'Scope to a package. Pass "null" to list unmembered elements.',
+                required=False,
+            ),
         }),
         handler=_list_elements,
+    ),
+    Tool(
+        name="list_package_elements",
+        description=(
+            "List elements belonging to a specific package (ADR-184). "
+            "Paginated — defaults to page=1, limit=50."
+        ),
+        input_schema=_schema({
+            "package_id": _str_arg("package_id", "Package id"),
+            "limit": (
+                {"type": "integer", "description": "Page size (default 50)"},
+                False,
+            ),
+            "page": (
+                {"type": "integer", "description": "Page number, 1-based"},
+                False,
+            ),
+        }),
+        handler=_list_package_elements,
     ),
     Tool(
         name="get_element",
@@ -1424,9 +1508,9 @@ TOOLS: list[Tool] = [
     Tool(
         name="update_element",
         description=(
-            "Update an Element's metadata and/or data. Note: elements "
-            "are owned by their parent diagram and cannot be moved "
-            "between diagrams — this is a design invariant, see ADR-178."
+            "Update an Element's metadata, data, and/or package "
+            "membership (ADR-184). Note: elements cannot be moved "
+            "between diagrams — see ADR-178."
         ),
         input_schema=_schema({
             "element_id": _str_arg("element_id", "Element id"),
@@ -1434,6 +1518,17 @@ TOOLS: list[Tool] = [
             "description": _str_arg("description", "New description", required=False),
             "data": (
                 {"type": "object", "additionalProperties": True},
+                False,
+            ),
+            "package_id": (
+                {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Set or clear the element's package membership "
+                        "(ADR-184). Pass a UUID to set, JSON null to "
+                        "clear, or omit to leave unchanged."
+                    ),
+                },
                 False,
             ),
         }),

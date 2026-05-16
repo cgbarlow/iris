@@ -13,6 +13,8 @@
 	import BpmnAuthoringShell from '$lib/canvas/bpmn/BpmnAuthoringShell.svelte';
 	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
 	import TextCanvas from '$lib/canvas/text/TextCanvas.svelte';
+	import DynamicListCanvas from '$lib/canvas/text/DynamicListCanvas.svelte';
+	import type { DynamicSource } from '$lib/canvas/text/DynamicListCanvas.svelte';
 	import MarkdownToc from '$lib/components/MarkdownToc.svelte';
 	import type { TocHeading } from '$lib/components/MarkdownView.svelte';
 	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
@@ -92,10 +94,24 @@
 		source_name: string;
 		target_name: string;
 	}
+	// ADR-184 — element → package memberships for elements drawn on
+	// this diagram. Surfaced in the Relationships tab alongside the
+	// existing two sections.
+	interface ElementPackageMembership {
+		element_id: string;
+		element_name: string;
+		package_id: string;
+		package_name: string;
+	}
 	let diagramRelationships = $state<DiagramRelationship[]>([]);
 	let elementRelationships = $state<ElementRelationship[]>([]);
+	let elementPackageMemberships = $state<ElementPackageMembership[]>([]);
 	let relationshipsLoading = $state(false);
-	const hasRelationships = $derived(diagramRelationships.length > 0 || elementRelationships.length > 0);
+	const hasRelationships = $derived(
+		diagramRelationships.length > 0
+		|| elementRelationships.length > 0
+		|| elementPackageMemberships.length > 0,
+	);
 
 	let showDeleteDialog = $state(false);
 	let showCloneDialog = $state(false);
@@ -483,6 +499,15 @@
 
 	/** Markdown source for Text-class diagrams; lives at diagram.data.content. */
 	let markdownContent = $derived((diagram?.data?.content as string | undefined) ?? '');
+	// ADR-186 (issue #147): pending dynamic_list source-config changes
+	// while in edit mode. Committed on Save.
+	let pendingDynamicSource = $state<DynamicSource | null>(null);
+	const dynamicSource = $derived<DynamicSource>(
+		pendingDynamicSource ?? (
+			((diagram?.data as Record<string, unknown> | null | undefined)?.dynamic_source as DynamicSource | null | undefined)
+			?? { mode: 'diagram_relationships' as const, package_id: null, show_description: false }
+		),
+	);
 	let textHeadings = $state<TocHeading[]>([]);
 	let showTocDrawer = $state(false);
 	/** Bound to the textarea inside TextCanvas so we can insert markdown links at the cursor. */
@@ -792,12 +817,16 @@
 			const result = await apiFetch<{
 				diagram_relationships: DiagramRelationship[];
 				element_relationships: ElementRelationship[];
+				element_package_memberships?: ElementPackageMembership[];
 			}>(`/api/diagrams/${id}/relationships`);
 			diagramRelationships = result.diagram_relationships;
 			elementRelationships = result.element_relationships;
+			// ADR-184 — tolerate older API responses missing the key.
+			elementPackageMemberships = result.element_package_memberships ?? [];
 		} catch {
 			diagramRelationships = [];
 			elementRelationships = [];
+			elementPackageMemberships = [];
 		}
 		relationshipsLoading = false;
 	}
@@ -1461,9 +1490,18 @@
 			// Text-class diagrams (issue #26 / #27): persist markdown source rather
 			// than nodes/edges, otherwise the save wipes diagram.data.content and
 			// the browse view shows an empty canvas.
-			const data = canvasType === 'text'
-				? { content: markdownContent }
-				: { nodes: canvasNodes, edges: canvasEdges };
+			// ADR-186/187 (issue #147): dynamic_list diagrams persist only
+			// the `dynamic_source` config; the markdown content is
+			// synthesised at read-time and must NOT round-trip through
+			// the PUT body.
+			let data: Record<string, unknown>;
+			if (diagram.diagram_type === 'dynamic_list') {
+				data = { dynamic_source: pendingDynamicSource ?? (diagram.data as any)?.dynamic_source ?? { mode: 'diagram_relationships', package_id: null, show_description: false } };
+			} else if (canvasType === 'text') {
+				data = { content: markdownContent };
+			} else {
+				data = { nodes: canvasNodes, edges: canvasEdges };
+			}
 			await apiFetch(`/api/diagrams/${diagram.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(diagram.current_version) },
@@ -2130,9 +2168,10 @@
 			>
 				Relationships
 				{#if hasRelationships}
+					{@const _relTotal = diagramRelationships.length + elementRelationships.length + elementPackageMemberships.length}
 					<span
 						style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-primary); margin-left: 4px; vertical-align: middle;"
-						aria-label="{diagramRelationships.length + elementRelationships.length} relationship{diagramRelationships.length + elementRelationships.length === 1 ? '' : 's'}"
+						aria-label="{_relTotal} relationship{_relTotal === 1 ? '' : 's'}"
 					></span>
 				{/if}
 			</button>
@@ -2944,19 +2983,36 @@
 						 sequence canvases. The duplicates that lived here in v5.4.0
 						 have been removed. -->
 					<div class="flex gap-4">
-						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-							<TextCanvas
-								bind:textareaEl={textTextareaEl}
-								content={markdownContent}
-								editing={editing}
-								oncontentchange={(c) => {
-									if (diagram) {
-										diagram.data = { ...(diagram.data ?? {}), content: c };
+						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto">
+							{#if diagram?.diagram_type === 'dynamic_list'}
+								<!-- ADR-186 (issue #147): auto-generated content; the
+									 canvas is read-only and the Source panel appears in
+									 edit mode. -->
+								<DynamicListCanvas
+									content={markdownContent}
+									editing={editing}
+									setId={diagram?.set_id ?? null}
+									source={dynamicSource}
+									onsourcechange={(next: DynamicSource) => {
+										pendingDynamicSource = next;
 										canvasDirty = true;
-									}
-								}}
-								onheadings={(h) => (textHeadings = h)}
-							/>
+									}}
+									onheadings={(h) => (textHeadings = h)}
+								/>
+							{:else}
+								<TextCanvas
+									bind:textareaEl={textTextareaEl}
+									content={markdownContent}
+									editing={editing}
+									oncontentchange={(c) => {
+										if (diagram) {
+											diagram.data = { ...(diagram.data ?? {}), content: c };
+											canvasDirty = true;
+										}
+									}}
+									onheadings={(h) => (textHeadings = h)}
+								/>
+							{/if}
 						</div>
 						{#if !editing && showTocDrawer}
 							<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
@@ -3026,13 +3082,24 @@
 						 because Text views legitimately have zero canvas nodes. -->
 					{#if markdownContent}
 						<div class="flex gap-4">
-							<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: hidden">
-								<TextCanvas
-									content={markdownContent}
-									editing={false}
-									oncontentchange={() => {}}
-									onheadings={(h) => (textHeadings = h)}
-								/>
+							<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto">
+								{#if diagram?.diagram_type === 'dynamic_list'}
+									<!-- ADR-186 (issue #147): browse-mode dynamic_list view. -->
+									<DynamicListCanvas
+										content={markdownContent}
+										editing={false}
+										setId={diagram?.set_id ?? null}
+										source={dynamicSource}
+										onheadings={(h) => (textHeadings = h)}
+									/>
+								{:else}
+									<TextCanvas
+										content={markdownContent}
+										editing={false}
+										oncontentchange={() => {}}
+										onheadings={(h) => (textHeadings = h)}
+									/>
+								{/if}
 							</div>
 							{#if showTocDrawer}
 								<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
@@ -3198,9 +3265,34 @@
 
 			{#if relationshipsLoading}
 				<p style="color: var(--color-muted)">Loading relationships...</p>
-			{:else if diagramRelationships.length === 0 && elementRelationships.length === 0}
+			{:else if diagramRelationships.length === 0 && elementRelationships.length === 0 && elementPackageMemberships.length === 0}
 				<p style="color: var(--color-muted)">No relationships found.</p>
 			{:else}
+				<!-- ADR-184 — element → package memberships for elements on this canvas -->
+				{#if elementPackageMemberships.length > 0}
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Element → Package memberships ({elementPackageMemberships.length})</h3>
+					<table class="mb-6 w-full text-sm">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<th class="py-2 text-left" style="color: var(--color-muted)">Element</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Package</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each elementPackageMemberships as m}
+								<tr style="border-bottom: 1px solid var(--color-border)">
+									<td class="py-2">
+										<a href="/elements/{m.element_id}" style="color: var(--color-primary)">{m.element_name}</a>
+									</td>
+									<td class="py-2">
+										<a href="/packages/{m.package_id}" style="color: var(--color-primary)">{m.package_name}</a>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+
 				<!-- Element relationships (within this diagram's canvas) -->
 				{#if elementRelationships.length > 0}
 					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Element Relationships ({elementRelationships.length})</h3>

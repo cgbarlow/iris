@@ -125,6 +125,70 @@ async def get_package(
     }
 
 
+async def list_package_elements(
+    db: DatabasePort,
+    package_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[list[dict[str, object]], int]:
+    """List elements that belong to a package (ADR-184).
+
+    Returns (items, total). Items match the ``ElementResponse`` shape:
+    package members are listed once, ordered by updated_at desc.
+    """
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM elements e "
+        "WHERE e.package_id = ? AND e.is_deleted = 0",
+        (package_id,),
+    )
+    count_row = await cursor.fetchone()
+    total: int = count_row[0]  # type: ignore[index]
+
+    offset = (page - 1) * page_size
+    cursor = await db.execute(
+        "SELECT e.id, e.element_type, e.current_version, "
+        "ev.name, ev.description, ev.data, "
+        "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
+        "e.set_id, s.name, ev.metadata, e.notation, "
+        "e.package_id, "
+        "(SELECT pv.name FROM packages p "
+        "  JOIN package_versions pv ON p.id = pv.package_id "
+        "    AND p.current_version = pv.version "
+        "  WHERE p.id = e.package_id) AS package_name "
+        "FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id "
+        "AND e.current_version = ev.version "
+        "LEFT JOIN sets s ON e.set_id = s.id "
+        "WHERE e.package_id = ? AND e.is_deleted = 0 "
+        "ORDER BY ev.name ASC LIMIT ? OFFSET ?",
+        (package_id, page_size, offset),
+    )
+    rows = await cursor.fetchall()
+    items = [
+        {
+            "id": r[0],
+            "element_type": r[1],
+            "current_version": r[2],
+            "name": r[3],
+            "description": r[4],
+            "data": json.loads(r[5]) if r[5] else {},
+            "created_at": r[6],
+            "created_by": r[7],
+            "updated_at": r[8],
+            "is_deleted": bool(r[9]),
+            "set_id": r[10],
+            "set_name": r[11],
+            "metadata": json.loads(r[12]) if r[12] else None,
+            "notation": r[13] or "simple",
+            "package_id": r[14],
+            "package_name": r[15],
+        }
+        for r in rows
+    ]
+    return items, total
+
+
 async def list_packages(
     db: DatabasePort,
     *,

@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
+
+# Sentinel for tri-state "package_id" on ElementUpdate. We can't use
+# ``None`` to mean "do not touch" because callers may legitimately set
+# the value to ``None`` to clear membership. The sentinel resolves the
+# ambiguity at the model boundary.
+_UNSET: Any = object()
 
 
 class ElementCreate(BaseModel):
@@ -13,18 +21,26 @@ class ElementCreate(BaseModel):
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     set_id: str | None = None
+    package_id: str | None = None
     metadata: dict[str, object] | None = None
     notation: str = "simple"
 
 
 class ElementUpdate(BaseModel):
-    """Request body for updating an element."""
+    """Request body for updating an element.
+
+    ``package_id`` is tri-state: omit the key to leave the column
+    untouched, pass ``null`` (JSON) to clear, or pass a string to set.
+    The router translates these three states into a kwarg passed to the
+    service layer.
+    """
 
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     change_summary: str | None = None
     metadata: dict[str, object] | None = None
+    package_id: Any = _UNSET
 
 
 class ElementRollback(BaseModel):
@@ -52,6 +68,8 @@ class ElementResponse(BaseModel):
     diagram_usage_count: int = 0
     set_id: str | None = None
     set_name: str | None = None
+    package_id: str | None = None
+    package_name: str | None = None
     metadata: dict[str, object] | None = None
     notation: str = "simple"
 

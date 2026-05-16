@@ -98,6 +98,7 @@
 		],
 		markdown: [
 			{ value: 'text', label: 'Text' },
+			{ value: 'dynamic_list', label: 'Dynamic List' },
 		],
 	};
 

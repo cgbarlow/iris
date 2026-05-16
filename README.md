@@ -61,6 +61,7 @@ The default self-hosted mode requires no external services. The optional Render 
 | **C4** | Person, Software System, Container, Component, Code Element, Deployment Node, Infrastructure Node | Uses, Depends On, Contains |
 | **DoView** | Outcome Box, Final Outcome, Overview Tile, Source Reference | Causal Link |
 | **Markdown (Text)** | Markdown source rendered as a document; cross-links via the `iris://diagram/<id>` and `iris://element/<id>` URL scheme; ` ```mermaid ` fenced blocks render as SVG diagrams (flowchart, sequence, class, state, ER, gantt) | TOC drawer with depth-indented headings; in-editor toolbar (B / I / H1–H3 / lists / quote / code / link / image / hr) and Ctrl+B / Ctrl+I / Ctrl+K shortcuts; clipboard image paste |
+| **Markdown (Dynamic List)** *(v6.7.0)* | Auto-generated bullet list driven by either intra-diagram element relationships (default) or the elements belonging to a chosen package; "Show description" toggle appends each element's description in brackets | Read-only canvas (content is computed on every read), Source panel in edit mode for mode / package / show_description selection |
 | **BPMN 2.0** *(preview, WIP)* | 14 base types across Activities, Events, Gateways, Swimlanes, Data, Artifacts via discriminator fields | Sequence Flow (default + conditional), Message Flow, Association, Data Association |
 | **Sequence** *(UML diagram type)* | Participants with lifelines | Sync, Async, Reply messages with activation boxes |
 
