@@ -2,10 +2,15 @@
  * Export utilities for model diagrams.
  *
  * Captures the content from an @xyflow/svelte canvas and converts it
- * to SVG, PNG, or PDF format for download.
+ * to SVG or PNG format for download. PDF / docx / markdown exports go
+ * through the server-side renderer (ADR-179, v6.2.0) via
+ * `DiagramExportMenu.svelte` — the client-side `exportToPdf` path that
+ * wrapped a PNG screenshot in jsPDF was removed in v6.5.0 (ADR-181)
+ * because the rasterised output was worse than a real text PDF for
+ * markdown-content diagrams and added zero value for visual diagrams
+ * over a direct PNG.
  */
 
-import { jsPDF } from 'jspdf';
 import { toPng, toSvg } from 'html-to-image';
 
 /** Characters allowed in filenames. */
@@ -162,38 +167,9 @@ export async function exportToPng(flowElement: HTMLElement, filename: string): P
 	}
 }
 
-/**
- * Export the flow canvas as a PDF file with the model name as a title.
- */
-export async function exportToPdf(
-	flowElement: HTMLElement,
-	filename: string,
-	modelName: string,
-): Promise<void> {
-	const safeName = sanitizeFilename(filename);
-	const viewport = getViewportElement(flowElement);
-	const { width, height } = flowElement.getBoundingClientRect();
-
-	let dataUrl: string;
-	try {
-		dataUrl = await toPng(viewport, { cacheBust: true });
-	} catch {
-		// Fallback
-		const svgString = extractSvgString(flowElement);
-		const blob = await svgToPngBlob(svgString, width, height);
-		dataUrl = await new Promise<string>((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result as string);
-			reader.onerror = () => reject(new Error('Failed to read PNG blob'));
-			reader.readAsDataURL(blob);
-		});
-	}
-
-	const orientation = width > height ? 'landscape' : 'portrait';
-	const pdf = new jsPDF({ orientation, unit: 'px', format: [width + 80, height + 120] });
-
-	pdf.setFontSize(18);
-	pdf.text(modelName, 40, 40);
-	pdf.addImage(dataUrl, 'PNG', 40, 60, width, height);
-	pdf.save(`${safeName}.pdf`);
-}
+// v6.5.0 (ADR-181): exportToPdf removed.
+// Replaced by server-rendered PDF via DiagramExportMenu — the
+// client-side jsPDF path wrapped a PNG screenshot of the canvas in
+// an A4 sheet, which was always worse than either (a) a real text PDF
+// from the server (for markdown-content diagrams) or (b) a direct PNG
+// (for visual diagrams).
