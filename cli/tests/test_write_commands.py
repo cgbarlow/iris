@@ -72,6 +72,28 @@ class TestCreate:
         assert body["name"] == "Pkg"
         assert body["set_id"] == "s1"
 
+    def test_create_element(self, respx_mock: respx.Router) -> None:
+        route = respx_mock.post(f"{BASE}/api/elements").mock(
+            return_value=httpx.Response(201, json={
+                "id": "el1", "name": "Widget",
+                "element_type": "component",
+                "current_version": 1, "notation": "simple", "set_id": "s1",
+                "created_at": "2026", "updated_at": "2026", "data": {},
+            }),
+        )
+        code, out, _ = _invoke(
+            "create", "element",
+            "--name", "Widget", "--element-type", "component",
+            "--set-id", "s1", "--notation", "simple",
+        )
+        assert code == 0
+        assert "el1" in out
+        body = json.loads(route.calls[0].request.content)
+        assert body["element_type"] == "component"
+        assert body["name"] == "Widget"
+        assert body["set_id"] == "s1"
+        assert body["notation"] == "simple"
+
     def test_create_diagram_with_data_json(self, respx_mock: respx.Router) -> None:
         route = respx_mock.post(f"{BASE}/api/diagrams").mock(
             return_value=httpx.Response(201, json={

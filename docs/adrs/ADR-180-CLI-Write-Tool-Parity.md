@@ -28,10 +28,16 @@ Add four new CLI sub-applications:
 
 | App | Commands | Wraps |
 |---|---|---|
-| `iris create` | `collection`, `set`, `package`, `diagram` | MCP `create_*` |
+| `iris create` | `collection`, `set`, `package`, `diagram`, `element` | MCP `create_*` |
 | `iris update` | `collection`, `set`, `package`, `diagram`, `element` | MCP `update_*` |
 | `iris move` | `diagram`, `package`, `set` | MCP `move_*` |
 | `iris render` | `diagram`, `markdown` | MCP `render_diagram`, `render_markdown` |
+
+**v6.4.0 follow-up:** `create_element` was missing from MCP
+(pre-existed Phase 4 — only `apply_diagram_creation` existed for
+element materialisation). The follow-up commit adds both
+`create_element` MCP tool and `iris create element` CLI command so
+the parity matrix is complete.
 
 Existing `iris export` group (read-only) is kept and unchanged; the new `iris render` group is a distinct verb for the v6.2.0 renderer pipeline that produces docx/pdf artefacts stored in Iris.
 

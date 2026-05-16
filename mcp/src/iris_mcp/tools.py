@@ -340,6 +340,29 @@ async def _create_package(c: IrisClient, args: dict[str, Any]) -> str:
     return with_web_url(result.model_dump_json(), "package")
 
 
+async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-178 (v6.4.0): create a standalone Element.
+
+    Elements created this way are not bound to a diagram — they exist
+    in the set's element pool. To draw an element onto a diagram, use
+    `apply_diagram_creation` (which materialises elements + their
+    diagram representation atomically) or create the diagram with an
+    inline element via `create_diagram` data payload.
+    """
+    body: dict[str, Any] = {
+        "element_type": args["element_type"],
+        "name": args["name"],
+    }
+    for key in ("description", "data", "set_id", "metadata", "notation"):
+        if args.get(key) is not None:
+            body[key] = args[key]
+    try:
+        resp = await c._request("POST", "/api/elements", json=body)
+    except IrisAuthError:
+        return _auth_required_payload("Create element")
+    return with_web_url(json.dumps(resp.json()), "element")
+
+
 async def _create_diagram(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-162 (v5.17.0): generic save for a new diagram of any
     (notation, diagram_type) pair. The caller is expected to have
@@ -1124,6 +1147,58 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_create_diagram,
+    ),
+    Tool(
+        name="create_element",
+        description=(
+            "Create a standalone Element in a set's element pool "
+            "(v6.4.0, ADR-180 follow-up). Elements created here are "
+            "NOT bound to a diagram — they exist in the set's element "
+            "pool and can be referenced by diagrams later. For drawing "
+            "elements onto a diagram in one step, prefer "
+            "`apply_diagram_creation` (atomic element + canvas "
+            "materialisation) or `create_diagram` with an inline data "
+            "payload."
+        ),
+        input_schema=_schema({
+            "element_type": _str_arg(
+                "element_type",
+                "Element type (e.g. 'component', 'class', "
+                "'outcome_box') — must be a registered type for the "
+                "chosen notation",
+            ),
+            "name": _str_arg(
+                "name", "Display name for the element",
+            ),
+            "set_id": _str_arg(
+                "set_id",
+                "Set to anchor the element under (optional — omitted "
+                "elements live in no set)",
+                required=False,
+            ),
+            "notation": _str_arg(
+                "notation",
+                "Notation id (default 'simple'). Should match the "
+                "element_type's notation.",
+                required=False,
+            ),
+            "description": _str_arg(
+                "description", "Optional description", required=False,
+            ),
+            "data": (
+                {
+                    "type": "object",
+                    "description": "Optional data payload (notation-specific)",
+                    "additionalProperties": True,
+                },
+                False,
+            ),
+            "metadata": (
+                {"type": "object", "additionalProperties": True},
+                False,
+            ),
+        }),
+        handler=_create_element,
     ),
     # ── Phase 2 render tools (ADR-179, v6.2.0) ────────────────────────
     Tool(

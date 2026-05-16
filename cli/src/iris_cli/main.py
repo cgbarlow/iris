@@ -648,6 +648,46 @@ def create_package_cmd(
     output.print_json(_run(_do()))
 
 
+@create_app.command("element")
+def create_element_cmd(
+    name: str = typer.Option(..., "--name"),
+    element_type: str = typer.Option(..., "--element-type"),
+    set_id: str | None = typer.Option(None, "--set-id"),
+    notation: str | None = typer.Option(None, "--notation"),
+    description: str | None = typer.Option(None, "--description"),
+    data_json: str | None = typer.Option(None, "--data-json"),
+    metadata_json: str | None = typer.Option(None, "--metadata-json"),
+) -> None:
+    """Create a standalone Element in a set's element pool.
+
+    For drawing elements onto a diagram in one step, use
+    `iris diagrams ...` flows or the API/MCP `apply_diagram_creation`
+    tool instead.
+    """
+    body: dict[str, Any] = {
+        "element_type": element_type,
+        "name": name,
+    }
+    if set_id is not None:
+        body["set_id"] = set_id
+    if notation is not None:
+        body["notation"] = notation
+    if description is not None:
+        body["description"] = description
+    data = _parse_json_opt(data_json, "--data-json")
+    if data is not None:
+        body["data"] = data
+    metadata = _parse_json_opt(metadata_json, "--metadata-json")
+    if metadata is not None:
+        body["metadata"] = metadata
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request("POST", "/api/elements", json=body)
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
 @create_app.command("diagram")
 def create_diagram_cmd(
     name: str = typer.Option(..., "--name"),
