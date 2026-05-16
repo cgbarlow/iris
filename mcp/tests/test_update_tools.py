@@ -200,3 +200,102 @@ class TestUpdateElement:
         )
         body = json.loads(result[0].text)
         assert body["description"] == "el desc"
+
+
+class TestIfMatchHeader:
+    """Versioned update endpoints (elements / diagrams / packages)
+    require an ``If-Match`` header — backend returns HTTP 428 without
+    it. Regression guard for v6.7.3 / issue #158."""
+
+    @pytest.mark.asyncio
+    async def test_update_element_sends_if_match(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/elements/el-1").mock(
+            return_value=httpx.Response(
+                200, json=_entity(id="el-1", current_version=7),
+            ),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/elements/el-1").mock(
+            return_value=httpx.Response(200, json=_entity(id="el-1")),
+        )
+        await tools.dispatch(
+            "update_element", client,
+            {"element_id": "el-1", "description": "x"},
+        )
+        assert put_route.calls[0].request.headers.get("If-Match") == "7"
+
+    @pytest.mark.asyncio
+    async def test_update_element_package_id_sends_if_match(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        """The package_id special-case path takes a different branch
+        than the standard helper — it must also send If-Match."""
+        respx_mock.get(f"{BASE}/api/elements/el-2").mock(
+            return_value=httpx.Response(
+                200, json=_entity(id="el-2", current_version=3),
+            ),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/elements/el-2").mock(
+            return_value=httpx.Response(200, json=_entity(id="el-2")),
+        )
+        await tools.dispatch(
+            "update_element", client,
+            {"element_id": "el-2", "package_id": "pkg-a"},
+        )
+        assert put_route.calls[0].request.headers.get("If-Match") == "3"
+
+    @pytest.mark.asyncio
+    async def test_update_diagram_sends_if_match(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/diagrams/d-1").mock(
+            return_value=httpx.Response(
+                200, json=_entity(id="d-1", current_version=4),
+            ),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/diagrams/d-1").mock(
+            return_value=httpx.Response(200, json=_entity(id="d-1")),
+        )
+        await tools.dispatch(
+            "update_diagram", client,
+            {"diagram_id": "d-1", "description": "x"},
+        )
+        assert put_route.calls[0].request.headers.get("If-Match") == "4"
+
+    @pytest.mark.asyncio
+    async def test_update_package_sends_if_match(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/packages/pk-1").mock(
+            return_value=httpx.Response(
+                200, json=_entity(id="pk-1", current_version=2),
+            ),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/packages/pk-1").mock(
+            return_value=httpx.Response(200, json=_entity(id="pk-1")),
+        )
+        await tools.dispatch(
+            "update_package", client,
+            {"package_id": "pk-1", "description": "x"},
+        )
+        assert put_route.calls[0].request.headers.get("If-Match") == "2"
+
+    @pytest.mark.asyncio
+    async def test_update_set_omits_if_match(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        """Unversioned endpoints (sets, collections) don't include
+        ``current_version`` in their GET response — no If-Match header
+        should be sent (backend would 400 on a stray header anyway)."""
+        respx_mock.get(f"{BASE}/api/sets/s-1").mock(
+            return_value=httpx.Response(200, json=_entity(id="s-1")),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/sets/s-1").mock(
+            return_value=httpx.Response(200, json=_entity(id="s-1")),
+        )
+        await tools.dispatch(
+            "update_set", client,
+            {"set_id": "s-1", "description": "x"},
+        )
+        assert "If-Match" not in put_route.calls[0].request.headers

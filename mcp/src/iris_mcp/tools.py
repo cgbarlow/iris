@@ -508,6 +508,13 @@ async def _put_merge_partial(
 
     Costs one extra GET per update. Trade-off for partial-update UX
     without a backend PATCH refactor.
+
+    Versioned entities (elements / diagrams / packages) require an
+    ``If-Match`` header carrying the current version — backend rejects
+    without it (HTTP 428). The GET we already do supplies the value;
+    we add the header when ``current_version`` is present in the
+    response. Unversioned endpoints (collections, sets) don't include
+    the field and don't require the header.
     """
     current_resp = await c._request("GET", f"/api/{kind_path}/{entity_id}")
     current = current_resp.json()
@@ -517,7 +524,12 @@ async def _put_merge_partial(
             body[field] = partial[field]
         elif field in current:
             body[field] = current[field]
-    return await c._request("PUT", f"/api/{kind_path}/{entity_id}", json=body)
+    headers: dict[str, str] | None = None
+    if "current_version" in current:
+        headers = {"If-Match": str(current["current_version"])}
+    return await c._request(
+        "PUT", f"/api/{kind_path}/{entity_id}", json=body, headers=headers,
+    )
 
 
 _COLLECTION_UPDATE_FIELDS = (
@@ -610,8 +622,10 @@ async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
                 elif field in current:
                     body[field] = current[field]
             body["package_id"] = args["package_id"]
+            headers = {"If-Match": str(current.get("current_version", 1))}
             resp = await c._request(
-                "PUT", f"/api/elements/{args['element_id']}", json=body,
+                "PUT", f"/api/elements/{args['element_id']}",
+                json=body, headers=headers,
             )
         else:
             resp = await _put_merge_partial(

@@ -207,6 +207,63 @@ class TestUpdate:
         assert code == 0
 
 
+class TestUpdateIfMatch:
+    """Versioned update endpoints require an ``If-Match`` header —
+    backend returns HTTP 428 without it. Regression guard for v6.7.3 /
+    issue #158."""
+
+    def test_update_diagram_sends_if_match(
+        self, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/diagrams/d1").mock(
+            return_value=httpx.Response(
+                200, json=_entity(id="d1", current_version=7),
+            ),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/diagrams/d1").mock(
+            return_value=httpx.Response(200, json=_entity(id="d1")),
+        )
+        code, _out, _ = _invoke(
+            "update", "diagram", "d1", "--description", "x",
+        )
+        assert code == 0
+        assert put_route.calls[0].request.headers.get("If-Match") == "7"
+
+    def test_update_package_sends_if_match(
+        self, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/packages/p1").mock(
+            return_value=httpx.Response(
+                200, json=_entity(id="p1", current_version=2),
+            ),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/packages/p1").mock(
+            return_value=httpx.Response(200, json=_entity(id="p1")),
+        )
+        code, _out, _ = _invoke(
+            "update", "package", "p1", "--description", "x",
+        )
+        assert code == 0
+        assert put_route.calls[0].request.headers.get("If-Match") == "2"
+
+    def test_update_collection_omits_if_match(
+        self, respx_mock: respx.Router,
+    ) -> None:
+        """Unversioned endpoints don't include current_version → no
+        If-Match header sent."""
+        respx_mock.get(f"{BASE}/api/collections/c1").mock(
+            return_value=httpx.Response(200, json=_entity(id="c1")),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/collections/c1").mock(
+            return_value=httpx.Response(200, json=_entity(id="c1")),
+        )
+        code, _out, _ = _invoke(
+            "update", "collection", "c1", "--description", "x",
+        )
+        assert code == 0
+        assert "If-Match" not in put_route.calls[0].request.headers
+
+
 # ── iris move ──────────────────────────────────────────────────────────
 
 
