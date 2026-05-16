@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.7.1] - 2026-05-16
+
+### Fixed
+
+- Supabase migration m069 used `0` for `diagram_type_notations.is_default`,
+  which PostgreSQL rejects with `column "is_default" is of type boolean
+  but expression is of type integer`. Now uses `FALSE`, matching the
+  v5.12.x boolean-literal convention. Re-running m069 against an
+  affected Supabase database is now a clean no-op (the prior failure
+  rolled back, so no partial state to repair).
+
+### Added
+
+- Protocol §15 — SQLite ↔ Supabase Migration Parity
+  ([issue #152](https://github.com/cgbarlow/iris/issues/152)).
+  Codifies the rules that prevent SQLite-passing changes from
+  500-ing on Supabase: paired SQLite/Supabase migrations in the
+  same PR, `TRUE`/`FALSE` boolean literals on Postgres,
+  positional row access in service code, no dollar-quoted SQL in
+  the startup path, migrate-before-roll-forward release ordering,
+  and a per-migration schema test in `backend/tests/test_migrations/`.
+  Motivated by the v6.7.0 m069 incident (`0` vs `FALSE` for
+  `diagram_type_notations.is_default`) and the v6.6.5 export-service
+  row-key incident.
+
 ## [6.7.0] - 2026-05-16
 
 Issues [#147](https://github.com/cgbarlow/iris/issues/147) and
