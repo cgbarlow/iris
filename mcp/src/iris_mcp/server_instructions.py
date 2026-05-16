@@ -45,7 +45,7 @@ DISCOVERY TOOLS.
   package_hierarchy(set_id=...) — full tree in one call
 
 WORKFLOW GUIDANCE.
-Each tool's description carries its own workflow. For diagram creation, see `create_diagram` (it explains the full discover → fetch creation cascade → guided conversation → confirm destination → save flow).
+Each tool's description carries its own workflow. For diagram creation, see `create_diagram` (it explains the full discover → fetch creation cascade → guided conversation → confirm destination → save flow). For editing existing content, use `update_collection` / `update_set` / `update_package` / `update_diagram` / `update_element` — all do partial updates (only pass the fields you want to change). For re-parenting, use `move_diagram` / `move_package` (in-set parent change) or `move_set` (cross-collection move). To produce downloadable artefacts (md/docx/pdf), use `render_diagram` or `render_markdown` — they store in Iris and return a `web_url` the user can click.
 
 AUTH RECOVERY.
 If a write tool returns error="auth_required", the user needs to sign in to Iris in their MCP client. Tell them: in claude.ai go to Settings → Connectors → Iris and click "Connect" / "Sign in"; a browser tab opens for sign-in and consent. They will NOT be asked for a client_id or secret — Dynamic Client Registration (RFC 7591) handles that automatically. If no sign-in button appears, try removing and re-adding the connector. Read tools (search, get_*, list_*, package_hierarchy) work without sign-in; only writes (create_*, update_*) need it. Don't call any auth-related tool yourself — the OAuth handshake is between the MCP client and Iris.

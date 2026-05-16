@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-05-16
+
+Issue #133 Phase 3 — MCP `update_*` and `move_*` tool surface. The
+cascade destination chooser is now fully actuated end-to-end (prompts
+v6.1.0, renderer v6.2.0, move tools v6.3.0).
+
+### Added
+
+- **5 MCP update tools** (ADR-178, SPEC-178-A) wrapping existing
+  backend PUT endpoints:
+  - `update_collection(collection_id, name?, description?, system_prompt?, mcp_system_context?, thumbnail_source?, thumbnail_diagram_id?)`
+  - `update_set(set_id, name?, description?, system_prompt?, mcp_system_context?, thumbnail_source?, thumbnail_diagram_id?)` — collection_id deliberately omitted (use move_set)
+  - `update_package(package_id, name?, description?, metadata?)`
+  - `update_diagram(diagram_id, name?, description?, data?, metadata?, change_summary?)` — versioned
+  - `update_element(element_id, name?, description?, data?)`
+
+  All five do a GET-then-merge-then-PUT so callers can pass partial
+  updates without losing other fields (backend PUT does full-replace).
+  All decorated with `web_url` (ADR-175 pattern). All map 401 to
+  `auth_required` payloads.
+
+- **3 MCP move tools**:
+  - `move_diagram(diagram_id, parent_package_id?)` — in-set re-parent;
+    null parent → set root.
+  - `move_package(package_id, parent_package_id?)` — in-set re-parent
+    with cycle check; null parent → set root.
+  - `move_set(set_id, collection_id?)` — cross-collection move; null
+    `collection_id` un-groups the set. Preserves all other metadata.
+
+  Cross-set moves of packages/diagrams are NOT supported in v6.3.0 —
+  documented as a deferred capability in ADR-178 and the Phase 6
+  parity matrix.
+
+### Changed
+
+- **Cascade destination prompt** drops the Phase-1 cross-set move
+  fallback. New body instructs the model: existing-set destination →
+  save + `move_diagram` / `move_package`; new-set destination →
+  `create_set` first in target collection, then save directly into
+  the new set. Migration m062 + Supabase m066 + seed + canonical doc
+  updated in lockstep.
+- The destination chooser doc's "Phase-1 fallback" section retitled
+  to "Actuation notes" to reflect the fully-shipped state.
+
+### Notes
+
+- Element re-parenting between diagrams is explicitly NOT a feature
+  (per ADR-178). Elements travel with their parent diagram.
+- Phase 6 (v6.6.0) will codify cross-surface parity as a CI gate.
+
+### See also
+
+- [ADR-178](docs/adrs/ADR-178-MCP-Update-Move-Tools.md)
+- [SPEC-178-A](docs/adrs/specs/SPEC-178-A-MCP-Update-Move-Tools.md)
+- [docs/plans/issue-133-doview-mcp-polish.md](docs/plans/issue-133-doview-mcp-polish.md)
+
+### Tests
+
+- 413/415 green in `backend/tests/test_{ai,migrations,export,artefacts}/`
+  + new `test_phase3_move_actuation_schema.py` (8 tests).
+- 197/197 green in `mcp/tests/` (16 new update + move tool tests).
+
 ## [6.2.0] - 2026-05-16
 
 Issue #133 Phase 2 — server-side md/docx/pdf renderer + Iris artefact
