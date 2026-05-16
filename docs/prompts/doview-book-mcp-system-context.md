@@ -11,7 +11,7 @@ This set is the visual companion to Dr Paul Duignan's outcomes-theory body of wo
 
 Structural overview calls (make BOTH so the TOC is complete):
   - package_hierarchy(set_id=<this-set>) — lists Part A through Part J packages.
-  - list_diagrams(set_id=<this-set>), then filter to entries with parent_package_id == null — these are the root-level Introduction and Conclusion markdown diagrams that bracket the parts.
+  - list_diagrams(set_id=<this-set>, parent_package_id="null") — returns ONLY the root-level Introduction and Conclusion markdown diagrams that bracket the parts (the "null" sentinel is a literal string, not JSON null). Do not call list_diagrams without parent_package_id — the Set has 100+ diagrams and the default page returns the most-recently-edited 50, which won't include the bracketing roots.
 
 In the TOC you present, show Introduction first, then Part A through Part J, then Conclusion last. Render each entry as a clickable markdown link using its web_url.
 
@@ -37,6 +37,7 @@ The menu above is the **v6.0.8** revision. If your live deployment is on the v5.
 
 ## Revision history
 
+- **v6.6.4.** Switched the second structural-overview call from `list_diagrams(set_id=...)` + client-side filter to `list_diagrams(set_id=..., parent_package_id="null")`. The Set crossed the 50-diagram threshold during issue #133 Phase 1–5 UAT, and the un-filtered call returns the 50 most-recently-edited diagrams (Parts G–J chapters) — the Introduction and Conclusion roots paginate off page 1. The new parent_package_id filter (single targeted call) returns just those two roots regardless of edit recency. Requires backend / iris-client / MCP at v6.6.4+.
 - **v6.0.9.** Added Introduction + Conclusion to the TOC. The set has two root-level markdown diagrams (parent_package_id=null) that bracket Part A through Part J; v6.0.7's `package_hierarchy` call alone misses them. Orient sheet now names two structural-overview calls so the model fetches both packages and root-level diagrams.
 - **v6.0.8.** Dropped `mcp__iris__ask` reference (the `ask` tool was removed from MCP — ADR-168). Dropped the `→ call create_diagram` implementation tag from option 3. Broadened option 2 from "cross-package" to "cross-package, cross-set, or cross-collection".
 - **v5.18.0.** Stripped ORIENT-FIRST protocol and DISCOVERY catalogue — now in server-wide MCP instructions (ADR-163). Down from ~30 lines (v5.17.0) to ~12.

@@ -197,12 +197,29 @@ class IrisClient:
         self,
         *,
         set_id: str | None = None,
+        parent_package_id: str | None = None,
         page: int = 1,
         page_size: int = 50,
     ) -> list[Diagram]:
+        """List diagrams. v6.6.4: supports pagination (``page``,
+        ``page_size``) and a ``parent_package_id`` filter so the
+        orient sheet's ``parent_package_id=null`` call returns
+        root-level diagrams (no parent package) in a single targeted
+        request — needed once a Set grows past ``page_size=50`` and
+        ``updated_at DESC`` ordering pushes the bracketing
+        Introduction / Conclusion diagrams off page 1.
+
+        Three ``parent_package_id`` semantics:
+
+        - ``None`` (omitted) — no parent filter.
+        - ``"null"`` — restrict to root-level (parent IS NULL).
+        - any other string — restrict to that specific parent.
+        """
         params: dict[str, Any] = {"page": page, "page_size": page_size}
         if set_id:
             params["set_id"] = set_id
+        if parent_package_id is not None:
+            params["parent_package_id"] = parent_package_id
         response = await self._request("GET", "/api/diagrams", params=params)
         payload = response.json()
         items = payload["items"] if isinstance(payload, dict) and "items" in payload else payload

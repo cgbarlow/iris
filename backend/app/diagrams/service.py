@@ -201,10 +201,25 @@ async def list_diagrams(
     notation: str | None = None,
     set_id: str | None = None,
     collection_id: str | None = None,
+    parent_package_id: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
-    """List diagrams with pagination."""
+    """List diagrams with pagination.
+
+    ``parent_package_id`` has three semantics (v6.6.4):
+
+    - ``None`` (omitted): no parent filter — return all diagrams
+      matching the other filters. Preserves pre-v6.6.4 behaviour.
+    - ``"null"`` (literal string sentinel): restrict to diagrams
+      with ``parent_package_id IS NULL`` (root-level only). Used by
+      the Outcomes Theory orient sheet to fetch the bracketing
+      Introduction / Conclusion diagrams in a single targeted call,
+      rather than paginating all 100+ diagrams and filtering
+      client-side.
+    - Any other string: restrict to diagrams whose
+      ``parent_package_id`` equals that value.
+    """
     where_clauses = ["d.is_deleted = 0"]
     params: list[object] = []
 
@@ -222,6 +237,12 @@ async def list_diagrams(
     elif collection_id:
         where_clauses.append("d.set_id IN (SELECT id FROM sets WHERE collection_id = ?)")
         params.append(collection_id)
+
+    if parent_package_id == "null":
+        where_clauses.append("d.parent_package_id IS NULL")
+    elif parent_package_id is not None:
+        where_clauses.append("d.parent_package_id = ?")
+        params.append(parent_package_id)
 
     where_sql = " AND ".join(where_clauses)
 

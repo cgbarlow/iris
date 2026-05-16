@@ -163,6 +163,31 @@ class TestOrientWrapperFormattingDirectives:
         assert "creation_format" in ctx
         assert "Do NOT look for a separate AI-analysis tool" in ctx
 
+    def test_wrapper_requires_askuserquestion_for_menu(self) -> None:
+        """v6.6.4: m063 (ADR-177, v6.1.0) added the ASKING QUESTIONS
+        rule to the server-wide instructions, requiring the orient
+        menu to fire via AskUserQuestion when the client supports it.
+        The wrapper exists precisely because claude.ai swallows the
+        server-wide instructions field (ADR-167) — so the
+        AskUserQuestion rule for the orient menu also has to be
+        embedded in the wrapper, or it never reaches the model in
+        claude.ai. Without this, the model renders the menu as prose
+        bullets and the user loses chip-style answers."""
+        item = {"id": "s1", "mcp_system_context": "x"}
+        wrap_orient(item, "set")
+        ctx = item["mcp_system_context"]
+        # The wrapper must name AskUserQuestion as the menu-delivery
+        # mechanism, not just "your response" / prose.
+        assert "AskUserQuestion" in ctx
+        # The fall-back path (clients without the tool) must also be
+        # spelled out so the wrapper doesn't strand non-Claude clients.
+        assert "numbered" in ctx.lower()
+        # Existing verbatim-copy discipline still applies — the
+        # AskUserQuestion option text must carry the full sentence,
+        # not a paraphrase.
+        assert "CHARACTER-BY-CHARACTER" in ctx
+        assert "parenthetical examples" in ctx
+
 
 class TestWrapOrient:
     """`wrap_orient` is the in-place primitive used by every links.py

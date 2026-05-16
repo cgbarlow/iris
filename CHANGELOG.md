@@ -7,6 +7,145 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.4] - 2026-05-16
+
+Issue #133 Phase 1 deploy-verification UAT — two unrelated defects
+the user's first run through the Outcomes Theory orient surfaced.
+
+### Background
+
+Two findings out of the Phase 1 UAT against the deployed v6.6.3
+stack (`docs/issue-133-deploy-verification.md` step 6, stage 1):
+
+1. **The orient menu rendered as prose bullets, not chips.** Every
+   other question in the cascade (info source, default name,
+   DoView-Q1/2/3, Stage-1→2 transition, destination chooser) fired
+   via AskUserQuestion as intended by ADR-177. The orient menu —
+   the very first user-facing question — did not. The model
+   dropped option numbers, stripped the question shape, and pushed
+   the four options into a prose paragraph.
+2. **The orient sheet's `list_diagrams` instruction returned no
+   roots.** The Outcomes Theory Book Set carries two root-level
+   markdown diagrams (Introduction, Conclusion) that bracket Parts
+   A–J. The orient sheet says to call `list_diagrams(set_id=...)`
+   and filter to `parent_package_id == null` to surface them. The
+   call returned 50 unrelated Part G–J chapter rows; the
+   bracketing roots were unreachable from the MCP surface.
+
+### Root cause #1 — orient wrapper missed the ADR-177 rollout
+
+ADR-177 (v6.1.0) promoted "use AskUserQuestion for every
+multi-option question" from an ORIENT-FIRST step-3 aside to a
+top-level rule in the MCP server-wide `instructions` channel, and
+m063 patched it into the deployed singleton body. But the
+`_orient_wrapper()` at `mcp/src/iris_mcp/links.py:55-129` — added
+in v6.0.6 (ADR-167) because claude.ai's hosted MCP integration does
+not reliably surface the server-wide `instructions` field to the
+model, so the orient directive gets re-embedded into every
+set/collection tool response — was not updated. Its step 3 said
+"copy each option … into your response," i.e. prose. In claude.ai
+the model sees the wrapper but not the server-wide rule, so the
+orient menu became the one place where AskUserQuestion was never
+reaching the model.
+
+Cascade questions were unaffected because their AskUserQuestion
+instructions live in the cascade prompt bodies themselves
+(`creation-cascade-shared-v1`, `creation-doview-notation-v1`, etc.)
+— which the model fetches as tool responses and so does read.
+
+### Root cause #2 — `list_diagrams` MCP tool never exposed pagination
+
+The backend `list_diagrams` route
+(`backend/app/diagrams/router.py`) has always been paginated at
+`page_size=50` ordered by `updated_at DESC`, but the MCP tool
+wrapper at `mcp/src/iris_mcp/tools.py:178` discarded `page` /
+`page_size` / `parent_package_id` entirely — it just called
+`c.list_diagrams(set_id=...)` and trusted the first 50 rows. The
+gap hadn't bitten because the Outcomes Theory Set was small. Issue
+#133 Phase 1–5 UAT pushed it past 50 diagrams and re-edited Parts
+G–J most recently, which displaced the older root markdown
+diagrams off page 1.
+
+The `list_packages` tool already had the right shape from ADR-158
+(v5.13.0) — pagination + `parent_package_id` filter + a "REQUIRE
+iterating pages or you will miss content" warning in the
+description. `list_diagrams` had never been backfilled.
+
+### Fixed
+
+- **`_orient_wrapper()` step 3 (`mcp/src/iris_mcp/links.py`)** now
+  instructs the model to fire ONE AskUserQuestion call with the
+  four menu options when the client supports the tool, carrying
+  each option's full sentence in the `description` field
+  (preserving the existing CHARACTER-BY-CHARACTER verbatim rule)
+  and a short 3-5-word `label` derived from the option's leading
+  concept. Numbered-prose fallback for clients without
+  AskUserQuestion is spelled out as a fallback, not the default.
+  Explicit "do NOT render the menu as prose bullets when
+  AskUserQuestion is available" anti-pattern callout.
+- **`list_diagrams` MCP tool (`mcp/src/iris_mcp/tools.py`)** now
+  exposes `page`, `page_size`, and `parent_package_id`. Tool
+  description matches `list_packages`: "Paginated — defaults to
+  page=1, page_size=50 (max 100). Sets with more than 50 diagrams
+  REQUIRE iterating pages, or you will miss content." Documents
+  the literal string `"null"` as the sentinel for root-only
+  filtering.
+- **Backend route + service** (`backend/app/diagrams/router.py`,
+  `backend/app/diagrams/service.py`) accept `parent_package_id`
+  with three semantics — omitted (no filter), `"null"`
+  (root-level only via `parent_package_id IS NULL`), or a UUID
+  (exact match).
+- **`iris-client` `list_diagrams`** plumbs the same three
+  semantics through to the HTTP layer.
+- **Outcomes Theory orient sheet content
+  (`docs/prompts/doview-book-mcp-system-context.md`)** updated to
+  call `list_diagrams(set_id=..., parent_package_id="null")` as a
+  single targeted call, with an explicit warning that the
+  un-filtered call returns the wrong 50 rows once the Set is past
+  50 diagrams. Revision-history entry added; admin must paste the
+  new body into the Set's `mcp_system_context` field via
+  `/admin/settings/ai`.
+
+### Tests
+
+- `mcp/tests/test_links_orient_wrapper.py::test_wrapper_requires_askuserquestion_for_menu`
+  — asserts the wrapper names AskUserQuestion, names the numbered
+  fallback, and still carries the existing verbatim-copy
+  discipline.
+- `mcp/tests/test_tools_list_diagrams_pagination.py` — six tests
+  covering wiring (page / page_size / parent_package_id defaults
+  and override, null-sentinel pass-through) and tool schema
+  (description warns about pagination, names the null sentinel,
+  exposes the three new args).
+- `iris-client/tests/test_diagrams_pagination.py` — five tests
+  covering default-param shape, page / page_size override, and
+  the three `parent_package_id` semantics on the HTTP layer.
+- `backend/tests/test_diagrams/test_list_diagrams_parent_filter.py`
+  — four end-to-end tests confirming `parent_package_id=null`
+  returns only roots even when 50 fresher under-package diagrams
+  fill the default page.
+
+### Deploy
+
+- **MCP redeploy** required (orient wrapper + tool schema change).
+- **Backend redeploy** required (route + service change).
+- **No Supabase migration.**
+- **Admin paste** required on the Outcomes Theory Set's
+  `mcp_system_context` field (`/admin/settings/ai`) — copy the
+  new "Content (paste this into the field on UAT)" block from
+  `docs/prompts/doview-book-mcp-system-context.md`. Without the
+  paste the orient call still works but the model still has the
+  old "fetch all then filter" instruction.
+- Frontend version bump only (no UI change).
+
+### Reference
+
+- ADR-167 — the wrapper this patch updates.
+- ADR-177 — the AskUserQuestion convention that originally missed
+  the wrapper rollout.
+- ADR-158 — the pagination + parent filter shape `list_diagrams`
+  is now backfilling parity with.
+
 ## [6.6.3] - 2026-05-16
 
 UI/UX patch — four minor issues caught during Phase 5 manual UAT.
