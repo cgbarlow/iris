@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.7.3] - 2026-05-16
+
+### Fixed
+
+- MCP `update_element` / `update_diagram` / `update_package` and the
+  CLI's shared `_put_merge_partial` helper never sent the `If-Match`
+  header. Backend update routes require it (HTTP 428 without) for
+  optimistic concurrency on versioned entities, so every call from
+  these surfaces failed in production. Both helpers now extract
+  `current_version` from the GET response and inject `If-Match` on
+  the PUT; unversioned endpoints (collections, sets) continue without
+  it since their GET responses don't include the field. Regression
+  guard added in `mcp/tests/test_update_tools.py::TestIfMatchHeader`
+  and `cli/tests/test_write_commands.py::TestUpdateIfMatch`.
+  ([issue #158](https://github.com/cgbarlow/iris/issues/157))
+
 ## [6.7.2] - 2026-05-16
 
 ### Fixed

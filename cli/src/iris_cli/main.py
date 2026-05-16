@@ -622,6 +622,12 @@ async def _put_merge_partial(
 
     The backend PUT does full-replace, so partial updates need a merge
     pass first. Costs one extra GET per update.
+
+    Versioned entities (elements / diagrams / packages) require an
+    ``If-Match`` header carrying the current version — backend rejects
+    without it (HTTP 428). We inject it from the GET response when
+    ``current_version`` is present; unversioned endpoints (collections,
+    sets) omit the field and don't require the header.
     """
     current_resp = await c._request("GET", f"/api/{kind_path}/{entity_id}")
     current = current_resp.json()
@@ -631,7 +637,12 @@ async def _put_merge_partial(
             body[field] = partial[field]
         elif field in current:
             body[field] = current[field]
-    resp = await c._request("PUT", f"/api/{kind_path}/{entity_id}", json=body)
+    headers: dict[str, str] | None = None
+    if "current_version" in current:
+        headers = {"If-Match": str(current["current_version"])}
+    resp = await c._request(
+        "PUT", f"/api/{kind_path}/{entity_id}", json=body, headers=headers,
+    )
     return resp.json()
 
 
