@@ -147,10 +147,11 @@ async def build_element_export(
         "   ON d.id = dv.diagram_id AND d.current_version = dv.version"
         " WHERE (d.is_deleted = 0 OR d.is_deleted IS NULL)",
     )
+    # SELECT d.id, dv.data — positional indexing for Supabase parity.
     linked: list[str] = [
-        row["id"]
+        row[0]
         for row in await cursor.fetchall()
-        if element_id in _element_ids_from_diagram_data(_json_load(row["data"]))
+        if element_id in _element_ids_from_diagram_data(_json_load(row[1]))
     ]
 
     return ElementExport(
@@ -186,7 +187,7 @@ async def _descendant_package_ids(
             " AND (is_deleted = 0 OR is_deleted IS NULL)",
             frontier,
         )
-        children = [r["id"] for r in await cursor.fetchall()]
+        children = [r[0] for r in await cursor.fetchall()]
         children = [c for c in children if c not in seen]
         descendants.extend(children)
         seen.update(children)
@@ -262,13 +263,13 @@ async def _fetch_set(db: aiosqlite.Connection, set_id: str) -> SetResponse:
     if row is None:
         raise ExportNotFoundError(f"Set {set_id} not found")
     return SetResponse(
-        id=row["id"],
-        name=row["name"],
-        description=row["description"],
-        created_at=row["created_at"],
-        created_by=row["created_by"] or "",
-        updated_at=row["updated_at"],
-        collection_id=row["collection_id"],
+        id=row[0],
+        name=row[1],
+        description=row[2],
+        created_at=row[3],
+        created_by=row[4] or "",
+        updated_at=row[5],
+        collection_id=row[6],
     )
 
 
@@ -322,12 +323,12 @@ async def _fetch_collection(
     if row is None:
         raise ExportNotFoundError(f"Collection {collection_id} not found")
     return CollectionResponse(
-        id=row["id"],
-        name=row["name"],
-        description=row["description"],
-        created_at=row["created_at"],
-        created_by=row["created_by"] or "",
-        updated_at=row["updated_at"],
+        id=row[0],
+        name=row[1],
+        description=row[2],
+        created_at=row[3],
+        created_by=row[4] or "",
+        updated_at=row[5],
     )
 
 
@@ -340,7 +341,7 @@ async def build_collection_export(
         " AND (is_deleted = 0 OR is_deleted IS NULL)",
         (collection_id,),
     )
-    set_ids = [r["id"] for r in await cursor.fetchall()]
+    set_ids = [r[0] for r in await cursor.fetchall()]
 
     set_exports: list[SetExport] = []
     running_total = 0
@@ -396,50 +397,53 @@ def _element_ids_from_diagram_data(data: dict[str, object]) -> list[str]:
     return out
 
 
-def _row_to_element(row: aiosqlite.Row) -> ElementResponse:
+# Positional indexing matches _ELEMENT_SELECT / _DIAGRAM_SELECT / _PACKAGE_SELECT.
+# Both adapters return tuple-compatible rows; only aiosqlite.Row also supports
+# str keys, so we stay positional for Supabase parity (issue #145).
+def _row_to_element(row: object) -> ElementResponse:
     return ElementResponse(
-        id=row["id"],
-        element_type=row["element_type"],
-        current_version=row["current_version"],
-        name=row["name"],
-        description=row["description"],
-        data=_json_load(row["data"]),
-        created_at=row["created_at"],
-        created_by=row["created_by"] or "",
-        updated_at=row["updated_at"],
-        set_id=row["set_id"],
-        notation=row["notation"] or "simple",
+        id=row[0],
+        element_type=row[1],
+        current_version=row[2],
+        name=row[3],
+        description=row[4],
+        data=_json_load(row[5]),
+        created_at=row[6],
+        created_by=row[7] or "",
+        updated_at=row[8],
+        set_id=row[9],
+        notation=row[10] or "simple",
     )
 
 
-def _row_to_diagram(row: aiosqlite.Row) -> DiagramResponse:
+def _row_to_diagram(row: object) -> DiagramResponse:
     return DiagramResponse(
-        id=row["id"],
-        diagram_type=row["diagram_type"],
-        current_version=row["current_version"],
-        name=row["name"],
-        description=row["description"],
-        data=_json_load(row["data"]),
-        created_at=row["created_at"],
-        created_by=row["created_by"] or "",
-        updated_at=row["updated_at"],
-        parent_package_id=row["parent_package_id"],
-        set_id=row["set_id"],
-        notation=row["notation"] or "simple",
+        id=row[0],
+        diagram_type=row[1],
+        current_version=row[2],
+        name=row[3],
+        description=row[4],
+        data=_json_load(row[5]),
+        created_at=row[6],
+        created_by=row[7] or "",
+        updated_at=row[8],
+        parent_package_id=row[9],
+        set_id=row[10],
+        notation=row[11] or "simple",
     )
 
 
-def _row_to_package(row: aiosqlite.Row) -> PackageResponse:
+def _row_to_package(row: object) -> PackageResponse:
     return PackageResponse(
-        id=row["id"],
-        current_version=row["current_version"],
-        name=row["name"],
-        description=row["description"],
-        created_at=row["created_at"],
-        created_by=row["created_by"] or "",
-        updated_at=row["updated_at"],
-        parent_package_id=row["parent_package_id"],
-        set_id=row["set_id"],
+        id=row[0],
+        current_version=row[1],
+        name=row[2],
+        description=row[3],
+        created_at=row[4],
+        created_by=row[5] or "",
+        updated_at=row[6],
+        parent_package_id=row[7],
+        set_id=row[8],
     )
 
 

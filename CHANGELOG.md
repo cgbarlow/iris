@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.5] - 2026-05-16
+
+Issue [#145](https://github.com/cgbarlow/iris/issues/145) — Phase 1
+UAT of the deployed v6.6.4 stack reported that the primary MCP path
+for `render_diagram` failed with `HTTP 500 Internal Server Error`.
+The documented `render_markdown` fallback worked, so the user still
+got their three artefacts, but the headline path was broken on every
+render call from a live MCP session.
+
+### Root cause
+
+`backend/app/export/service.py` read every database row by string
+column key (`row["id"]`, `row["data"]`, …). The SQLite adapter sets
+`db.row_factory = aiosqlite.Row`, so string keys work in the test
+suite. The Supabase adapter normalises every asyncpg `Record` to a
+plain `tuple[Any, ...]` (so it can convert PG `datetime` / `UUID`
+to SQLite-compatible strings — see
+`backend/app/db/adapter.py::_normalize_row`). Tuples only support
+integer indexing. Every export call on Supabase raised
+`TypeError: tuple indices must be integers or slices, not str`,
+which FastAPI surfaced as a 500.
+
+Every other backend service module (`app/diagrams/service.py`,
+`app/sets/`, `app/elements/`, `app/packages/`, …) already uses
+positional indexing for exactly this reason. The export service
+was the only outlier — which is why the bug only showed up against
+production, not the SQLite test suite. The same defect was also
+silently breaking every other `GET /api/export/*` bundle endpoint
+on Supabase deployments.
+
+### Fix
+
+- All `row["col"]` reads in `app/export/service.py` converted to
+  positional indexing matching `_ELEMENT_SELECT` / `_DIAGRAM_SELECT`
+  / `_PACKAGE_SELECT` column order. Touches `_row_to_element`,
+  `_row_to_diagram`, `_row_to_package`, `_fetch_set`,
+  `_fetch_collection`, `build_collection_export`,
+  `_fetch_elements_for_diagram`, `_descendant_package_ids`.
+- Helper type annotations widened from `aiosqlite.Row` to `object`
+  with a comment noting both adapters are now supported.
+
+### Tests
+
+- New `backend/tests/test_export/test_service_tuple_rows.py` —
+  three unit tests against `_row_to_diagram` / `_row_to_element` /
+  `_row_to_package` with plain-tuple inputs (the Supabase row
+  shape). Pre-fix these raise `TypeError`; post-fix they pass.
+  A future maintainer that reintroduces `row["col"]` reads in the
+  export service trips the test without needing a live Supabase
+  connection.
+- All 44 existing export-suite tests still pass against SQLite.
+
+### Files
+
+- `backend/app/export/service.py` — positional indexing throughout.
+- `backend/tests/test_export/test_service_tuple_rows.py` (new).
+- `docs/adrs/ADR-183-Export-Service-Adapter-Parity.md` (new).
+- `docs/adrs/specs/SPEC-183-A-Export-Service-Adapter-Parity.md` (new).
+- `mcp/pyproject.toml` 6.6.4 → 6.6.5.
+- `frontend/package.json` 6.6.4 → 6.6.5.
+
+### Deploy
+
+Backend-only fix. After the Render rebuild lands, re-run the
+`render_diagram` smoke from `docs/issue-133-deploy-verification.md`
+step 6 / Phase 2 — both the curl and the cascade-driven MCP path
+should return 200 + artefact URLs.
+
 ## [6.6.4] - 2026-05-16
 
 Issue #133 Phase 1 deploy-verification UAT — two unrelated defects
