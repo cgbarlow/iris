@@ -116,15 +116,20 @@ async def list_all(
     notation: str | None = None,
     set_id: str | None = None,
     collection_id: str | None = None,
+    parent_package_id: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> DiagramListResponse:
-    """List diagrams with optional type/notation/set/collection filter and pagination."""
+    """List diagrams with optional type/notation/set/collection/parent filter
+    and pagination. v6.6.4: pass ``parent_package_id=null`` (literal
+    string) to restrict to root-level diagrams (no parent package)."""
     db = request.app.state.db_manager.main_db
     items, total = await list_diagrams(
         db, diagram_type=diagram_type, notation=notation,
-        set_id=set_id, collection_id=collection_id, page=page, page_size=page_size,
+        set_id=set_id, collection_id=collection_id,
+        parent_package_id=parent_package_id,
+        page=page, page_size=page_size,
     )
     return DiagramListResponse(
         items=[DiagramResponse(**item) for item in items],

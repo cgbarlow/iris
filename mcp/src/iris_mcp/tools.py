@@ -176,7 +176,16 @@ async def _get_diagram(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _list_diagrams(c: IrisClient, args: dict[str, Any]) -> str:
-    rows = await c.list_diagrams(set_id=args.get("set_id"))
+    """v6.6.4: accepts page/page_size/parent_package_id so a model can
+    walk big sets without missing root-level diagrams that paginate
+    off page 1 under the backend's default ``updated_at DESC``
+    ordering. Mirrors the `list_packages` wiring (ADR-158)."""
+    rows = await c.list_diagrams(
+        set_id=args.get("set_id"),
+        parent_package_id=args.get("parent_package_id"),
+        page=args.get("page", 1),
+        page_size=args.get("page_size", 50),
+    )
     return with_web_urls_list(json.dumps([r.model_dump() for r in rows]), "diagram")
 
 
@@ -676,9 +685,36 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="list_diagrams",
-        description="List diagrams, optionally scoped to a set.",
+        description=(
+            "List diagrams, optionally scoped to a set and filtered "
+            "by parent package. Paginated — defaults to page=1, "
+            "page_size=50 (max 100). Sets with more than 50 diagrams "
+            "REQUIRE iterating pages, or you will miss content. "
+            "Use `parent_package_id` to filter: pass the literal "
+            "string \"null\" (not JSON null) to restrict to "
+            "root-level diagrams (no parent package — useful for "
+            "Sets whose orient sheet brackets the parts with "
+            "Introduction / Conclusion markdown diagrams); pass a "
+            "package id to restrict to that package's direct diagram "
+            "children; omit for no parent filter."
+        ),
         input_schema=_schema({
             "set_id": _str_arg("set_id", "Scope to a set", required=False),
+            "parent_package_id": _str_arg(
+                "parent_package_id",
+                "Filter by parent package. Literal string \"null\" "
+                "restricts to root-level (no parent); a package id "
+                "restricts to that package's direct diagram children.",
+                required=False,
+            ),
+            "page": (
+                {"type": "integer", "description": "Page number (1-indexed)", "default": 1, "minimum": 1},
+                False,
+            ),
+            "page_size": (
+                {"type": "integer", "description": "Results per page (max 100)", "default": 50, "minimum": 1, "maximum": 100},
+                False,
+            ),
         }),
         handler=_list_diagrams,
     ),
