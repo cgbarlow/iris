@@ -3,12 +3,18 @@
 Commands are grouped by entity / concern. All async calls to the backend
 route through a single `iris_client.IrisClient` instance configured via
 `iris_cli.config.load`.
+
+v6.4.0 (ADR-180): adds write-tool parity with MCP. New sub-apps:
+`iris create`, `iris update`, `iris move`, `iris render`. Existing
+`iris export` is read-only; `iris render` is the artefact pipeline
+(md/docx/pdf via the v6.2.0 renderer).
 """
 
 from __future__ import annotations
 
 import asyncio
 import getpass
+import json as json_lib
 import socket
 import sys
 from pathlib import Path
@@ -23,7 +29,7 @@ from iris_cli import output
 
 app = typer.Typer(
     name="iris",
-    help="Command-line interface for Iris (read-only + AI).",
+    help="Command-line interface for Iris.",
     no_args_is_help=True,
 )
 
@@ -34,8 +40,14 @@ elements_app = typer.Typer(help="Element commands.", no_args_is_help=True)
 packages_app = typer.Typer(help="Package commands.", no_args_is_help=True)
 sets_app = typer.Typer(help="Set commands.", no_args_is_help=True)
 collections_app = typer.Typer(help="Collection commands.", no_args_is_help=True)
-export_app = typer.Typer(help="Export entities as JSON or Markdown.", no_args_is_help=True)
+export_app = typer.Typer(help="Export entities as JSON or Markdown (read-only).", no_args_is_help=True)
 conversations_app = typer.Typer(help="Conversation commands.", no_args_is_help=True)
+
+# v6.4.0 (ADR-180): write-tool parity with MCP.
+create_app = typer.Typer(help="Create new entities.", no_args_is_help=True)
+update_app = typer.Typer(help="Update entity metadata (partial).", no_args_is_help=True)
+move_app = typer.Typer(help="Re-parent entities (diagram / package / set).", no_args_is_help=True)
+render_app = typer.Typer(help="Render diagrams or markdown to md/docx/pdf artefacts.", no_args_is_help=True)
 
 app.add_typer(diagrams_app, name="diagrams")
 app.add_typer(elements_app, name="elements")
@@ -44,6 +56,10 @@ app.add_typer(sets_app, name="sets")
 app.add_typer(collections_app, name="collections")
 app.add_typer(export_app, name="export")
 app.add_typer(conversations_app, name="conversations")
+app.add_typer(create_app, name="create")
+app.add_typer(update_app, name="update")
+app.add_typer(move_app, name="move")
+app.add_typer(render_app, name="render")
 
 
 # --- Global context ---------------------------------------------------------
@@ -534,6 +550,429 @@ def conversations_list(
             columns=["id", "question", "model_used", "created_at"],
             title=f"Conversations in {set_id}",
         )
+
+
+# --- v6.4.0 (ADR-180) write-tool parity with MCP ---------------------------
+
+
+def _parse_json_opt(raw: str | None, flag: str) -> dict[str, Any] | None:
+    """Parse a JSON dict from a CLI flag; bail with a clear error on bad JSON."""
+    if raw is None:
+        return None
+    try:
+        parsed = json_lib.loads(raw)
+    except json_lib.JSONDecodeError as exc:
+        output.print_error(f"{flag}: invalid JSON ({exc})")
+        raise typer.Exit(code=1) from exc
+    if not isinstance(parsed, dict):
+        output.print_error(f"{flag}: expected a JSON object, got {type(parsed).__name__}")
+        raise typer.Exit(code=1)
+    return parsed
+
+
+def _resolve_null(value: str) -> str | None:
+    """Treat the literal string 'null' as None for move flags."""
+    return None if value.lower() == "null" else value
+
+
+async def _put_merge_partial(
+    c: IrisClient, kind_path: str, entity_id: str,
+    partial: dict[str, Any], updatable_fields: tuple[str, ...],
+) -> dict[str, Any]:
+    """GET-then-merge-then-PUT, mirroring the MCP update_* helper.
+
+    The backend PUT does full-replace, so partial updates need a merge
+    pass first. Costs one extra GET per update.
+    """
+    current_resp = await c._request("GET", f"/api/{kind_path}/{entity_id}")
+    current = current_resp.json()
+    body: dict[str, Any] = {}
+    for field in updatable_fields:
+        if field in partial and partial[field] is not None:
+            body[field] = partial[field]
+        elif field in current:
+            body[field] = current[field]
+    resp = await c._request("PUT", f"/api/{kind_path}/{entity_id}", json=body)
+    return resp.json()
+
+
+# ── iris create ────────────────────────────────────────────────────────────
+
+
+@create_app.command("collection")
+def create_collection_cmd(
+    name: str = typer.Option(..., "--name"),
+    description: str | None = typer.Option(None, "--description"),
+) -> None:
+    """Create a new Collection."""
+    async def _do() -> Any:
+        async with _client() as c:
+            return await c.create_collection(name=name, description=description)
+    output.print_json(_run(_do()))
+
+
+@create_app.command("set")
+def create_set_cmd(
+    name: str = typer.Option(..., "--name"),
+    collection_id: str | None = typer.Option(None, "--collection-id"),
+    description: str | None = typer.Option(None, "--description"),
+) -> None:
+    """Create a new Set (optionally nested under a collection)."""
+    async def _do() -> Any:
+        async with _client() as c:
+            return await c.create_set(
+                name=name, collection_id=collection_id, description=description,
+            )
+    output.print_json(_run(_do()))
+
+
+@create_app.command("package")
+def create_package_cmd(
+    name: str = typer.Option(..., "--name"),
+    set_id: str | None = typer.Option(None, "--set-id"),
+    parent_package_id: str | None = typer.Option(None, "--parent-package-id"),
+    description: str | None = typer.Option(None, "--description"),
+    metadata_json: str | None = typer.Option(
+        None, "--metadata-json", help="Metadata as a JSON object string.",
+    ),
+) -> None:
+    """Create a new Package."""
+    metadata = _parse_json_opt(metadata_json, "--metadata-json")
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await c.create_package(
+                name=name, set_id=set_id, parent_package_id=parent_package_id,
+                description=description, metadata=metadata,
+            )
+    output.print_json(_run(_do()))
+
+
+@create_app.command("diagram")
+def create_diagram_cmd(
+    name: str = typer.Option(..., "--name"),
+    diagram_type: str = typer.Option(..., "--diagram-type"),
+    notation: str | None = typer.Option(None, "--notation"),
+    set_id: str | None = typer.Option(None, "--set-id"),
+    parent_package_id: str | None = typer.Option(None, "--parent-package-id"),
+    description: str | None = typer.Option(None, "--description"),
+    data_json: str | None = typer.Option(
+        None, "--data-json", help="Canvas data as a JSON object string.",
+    ),
+) -> None:
+    """Create a new Diagram."""
+    data = _parse_json_opt(data_json, "--data-json")
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await c.create_diagram(
+                name=name, diagram_type=diagram_type, notation=notation,
+                set_id=set_id, parent_package_id=parent_package_id,
+                description=description, data=data,
+            )
+    output.print_json(_run(_do()))
+
+
+# ── iris update ────────────────────────────────────────────────────────────
+
+_COLLECTION_UPDATE_FIELDS = (
+    "name", "description", "thumbnail_source", "thumbnail_diagram_id",
+    "system_prompt", "mcp_system_context",
+)
+_SET_METADATA_FIELDS = (
+    "name", "description", "thumbnail_source", "thumbnail_diagram_id",
+    "system_prompt", "mcp_system_context",
+)
+_PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
+_DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
+_ELEMENT_UPDATE_FIELDS = ("name", "description", "data")
+
+
+@update_app.command("collection")
+def update_collection_cmd(
+    collection_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    system_prompt: str | None = typer.Option(None, "--system-prompt"),
+    mcp_system_context: str | None = typer.Option(None, "--mcp-system-context"),
+    thumbnail_source: str | None = typer.Option(None, "--thumbnail-source"),
+    thumbnail_diagram_id: str | None = typer.Option(None, "--thumbnail-diagram-id"),
+) -> None:
+    """Update a Collection's metadata (partial — GET-then-merge-then-PUT)."""
+    partial = {
+        "name": name, "description": description,
+        "system_prompt": system_prompt,
+        "mcp_system_context": mcp_system_context,
+        "thumbnail_source": thumbnail_source,
+        "thumbnail_diagram_id": thumbnail_diagram_id,
+    }
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await _put_merge_partial(
+                c, "collections", collection_id, partial, _COLLECTION_UPDATE_FIELDS,
+            )
+    output.print_json(_run(_do()))
+
+
+@update_app.command("set")
+def update_set_cmd(
+    set_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    system_prompt: str | None = typer.Option(None, "--system-prompt"),
+    mcp_system_context: str | None = typer.Option(None, "--mcp-system-context"),
+    thumbnail_source: str | None = typer.Option(None, "--thumbnail-source"),
+    thumbnail_diagram_id: str | None = typer.Option(None, "--thumbnail-diagram-id"),
+) -> None:
+    """Update a Set's metadata. To move a set between collections, use
+    `iris move set` instead — this command deliberately excludes
+    collection_id."""
+    partial = {
+        "name": name, "description": description,
+        "system_prompt": system_prompt,
+        "mcp_system_context": mcp_system_context,
+        "thumbnail_source": thumbnail_source,
+        "thumbnail_diagram_id": thumbnail_diagram_id,
+    }
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await _put_merge_partial(
+                c, "sets", set_id, partial, _SET_METADATA_FIELDS,
+            )
+    output.print_json(_run(_do()))
+
+
+@update_app.command("package")
+def update_package_cmd(
+    package_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    metadata_json: str | None = typer.Option(None, "--metadata-json"),
+) -> None:
+    """Update a Package's metadata."""
+    partial = {
+        "name": name, "description": description,
+        "metadata": _parse_json_opt(metadata_json, "--metadata-json"),
+    }
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await _put_merge_partial(
+                c, "packages", package_id, partial, _PACKAGE_UPDATE_FIELDS,
+            )
+    output.print_json(_run(_do()))
+
+
+@update_app.command("diagram")
+def update_diagram_cmd(
+    diagram_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    data_json: str | None = typer.Option(None, "--data-json"),
+    metadata_json: str | None = typer.Option(None, "--metadata-json"),
+    change_summary: str | None = typer.Option(None, "--change-summary"),
+) -> None:
+    """Update a Diagram. Versioned — every successful update increments
+    current_version. Use `iris move diagram` to re-parent."""
+    partial = {
+        "name": name, "description": description,
+        "data": _parse_json_opt(data_json, "--data-json"),
+        "metadata": _parse_json_opt(metadata_json, "--metadata-json"),
+        "change_summary": change_summary,
+    }
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await _put_merge_partial(
+                c, "diagrams", diagram_id, partial, _DIAGRAM_UPDATE_FIELDS,
+            )
+    output.print_json(_run(_do()))
+
+
+@update_app.command("element")
+def update_element_cmd(
+    element_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    data_json: str | None = typer.Option(None, "--data-json"),
+) -> None:
+    """Update an Element. Note: elements cannot be moved between
+    diagrams — they travel with their parent diagram (ADR-178 invariant)."""
+    partial = {
+        "name": name, "description": description,
+        "data": _parse_json_opt(data_json, "--data-json"),
+    }
+
+    async def _do() -> Any:
+        async with _client() as c:
+            return await _put_merge_partial(
+                c, "elements", element_id, partial, _ELEMENT_UPDATE_FIELDS,
+            )
+    output.print_json(_run(_do()))
+
+
+# ── iris move ──────────────────────────────────────────────────────────────
+
+
+@move_app.command("diagram")
+def move_diagram_cmd(
+    diagram_id: str = typer.Argument(...),
+    to_package: str = typer.Option(
+        ..., "--to-package",
+        help="Target package id, or `null` to move to set root.",
+    ),
+) -> None:
+    """Re-parent a diagram within its current set."""
+    target = _resolve_null(to_package)
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "PUT", f"/api/diagrams/{diagram_id}/parent",
+                json={"parent_package_id": target},
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@move_app.command("package")
+def move_package_cmd(
+    package_id: str = typer.Argument(...),
+    to_parent: str = typer.Option(
+        ..., "--to-parent",
+        help="Target parent package id, or `null` to move to set root.",
+    ),
+) -> None:
+    """Re-parent a package within its current set (cycle-checked)."""
+    target = _resolve_null(to_parent)
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "PUT", f"/api/packages/{package_id}/parent",
+                json={"parent_package_id": target},
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+_SET_UPDATE_FIELDS = (
+    "name", "description", "thumbnail_source", "thumbnail_diagram_id",
+    "collection_id", "system_prompt", "mcp_system_context",
+)
+
+
+@move_app.command("set")
+def move_set_cmd(
+    set_id: str = typer.Argument(...),
+    to_collection: str = typer.Option(
+        ..., "--to-collection",
+        help="Target collection id, or `null` to un-group.",
+    ),
+) -> None:
+    """Move a set to a different (or no) collection. Preserves other
+    metadata."""
+    target = _resolve_null(to_collection)
+
+    async def _do() -> Any:
+        async with _client() as c:
+            current_resp = await c._request("GET", f"/api/sets/{set_id}")
+            current = current_resp.json()
+            body: dict[str, Any] = {}
+            for field in _SET_UPDATE_FIELDS:
+                if field == "collection_id":
+                    body["collection_id"] = target
+                elif field in current:
+                    body[field] = current[field]
+            resp = await c._request("PUT", f"/api/sets/{set_id}", json=body)
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+# ── iris render ────────────────────────────────────────────────────────────
+
+
+def _write_or_print_artefact(
+    meta: dict[str, Any], out: Path | None, body_bytes: bytes | None,
+) -> None:
+    if out is not None and body_bytes is not None:
+        out.write_bytes(body_bytes)
+        typer.echo(
+            f"Wrote {len(body_bytes)} bytes to {out} "
+            f"(artefact_id={meta.get('id')})",
+        )
+    else:
+        output.print_json(meta)
+
+
+@render_app.command("diagram")
+def render_diagram_cmd(
+    diagram_id: str = typer.Argument(...),
+    format: str = typer.Option(..., "--format", help="md, docx, or pdf"),
+    out: Path | None = typer.Option(
+        None, "-o", "--output",
+        help="If provided, download artefact bytes to this path. Otherwise print metadata.",
+    ),
+) -> None:
+    """Render a diagram to md/docx/pdf and store as an Iris artefact."""
+    async def _do() -> tuple[dict[str, Any], bytes | None]:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", f"/api/export/diagram/{diagram_id}",
+                json={"format": format},
+            )
+            meta = resp.json()
+            body_bytes: bytes | None = None
+            if out is not None:
+                got = await c._request(
+                    "GET", f"/api/artefacts/{meta['id']}",
+                )
+                body_bytes = got.content
+            return meta, body_bytes
+
+    meta, body = _run(_do())
+    _write_or_print_artefact(meta, out, body)
+
+
+@render_app.command("markdown")
+def render_markdown_cmd(
+    title: str = typer.Option(..., "--title"),
+    format: str = typer.Option(..., "--format", help="md, docx, or pdf"),
+    input_file: Path | None = typer.Option(
+        None, "--input",
+        help="Read markdown source from this file. Reads stdin if omitted.",
+    ),
+    out: Path | None = typer.Option(
+        None, "-o", "--output",
+        help="If provided, download artefact bytes to this path. Otherwise print metadata.",
+    ),
+) -> None:
+    """Render ad-hoc markdown to md/docx/pdf and store as an Iris
+    artefact. Reads markdown source from --input or stdin."""
+    if input_file is not None:
+        source = input_file.read_text(encoding="utf-8")
+    else:
+        source = sys.stdin.read()
+
+    async def _do() -> tuple[dict[str, Any], bytes | None]:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", "/api/export/markdown",
+                json={"markdown": source, "title": title, "format": format},
+            )
+            meta = resp.json()
+            body_bytes: bytes | None = None
+            if out is not None:
+                got = await c._request(
+                    "GET", f"/api/artefacts/{meta['id']}",
+                )
+                body_bytes = got.content
+            return meta, body_bytes
+
+    meta, body = _run(_do())
+    _write_or_print_artefact(meta, out, body)
 
 
 if __name__ == "__main__":
