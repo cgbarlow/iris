@@ -395,6 +395,71 @@ async def _list_conversations(c: IrisClient, args: dict[str, Any]) -> str:
     return json.dumps([r.model_dump() for r in rows])
 
 
+# ── Phase 2 render tools (ADR-179, v6.2.0) ────────────────────────────
+
+
+def _attach_artefact_url(body: dict[str, Any], client_url: str) -> dict[str, Any]:
+    """Attach the backend `web_url` for an artefact response.
+
+    Artefacts are served by the backend at `/api/artefacts/<id>` (not
+    by the frontend) — the URL has Content-Disposition: attachment
+    so any client (browser, MCP, curl) downloads it directly. The
+    URL points at IRIS_URL (backend), not IRIS_WEB_URL (frontend).
+    """
+    if not isinstance(body, dict):
+        return body
+    artefact_id = body.get("id")
+    if isinstance(artefact_id, str) and client_url:
+        body["web_url"] = f"{client_url.rstrip('/')}/api/artefacts/{artefact_id}"
+    return body
+
+
+async def _render_diagram(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-179 (v6.2.0): render a diagram to md/docx/pdf and store as
+    an artefact in Iris. Returns the artefact metadata + download URL.
+
+    Pair the returned `web_url` with a short label and present it to
+    the user as a clickable download link. The artefact is auth-
+    optional once created so the user can share the URL with anyone.
+    """
+    try:
+        response = await c._request(
+            "POST",
+            f"/api/export/diagram/{args['diagram_id']}",
+            json={"format": args.get("format", "md")},
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Render diagram")
+    body = _attach_artefact_url(response.json(), c.url)
+    return json.dumps(body)
+
+
+async def _render_markdown(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-179 (v6.2.0): render ad-hoc markdown content to md/docx/pdf
+    and store as an artefact in Iris. Used by the creation cascade
+    when the user picks 'Chat with downloadable artefacts'. Returns
+    the artefact metadata + download URL.
+
+    The cascade calls this once per selected format (markdown / docx
+    / pdf). Each call returns a distinct artefact_id and web_url —
+    present all returned URLs together as a list of download links.
+    """
+    try:
+        response = await c._request(
+            "POST",
+            "/api/export/markdown",
+            json={
+                "markdown": args["markdown"],
+                "title": args.get("title", "Untitled"),
+                "format": args.get("format", "md"),
+            },
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Render markdown")
+    body = _attach_artefact_url(response.json(), c.url)
+    return json.dumps(body)
+
+
 TOOLS: list[Tool] = [
     Tool(
         name="search",
@@ -901,6 +966,56 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_create_diagram,
+    ),
+    # ── Phase 2 render tools (ADR-179, v6.2.0) ────────────────────────
+    Tool(
+        name="render_diagram",
+        description=(
+            "Render a diagram as markdown / docx / pdf and store the "
+            "result as an Iris artefact. Returns "
+            "{id, filename, mime_type, size_bytes, web_url, ...} — "
+            "present the web_url to the user as a clickable download "
+            "link. For markdown-content diagrams the original "
+            "data.content is used directly; for visual diagrams a "
+            "structured markdown summary is generated then rendered. "
+            "Distinct from `export_diagram` (which returns raw JSON/"
+            "markdown text) — this tool produces downloadable files."
+        ),
+        input_schema=_schema({
+            "diagram_id": _str_arg("diagram_id", "Diagram id"),
+            "format": (
+                {"type": "string", "enum": ["md", "docx", "pdf"]},
+                True,
+            ),
+        }),
+        handler=_render_diagram,
+    ),
+    Tool(
+        name="render_markdown",
+        description=(
+            "Render ad-hoc markdown content as markdown / docx / pdf "
+            "and store the result as an Iris artefact. Used by the "
+            "creation cascade when the user picks 'Chat with "
+            "downloadable artefacts' — call once per selected format "
+            "(md / docx / pdf). Returns {id, filename, mime_type, "
+            "size_bytes, web_url, ...}. Present the web_url to the "
+            "user as a clickable download link. The artefact is "
+            "served at /api/artefacts/<id> with Content-Disposition: "
+            "attachment so any client downloads it directly."
+        ),
+        input_schema=_schema({
+            "markdown": _str_arg("markdown", "Markdown source text"),
+            "title": _str_arg(
+                "title",
+                "Document title (becomes the docx/pdf heading and "
+                "filename slug)",
+            ),
+            "format": (
+                {"type": "string", "enum": ["md", "docx", "pdf"]},
+                True,
+            ),
+        }),
+        handler=_render_markdown,
     ),
 ]
 

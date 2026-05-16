@@ -17,6 +17,13 @@ dependencies = [
     "pdfplumber>=0.11.0",
     "python-docx>=1.1.0",
     "openpyxl>=3.1.0",
+    # ADR-179, v6.2.0: markdown → docx/pdf renderer for the cascade
+    # destination "Chat with downloadable artefacts" branch and the
+    # POST /api/export/{diagram|markdown} endpoints. WeasyPrint requires
+    # Pango / Cairo / GDK-PixBuf system libraries — verified at the
+    # Phase 2 deploy gate per feedback_render_deploy_verification.
+    "markdown-it-py>=4.0.0",
+    "weasyprint>=68.0",
 ]
 
 [project.optional-dependencies]

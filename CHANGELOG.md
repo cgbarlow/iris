@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-05-16
+
+Issue #133 Phase 2 — server-side md/docx/pdf renderer + Iris artefact
+store. The Phase-1 destination chooser cascade can now actually
+produce the downloadable artefacts it promises.
+
+### Added
+
+- **Renderer module at `backend/app/export/renderers/`** (ADR-179,
+  SPEC-179-A).
+  - `markdown.py` — passthrough + normalisation.
+  - `docx.py` — md → docx via `python-docx` + `markdown-it-py`.
+    Headings, paragraphs, bullet/number lists, code blocks, mermaid
+    blocks (verbatim passthrough), blockquotes.
+  - `pdf.py` — md → pdf via `weasyprint`. Iris-branded CSS at
+    `renderers/styles/iris.css` — system fonts, header colour
+    palette, code block styling.
+- **Artefact store at `backend/app/artefacts/`** (sibling to images,
+  not a graft).
+  - `artefacts` table — id / filename / mime / bytes / size_bytes /
+    source_kind / source_ref / created_by / created_at.
+  - Allowed mimes: text/markdown, docx, pdf. 25 MB per-row cap.
+  - Magic-byte validation for pdf (`%PDF`) and docx (`PK\x03\x04`).
+- **Backend endpoints**:
+  - `POST /api/export/diagram/{diagram_id}` body `{format}` —
+    render a diagram, store, return `ArtefactResponse` with
+    `web_url`.
+  - `POST /api/export/markdown` body `{markdown, title, format}` —
+    ad-hoc render of cascade-generated content.
+  - `GET /api/artefacts/{artefact_id}` — auth-optional download,
+    Content-Disposition: attachment, immutable cache.
+- **MCP tools** `render_diagram` and `render_markdown`. Both return
+  `{id, filename, mime_type, size_bytes, web_url, ...}`. `web_url`
+  points at the backend `/api/artefacts/<id>` so any client (browser,
+  curl) downloads directly.
+- **New backend deps**: `markdown-it-py>=4.0.0`, `weasyprint>=68.0`.
+  Both verified installable in the dev devcontainer. WeasyPrint
+  needs Pango / Cairo / GDK-PixBuf system libraries — Render image
+  to be verified at deploy gate per
+  `feedback_render_deploy_verification`.
+
+### Changed
+
+- **Cascade destination prompt** (`creation-cascade-destination-v1`)
+  no longer carries the Phase-1 docx/pdf fallback paragraph. The
+  body now instructs: "When the user picks docx or pdf at Q-Dest3,
+  call the MCP `render_markdown` tool once per selected format ...
+  present the `web_url` to the user as a clickable download link."
+  The cross-set move fallback stays until Phase 3 (v6.3.0) ships
+  `move_*` tools.
+- The seed file's `CASCADE_DESTINATION_PROMPT` constant matches the
+  new canonical body; `docs/prompts/creation-cascade-destination.md`
+  updated in lockstep.
+
+### See also
+
+- [ADR-179](docs/adrs/ADR-179-Renderer-And-Artefact-Store.md)
+- [SPEC-179-A](docs/adrs/specs/SPEC-179-A-Renderer-And-Artefact-Store.md)
+- [docs/plans/issue-133-doview-mcp-polish.md](docs/plans/issue-133-doview-mcp-polish.md)
+
+### Tests
+
+406/406 green across `tests/test_ai/` + `tests/test_migrations/` +
+`tests/test_export/` + `tests/test_artefacts/`. 181/181 green in
+`mcp/tests/` (8 new tool tests).
+
 ## [6.1.0] - 2026-05-16
 
 Issue #133 Phase 1 — creation-cascade UX polish + MCP-wide
