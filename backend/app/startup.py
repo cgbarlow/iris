@@ -66,6 +66,7 @@ from app.migrations.m059_mcp_user_question_rule import up as m059_up
 from app.migrations.m060_artefacts_table import up as m060_up
 from app.migrations.m061_drop_phase1_docx_fallback import up as m061_up
 from app.migrations.m062_drop_phase1_move_fallback import up as m062_up
+from app.migrations.m063_doview_analysis_creation_format_pointer import up as m063_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -159,6 +160,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m060_up(main)  # issue #133 Phase 2, v6.2.0: artefacts table for rendered md/docx/pdf (ADR-179)
     await m061_up(main)  # issue #133 Phase 2, v6.2.0: drop Phase-1 docx/pdf fallback from cascade destination prompt (ADR-179)
     await m062_up(main)  # issue #133 Phase 3, v6.3.0: drop Phase-1 cross-set move fallback (ADR-178)
+    await m063_up(main)  # issue #133 Phase 1 UAT defect, v6.6.2: backstop creation_format pointer to response_format for (markdown, doview_analysis)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
