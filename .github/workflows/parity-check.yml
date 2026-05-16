@@ -1,0 +1,37 @@
+name: surface-parity
+
+# v6.6.0 (ADR-182, SPEC-182-A): enforce that every backend write
+# endpoint has a matching MCP tool AND a matching CLI subcommand.
+#
+# Hard-fails the PR if a write-parity violation is introduced. Soft-
+# reports documented asymmetries (CLI `ask`, no `delete_*`, no
+# `move_element`, etc.) without failing.
+#
+# Also runs the protocols §13 DRY check: no module outside
+# `backend/app/export/renderers/` may import `weasyprint` /
+# `markdown_it` for rendering.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/**/router.py'
+      - 'backend/app/export/renderers/**'
+      - 'mcp/src/iris_mcp/tools.py'
+      - 'cli/src/iris_cli/main.py'
+      - 'scripts/check_surface_parity.py'
+      - '.github/workflows/parity-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run surface-parity check
+        run: python3 scripts/check_surface_parity.py
