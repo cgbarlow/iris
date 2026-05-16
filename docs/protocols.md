@@ -144,3 +144,15 @@ These protocols must be followed when using plan mode. They are non-negotiable.
 - Documented asymmetries (CLI `ask`, no `delete_*`, no `move_element`, no cross-set moves) are codified in the script's exception list. New asymmetries need a corresponding ADR and the script update.
 - DRY corollary (§13): the md → docx and md → pdf renderers exist only in `backend/app/export/renderers/`. The script also checks this — no other module may import `weasyprint` or `markdown_it` for rendering.
 - See [ADR-182](./adrs/ADR-182-Surface-Parity-Discipline.md) for the full rationale and the exception catalogue.
+
+## 15. SQLite ↔ Supabase Migration Parity
+
+**Every database change must work on both SQLite and Supabase (PostgreSQL) deployments. Passing tests on SQLite is not sufficient.**
+
+- Every SQLite migration in `backend/app/migrations/m{NNN}_*.py` must ship in the same PR as its Supabase mirror in `backend/app/migrations/supabase/m{NNN}_*.sql`. Numbering is independent per family — link the pair in the SQL header (`-- Mirrors SQLite m{NNN}.`) so reviewers can pair them at a glance.
+- Both halves must be idempotent: SQLite via `IF NOT EXISTS` / `INSERT OR IGNORE`; Supabase via `IF NOT EXISTS` and `ON CONFLICT ... DO NOTHING`. Migrations may be re-run.
+- Boolean columns: PostgreSQL rejects integer literals where a `BOOLEAN` is expected. Supabase migrations MUST use `TRUE`/`FALSE`, even when the SQLite mirror uses `0`/`1`. This is the most common slip — see the v5.12.x regression guards in `backend/tests/test_migrations/test_response_format_prompts_schema.py` and the m069 / issue #152 incident.
+- Row access in service code: asyncpg returns native `datetime` / `UUID` objects (normalised to strings by `_normalize_row` in `backend/app/db/adapter.py`) wrapped in plain tuples; aiosqlite returns `Row` objects that support string-key access. Service-layer code MUST read rows positionally (`r[0]`, `r[1]`, …) — `row["col"]` works on SQLite and 500s on Supabase. The export-service incident (v6.6.5) is the cautionary tale.
+- Dollar-quoted SQL (`$$ … $$`), trigger and function definitions cannot be executed by asyncpg at startup. They live only in the Supabase `.sql` files and are applied via `scripts/supabase-migrate.sh`; the Supabase startup path in `backend/app/startup.py:_initialize_supabase` deliberately does NOT run the migration runner.
+- **Release ordering for Supabase deployments**: schema-dependent code MUST NOT go live before its column exists. The release checklist for any version that adds a Supabase migration must include applying the migration BEFORE rolling the app forward. Render auto-deploys on push, so the safe sequence is: (a) merge migration-only PR, (b) run `scripts/supabase-migrate.sh` against the target DB, (c) merge the code change that depends on the new schema.
+- Every new migration ships with a per-migration schema test in `backend/tests/test_migrations/` that asserts the boolean-literal convention, idempotency markers, and any cross-mode constraints. Copy the pattern from `test_response_format_prompts_schema.py` / `test_cascade_ux_polish_schema.py`.
