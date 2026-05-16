@@ -69,6 +69,7 @@ from app.migrations.m062_drop_phase1_move_fallback import up as m062_up
 from app.migrations.m063_doview_analysis_creation_format_pointer import up as m063_up
 from app.migrations.m064_element_package_membership import up as m064_up
 from app.migrations.m065_dynamic_list_diagram_type import up as m065_up
+from app.migrations.m066_class_for_simple_notation import up as m066_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -165,6 +166,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m063_up(main)  # issue #133 Phase 1 UAT defect, v6.6.2: backstop creation_format pointer to response_format for (markdown, doview_analysis)
     await m064_up(main)  # issue #149, v6.7.0: elements.package_id column (ADR-184)
     await m065_up(main)  # issue #147, v6.7.0: dynamic_list diagram_type (ADR-186)
+    await m066_up(main)  # issue #160, v6.7.4: register (class, simple) diagram_type_notations pair (ADR-188)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

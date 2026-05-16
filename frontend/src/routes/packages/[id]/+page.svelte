@@ -42,12 +42,25 @@
 		created_by_username?: string;
 	}
 
+	interface PackageElement {
+		id: string;
+		name: string;
+		element_type: string;
+		notation: string;
+		description: string | null;
+		updated_at: string;
+	}
+
 	let pkg = $state<Package | null>(null);
 	let parentPackageName = $state<string | null>(null);
 	let versions = $state<PackageVersion[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state<'details' | 'versions'>('details');
+	let activeTab = $state<'details' | 'versions' | 'relationships'>('details');
+	let packageElements = $state<PackageElement[]>([]);
+	let packageElementsLoading = $state(false);
+	let packageElementsTotal = $state(0);
+	let packageElementsLoaded = $state(false);
 	let showDeleteDialog = $state(false);
 	let deleteMessage = $state('Are you sure you want to delete this package? This action cannot be undone.');
 	let cloneLoading = $state(false);
@@ -139,6 +152,35 @@
 			versions = [];
 		}
 		versionsLoading = false;
+	}
+
+	async function loadPackageElements(id: string) {
+		// Lazy-loaded the first time the Relationships tab is opened
+		// (issue #157, ADR-188). Uses the existing
+		// GET /api/packages/{id}/elements endpoint from ADR-184.
+		packageElementsLoading = true;
+		try {
+			const resp = await apiFetch<{
+				items: PackageElement[];
+				total: number;
+				page: number;
+				page_size: number;
+			}>(`/api/packages/${id}/elements?page_size=200`);
+			packageElements = resp.items;
+			packageElementsTotal = resp.total;
+		} catch {
+			packageElements = [];
+			packageElementsTotal = 0;
+		}
+		packageElementsLoaded = true;
+		packageElementsLoading = false;
+	}
+
+	function activateRelationshipsTab() {
+		activeTab = 'relationships';
+		if (pkg && !packageElementsLoaded && !packageElementsLoading) {
+			loadPackageElements(pkg.id);
+		}
 	}
 
 	function enterDetailsEdit() {
@@ -568,6 +610,15 @@
 				</button>
 				<button
 					role="tab"
+					aria-selected={activeTab === 'relationships'}
+					onclick={activateRelationshipsTab}
+					class="px-4 py-2 text-sm"
+					style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}"
+				>
+					Relationships
+				</button>
+				<button
+					role="tab"
 					aria-selected={activeTab === 'versions'}
 					onclick={() => { activeTab = 'versions'; }}
 					class="px-4 py-2 text-sm"
@@ -807,6 +858,45 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
+		{:else if activeTab === 'relationships'}
+			<section aria-labelledby="package-elements-heading">
+				<h2 id="package-elements-heading" class="mb-3 text-base font-semibold" style="color: var(--color-fg)">
+					Elements
+					{#if packageElementsLoaded}
+						<span class="ml-2 text-sm font-normal" style="color: var(--color-muted)">({packageElementsTotal})</span>
+					{/if}
+				</h2>
+				{#if packageElementsLoading}
+					<p class="text-sm" style="color: var(--color-muted)">Loading elements…</p>
+				{:else if packageElements.length === 0}
+					<p class="text-sm" style="color: var(--color-muted)">No elements in this package.</p>
+				{:else}
+					<div class="overflow-x-auto">
+						<table class="w-full text-sm" style="color: var(--color-fg)">
+							<thead>
+								<tr style="border-bottom: 1px solid var(--color-border)">
+									<th class="py-2 pr-4 text-left font-medium" style="color: var(--color-muted)">Name</th>
+									<th class="py-2 pr-4 text-left font-medium" style="color: var(--color-muted)">Type</th>
+									<th class="py-2 pr-4 text-left font-medium" style="color: var(--color-muted)">Notation</th>
+									<th class="py-2 text-left font-medium" style="color: var(--color-muted)">Updated</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each packageElements as el (el.id)}
+									<tr style="border-bottom: 1px solid var(--color-border)">
+										<td class="py-2 pr-4">
+											<a href="/elements/{el.id}" class="underline" style="color: var(--color-primary)">{el.name}</a>
+										</td>
+										<td class="py-2 pr-4">{el.element_type}</td>
+										<td class="py-2 pr-4">{el.notation}</td>
+										<td class="py-2" style="color: var(--color-muted)">{el.updated_at}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</section>
 		{:else if activeTab === 'versions'}
 			<VersionHistory {versions} loading={versionsLoading} />
 		{/if}
