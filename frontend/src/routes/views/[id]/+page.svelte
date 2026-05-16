@@ -941,13 +941,47 @@
 
 	async function handleDelete() {
 		if (!diagram) return;
+		// v6.6.3: pre-compute a sensible "up" destination BEFORE deleting,
+		// so the user lands on something familiar instead of /views (which
+		// loses set context). Order of preference:
+		//   1. Previous diagram in the same set (alphabetical by name,
+		//      then created_at — matches the list_diagrams default order)
+		//   2. Parent package page if the diagram has one
+		//   3. Set page if not (or if listing fails)
+		//   4. /views as last resort
+		const setId = diagram.set_id;
+		const parentPackageId = diagram.parent_package_id;
+		const currentId = diagram.id;
+		let upHref = '/views';
+		try {
+			if (setId) {
+				const siblings = await apiFetch<Array<{ id: string }>>(
+					`/api/diagrams?set_id=${setId}`,
+				);
+				const idx = siblings.findIndex((d) => d.id === currentId);
+				const fallback = (
+					(idx > 0 && siblings[idx - 1]?.id) ||
+					(idx >= 0 && idx + 1 < siblings.length && siblings[idx + 1]?.id) ||
+					siblings.find((d) => d.id !== currentId)?.id
+				);
+				if (fallback) {
+					upHref = `/views/${fallback}`;
+				} else if (parentPackageId) {
+					upHref = `/packages/${parentPackageId}`;
+				} else {
+					upHref = `/sets/${setId}`;
+				}
+			}
+		} catch {
+			// Network / listing error — fall through to /views.
+		}
 		try {
 			await apiFetch(`/api/diagrams/${diagram.id}`, {
 				method: 'DELETE',
 				headers: { 'If-Match': String(diagram.current_version) },
 			});
 			showDeleteDialog = false;
-			await goto('/views');
+			await goto(upHref);
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to delete diagram';
 		}
@@ -1963,7 +1997,7 @@
 			{:else}
 				<button
 					onclick={() => addAiContextItem({ id: diagram.id, result_type: 'diagram', name: diagram.name, set_id: diagram.set_id ?? null, set_name: diagram.set_name ?? null })}
-					class="flex items-center gap-2 rounded px-4 py-2 text-sm"
+					class="flex items-center gap-2 whitespace-nowrap rounded px-4 py-2 text-sm"
 					style="border: 1px solid var(--color-border); color: var(--color-fg); background: transparent"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="14" height="14" aria-hidden="true" style="color: var(--color-primary)"><path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"/></svg>
@@ -1973,21 +2007,21 @@
 			<button
 				onclick={toggleBookmark}
 				disabled={bookmarkLoading}
-				class="rounded px-4 py-2 text-sm"
+				class="whitespace-nowrap rounded px-4 py-2 text-sm"
 				style="border: 1px solid {isBookmarked ? 'var(--color-primary)' : 'var(--color-border)'}; color: {isBookmarked ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {isBookmarked ? 'var(--color-surface, transparent)' : 'transparent'}"
 			>
 				{isBookmarked ? 'Bookmarked' : 'Bookmark'}
 			</button>
 			<button
 				onclick={() => (showCloneDialog = true)}
-				class="rounded px-4 py-2 text-sm"
+				class="whitespace-nowrap rounded px-4 py-2 text-sm"
 				style="border: 1px solid var(--color-border); color: var(--color-fg)"
 			>
 				Clone
 			</button>
 			<button
 				onclick={() => (showDeleteDialog = true)}
-				class="rounded px-4 py-2 text-sm text-white"
+				class="whitespace-nowrap rounded px-4 py-2 text-sm text-white"
 				style="background-color: var(--color-danger)"
 			>
 				Delete
@@ -2442,7 +2476,7 @@
 							<DiagramExportMenu
 								diagramId={diagram.id}
 								diagramName={diagram.name}
-								isMarkdownContent={(notation as string) === 'markdown'}
+								isMarkdownContent={diagram?.notation === 'markdown' || (canvasType as string) === 'text'}
 								flowElement={() => getFlowElement()}
 							/>
 						{/if}
@@ -2746,7 +2780,7 @@
 							<DiagramExportMenu
 								diagramId={diagram.id}
 								diagramName={diagram.name}
-								isMarkdownContent={(notation as string) === 'markdown'}
+								isMarkdownContent={diagram?.notation === 'markdown' || (canvasType as string) === 'text'}
 								flowElement={() => getFlowElement()}
 							/>
 						{/if}

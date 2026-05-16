@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.3] - 2026-05-16
+
+UI/UX patch — four minor issues caught during Phase 5 manual UAT.
+
+### Fixed
+
+- **GUI Export menu: "Unexpected end of JSON input"** for every
+  format (markdown / docx / pdf). Root cause: `DiagramExportMenu.svelte`
+  used bare `fetch('/api/export/diagram/...')`, which resolves
+  against the FRONTEND host in production (chrisbarlow.nz), not the
+  backend (iris-api-gtb3.onrender.com). The SPA fallback returned an
+  HTML document that `JSON.parse` rejected. Switched to `apiFetch`
+  which prefixes `API_BASE_URL` and carries the JWT bearer. The
+  artefact download `<a href>` now also uses `${API_BASE_URL}/api/artefacts/<id>`
+  so the browser hits the backend directly.
+- **SVG/PNG export options visible on markdown diagrams** (and then
+  failed with "no canvas element to capture"). Root cause: the
+  parent `+page.svelte` computed `isMarkdownContent={(notation as string) === 'markdown'}`,
+  but the page's `notation` $derived value resolves to `'text'` (the
+  canvas-type token) for markdown-notation diagrams, not
+  `'markdown'`. Now uses `diagram?.notation === 'markdown' || (canvasType as string) === 'text'`
+  which matches the actual diagram metadata.
+- **Hierarchy panel "+ New" and "Show" buttons wrap to two lines** in
+  narrow side-panel widths. Added `whitespace-nowrap` to both
+  buttons in `HierarchyControls.svelte`.
+- **View toolbar "Add to context" wraps to two lines**, doubling the
+  height of the whole button row. Added `whitespace-nowrap` to
+  Add to context, Bookmark, Clone, Delete buttons.
+- **Delete diagram navigates to `/views` (loses set context)**. Now
+  pre-computes a sensible "up" destination before the DELETE: prefer
+  the previous sibling diagram in the same set, then the next
+  sibling, then any other diagram in the set, then the parent
+  package, then the set page, then `/views` as last resort.
+
+### Frontend type checks
+
+`npm run check`: 165 → 165 errors (zero new from this patch — all
+pre-existing in unrelated files).
+
+### Deploy
+
+Frontend redeploy only. No backend / Supabase / MCP changes.
+
 ## [6.6.2] - 2026-05-16
 
 Issue #133 Phase 1 UAT defect fix — doview_analysis content

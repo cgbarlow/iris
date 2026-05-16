@@ -44,7 +44,7 @@
 		<button
 			type="button"
 			onclick={() => { newOpen = !newOpen; showOpen = false; }}
-			class="rounded px-3 py-1.5 text-sm text-white"
+			class="whitespace-nowrap rounded px-3 py-1.5 text-sm text-white"
 			style="background-color: var(--color-primary)"
 			aria-haspopup="menu"
 			aria-expanded={newOpen}
@@ -83,7 +83,7 @@
 		<button
 			type="button"
 			onclick={() => { showOpen = !showOpen; newOpen = false; }}
-			class="rounded border px-3 py-1.5 text-sm"
+			class="whitespace-nowrap rounded border px-3 py-1.5 text-sm"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 			aria-haspopup="menu"
 			aria-expanded={showOpen}
