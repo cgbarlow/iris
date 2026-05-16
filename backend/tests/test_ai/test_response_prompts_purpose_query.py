@@ -123,12 +123,21 @@ class TestComposedEndpoint:
         )
         assert resp.status_code == 200
         body = resp.json()["body"]
-        # The doview creation cascade includes the Stage 0 setup-questions
-        # conversation (Q1..Q6 — "Describe in a couple of lines or less
-        # what you want a DoView of.") from the seeded creation_format.
+        # As of v6.1.0 (ADR-176), the cascade composes the three new
+        # shared base prompts (shared / citations / destination) +
+        # the DoView notation prompt + the outcomes_map layout prompt.
+        # Spot-check that each layer contributed.
+        # Shared cascade base (Q0..Q2 + AskUserQuestion convention).
+        assert "ASKING QUESTIONS" in body
+        assert "subject of the diagram" in body
+        # Citations base (Author/Org · Title · YYYY · URL format).
+        assert "Author/Org" in body
+        # Destination base (Save where? chooser).
+        assert "Q-Dest1" in body or "Save where?" in body
+        # DoView notation (Stage 0 DoView-specific questions).
         assert "Stage 0" in body
-        assert "Describe in a couple of lines" in body
-        # And the outcomes_map layout rules (final_outcome type).
+        assert "DoView-Q1" in body or "How many subpages" in body
+        # Outcomes_map layout rules (final_outcome type).
         assert "final_outcome" in body
 
     async def test_creation_format_HTTP_path_drops_ui_selection_preamble(

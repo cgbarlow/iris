@@ -200,18 +200,19 @@ class TestSeedIdempotency:
     async def test_expected_total_row_count(
         self, db: aiosqlite.Connection
     ) -> None:
-        """After seed: 4 DoView-era rows + 11 new rows = 15 active
-        creation_format rows (v5.8.0). Plus 3 response_format rows
-        added by m051 (ADR-157, v5.12.0) = 18 total active rows.
-        Verify both counts independently so a regression in either
-        purpose's seed surfaces clearly."""
+        """After seed: 4 DoView-era rows (m028) + 11 expansion rows
+        (ADR-132, v5.8.0) + 3 shared cascade base rows (ADR-176,
+        v6.1.0) = 18 active creation_format rows. Plus 3
+        response_format rows added by m051 (ADR-157, v5.12.0) = 21
+        total active rows. Verify both counts independently so a
+        regression in either purpose's seed surfaces clearly."""
         cursor = await db.execute(
             "SELECT COUNT(*) FROM ai_creation_prompts "
             "WHERE is_active=1 AND purpose = 'creation_format'"
         )
         creation_count = (await cursor.fetchone())[0]
-        assert creation_count == 15, (
-            f"Expected 15 active creation_format rows, got {creation_count}"
+        assert creation_count == 18, (
+            f"Expected 18 active creation_format rows (4 DoView-era + 11 expansion + 3 cascade-shared), got {creation_count}"
         )
 
         cursor = await db.execute(

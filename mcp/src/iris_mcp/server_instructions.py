@@ -29,6 +29,15 @@ When a scope (Set or Collection) you've just queried carries an `mcp_system_cont
   2. INVOKE the structural-overview call the orient sheet names (typically `package_hierarchy` for a Set with packages). Surface the resulting tree to the user as part of the orient — NOT as a follow-up "want me to load it?" prompt. If your MCP client lazy-loads tools and the named tool isn't currently in your toolset, request/load it before continuing. The TOC is part of the orient, not optional.
   3. Offer the menu of options the orient sheet specifies, IN ORDER, VERBATIM. Use AskUserQuestion when the client supports it; numbered list otherwise. Do not paraphrase, do not silently drop options.
 
+ASKING QUESTIONS.
+Whenever you need the user to choose from a finite set of options, ask via the MCP client's structured user-question tool (AskUserQuestion in Claude Code / Claude Desktop / Cursor). Do not embed multi-option questions in prose. Do not list multiple questions in a single message — one question per turn, wait for the answer, then ask the next. When the client does not expose a user-question tool, fall back to a numbered list with options IN ORDER, VERBATIM (no paraphrasing).
+This applies to:
+  - the orient menu (already covered in ORIENT-FIRST above),
+  - every Stage-0 setup question in a creation cascade,
+  - the save-destination chooser,
+  - any other choice the model surfaces to the user.
+If you ever feel unsure whether a question warrants the tool: it does.
+
 DISCOVERY TOOLS.
   list_collections / list_sets / list_packages — structural
   list_notations / list_diagram_types — what's authorable
