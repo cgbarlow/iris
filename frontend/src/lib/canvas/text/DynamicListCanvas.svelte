@@ -11,7 +11,7 @@
 	 */
 	import MarkdownView from '$lib/components/MarkdownView.svelte';
 	import type { TocHeading } from '$lib/components/markdownHelpers';
-	import { apiFetch } from '$lib/api';
+	import { apiFetch } from '$lib/utils/api';
 	import { onMount } from 'svelte';
 
 	interface PackageOption {

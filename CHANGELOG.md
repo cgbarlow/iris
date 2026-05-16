@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.7.2] - 2026-05-16
+
+### Fixed
+
+- `DynamicListCanvas.svelte` imported `apiFetch` from `$lib/api` —
+  a directory containing only `named-prompts.ts` (no `index.ts`), so
+  Vite errored with `EISDIR: illegal operation on a directory, read`
+  and every frontend deploy on Render aborted at 1041 modules
+  transformed. Now imports from `$lib/utils/api`, matching the
+  convention used everywhere else in the canvas tree.
+
 ## [6.7.1] - 2026-05-16
 
 ### Fixed
