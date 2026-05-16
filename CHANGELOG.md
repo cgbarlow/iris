@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.2] - 2026-05-16
+
+Issue #133 Phase 1 UAT defect fix — doview_analysis content
+structure regression that crept in at v6.0.0 (ADR-164).
+
+### Background
+
+A doview_analysis created via the cascade
+(`https://iris-uat.chrisbarlow.nz/views/3e196c18-b061-4656-b841-395509a9c611`,
+2026-05-16) didn't follow the response_format output structure —
+no opening sentence, no Summary/Full/Diagrams sections, no
+outcomes-theory framing, no tool URLs, no handbook reference. Zero
+compliance.
+
+### Root cause
+
+v5.12.0 (ADR-157) introduced the response_format prompts for
+`(markdown, doview_analysis)` and a dedicated `save_doview_analysis`
+MCP tool whose description hinted at the expected structure
+("Markdown body of the analysis (Summary + Full + Diagrams
+sections)"). The model would fetch `purpose='response_format'`,
+draft compliant markdown, then save.
+
+v5.17.0 (ADR-162) added generic `create_diagram` with a
+`_CREATION_FLOW_PREAMBLE` that directs the model to fetch
+`purpose='creation_format'`. At v5.17.0 both tools coexisted —
+doview_analysis still went through `save_doview_analysis`.
+
+v6.0.0 (ADR-164) removed `save_doview_analysis`, leaving
+doview_analysis creation to go through generic `create_diagram`.
+But `_CREATION_FLOW_PREAMBLE` was not updated to tell the model
+"for markdown-content diagrams like doview_analysis, ALSO fetch
+`purpose='response_format'` to get the output-structure rules."
+The structure-rules dependency was lost.
+
+v6.1.0's Phase 1 work made cascade-driven creation more attractive
+(AskUserQuestion, destination chooser), so the latent defect from
+v6.0.0 became much more visible.
+
+### Fixed
+
+- **`mcp/src/iris_mcp/tools.py:_CREATION_FLOW_PREAMBLE`** gains a
+  step 2a: explicit instruction for the model to fetch
+  `get_response_prompt(notation='markdown', diagram_type=...,
+  purpose='response_format')` when creating any content-bearing
+  markdown diagram, and to apply those rules to the markdown body.
+- **New backstop prompt** `creation-format-doview-analysis-pointer-v1`
+  at `(purpose='creation_format', layer='diagram_type',
+  diagram_type='doview_analysis')` instructs the model to fetch the
+  response_format cascade and apply its rules. Composes into every
+  creation_format cascade for doview_analysis. Single source of
+  truth for the actual rules stays on the response_format side per
+  protocols §13 DRY — this row is a pointer, not duplicated content.
+- SQLite migration `m063_doview_analysis_creation_format_pointer.py`
+  + Supabase mirror `m067_…sql`.
+- Seed file `backend/app/seed/creation_prompts.py` extended with
+  `DOVIEW_ANALYSIS_CREATION_FORMAT_POINTER` constant; re-applied
+  on every backend startup so admin edits get overwritten with
+  canonical content.
+
+### Verification
+
+- `pytest backend/tests/test_migrations/test_doview_analysis_creation_pointer_schema.py`
+  — 12 new green.
+- `pytest backend/tests/test_ai/test_creation_prompts_expanded.py`
+  — row-count assertion updated 18 → 19 active creation_format rows.
+- 376/376 + 201/201 (backend + MCP) green.
+- Manual UAT after redeploy: re-create a doview_analysis via the
+  cascade; expect compliant Summary/Full/Diagrams structure.
+
+### Deploy
+
+Run new Supabase migration (`m067_doview_analysis_creation_format_pointer.sql`)
+via the Supabase SQL Editor or `./scripts/supabase-migrate.sh`,
+then redeploy backend + iris-mcp on Render. No frontend changes.
+
 ## [6.6.1] - 2026-05-16
 
 Issue #133 deploy fix — Render base image was missing WeasyPrint

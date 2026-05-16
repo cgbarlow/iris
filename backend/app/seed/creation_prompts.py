@@ -406,6 +406,38 @@ This is preferable to fake URLs and lets the user replace it with
 real sources later.
 """
 
+DOVIEW_ANALYSIS_CREATION_FORMAT_POINTER = """## CRITICAL: doview_analysis output structure rules
+
+This diagram's markdown content (`data.content`) MUST follow the
+output-structure rules defined in the corresponding response_format
+cascade. Those rules are the single source of truth for the
+doview_analysis output shape (required opening sentence, three
+standalone sections — Summary / Full / Diagrams — outcomes-theory
+framing, outcomes-system definition, tool URLs, full handbook
+reference at the end).
+
+Before composing the markdown body, fetch and apply:
+
+  get_response_prompt(
+    notation='markdown',
+    diagram_type='doview_analysis',
+    purpose='response_format'
+  )
+
+The body returned by that call contains the full set of rules. The
+markdown you generate for `data.content` must comply with every one.
+Without this fetch, the doview_analysis you produce will not match
+the expected output structure and will fail content review.
+
+This pointer exists because the creation_format cascade and
+response_format cascade are separate code paths (purpose-discriminated
+since ADR-157 / v5.12.0). Cascade-driven creation needs to know that
+for (markdown, doview_analysis) the content rules live on the OTHER
+purpose. Single source of truth (response_format) preserved; this row
+is a pointer, not duplicated content.
+"""
+
+
 CASCADE_DESTINATION_PROMPT = """## Destination chooser (shared)
 
 Before generating ANY diagrams, run this chooser. Do not skip it. Do
@@ -941,6 +973,16 @@ _EXPANSION_ROWS = [
         "diagram_type": None,
         "prompt_text": CASCADE_CITATIONS_PROMPT,
         "display_order": 2,
+    },
+    {
+        "id": "creation-format-doview-analysis-pointer-v1",
+        "name": "DoView Analysis — response_format pointer (creation cascade)",
+        "description": "Backstop instruction telling the model to fetch and apply the response_format rules when creating a (markdown, doview_analysis) via the creation cascade. Single source of truth for the actual rules stays on the response_format side per DRY. ADR-157 + ADR-180 follow-up, v6.6.2.",
+        "layer": "diagram_type",
+        "notation": None,
+        "diagram_type": "doview_analysis",
+        "prompt_text": DOVIEW_ANALYSIS_CREATION_FORMAT_POINTER,
+        "display_order": 0,
     },
     {
         "id": "creation-cascade-destination-v1",

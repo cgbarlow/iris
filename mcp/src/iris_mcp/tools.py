@@ -115,12 +115,24 @@ CREATION FLOW (recommended):
      used by Iris AI when generating diagrams. For DoView it includes
      the Stage 0 setup questions (Q1..Q6), the entity types, the
      colour palette, and the outcomes_map layout rules.
+  2a. CRITICAL for content-bearing markdown diagrams
+      (notation='markdown', e.g. diagram_type='doview_analysis'):
+      ALSO fetch get_response_prompt(notation='markdown',
+      diagram_type=..., purpose='response_format'). The response_format
+      rules govern the OUTPUT STRUCTURE of the markdown body
+      (required opening sentence, section headings, citation format,
+      framing language). Apply BOTH cascades to the content you
+      generate. Without this fetch, the markdown body will not
+      follow the structure rules and the diagram will fail
+      content-compliance review.
   3. Run the guided conversation IN CHAT with the user. Use
      AskUserQuestion when supported; numbered list otherwise.
   4. Compose the `data` JSON locally per the creation prompt's rules.
      For visual diagrams (notation in doview / archimate / c4 / uml /
      simple / bpmn), data is a Svelte-Flow-shaped {nodes, edges}
-     payload. For markdown diagrams, data is {"content": "<markdown>"}.
+     payload. For markdown diagrams, data is {"content": "<markdown>"}
+     and the <markdown> must follow the response_format rules from
+     step 2a.
   5. Confirm destination with the user (see destination preamble
      below).
   6. Call create_diagram with the composed data.

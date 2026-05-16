@@ -202,17 +202,18 @@ class TestSeedIdempotency:
     ) -> None:
         """After seed: 4 DoView-era rows (m028) + 11 expansion rows
         (ADR-132, v5.8.0) + 3 shared cascade base rows (ADR-176,
-        v6.1.0) = 18 active creation_format rows. Plus 3
-        response_format rows added by m051 (ADR-157, v5.12.0) = 21
-        total active rows. Verify both counts independently so a
-        regression in either purpose's seed surfaces clearly."""
+        v6.1.0) + 1 doview_analysis pointer (v6.6.2) = 19 active
+        creation_format rows. Plus 3 response_format rows added by
+        m051 (ADR-157, v5.12.0) = 22 total active rows. Verify both
+        counts independently so a regression in either purpose's
+        seed surfaces clearly."""
         cursor = await db.execute(
             "SELECT COUNT(*) FROM ai_creation_prompts "
             "WHERE is_active=1 AND purpose = 'creation_format'"
         )
         creation_count = (await cursor.fetchone())[0]
-        assert creation_count == 18, (
-            f"Expected 18 active creation_format rows (4 DoView-era + 11 expansion + 3 cascade-shared), got {creation_count}"
+        assert creation_count == 19, (
+            f"Expected 19 active creation_format rows (4 DoView-era + 11 expansion + 3 cascade-shared + 1 doview_analysis pointer), got {creation_count}"
         )
 
         cursor = await db.execute(
