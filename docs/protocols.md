@@ -134,3 +134,13 @@ These protocols must be followed when using plan mode. They are non-negotiable.
 - Backend and frontend must not independently re-implement the same validation rules — share the source of truth or derive one from the other
 - Test helpers and fixtures used across multiple test files must live in shared modules, not be copy-pasted
 - Duplication in ADRs and specs is acceptable — documentation may restate for clarity, but code must not
+
+## 14. Surface Parity (v6.6.0)
+
+**Every backend write endpoint MUST have a matching MCP tool AND a matching CLI subcommand.**
+
+- Write endpoints are `POST` / `PUT` / `PATCH` / `DELETE` on a domain entity. Read endpoints (`GET`) are out of scope — different surfaces have different read affordances, and matching them rigidly would over-constrain.
+- Enforced by `scripts/check_surface_parity.py`, which runs in CI on every PR that touches a router, the MCP tools file, the CLI main file, or the script itself. Hard-fails on a write-parity diff.
+- Documented asymmetries (CLI `ask`, no `delete_*`, no `move_element`, no cross-set moves) are codified in the script's exception list. New asymmetries need a corresponding ADR and the script update.
+- DRY corollary (§13): the md → docx and md → pdf renderers exist only in `backend/app/export/renderers/`. The script also checks this — no other module may import `weasyprint` or `markdown_it` for rendering.
+- See [ADR-182](./adrs/ADR-182-Surface-Parity-Discipline.md) for the full rationale and the exception catalogue.

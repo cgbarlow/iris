@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.0] - 2026-05-16
+
+Issue #133 Phase 6 — surface parity discipline. The final phase of the
+multi-phase plan. Codifies the rule that every backend write endpoint
+must have a matching MCP tool AND a matching CLI subcommand; enforces
+it as a CI gate so future drift is caught at PR time.
+
+### Added
+
+- **`scripts/check_surface_parity.py`** (ADR-182, SPEC-182-A). Parses
+  backend routers, MCP tool registrations, and CLI commands; reports
+  hard violations (exit 1) and soft warnings (exit 0). Also runs the
+  protocols §13 DRY check for the renderer module — no `weasyprint`
+  / `markdown_it` imports outside `backend/app/export/renderers/`.
+- **`.github/workflows/parity-check.yml`** runs the script on every
+  PR that touches a router, the MCP tools file, the CLI main file,
+  the renderer module, or the script itself.
+
+### Changed
+
+- **`docs/protocols.md`** gains §14 "Surface Parity" with a one-line
+  rule reference and pointer to ADR-182.
+- **`CLAUDE.md`** appends a §14 reference so future code generation
+  respects the rule.
+
+### Documented asymmetries
+
+The script exempts (and the ADR lists):
+
+| Surface gap | Reason |
+|---|---|
+| `iris ask` CLI-only | MCP clients bring their own LLM (ADR-168) |
+| No `delete_*` anywhere | Out of scope for #133; future ADR for audit/undo |
+| No `move_element` | Elements are owned by their parent diagram (ADR-178 invariant) |
+| In-set-only `move_diagram` / `move_package` | Backend `/parent` endpoints are in-set only; cross-set requires `create_set` + re-save (ADR-178) |
+
+### Verification
+
+- `python3 scripts/check_surface_parity.py` against the current main
+  tree → exit 0, "✅ Parity clean".
+- 17 backend write ops, 13 MCP write tools, 13 CLI write commands.
+  The 4-tool delta is exactly the 4 entity-level `delete_*` endpoints
+  (collection, set, package, diagram, element — 5 actually, but
+  filtered down by the documented asymmetry).
+
+### See also
+
+- [ADR-182](docs/adrs/ADR-182-Surface-Parity-Discipline.md)
+- [SPEC-182-A](docs/adrs/specs/SPEC-182-A-Surface-Parity-Discipline.md)
+- [docs/plans/issue-133-doview-mcp-polish.md](docs/plans/issue-133-doview-mcp-polish.md) — multi-phase plan, complete with all six phases shipped.
+
+### Issue #133 — complete
+
+This is the final phase of issue #133. All six phases shipped between
+2026-05-16 morning (v6.1.0) and 2026-05-16 evening (v6.6.0):
+
+- v6.1.0 — cascade UX polish + MCP-wide AskUserQuestion (ADR-176, ADR-177)
+- v6.2.0 — md/docx/pdf renderer + Iris artefact store (ADR-179)
+- v6.3.0 — MCP update_* + move_* tools (ADR-178)
+- v6.4.0 — CLI write-tool parity + create_element backfill (ADR-180)
+- v6.5.0 — unified GUI diagram export menu (ADR-181)
+- v6.6.0 — surface parity discipline + CI gate (ADR-182, this release)
+
 ## [6.5.0] - 2026-05-16
 
 Issue #133 Phase 5 — unified diagram export menu in the GUI. The
