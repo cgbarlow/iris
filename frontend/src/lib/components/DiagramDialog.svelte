@@ -54,6 +54,7 @@
 		simple: [
 			{ value: 'component', label: 'Component' },
 			{ value: 'sequence', label: 'Sequence' },
+			{ value: 'class', label: 'Class' },
 			{ value: 'deployment', label: 'Deployment' },
 			{ value: 'process', label: 'Process' },
 			{ value: 'roadmap', label: 'Roadmap' },

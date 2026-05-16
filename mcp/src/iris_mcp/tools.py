@@ -385,7 +385,7 @@ async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
         "element_type": args["element_type"],
         "name": args["name"],
     }
-    for key in ("description", "data", "set_id", "metadata", "notation"):
+    for key in ("description", "data", "set_id", "metadata", "notation", "package_id"):
         if args.get(key) is not None:
             body[key] = args[key]
     try:
@@ -1320,6 +1320,15 @@ TOOLS: list[Tool] = [
                 "set_id",
                 "Set to anchor the element under (optional — omitted "
                 "elements live in no set)",
+                required=False,
+            ),
+            "package_id": _str_arg(
+                "package_id",
+                "Optional package to attach the new element to "
+                "(v6.7.4, ADR-188 / issue #154). The package must "
+                "belong to the same set as `set_id`; otherwise the "
+                "REST call returns 400. Saves a follow-up "
+                "`update_element` call.",
                 required=False,
             ),
             "notation": _str_arg(

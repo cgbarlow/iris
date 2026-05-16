@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.7.4] - 2026-05-16
+
+### Added
+
+- **MCP `create_element` accepts `package_id`** (ADR-188, issue
+  [#154](https://github.com/cgbarlow/iris/issues/154)). Closes the
+  v6.7.0 surface-parity gap where REST + CLI accepted `package_id` on
+  create but the MCP tool didn't, forcing callers into a follow-up
+  `update_element` round-trip. Schema and handler both updated; new
+  regression test `mcp/tests/test_create_element_package.py` (4
+  tests).
+- **Package detail "Relationships" tab** (ADR-189, issue
+  [#157](https://github.com/cgbarlow/iris/issues/157)). The package
+  detail page now has a third tab that lazy-loads
+  `GET /api/packages/{id}/elements` and lists the elements attached
+  to the package with links into each. Mirrors the relationship-
+  surface pattern from the views/diagrams detail page. New
+  regression test
+  `frontend/tests/unit/packageRelationshipsTab.test.ts` (9 tests).
+
+### Fixed
+
+- **`class` diagram type now available under `simple` notation**
+  (ADR-190, issue
+  [#160](https://github.com/cgbarlow/iris/issues/160)). The m020
+  registry seed only declared `('class', 'uml', 1)`, but live data
+  contains elements with `notation='simple'` and `element_type='class'`
+  (e.g. the FIXM US Extension v4.1.1 dataset — verified live against
+  iris-api UAT, element
+  `09158b60-94cd-46db-9211-a4d50c9c1550`), so the new-element
+  diagram-type dropdown hid `class` whenever the user picked Simple.
+  Paired SQLite m066 + Supabase m070 migrations insert the missing
+  `('class', 'simple', is_default=0)` row idempotently
+  (`INSERT OR IGNORE` / `ON CONFLICT … DO NOTHING`, `FALSE` literal
+  on Postgres per Protocol §15). Frontend hard-coded fallback list
+  in `DiagramDialog.svelte` updated to match. New per-migration
+  schema test `backend/tests/test_migrations/test_class_for_simple_notation_schema.py`
+  (7 tests).
+
+### Migrations
+
+- SQLite `m066_class_for_simple_notation.py` — wired into
+  `backend/app/startup.py:_initialize_sqlite` migration runner.
+- Supabase mirror `m070_class_for_simple_notation.sql` — applied
+  via `scripts/supabase-migrate.sh` **before** the app rolls forward
+  (Protocol §15 release ordering).
+
 ## [6.7.3] - 2026-05-16
 
 ### Fixed
