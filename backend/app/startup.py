@@ -61,6 +61,8 @@ from app.migrations.m054_oauth_tables import up as m054_up
 from app.migrations.m055_fix_orient_protocol_tool_name import up as m055_up
 from app.migrations.m056_fix_scope_context_tool_name import up as m056_up
 from app.migrations.m057_fix_stale_auth_recovery import up as m057_up
+from app.migrations.m058_cascade_ux_polish import up as m058_up
+from app.migrations.m059_mcp_user_question_rule import up as m059_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -149,6 +151,8 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m055_up(main)  # issue #115, v6.0.1: fix iris_package_hierarchy → package_hierarchy (server-wide)
     await m056_up(main)  # issue #115, v6.0.2: same fix for per-scope mcp_system_context
     await m057_up(main)  # issue #115 follow-up, v6.0.3: drop stale iris_authenticate refs from singleton body
+    await m058_up(main)  # issue #133 Phase 1, v6.1.0: cascade UX polish — three new shared base prompts + DoView/Outcomes Map updates (ADR-176)
+    await m059_up(main)  # issue #133 Phase 1, v6.1.0: insert ASKING QUESTIONS section into MCP server-instructions singleton (ADR-177)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

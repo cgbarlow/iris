@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-05-16
+
+Issue #133 Phase 1 — creation-cascade UX polish + MCP-wide
+AskUserQuestion convention.
+
+### Added
+
+- **Three new shared base-layer prompts for every notation's
+  `creation_format` cascade (ADR-176, SPEC-176-A).**
+  - `creation-cascade-shared-v1` (display_order=1) — Stage-0 questions
+    (subject, info source with paste/upload affordance, default name
+    suggestion) and the Stage 1 → Stage 2 transition question (skip
+    detail / review detail / refine structure).
+  - `creation-cascade-citations-v1` (display_order=2) — citation
+    discipline: raw URLs and the
+    `Author/Org · Title · YYYY · https://url` label format for every
+    source-reference / annotation element.
+  - `creation-cascade-destination-v1` (display_order=3) —
+    save-destination chooser (Iris / downloadable artefacts / both;
+    new set under parent collection by default; markdown / docx / pdf
+    format selection). Includes Phase-1 fallbacks while the renderer
+    (v6.2.0) and `move_*` tools (v6.3.0) are still in flight.
+  Composed via the existing layered-prompt composer at
+  `app/ai/creation.py:_build_layered_prompt`, so every notation
+  (DoView, BPMN, UML, ArchiMate, C4, Simple) inherits the new
+  conventions automatically.
+- **MCP-wide ASKING QUESTIONS convention in the server-instructions
+  singleton body (ADR-177, SPEC-177-A).** Whenever the model surfaces
+  a finite-choice question to the user, it MUST use the client's
+  structured user-question tool (AskUserQuestion in Claude Code /
+  Claude Desktop / Cursor). Applies to the orient menu, every cascade
+  Stage-0 question, the save-destination chooser, and any other
+  user-facing choice. Supersedes the user-question half of ADR-167.
+- New canonical paste-ready docs at
+  `docs/prompts/creation-cascade-shared.md`,
+  `docs/prompts/creation-cascade-citations.md`,
+  `docs/prompts/creation-cascade-destination.md`.
+- `display_order` is now part of the conflict tuple in
+  `/api/ai/creation-prompts` CRUD (so multiple active base-layer rows
+  can coexist at the same `(purpose, layer, NULL, NULL)` provided
+  their display_orders differ).
+
+### Changed
+
+- `creation-doview-notation-v1` deferred to the shared cascade — the
+  duplicated Stage-0 paste/upload, default-name, skip-detail, and
+  destination guidance is removed from its body and lives once at the
+  base layer. The DoView-specific questions (subpage count, detail
+  level, sources page) remain in the notation prompt as
+  `DoView-Q1` / `DoView-Q2` / `DoView-Q3`.
+- `creation-outcomes-map-v1` updated to reference
+  `creation-cascade-citations-v1` instead of restating the URL rule.
+- `mcp-server-instructions-v1` body re-applied on every backend
+  startup by `seed_creation_prompts` (new behaviour for this row —
+  matches the existing cascade-prompt pattern). Future copy edits to
+  the MCP server instructions ship without needing a new migration.
+- `mcp/src/iris_mcp/server_instructions.py:_FALLBACK_INSTRUCTIONS`
+  updated to include the new ASKING QUESTIONS section so day-one
+  fallback matches the seeded body.
+- `docs/prompts/mcp-server-instructions.md` updated with the new
+  ASKING QUESTIONS section and a v6.1.0 revision-history entry.
+- `mcp/README.md` documents the new conversation conventions and
+  creation cascade structure.
+
+### See also
+
+- [ADR-176](docs/adrs/ADR-176-Cascade-Shared-Base-Prompts.md)
+- [ADR-177](docs/adrs/ADR-177-AskUserQuestion-MCP-Convention.md)
+- [SPEC-176-A](docs/adrs/specs/SPEC-176-A-Cascade-Shared-Base-Prompts.md)
+- [SPEC-177-A](docs/adrs/specs/SPEC-177-A-AskUserQuestion-MCP-Convention.md)
+- [docs/plans/issue-133-doview-mcp-polish.md](docs/plans/issue-133-doview-mcp-polish.md) — multi-phase plan; this is Phase 1.
+- Issue [#133](https://github.com/cgbarlow/iris/issues/133) — UAT report and feedback.
+
 ## [6.0.15] - 2026-05-13
 
 ### Fixed

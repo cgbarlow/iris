@@ -1038,7 +1038,7 @@ async def update_creation_prompt(
     db = request.app.state.db_manager.main_db
 
     cursor = await db.execute(
-        "SELECT purpose, layer, notation, diagram_type, is_active "
+        "SELECT purpose, layer, notation, diagram_type, is_active, display_order "
         "FROM ai_creation_prompts WHERE id = ?", (prompt_id,),
     )
     existing = await cursor.fetchone()
@@ -1051,15 +1051,20 @@ async def update_creation_prompt(
     final_notation = body.notation if body.notation is not None else existing[2]
     final_diagram_type = body.diagram_type if body.diagram_type is not None else existing[3]
     final_is_active = body.is_active if body.is_active is not None else bool(existing[4])
+    final_display_order = body.display_order if body.display_order is not None else existing[5]
 
     # Conflict check: if the final row would be active, ensure no OTHER
     # active row already exists with the same (purpose, layer, notation,
-    # diagram_type) tuple.
+    # diagram_type, display_order) tuple. display_order is part of the
+    # tuple as of v6.1.0 (ADR-176) so multiple base-layer rows can
+    # coexist at the same (purpose, layer, NULL, NULL) provided their
+    # display_orders differ.
     if final_is_active:
         await _ensure_no_active_conflict(
             db, prompt_id=prompt_id,
             purpose=final_purpose, layer=final_layer,
             notation=final_notation, diagram_type=final_diagram_type,
+            display_order=final_display_order,
         )
 
     updates: list[str] = []
@@ -1138,18 +1143,29 @@ async def _ensure_no_active_conflict(
     layer: str,
     notation: str | None,
     diagram_type: str | None,
+    display_order: int,
 ) -> None:
     """Raise 409 if another is_active=true row has the same
-    (purpose, layer, notation, diagram_type) tuple. `prompt_id` is
-    excluded from the check (so a PUT on the row itself doesn't
-    self-conflict)."""
+    (purpose, layer, notation, diagram_type, display_order) tuple.
+    `prompt_id` is excluded from the check (so a PUT on the row itself
+    doesn't self-conflict).
+
+    display_order is part of the conflict tuple as of v6.1.0 (ADR-176):
+    the cascade design intentionally has multiple active base-layer
+    rows for (creation_format, base, NULL, NULL) — cascade-shared (1),
+    cascade-citations (2), cascade-destination (3) — which compose in
+    display_order ascending via _build_layered_prompt. Without
+    display_order in the tuple, the second base-layer row could not be
+    inserted or updated without disabling the first.
+    """
     query = (
         "SELECT id, name FROM ai_creation_prompts "
         "WHERE purpose = ? AND layer = ? AND is_active = 1 "
         "AND COALESCE(notation, '') = COALESCE(?, '') "
         "AND COALESCE(diagram_type, '') = COALESCE(?, '') "
+        "AND display_order = ? "
     )
-    params: list[Any] = [purpose, layer, notation, diagram_type]
+    params: list[Any] = [purpose, layer, notation, diagram_type, display_order]
     if prompt_id is not None:
         query += "AND id != ? "
         params.append(prompt_id)
@@ -1162,9 +1178,11 @@ async def _ensure_no_active_conflict(
             f"An active prompt already exists for "
             f"(purpose={purpose}, layer={layer}, "
             f"notation={notation or 'NULL'}, "
-            f"diagram_type={diagram_type or 'NULL'}): "
-            f"'{row[1]}' ({row[0]}). Disable that prompt first or pick "
-            f"a different combination."
+            f"diagram_type={diagram_type or 'NULL'}, "
+            f"display_order={display_order}): "
+            f"'{row[1]}' ({row[0]}). Disable that prompt first, pick "
+            f"a different display_order, or pick a different (notation, "
+            f"diagram_type) combination."
         )
         raise HTTPException(status_code=409, detail=msg)
 
@@ -1179,12 +1197,15 @@ async def create_creation_prompt(
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
 
-    # Conflict check (only when the new row is active).
+    # Conflict check (only when the new row is active). display_order
+    # is part of the conflict tuple as of v6.1.0 (ADR-176) — see
+    # _ensure_no_active_conflict for the rationale.
     if body.is_active:
         await _ensure_no_active_conflict(
             db, prompt_id=None,
             purpose=body.purpose, layer=body.layer,
             notation=body.notation, diagram_type=body.diagram_type,
+            display_order=body.display_order,
         )
 
     # Auto-generate a slug-based id with collision suffix if needed.
