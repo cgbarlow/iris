@@ -4,7 +4,8 @@
 	import { onDestroy } from 'svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { viewBreadcrumbHref, type BreadcrumbAncestor } from '$lib/utils/viewBreadcrumb';
-	import { exportToSvg, exportToPng, exportToPdf } from '$lib/utils/export';
+	// v6.5.0 (ADR-181): export functions moved into DiagramExportMenu.
+	import DiagramExportMenu from '$lib/components/DiagramExportMenu.svelte';
 	import type { Diagram, DiagramVersion, Bookmark } from '$lib/types/api';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
@@ -257,8 +258,7 @@
 		}
 	}
 
-	// Export menu state
-	let showExportMenu = $state(false);
+	// v6.5.0 (ADR-181): export menu state moved into DiagramExportMenu.svelte.
 
 	// Element picker state (link existing element)
 	let showElementPicker = $state(false);
@@ -1766,34 +1766,16 @@
 		showCommentsSidebar = false;
 	}
 
-	// Export handlers
+	// Flow element accessor used by DiagramExportMenu's client-side
+	// SVG/PNG capture and by other consumers (focus mode, etc.).
 	function getFlowElement(): HTMLElement | null {
 		return document.querySelector('.svelte-flow') as HTMLElement | null;
 	}
 
-	async function handleExportSvg() {
-		const el = getFlowElement();
-		if (el && diagram) {
-			await exportToSvg(el, diagram.name);
-			showExportMenu = false;
-		}
-	}
-
-	async function handleExportPng() {
-		const el = getFlowElement();
-		if (el && diagram) {
-			await exportToPng(el, diagram.name);
-			showExportMenu = false;
-		}
-	}
-
-	async function handleExportPdf() {
-		const el = getFlowElement();
-		if (el && diagram) {
-			await exportToPdf(el, diagram.name, diagram.name);
-			showExportMenu = false;
-		}
-	}
+	// v6.5.0 (ADR-181): handleExportSvg / handleExportPng / handleExportPdf
+	// are now inside DiagramExportMenu.svelte. The component manages its
+	// own open/close state and calls $lib/utils/export directly for the
+	// client-rasterised paths.
 
 	// Sequence diagram viewport
 	const seqContentWidth = $derived(
@@ -2456,30 +2438,14 @@
 								 bpmn-default seed) and on Text views (no canvas to theme). -->
 							<ThemeSelector {notation} />
 						{/if}
-						<div class="relative">
-							<button
-								onclick={() => (showExportMenu = !showExportMenu)}
-								class="rounded px-3 py-1.5 text-sm"
-								style="border: 1px solid var(--color-border); color: var(--color-fg)"
-								aria-haspopup="true"
-								aria-expanded={showExportMenu}
-							>
-								Export
-							</button>
-							{#if showExportMenu}
-								<div
-									class="absolute right-0 z-50 mt-1 min-w-[140px] rounded border py-1 shadow-lg"
-									style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
-									role="menu"
-								>
-									<button onclick={handleExportSvg} class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80" style="color: var(--color-fg)" role="menuitem">SVG</button>
-									<button onclick={handleExportPng} class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80" style="color: var(--color-fg)" role="menuitem">PNG</button>
-									<button onclick={handleExportPdf} class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80" style="color: var(--color-fg)" role="menuitem">PDF</button>
-									<button disabled title="Coming soon" class="block w-full px-4 py-1.5 text-left text-sm disabled:opacity-50" style="color: var(--color-fg)" role="menuitem">Visio</button>
-									<button disabled title="Coming soon" class="block w-full px-4 py-1.5 text-left text-sm disabled:opacity-50" style="color: var(--color-fg)" role="menuitem">Draw.io</button>
-								</div>
-							{/if}
-						</div>
+						{#if diagram}
+							<DiagramExportMenu
+								diagramId={diagram.id}
+								diagramName={diagram.name}
+								isMarkdownContent={(notation as string) === 'markdown'}
+								flowElement={() => getFlowElement()}
+							/>
+						{/if}
 						{#if !editing}
 							<button
 								onclick={toggleCommentsSidebar}
@@ -2776,30 +2742,14 @@
 								 bpmn-default seed) and on Text views (no canvas to theme). -->
 							<ThemeSelector {notation} />
 						{/if}
-						<div class="relative">
-							<button
-								onclick={() => (showExportMenu = !showExportMenu)}
-								class="rounded px-3 py-1.5 text-sm"
-								style="border: 1px solid var(--color-border); color: var(--color-fg)"
-								aria-haspopup="true"
-								aria-expanded={showExportMenu}
-							>
-								Export
-							</button>
-							{#if showExportMenu}
-								<div
-									class="absolute right-0 z-50 mt-1 min-w-[140px] rounded border py-1 shadow-lg"
-									style="background-color: var(--color-bg, #fff); border-color: var(--color-border)"
-									role="menu"
-								>
-									<button onclick={handleExportSvg} class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80" style="color: var(--color-fg)" role="menuitem">SVG</button>
-									<button onclick={handleExportPng} class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80" style="color: var(--color-fg)" role="menuitem">PNG</button>
-									<button onclick={handleExportPdf} class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80" style="color: var(--color-fg)" role="menuitem">PDF</button>
-									<button disabled title="Coming soon" class="block w-full px-4 py-1.5 text-left text-sm disabled:opacity-50" style="color: var(--color-fg)" role="menuitem">Visio</button>
-									<button disabled title="Coming soon" class="block w-full px-4 py-1.5 text-left text-sm disabled:opacity-50" style="color: var(--color-fg)" role="menuitem">Draw.io</button>
-								</div>
-							{/if}
-						</div>
+						{#if diagram}
+							<DiagramExportMenu
+								diagramId={diagram.id}
+								diagramName={diagram.name}
+								isMarkdownContent={(notation as string) === 'markdown'}
+								flowElement={() => getFlowElement()}
+							/>
+						{/if}
 						{#if !editing}
 							<button
 								onclick={toggleCommentsSidebar}

@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.5.0] - 2026-05-16
+
+Issue #133 Phase 5 — unified diagram export menu in the GUI. The
+diagram view's Export dropdown now ships real text PDFs and docx
+files (server-rendered via Phase 2's renderer) alongside the
+client-rasterised SVG / PNG it always had. The legacy jsPDF
+PNG-screenshot-wrapped-in-A4 path is removed.
+
+### Added
+
+- **`frontend/src/lib/components/DiagramExportMenu.svelte`** (ADR-181,
+  SPEC-181-A) — reusable Export dropdown component. Server-rendered
+  Markdown / Docx / PDF via `POST /api/export/diagram/{id}` from
+  Phase 2 (ADR-179). Client-rasterised SVG / PNG retained for visual
+  diagrams. Visual-only items are hidden for markdown-content
+  diagrams; the rest is universal. Triggers browser-native download
+  via `<a download>` against `/api/artefacts/<id>` so no bytes flow
+  through Svelte state.
+
+### Changed
+
+- `frontend/src/routes/views/[id]/+page.svelte` replaces both inline
+  Export menus (regular view + focus mode) with `<DiagramExportMenu>`.
+  The page-level `handleExportSvg`, `handleExportPng`,
+  `handleExportPdf` functions and the `showExportMenu` state are
+  removed — the component manages its own.
+
+### Removed
+
+- `frontend/src/lib/utils/export.ts` no longer imports `jspdf` or
+  exposes `exportToPdf`. The old client-side PDF path (PNG screenshot
+  wrapped in jsPDF at A4 paper size) was always worse than (a) a real
+  text PDF from the server for markdown-content diagrams or (b) a
+  direct PNG for visual diagrams.
+- `jspdf` removed from `frontend/package.json` dependencies.
+
+### See also
+
+- [ADR-181](docs/adrs/ADR-181-Unified-Diagram-Export-GUI.md)
+- [SPEC-181-A](docs/adrs/specs/SPEC-181-A-Unified-Diagram-Export-GUI.md)
+- [docs/plans/issue-133-doview-mcp-polish.md](docs/plans/issue-133-doview-mcp-polish.md)
+
+### Verification
+
+- `npm run check`: zero new type errors (165 → 165 errors; all
+  pre-existing). The new `.svelte` component and `+page.svelte`
+  rewiring are type-clean.
+- Manual UAT (post-merge): open a markdown diagram → Export → PDF →
+  file is a real text PDF, not a screenshot. Visual diagram → Export
+  → SVG / PNG still produce the canvas screenshot.
+
 ## [6.4.0] - 2026-05-16
 
 Issue #133 Phase 4 — CLI write-tool parity with MCP. Every backend
