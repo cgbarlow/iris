@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.7.0] - 2026-05-16
+
+Issues [#147](https://github.com/cgbarlow/iris/issues/147) and
+[#149](https://github.com/cgbarlow/iris/issues/149) — two linked
+features shipped together as a single coordinated release:
+
+### Added — Element → package optional membership (issue #149, ADR-184)
+
+- New nullable `elements.package_id` column (migration m064) — an
+  element may belong to a package independently of (and additionally
+  to) its set. Cross-field invariant: if both `set_id` and
+  `package_id` are non-null, the referenced package's `set_id` must
+  match or be null (HTTP 422 on mismatch).
+- `ElementCreate` and `ElementUpdate` accept `package_id`; the update
+  shape is tri-state (omit to leave untouched, JSON `null` to clear,
+  string to set).
+- `ElementResponse` exposes `package_id` and `package_name`.
+- `GET /api/elements` gains a three-valued `package_id` filter (omit,
+  `"null"`, or a UUID) per the convention from
+  [ADR-185](docs/adrs/ADR-185-Nullable-Filter-Convention.md). The
+  existing `list_diagrams.parent_package_id` filter is refactored to
+  use the same shared helper.
+- New endpoint `GET /api/packages/{id}/elements` (paginated).
+- `GET /api/diagrams/{id}/relationships` response gains
+  `element_package_memberships` — element → package rows for elements
+  drawn on the diagram.
+- Frontend: element-detail edit form exposes a Package picker scoped
+  to the element's set. `/views/[id]` Relationships tab gains a third
+  section listing element → package memberships.
+- CLI: `iris elements update --package-id <uuid|null>`,
+  `iris elements list --package-id <uuid|null>`, new subcommand
+  `iris packages list-elements <pkg>`.
+- MCP: `update_element` accepts `package_id`; `list_elements` accepts
+  the `package_id` filter; new tool `list_package_elements`.
+
+### Added — Dynamic List diagram type (issue #147, ADR-186 + ADR-187)
+
+- New diagram type `dynamic_list` under the existing `markdown`
+  notation (migration m065). Auto-generated bullet markdown computed
+  from one of two source modes:
+  - `diagram_relationships` (default) — two bullets per intra-diagram
+    relationship (source name, then target name); non-deduplicated.
+  - `package_elements` — one bullet per element in a chosen package,
+    sorted alphabetically by name.
+- `show_description` toggle appends `(description)` to each bullet in
+  both modes. Null/empty descriptions fall back to the plain bullet.
+- Content is synthesised at read-time on the backend (ADR-187 —
+  reusable "compute-on-read" pattern). The persisted `data` row never
+  carries `content` or `is_content_locked`; both keys appear only on
+  responses. Export and MCP `render_diagram` pick up the synthesised
+  text via the existing markdown-notation pipeline.
+- New Svelte component `DynamicListCanvas` — read-only preview plus a
+  Source panel in edit mode (mode select + package picker +
+  Show-description checkbox). `/views/[id]` routes to it for
+  `dynamic_list` diagrams.
+- `DiagramDialog` lists Dynamic List under the markdown notation.
+
+### Changed
+
+- `list_diagrams.parent_package_id` parameter parsing refactored to
+  use the shared `parse_nullable_id` helper (no behavioural change).
+- `/views/[id]` Relationships-tab pill counter now reflects all three
+  categories (diagram relationships + element relationships +
+  element → package memberships).
+
+### Migrations
+
+- SQLite: m064, m065. Both idempotent, no back-fill.
+- Supabase: m068 (mirrors m064), m069 (mirrors m065).
+
+### Surface parity
+
+- `python scripts/check_surface_parity.py` passes unchanged. No new
+  write verbs registered; ADR-178's "no `move_element`" invariant
+  preserved (element → package is an additive enrichment of
+  `update_element`, not a move).
+
 ## [6.6.5] - 2026-05-16
 
 Issue [#145](https://github.com/cgbarlow/iris/issues/145) — Phase 1

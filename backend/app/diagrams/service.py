@@ -172,7 +172,7 @@ async def get_diagram(
     except (json.JSONDecodeError, TypeError):
         detected = []
 
-    return {
+    result: dict[str, object] = {
         "id": row[0],
         "diagram_type": row[1],
         "current_version": row[2],
@@ -192,6 +192,42 @@ async def get_diagram(
         "detected_notations": detected,
         "metadata": json.loads(row[14]) if row[14] else None,
     }
+    # ADR-187 — compute-on-read overlay for dynamic_list (and future
+    # opt-in computed diagram types).
+    await _maybe_synthesise_content(db, result)
+    return result
+
+
+async def _maybe_synthesise_content(
+    db: DatabasePort, diagram: dict[str, object],
+) -> None:
+    """Populate ``data.content`` and ``data.is_content_locked`` on
+    opt-in computed diagram types (ADR-187). Mutates ``diagram`` in
+    place. Persisted row is unchanged.
+    """
+    if diagram.get("diagram_type") != "dynamic_list":
+        return
+    from app.diagrams.dynamic_list import compute_dynamic_list_content
+
+    data = diagram.get("data") or {}
+    if not isinstance(data, dict):
+        data = {}
+    src = data.get("dynamic_source") or {}
+    if not isinstance(src, dict):
+        src = {}
+    mode = src.get("mode") or "diagram_relationships"
+    package_id = src.get("package_id")
+    show_description = bool(src.get("show_description", False))
+    rendered = await compute_dynamic_list_content(
+        db,
+        str(diagram["id"]),
+        mode=str(mode),
+        package_id=package_id if isinstance(package_id, str) else None,
+        show_description=show_description,
+    )
+    data["content"] = rendered
+    data["is_content_locked"] = True
+    diagram["data"] = data
 
 
 async def list_diagrams(
@@ -238,11 +274,14 @@ async def list_diagrams(
         where_clauses.append("d.set_id IN (SELECT id FROM sets WHERE collection_id = ?)")
         params.append(collection_id)
 
-    if parent_package_id == "null":
+    # ADR-185 — three-valued nullable-filter convention.
+    from app.common.nullable_filter import parse_nullable_id
+    parent_filter = parse_nullable_id(parent_package_id)
+    if parent_filter[0] == "is_null":
         where_clauses.append("d.parent_package_id IS NULL")
-    elif parent_package_id is not None:
+    elif parent_filter[0] == "eq":
         where_clauses.append("d.parent_package_id = ?")
-        params.append(parent_package_id)
+        params.append(parent_filter[1])
 
     where_sql = " AND ".join(where_clauses)
 

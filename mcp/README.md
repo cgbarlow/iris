@@ -118,9 +118,14 @@ ADR-123/129).
 - **Write tools** for full lifecycle (ADR-161, ADR-178):
   - `create_*` for collection / set / package / diagram
   - `update_*` for collection / set / package / diagram / element
-    (partial updates — pass only the fields you want to change)
+    (partial updates — pass only the fields you want to change).
+    `update_element` accepts `package_id` (set / clear via JSON null)
+    per ADR-184 / v6.7.0.
   - `move_*` for diagram / package / set (in-scope re-parenting;
     cross-set moves of packages/diagrams deferred to a future ADR)
+  - `list_package_elements(package_id)` — list elements that belong
+    to a package (ADR-184 / v6.7.0). `list_elements` also accepts a
+    `package_id` filter (UUID or `"null"`).
 - **Render tools** (v6.2.0, ADR-179):
   - `render_diagram(diagram_id, format)` and
     `render_markdown(markdown, title, format)` — produce md/docx/pdf

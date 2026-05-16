@@ -54,6 +54,12 @@
 	let editDescription = $state('');
 	let editTags = $state<string[]>([]);
 	let editAttributes = $state<{name: string; type: string; scope: string; notes: string; lower_bound: string; upper_bound: string}[]>([]);
+	// ADR-184 — element ↔ package optional membership. ``null`` means
+	// no package; empty string is treated identically to null in the
+	// submit logic.
+	let editPackageId = $state<string | null>(null);
+	interface PackageOption { id: string; name: string }
+	let setPackages = $state<PackageOption[]>([]);
 	let editElementType = $state('');
 
 	/** Entity type options for the current element's notation. */
@@ -96,7 +102,8 @@
 			Array.isArray(origAttrs) ? origAttrs.map((a: any) => ({ name: a.name ?? '', type: a.type ?? '', scope: a.scope ?? 'Public', notes: a.notes ?? '', lower_bound: a.lower_bound ?? '', upper_bound: a.upper_bound ?? '' })) : []
 		);
 		const typeChanged = editElementType !== entity.element_type;
-		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged;
+		const pkgChanged = (editPackageId ?? null) !== ((entity as any).package_id ?? null);
+		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged;
 	});
 
 	async function loadEntity(id: string) {
@@ -212,7 +219,7 @@
 		bookmarkLoading = false;
 	}
 
-	function enterDetailsEdit() {
+	async function enterDetailsEdit() {
 		if (!entity) return;
 		editName = entity.name;
 		editDescription = entity.description ?? '';
@@ -222,6 +229,21 @@
 		editAttributes = Array.isArray(srcAttrs)
 			? srcAttrs.map((a: any) => ({ name: a.name ?? '', type: a.type ?? '', scope: a.scope ?? 'Public', notes: a.notes ?? '', lower_bound: a.lower_bound ?? '', upper_bound: a.upper_bound ?? '' }))
 			: [];
+		editPackageId = (entity as any).package_id ?? null;
+		// Load packages scoped to the element's set so the picker stays
+		// constrained to a consistent group (ADR-184).
+		try {
+			if (entity.set_id) {
+				const resp = await apiFetch<{ items: PackageOption[] }>(
+					`/api/packages?set_id=${encodeURIComponent(entity.set_id)}&page_size=100`
+				);
+				setPackages = resp.items ?? [];
+			} else {
+				setPackages = [];
+			}
+		} catch {
+			setPackages = [];
+		}
 		editingDetails = true;
 		detailsDirty = false;
 	}
@@ -244,16 +266,23 @@
 			} else {
 				delete updatedData.attributes;
 			}
+			const putBody: Record<string, unknown> = {
+				name: sanitizedName,
+				element_type: editElementType || entity.element_type,
+				description: sanitizedDesc,
+				data: updatedData,
+				change_summary: 'Updated element details',
+			};
+			// ADR-184 tri-state: include the key (set / null) when the
+			// user picked a value or explicitly cleared via the "None"
+			// option. ``editPackageId === undefined`` would mean "leave
+			// untouched" but we initialise it to either the current
+			// value or null on entry, so always include it here.
+			putBody.package_id = editPackageId ?? null;
 			await apiFetch(`/api/elements/${entity.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(entity.current_version) },
-				body: JSON.stringify({
-					name: sanitizedName,
-					element_type: editElementType || entity.element_type,
-					description: sanitizedDesc,
-					data: updatedData,
-					change_summary: 'Updated element details',
-				}),
+				body: JSON.stringify(putBody),
 			});
 
 			// Sync tags
@@ -551,6 +580,33 @@
 								<span class="rounded px-2 py-0.5 text-sm" style="background: var(--color-surface); color: var(--color-fg)">
 									{entity.set_name ?? 'Default'}
 								</span>
+							</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Package</dt>
+							<dd>
+								{#if editingDetails}
+									<select
+										bind:value={editPackageId}
+										class="rounded border px-2 py-1 text-sm"
+										style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+										aria-label="Package membership"
+									>
+										<option value={null}>None</option>
+										{#each setPackages as pkg}
+											<option value={pkg.id}>{pkg.name}</option>
+										{/each}
+									</select>
+								{:else if (entity as any).package_id}
+									<a
+										href={`/packages/${(entity as any).package_id}`}
+										class="rounded px-2 py-0.5 text-sm underline"
+										style="background: var(--color-surface); color: var(--color-fg)"
+									>
+										{(entity as any).package_name ?? (entity as any).package_id}
+									</a>
+								{:else}
+									<span style="color: var(--color-muted)">None</span>
+								{/if}
 							</dd>
 
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Tags</dt>

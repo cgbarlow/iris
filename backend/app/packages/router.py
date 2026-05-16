@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.elements.models import ElementListResponse, ElementResponse
 from app.packages.models import (
     PackageCreate,
     PackageHierarchyNode,
@@ -24,6 +25,7 @@ from app.packages.service import (
     get_package_children,
     get_package_hierarchy,
     get_package_versions,
+    list_package_elements,
     list_packages,
     set_package_parent,
     update_package,
@@ -179,6 +181,27 @@ async def delete(
     )
     if not deleted:
         raise HTTPException(status_code=409, detail="Version conflict or not found")
+
+
+@router.get("/{package_id}/elements", response_model=ElementListResponse)
+async def get_package_elements_route(
+    package_id: str,
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> ElementListResponse:
+    """List elements that belong to this package (ADR-184)."""
+    db = request.app.state.db_manager.main_db
+    items, total = await list_package_elements(
+        db, package_id, page=page, page_size=page_size,
+    )
+    return ElementListResponse(
+        items=[ElementResponse(**item) for item in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/{package_id}/ancestors")

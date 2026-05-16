@@ -433,9 +433,64 @@ async def get_diagram_relationships(
         for row in rows
     ]
 
+    # Element → package memberships for elements drawn on this diagram
+    # (ADR-184). Extracts entityIds from the diagram's current canvas,
+    # then looks up which of those elements have a non-null package_id.
+    diag_cursor = await db.execute(
+        "SELECT dv.data FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+        "  AND d.current_version = dv.version "
+        "WHERE d.id = ?",
+        (diagram_id,),
+    )
+    diag_row = await diag_cursor.fetchone()
+    element_ids: list[str] = []
+    if diag_row and diag_row[0]:
+        try:
+            import json as _json
+            canvas = _json.loads(diag_row[0]) if isinstance(diag_row[0], str) else diag_row[0]
+            if isinstance(canvas, dict):
+                for node in canvas.get("nodes", []) or []:
+                    node_data = node.get("data") if isinstance(node, dict) else None
+                    if isinstance(node_data, dict):
+                        eid = node_data.get("entityId")
+                        if isinstance(eid, str):
+                            element_ids.append(eid)
+        except (TypeError, ValueError):
+            element_ids = []
+
+    element_package_memberships: list[dict[str, Any]] = []
+    if element_ids:
+        placeholders = ",".join("?" for _ in element_ids)
+        mem_cursor = await db.execute(
+            f"SELECT e.id, ev.name, e.package_id, "  # noqa: S608
+            "(SELECT pv.name FROM packages p "
+            "  JOIN package_versions pv ON p.id = pv.package_id "
+            "    AND p.current_version = pv.version "
+            "  WHERE p.id = e.package_id) AS package_name "
+            "FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id "
+            "  AND e.current_version = ev.version "
+            f"WHERE e.id IN ({placeholders}) "
+            "  AND e.is_deleted = 0 "
+            "  AND e.package_id IS NOT NULL",
+            element_ids,
+        )
+        mem_rows = await mem_cursor.fetchall()
+        element_package_memberships = [
+            {
+                "element_id": r[0],
+                "element_name": r[1],
+                "package_id": r[2],
+                "package_name": r[3],
+            }
+            for r in mem_rows
+        ]
+
     return {
         "diagram_relationships": diagram_links,
         "element_relationships": rels.get("element_relationships", []),
+        "element_package_memberships": element_package_memberships,
     }
 
 

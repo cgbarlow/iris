@@ -16,7 +16,9 @@ from app.elements.models import (
     ElementUpdate,
     ElementVersionResponse,
 )
+from app.elements.models import _UNSET as _ELEMENT_UPDATE_UNSET
 from app.elements.service import (
+    ElementPackageInvariantError,
     cascade_delete_element,
     create_element,
     get_element,
@@ -39,18 +41,25 @@ async def create(
 ) -> ElementResponse:
     """Create a new element."""
     db = request.app.state.db_manager.main_db
-    result = await create_element(
-        db,
-        element_type=body.element_type,
-        name=body.name,
-        description=body.description,
-        data=body.data,
-        created_by=current_user["id"],
-        set_id=body.set_id,
-        metadata=body.metadata,
-        notation=body.notation,
-    )
-    return ElementResponse(**result)
+    try:
+        result = await create_element(
+            db,
+            element_type=body.element_type,
+            name=body.name,
+            description=body.description,
+            data=body.data,
+            created_by=current_user["id"],
+            set_id=body.set_id,
+            package_id=body.package_id,
+            metadata=body.metadata,
+            notation=body.notation,
+        )
+    except ElementPackageInvariantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
+    # Re-read so we pick up package_name/set_name without re-issuing joins
+    # in the create path.
+    fresh = await get_element(db, result["id"])
+    return ElementResponse(**(fresh or result))
 
 
 @router.get("", response_model=ElementListResponse)
@@ -59,16 +68,29 @@ async def list_all(
     element_type: str | None = None,
     set_id: str | None = None,
     collection_id: str | None = None,
+    package_id: str | None = None,
     notation: str | None = None,
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> ElementListResponse:
-    """List elements with optional type/set/collection/notation/search filter and pagination."""
+    """List elements with optional filters and pagination.
+
+    ``package_id`` accepts the three-valued sentinel (ADR-185): omit the
+    parameter, pass the literal string ``"null"``, or pass a UUID.
+    """
     db = request.app.state.db_manager.main_db
     items, total = await list_elements(
-        db, element_type=element_type, set_id=set_id, collection_id=collection_id, notation=notation, search=search, page=page, page_size=page_size,
+        db,
+        element_type=element_type,
+        set_id=set_id,
+        collection_id=collection_id,
+        package_id=package_id,
+        notation=notation,
+        search=search,
+        page=page,
+        page_size=page_size,
     )
     return ElementListResponse(
         items=[ElementResponse(**item) for item in items],
@@ -146,17 +168,24 @@ async def update(
         )
 
     db = request.app.state.db_manager.main_db
-    result = await update_element(
-        db,
-        element_id,
-        name=body.name,
-        description=body.description,
-        data=body.data,
-        change_summary=body.change_summary,
-        updated_by=current_user["id"],
-        expected_version=expected_version,
-        metadata=body.metadata,
-    )
+    # ElementUpdate's ``package_id`` defaults to the _UNSET sentinel
+    # (meaning "do not touch"); the service layer treats an explicit
+    # ``None`` as "clear". Forward as-is via the same sentinel.
+    update_kwargs: dict[str, Any] = {
+        "name": body.name,
+        "description": body.description,
+        "data": body.data,
+        "change_summary": body.change_summary,
+        "updated_by": current_user["id"],
+        "expected_version": expected_version,
+        "metadata": body.metadata,
+    }
+    if body.package_id is not _ELEMENT_UPDATE_UNSET:
+        update_kwargs["package_id"] = body.package_id
+    try:
+        result = await update_element(db, element_id, **update_kwargs)
+    except ElementPackageInvariantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
     if result is None:
         raise HTTPException(status_code=409, detail="Version conflict")
 

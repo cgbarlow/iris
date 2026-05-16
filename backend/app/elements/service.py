@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from app.common.nullable_filter import parse_nullable_id
 from app.migrations.m012_sets import DEFAULT_SET_ID
 from app.search.service import index_element as _index_element
 from app.search.service import remove_element_index as _remove_element_index
@@ -14,6 +15,50 @@ from app.search.service import remove_element_index as _remove_element_index
 if TYPE_CHECKING:
     import aiosqlite
     from app.db.adapter import DatabasePort
+
+
+class ElementPackageInvariantError(ValueError):
+    """Raised when (element.set_id, package.set_id) are inconsistent.
+
+    The router translates this into HTTP 422 with the message intact.
+    See ADR-184 for the invariant statement.
+    """
+
+
+async def _validate_element_package_set_consistency(
+    db: DatabasePort,
+    *,
+    set_id: str | None,
+    package_id: str | None,
+) -> None:
+    """Enforce the (element.set_id, package.set_id) invariant.
+
+    Allowed states:
+      - package_id is None: no constraint.
+      - set_id is None: no constraint.
+      - package's set_id is None: package belongs to no set; any
+        element set is fine.
+      - package's set_id == element's set_id: match.
+
+    Any other combination raises :class:`ElementPackageInvariantError`.
+    """
+    if package_id is None or set_id is None:
+        return
+    cursor = await db.execute(
+        "SELECT set_id FROM packages WHERE id = ? AND is_deleted = 0",
+        (package_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        msg = f"Package {package_id} not found"
+        raise ElementPackageInvariantError(msg)
+    pkg_set_id = row[0]
+    if pkg_set_id is not None and pkg_set_id != set_id:
+        msg = (
+            f"Element belongs to set {set_id} but package {package_id} "
+            f"belongs to set {pkg_set_id}"
+        )
+        raise ElementPackageInvariantError(msg)
 
 
 async def create_element(
@@ -25,6 +70,7 @@ async def create_element(
     data: dict[str, object],
     created_by: str,
     set_id: str | None = None,
+    package_id: str | None = None,
     metadata: dict[str, object] | None = None,
     change_summary: str | None = None,
     notation: str = "simple",
@@ -36,10 +82,16 @@ async def create_element(
     metadata_json = json.dumps(metadata) if metadata else None
     effective_set_id = set_id or DEFAULT_SET_ID
 
+    await _validate_element_package_set_consistency(
+        db, set_id=effective_set_id, package_id=package_id,
+    )
+
     await db.execute(
         "INSERT INTO elements (id, element_type, current_version, "
-        "created_at, created_by, updated_at, set_id, notation) VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
-        (element_id, element_type, now, created_by, now, effective_set_id, notation),
+        "created_at, created_by, updated_at, set_id, package_id, notation) "
+        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)",
+        (element_id, element_type, now, created_by, now,
+         effective_set_id, package_id, notation),
     )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, "
@@ -66,6 +118,7 @@ async def create_element(
         "updated_at": now,
         "is_deleted": False,
         "set_id": effective_set_id,
+        "package_id": package_id,
         "metadata": metadata,
         "notation": notation,
     }
@@ -80,7 +133,12 @@ async def get_element(
         "SELECT e.id, e.element_type, e.current_version, "
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "u.username, e.set_id, s.name, ev.metadata, e.notation "
+        "u.username, e.set_id, s.name, ev.metadata, e.notation, "
+        "e.package_id, "
+        "(SELECT pv.name FROM packages p "
+        "  JOIN package_versions pv ON p.id = pv.package_id "
+        "    AND p.current_version = pv.version "
+        "  WHERE p.id = e.package_id) AS package_name "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -109,6 +167,8 @@ async def get_element(
         "set_name": row[12],
         "metadata": json.loads(row[13]) if row[13] else None,
         "notation": row[14] or "simple",
+        "package_id": row[15],
+        "package_name": row[16],
     }
 
     # Enrich with tags
@@ -147,12 +207,18 @@ async def list_elements(
     element_type: str | None = None,
     set_id: str | None = None,
     collection_id: str | None = None,
+    package_id: str | None = None,
     notation: str | None = None,
     search: str | None = None,
     page: int = 1,
     page_size: int = 50,
 ) -> tuple[list[dict[str, object]], int]:
-    """List elements with pagination. Returns (items, total_count)."""
+    """List elements with pagination. Returns (items, total_count).
+
+    ``package_id`` has three-valued semantics (ADR-185):
+    omitted = no filter; literal ``"null"`` = ``package_id IS NULL``;
+    any other string = exact match.
+    """
     where_clauses = ["e.is_deleted = 0"]
     params: list[object] = []
 
@@ -166,6 +232,13 @@ async def list_elements(
     elif collection_id:
         where_clauses.append("e.set_id IN (SELECT id FROM sets WHERE collection_id = ?)")
         params.append(collection_id)
+
+    pkg_filter = parse_nullable_id(package_id)
+    if pkg_filter[0] == "is_null":
+        where_clauses.append("e.package_id IS NULL")
+    elif pkg_filter[0] == "eq":
+        where_clauses.append("e.package_id = ?")
+        params.append(pkg_filter[1])
 
     if notation:
         where_clauses.append("e.notation = ?")
@@ -196,7 +269,12 @@ async def list_elements(
         f"SELECT e.id, e.element_type, e.current_version, "  # noqa: S608
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "e.set_id, s.name, ev.metadata, e.notation "
+        "e.set_id, s.name, ev.metadata, e.notation, "
+        "e.package_id, "
+        "(SELECT pv.name FROM packages p "
+        "  JOIN package_versions pv ON p.id = pv.package_id "
+        "    AND p.current_version = pv.version "
+        "  WHERE p.id = e.package_id) AS package_name "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -223,6 +301,8 @@ async def list_elements(
             "set_name": r[11],
             "metadata": json.loads(r[12]) if r[12] else None,
             "notation": r[13] or "simple",
+            "package_id": r[14],
+            "package_name": r[15],
         }
         for r in rows
     ]
@@ -261,6 +341,9 @@ async def list_elements(
     return items, total
 
 
+_UNSET_PACKAGE_ID: Any = object()
+
+
 async def update_element(
     db: DatabasePort,
     element_id: str,
@@ -272,11 +355,18 @@ async def update_element(
     updated_by: str,
     expected_version: int,
     metadata: dict[str, object] | None = None,
+    package_id: Any = _UNSET_PACKAGE_ID,
 ) -> dict[str, object] | None:
-    """Update an element with optimistic concurrency. Returns None on conflict."""
+    """Update an element with optimistic concurrency. Returns None on conflict.
+
+    ``package_id`` is tri-state. The sentinel ``_UNSET_PACKAGE_ID`` means
+    "do not touch the column"; an explicit ``None`` clears the column;
+    a string sets it. The invariant against ``set_id`` runs whenever
+    ``package_id`` is being touched.
+    """
     # Check current version (OCC)
     cursor = await db.execute(
-        "SELECT current_version FROM elements WHERE id = ? AND is_deleted = 0",
+        "SELECT current_version, set_id FROM elements WHERE id = ? AND is_deleted = 0",
         (element_id,),
     )
     row = await cursor.fetchone()
@@ -284,18 +374,31 @@ async def update_element(
         return None
 
     current_version: int = row[0]
+    current_set_id: str | None = row[1]
     if current_version != expected_version:
         return None
+
+    if package_id is not _UNSET_PACKAGE_ID:
+        await _validate_element_package_set_consistency(
+            db, set_id=current_set_id, package_id=package_id,
+        )
 
     new_version = current_version + 1
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
 
-    await db.execute(
-        "UPDATE elements SET current_version = ?, updated_at = ? WHERE id = ?",
-        (new_version, now, element_id),
-    )
+    if package_id is _UNSET_PACKAGE_ID:
+        await db.execute(
+            "UPDATE elements SET current_version = ?, updated_at = ? WHERE id = ?",
+            (new_version, now, element_id),
+        )
+    else:
+        await db.execute(
+            "UPDATE elements SET current_version = ?, updated_at = ?, "
+            "package_id = ? WHERE id = ?",
+            (new_version, now, package_id, element_id),
+        )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, "
         "data, change_type, change_summary, created_at, created_by, metadata) "

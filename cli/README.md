@@ -36,6 +36,11 @@ iris create diagram --name "Overview" --diagram-type simple --set-id <set-id> \
 
 iris update set <set-id> --description "Updated"        # partial update
 iris update diagram <diag-id> --change-summary "fixed labels"
+iris update element <el-id> --package-id <pkg-id>       # v6.7.0 ADR-184
+iris update element <el-id> --package-id null           # clear membership
+iris elements list --package-id <pkg-id>                # filter by package
+iris elements list --package-id null                    # list unmembered
+iris packages list-elements <pkg-id>                    # all members of a pkg
 
 iris move diagram <diag-id> --to-package <pkg-id>       # in-set re-parent
 iris move diagram <diag-id> --to-package null           # move to set root

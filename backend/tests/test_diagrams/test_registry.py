@@ -66,8 +66,10 @@ class TestListDiagramTypes:
         resp = await client.get("/api/registry/diagram-types", headers=headers)
         assert resp.status_code == 200
         types = resp.json()
-        # 7 original + 6 new (ADR-082) + 2 DoView (ADR-094) + 2 BPMN (ADR-136) + 1 Text (ADR-137)
-        assert len(types) == 18
+        # 7 original + 6 new (ADR-082) + 2 DoView (ADR-094) + 2 BPMN (ADR-136)
+        # + 1 Text (ADR-137) + 1 doview_analysis (legacy seed) + 1 Dynamic List
+        # (ADR-186) = 20.
+        assert len(types) == 20
         type_ids = [t["id"] for t in types]
         assert "component" in type_ids
         assert "sequence" in type_ids
