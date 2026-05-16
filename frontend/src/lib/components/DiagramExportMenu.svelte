@@ -10,6 +10,8 @@
   2781-2789 pre-v6.5.0).
 -->
 <script lang="ts">
+	import { API_BASE_URL } from '$lib/config';
+	import { apiFetch } from '$lib/utils/api';
 	import { exportToPng, exportToSvg } from '$lib/utils/export';
 
 	interface Props {
@@ -31,28 +33,41 @@
 	let busy = $state<string | null>(null);
 	let errorMsg = $state<string | null>(null);
 
+	// v6.6.3: markdown-content diagrams have no canvas, so SVG/PNG would
+	// always fail with "no canvas element to capture". Hide those menu
+	// items in that case. For visual diagrams, only show them if a flow
+	// element accessor was actually provided by the parent.
 	const showVisualOptions = $derived(!isMarkdownContent && flowElement !== undefined);
+
+	type ArtefactMeta = {
+		id: string;
+		filename: string;
+		mime_type: string;
+		size_bytes: number;
+	};
 
 	async function renderServerSide(format: 'md' | 'docx' | 'pdf') {
 		busy = format;
 		errorMsg = null;
 		try {
-			const resp = await fetch(`/api/export/diagram/${diagramId}`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ format }),
-				credentials: 'include',
-			});
-			if (!resp.ok) {
-				const detail = await resp.text();
-				throw new Error(
-					`Render failed (${resp.status}): ${detail.slice(0, 200)}`,
-				);
-			}
-			const meta = (await resp.json()) as { id: string; filename: string };
-			// Browser-native download via Content-Disposition: attachment.
+			// v6.6.3: route through apiFetch so the request hits
+			// `${API_BASE_URL}/api/export/...` (the backend host, not the
+			// frontend host) AND carries the JWT bearer. Pre-v6.6.3 the
+			// component used bare `fetch('/api/export/...')` which 404'd on
+			// the frontend host in production — surfaced as "Unexpected end
+			// of JSON input" because the SPA fallback returned an HTML
+			// document that JSON.parse rejected.
+			const meta = await apiFetch<ArtefactMeta>(
+				`/api/export/diagram/${diagramId}`,
+				{
+					method: 'POST',
+					body: JSON.stringify({ format }),
+				},
+			);
+			// Artefact download URL is the BACKEND host
+			// (Content-Disposition: attachment serves the bytes directly).
 			const a = document.createElement('a');
-			a.href = `/api/artefacts/${meta.id}`;
+			a.href = `${API_BASE_URL}/api/artefacts/${meta.id}`;
 			a.download = meta.filename;
 			document.body.appendChild(a);
 			a.click();
