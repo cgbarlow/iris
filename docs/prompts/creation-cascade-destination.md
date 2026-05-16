@@ -62,17 +62,20 @@ AskUserQuestion with multi-select enabled:
 
 At least one option must be selected.
 
-### Phase-1 fallback (cascade-prompt only, no renderer yet)
+### Phase-1 fallback (move tools only)
 
-This prompt-side cascade is shipping in v6.1.0 ahead of the renderer
-and move tools that actuate it. Until v6.2.0 and v6.3.0 land:
+The destination chooser was shipped in v6.1.0 ahead of the move tools
+that handle post-hoc destination changes. The docx/pdf renderer
+landed in v6.2.0 — those formats now go through `render_markdown`.
+The cross-set move fallback remains until v6.3.0 ships `move_*` tools:
 
-- If the user picks "Chat with downloadable artefacts" and selects
-  docx or pdf at Q-Dest3, respond: "Docx and PDF generation ships in
-  v6.2.0 (Phase 2 of issue #133). For now I can produce a markdown
-  artefact in the chat and create the Iris bundle if you'd like."
-  Then offer AskUserQuestion with options "Yes, markdown + Iris save",
-  "Just the Iris save", "Cancel and wait for v6.2.0".
+- When the user picks "Chat with downloadable artefacts" and selects
+  one or more formats at Q-Dest3, call the MCP `render_markdown`
+  tool once per selected format (markdown / docx / pdf). Each call
+  returns `{artefact_id, web_url, mime_type, filename}` — present the
+  `web_url` to the user as a clickable download link. For "Both"
+  (Iris + artefacts), also create the Iris bundle via the
+  destination-specific `create_*` tools.
 
 - If the user picks "Somewhere else" or "Browse" at Q-Dest2 and the
   chosen destination differs from the current set, respond: "I can

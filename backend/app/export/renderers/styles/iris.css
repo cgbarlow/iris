@@ -1,0 +1,125 @@
+/* Iris-branded PDF renderer CSS (ADR-179, v6.2.0).
+ *
+ * Minimal stylesheet for weasyprint-rendered documents. Uses system
+ * font stacks (no embedded fonts) so the renderer container stays
+ * small. Color palette echoes the Iris frontend tokens at low fidelity.
+ */
+
+@page {
+    size: A4;
+    margin: 2cm 2cm 2.5cm 2cm;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #1f2937;
+}
+
+h1 {
+    font-size: 22pt;
+    color: #111827;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.3em;
+    margin-top: 0;
+}
+
+h2 {
+    font-size: 16pt;
+    color: #111827;
+    margin-top: 1.4em;
+}
+
+h3 {
+    font-size: 13pt;
+    color: #374151;
+    margin-top: 1em;
+}
+
+h4, h5, h6 {
+    font-size: 11pt;
+    color: #374151;
+    margin-top: 0.8em;
+}
+
+p {
+    margin: 0.6em 0;
+}
+
+a {
+    color: #1d4ed8;
+    word-break: break-all;
+}
+
+code {
+    font-family: "SF Mono", Menlo, Consolas, Monaco, monospace;
+    font-size: 9.5pt;
+    background: #f3f4f6;
+    padding: 0 0.2em;
+    border-radius: 2px;
+}
+
+pre {
+    background: #f3f4f6;
+    padding: 0.7em 1em;
+    border-radius: 4px;
+    overflow-x: auto;
+    page-break-inside: avoid;
+    font-size: 9pt;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+}
+
+blockquote {
+    border-left: 3px solid #d1d5db;
+    margin: 1em 0;
+    padding: 0.2em 1em;
+    color: #4b5563;
+}
+
+ul, ol {
+    padding-left: 1.6em;
+    margin: 0.6em 0;
+}
+
+li {
+    margin: 0.2em 0;
+}
+
+table {
+    border-collapse: collapse;
+    margin: 1em 0;
+    width: 100%;
+    font-size: 10pt;
+}
+
+th, td {
+    border: 1px solid #d1d5db;
+    padding: 0.4em 0.7em;
+    text-align: left;
+}
+
+th {
+    background: #f9fafb;
+    font-weight: 600;
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid #e5e7eb;
+    margin: 1.5em 0;
+}
+
+.iris-doc-title {
+    font-size: 24pt;
+    color: #111827;
+    margin: 0 0 0.5em 0;
+    border-bottom: 2px solid #6366f1;
+    padding-bottom: 0.3em;
+}
