@@ -1,6 +1,7 @@
 # iris-cli
 
-Command-line interface for Iris. Read-only + AI surface (ADR-130).
+Command-line interface for Iris. Read-only + write + AI surface
+(ADR-130 + ADR-180 v6.4.0).
 
 ## Install (from repo)
 
@@ -21,12 +22,36 @@ uv tool install "git+https://github.com/cgbarlow/iris#subdirectory=cli"
 # Personal Access Token for you and stores it in ~/.config/iris/config.toml.
 iris login --url https://iris.example.com
 
+# Read
 iris whoami
 iris search "payment"
 iris diagrams list
 iris export diagram <id> --format markdown -o overview.md
 iris ask "Summarise the onboarding flow" --set default
+
+# Write (v6.4.0, ADR-180)
+iris create set --name "My Set" --collection-id <col-id>
+iris create diagram --name "Overview" --diagram-type simple --set-id <set-id> \
+  --data-json '{"nodes": [], "edges": []}'
+
+iris update set <set-id> --description "Updated"        # partial update
+iris update diagram <diag-id> --change-summary "fixed labels"
+
+iris move diagram <diag-id> --to-package <pkg-id>       # in-set re-parent
+iris move diagram <diag-id> --to-package null           # move to set root
+iris move set <set-id> --to-collection <new-col-id>     # cross-collection
+iris move set <set-id> --to-collection null             # un-group
+
+iris render diagram <diag-id> --format pdf -o out.pdf   # store artefact + download
+iris render markdown --title T --format docx --input notes.md -o notes.docx
 ```
+
+### `iris ask` is CLI-only by design
+
+ADR-168 removed `ask` from the MCP surface because MCP clients bring
+their own LLM. CLI users don't, so `iris ask` stays. This is a
+deliberate asymmetry — documented in ADR-180 and the Phase 6 parity
+matrix.
 
 Configuration resolution order (first match wins):
 1. CLI flag (`--url`, `--token`)

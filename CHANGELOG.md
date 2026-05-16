@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-05-16
+
+Issue #133 Phase 4 — CLI write-tool parity with MCP. Every backend
+write endpoint that has an MCP tool now also has an `iris` CLI
+subcommand. The deliberate `iris ask` asymmetry (CLI-only, no MCP
+counterpart per ADR-168) is documented.
+
+### Added
+
+- `iris create` sub-app with `collection`, `set`, `package`,
+  `diagram` commands (ADR-180, SPEC-180-A). Mirrors the MCP `create_*`
+  surface.
+- `iris update` sub-app with `collection`, `set`, `package`,
+  `diagram`, `element` commands. Same partial-update semantics as
+  MCP `update_*` (GET-then-merge-then-PUT). `iris update set`
+  deliberately excludes `--collection-id` (use `iris move set`).
+- `iris move` sub-app with `diagram`, `package`, `set` commands.
+  Pass the literal string `null` to set the target to NULL (move
+  to set root / un-group).
+- `iris render` sub-app with `diagram` and `markdown` commands.
+  Renders to md/docx/pdf via the Phase 2 backend endpoints. With
+  `-o OUT_PATH`, downloads the artefact bytes; without, prints the
+  metadata JSON.
+- `cli/pyproject.toml`: 0.1.0 → 0.2.0.
+
+### See also
+
+- [ADR-180](docs/adrs/ADR-180-CLI-Write-Tool-Parity.md)
+- [SPEC-180-A](docs/adrs/specs/SPEC-180-A-CLI-Write-Parity.md)
+- [docs/plans/issue-133-doview-mcp-polish.md](docs/plans/issue-133-doview-mcp-polish.md)
+
+### Tests
+
+- 34/34 functional tests green in `cli/tests/` (17 new write-command
+  tests + existing 17). 3 integration smoke tests skipped because they
+  need the backend module installed in the CLI venv — pre-existing.
+
 ## [6.3.0] - 2026-05-16
 
 Issue #133 Phase 3 — MCP `update_*` and `move_*` tool surface. The
