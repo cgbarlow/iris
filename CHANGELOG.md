@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.6.1] - 2026-05-16
+
+Issue #133 deploy fix — Render base image was missing WeasyPrint
+runtime system dependencies. `POST /api/export/markdown` returned
+500 on the v6.6.0 deploy; this release adds the missing libraries
+to `backend/Dockerfile` so the renderer endpoint resolves cleanly.
+
+### Fixed
+
+- `backend/Dockerfile` now installs `libpango-1.0-0`,
+  `libpangoft2-1.0-0`, `libgdk-pixbuf-2.0-0`, `shared-mime-info`,
+  and `fonts-dejavu-core` alongside the pre-existing `libcairo2`.
+  Predicted by the `feedback_render_deploy_verification` memory
+  exactly — verified by curl against the live endpoint per the
+  ADR-179 deploy gate.
+
 ## [6.6.0] - 2026-05-16
 
 Issue #133 Phase 6 — surface parity discipline. The final phase of the

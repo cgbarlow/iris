@@ -1,10 +1,25 @@
 FROM python:3.12-slim
 
 # Install system dependencies
-#   mdbtools: .eap file import (MS Access to SQLite conversion)
-#   libcairo2: SVG thumbnail generation via cairosvg
-#   git:      mnemos extension auto-clone (POST /api/extensions/mnemos/upgrade)
-RUN apt-get update && apt-get install -y --no-install-recommends mdbtools libcairo2 git && rm -rf /var/lib/apt/lists/*
+#   mdbtools:             .eap file import (MS Access → SQLite conversion)
+#   libcairo2:            SVG thumbnail generation via cairosvg
+#   libpango-1.0-0,
+#   libpangoft2-1.0-0,
+#   libgdk-pixbuf-2.0-0,
+#   shared-mime-info:     WeasyPrint PDF renderer (ADR-179, v6.2.0)
+#   fonts-dejavu-core:    fallback fonts so WeasyPrint PDFs render text without
+#                         relying on system fonts that aren't installed
+#   git:                  mnemos extension auto-clone (POST /api/extensions/mnemos/upgrade)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        mdbtools \
+        libcairo2 \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libgdk-pixbuf-2.0-0 \
+        shared-mime-info \
+        fonts-dejavu-core \
+        git \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/render/project/src
 
