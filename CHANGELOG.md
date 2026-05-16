@@ -30,6 +30,13 @@ counterpart per ADR-168) is documented.
   Renders to md/docx/pdf via the Phase 2 backend endpoints. With
   `-o OUT_PATH`, downloads the artefact bytes; without, prints the
   metadata JSON.
+- **`create_element`** MCP tool + **`iris create element`** CLI
+  command (Phase 4 follow-up). Backfills a parity gap that predates
+  Phase 4: every other entity type had a `create_*` tool, but
+  standalone elements could only be created via
+  `apply_diagram_creation` (atomic with a diagram canvas). The new
+  surface targets the element-pool use case where an element exists
+  independently and is referenced by diagrams later.
 - `cli/pyproject.toml`: 0.1.0 → 0.2.0.
 
 ### See also
