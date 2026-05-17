@@ -380,12 +380,20 @@ async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
     `apply_diagram_creation` (which materialises elements + their
     diagram representation atomically) or create the diagram with an
     inline element via `create_diagram` data payload.
+
+    v6.8.0 (ADR-191): when ``template_id`` is supplied, the named
+    template pre-fills any whitelisted fields that the caller hasn't
+    set explicitly.
     """
-    body: dict[str, Any] = {
-        "element_type": args["element_type"],
-        "name": args["name"],
-    }
-    for key in ("description", "data", "set_id", "metadata", "notation", "package_id"):
+    body: dict[str, Any] = {}
+    if args.get("element_type") is not None:
+        body["element_type"] = args["element_type"]
+    if args.get("name") is not None:
+        body["name"] = args["name"]
+    for key in (
+        "description", "data", "set_id", "metadata", "notation",
+        "package_id", "template_id",
+    ):
         if args.get(key) is not None:
             body[key] = args[key]
     try:
@@ -393,6 +401,102 @@ async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
     except IrisAuthError:
         return _auth_required_payload("Create element")
     return with_web_url(json.dumps(resp.json()), "element")
+
+
+# ── Element templates (v6.8.0, ADR-191) ──────────────────────────────
+
+
+async def _create_element_template(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.8.0 (ADR-191): capture a template from an existing element.
+
+    ``included_fields`` selects which element fields the template
+    carries (whitelist: name, description, element_type, notation,
+    data, metadata, package_id, tags). Templates are set-scoped by
+    default; pass ``is_global=true`` to make a template visible from
+    any set (in which case omit ``set_id``).
+    """
+    body: dict[str, Any] = {
+        "source_element_id": args["source_element_id"],
+        "name": args["name"],
+        "included_fields": args["included_fields"],
+        "is_global": bool(args.get("is_global", False)),
+    }
+    if args.get("description") is not None:
+        body["description"] = args["description"]
+    if args.get("set_id") is not None:
+        body["set_id"] = args["set_id"]
+    try:
+        resp = await c._request(
+            "POST", "/api/element-templates", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create element template")
+    return with_web_url(json.dumps(resp.json()), "element-template")
+
+
+async def _list_element_templates(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.8.0 (ADR-191): list element templates with set + global scope."""
+    params: dict[str, Any] = {
+        "page": int(args.get("page", 1)),
+        "page_size": int(args.get("limit", 50)),
+        "include_global": bool(args.get("include_global", True)),
+    }
+    if args.get("set_id") is not None:
+        params["set_id"] = args["set_id"]
+    try:
+        resp = await c._request(
+            "GET", "/api/element-templates", params=params,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("List element templates")
+    return with_web_urls_list(
+        json.dumps(resp.json().get("items", [])), "element-template",
+    )
+
+
+async def _get_element_template(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.8.0 (ADR-191): fetch a single template by ID."""
+    try:
+        resp = await c._request(
+            "GET", f"/api/element-templates/{args['template_id']}",
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Get element template")
+    return with_web_url(json.dumps(resp.json()), "element-template")
+
+
+async def _update_element_template(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.8.0 (ADR-191): edit a template (no If-Match — templates are
+    not versioned). Only the keys present in ``args`` are sent."""
+    template_id = args["template_id"]
+    body: dict[str, Any] = {}
+    for key in ("name", "description", "included_fields", "is_global"):
+        if key in args and args[key] is not None:
+            body[key] = args[key]
+    # set_id is tri-state-friendly: caller may pass None to mean
+    # "clear" (for a global template), or a string to set.
+    if "set_id" in args:
+        body["set_id"] = args["set_id"]
+    try:
+        resp = await c._request(
+            "PUT", f"/api/element-templates/{template_id}", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update element template")
+    return with_web_url(json.dumps(resp.json()), "element-template")
+
+
+async def _delete_element_template(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.8.0 (ADR-191): soft-delete a template."""
+    try:
+        await c._request(
+            "DELETE", f"/api/element-templates/{args['template_id']}",
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Delete element template")
+    return json.dumps({
+        "success": True, "template_id": args["template_id"], "deleted": True,
+    })
 
 
 async def _create_diagram(c: IrisClient, args: dict[str, Any]) -> str:
@@ -1304,17 +1408,25 @@ TOOLS: list[Tool] = [
             "elements onto a diagram in one step, prefer "
             "`apply_diagram_creation` (atomic element + canvas "
             "materialisation) or `create_diagram` with an inline data "
-            "payload."
+            "payload. v6.8.0 (ADR-191): supply `template_id` to pre-"
+            "fill whitelisted fields from a saved element template; "
+            "explicit fields always win over template defaults."
         ),
         input_schema=_schema({
             "element_type": _str_arg(
                 "element_type",
                 "Element type (e.g. 'component', 'class', "
                 "'outcome_box') — must be a registered type for the "
-                "chosen notation",
+                "chosen notation. Optional only when `template_id` is "
+                "supplied and the template includes element_type.",
+                required=False,
             ),
             "name": _str_arg(
-                "name", "Display name for the element",
+                "name",
+                "Display name for the element. Optional only when "
+                "`template_id` is supplied and the template includes "
+                "name.",
+                required=False,
             ),
             "set_id": _str_arg(
                 "set_id",
@@ -1352,8 +1464,188 @@ TOOLS: list[Tool] = [
                 {"type": "object", "additionalProperties": True},
                 False,
             ),
+            "template_id": _str_arg(
+                "template_id",
+                "Optional element template (v6.8.0, ADR-191) to "
+                "pre-fill whitelisted fields. Explicit request fields "
+                "always win over template defaults.",
+                required=False,
+            ),
         }),
         handler=_create_element,
+    ),
+    # ── Element templates (v6.8.0, ADR-191, issue #153) ────────────────
+    Tool(
+        name="create_element_template",
+        description=(
+            "Capture a saved template from an existing element. The "
+            "template snapshots a user-chosen subset of the element's "
+            "fields (whitelist: name, description, element_type, "
+            "notation, data, metadata, package_id, tags) so future "
+            "`create_element` calls can pre-fill from it via "
+            "`template_id`. Set-scoped by default; pass "
+            "`is_global=true` to share across sets (and omit "
+            "`set_id`). v6.8.0, ADR-191, issue #153."
+        ),
+        input_schema=_schema({
+            "source_element_id": _str_arg(
+                "source_element_id",
+                "ID of the element to snapshot the template from",
+            ),
+            "name": _str_arg(
+                "name", "Display name for the template",
+            ),
+            "included_fields": (
+                {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Element fields to carry into the template. "
+                        "Anything outside the whitelist is dropped "
+                        "silently. At least one whitelisted field is "
+                        "required."
+                    ),
+                },
+                True,
+            ),
+            "description": _str_arg(
+                "description", "Optional template description",
+                required=False,
+            ),
+            "set_id": _str_arg(
+                "set_id",
+                "Set to scope the template to. Required when "
+                "`is_global` is false; must be omitted when "
+                "`is_global` is true.",
+                required=False,
+            ),
+            "is_global": (
+                {
+                    "type": "boolean",
+                    "description": (
+                        "Promote the template to global (visible from "
+                        "every set). Default false."
+                    ),
+                    "default": False,
+                },
+                False,
+            ),
+        }),
+        handler=_create_element_template,
+    ),
+    Tool(
+        name="list_element_templates",
+        description=(
+            "List element templates with set + global scope. "
+            "v6.8.0, ADR-191."
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg(
+                "set_id",
+                "Scope to a single set. Combine with "
+                "`include_global=true` to also include global "
+                "templates.",
+                required=False,
+            ),
+            "include_global": (
+                {
+                    "type": "boolean",
+                    "description": (
+                        "When true (default), global templates are "
+                        "included in the result."
+                    ),
+                    "default": True,
+                },
+                False,
+            ),
+            "page": (
+                {"type": "integer", "description": "Page (1-based)",
+                 "default": 1},
+                False,
+            ),
+            "limit": (
+                {"type": "integer", "description": "Page size",
+                 "default": 50},
+                False,
+            ),
+        }),
+        handler=_list_element_templates,
+    ),
+    Tool(
+        name="get_element_template",
+        description=(
+            "Fetch a single element template by ID. v6.8.0, ADR-191."
+        ),
+        input_schema=_schema({
+            "template_id": _str_arg(
+                "template_id", "Template ID",
+            ),
+        }),
+        handler=_get_element_template,
+    ),
+    Tool(
+        name="update_element_template",
+        description=(
+            "Edit an element template's name, description, included "
+            "fields, or scope (promote to/from global). Templates "
+            "are not versioned — no If-Match. When "
+            "`included_fields` changes and the source element is "
+            "still alive, `template_data` is re-projected from the "
+            "source; otherwise the prior snapshot is filtered down "
+            "to the intersection with the new fields. v6.8.0, "
+            "ADR-191."
+        ),
+        input_schema=_schema({
+            "template_id": _str_arg(
+                "template_id", "Template ID",
+            ),
+            "name": _str_arg(
+                "name", "New name", required=False,
+            ),
+            "description": _str_arg(
+                "description", "New description", required=False,
+            ),
+            "included_fields": (
+                {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Replacement included_fields. Triggers a "
+                        "re-projection of template_data."
+                    ),
+                },
+                False,
+            ),
+            "set_id": _str_arg(
+                "set_id",
+                "New set scope. Pass null to clear (when promoting "
+                "to global).",
+                required=False,
+            ),
+            "is_global": (
+                {
+                    "type": "boolean",
+                    "description": (
+                        "Promote to global (set_id must be null) or "
+                        "demote back."
+                    ),
+                },
+                False,
+            ),
+        }),
+        handler=_update_element_template,
+    ),
+    Tool(
+        name="delete_element_template",
+        description=(
+            "Soft-delete an element template. v6.8.0, ADR-191."
+        ),
+        input_schema=_schema({
+            "template_id": _str_arg(
+                "template_id", "Template ID",
+            ),
+        }),
+        handler=_delete_element_template,
     ),
     # ── Phase 2 render tools (ADR-179, v6.2.0) ────────────────────────
     Tool(

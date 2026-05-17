@@ -40,7 +40,19 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DOCUMENTED_ASYMMETRIES: tuple[tuple[str, str, str], ...] = (
     ("cli_only", "ask", "ADR-168 — MCP clients bring their own LLM"),
-    ("deferred_write", "delete_*",
+    # delete_* deferred ONLY for the original five entities (issue #133
+    # scope). New entities (e.g. element_template, ADR-191) are
+    # expected to expose delete on every surface — they're not
+    # eligible for the deferred-write blanket.
+    ("deferred_write", "delete_collection",
+     "out-of-scope for issue #133; needs a future ADR (audit, undo)"),
+    ("deferred_write", "delete_set",
+     "out-of-scope for issue #133; needs a future ADR (audit, undo)"),
+    ("deferred_write", "delete_package",
+     "out-of-scope for issue #133; needs a future ADR (audit, undo)"),
+    ("deferred_write", "delete_diagram",
+     "out-of-scope for issue #133; needs a future ADR (audit, undo)"),
+    ("deferred_write", "delete_element",
      "out-of-scope for issue #133; needs a future ADR (audit, undo)"),
     ("design_invariant", "move_element",
      "ADR-178 invariant — elements travel with their parent diagram"),
@@ -105,17 +117,20 @@ def parse_cli_writes() -> set[WriteOp]:
     """Scan CLI for write subcommand groups.
 
     Looks for `@{create,update,move,delete}_app.command("entity")`
-    decorators in cli/src/iris_cli/main.py.
+    decorators in cli/src/iris_cli/main.py. Entity names may be
+    kebab-case in the CLI (e.g. ``"element-template"``) — we
+    normalise to underscores for cross-surface comparison.
     """
     results: set[WriteOp] = set()
     cli_path = REPO_ROOT / "cli/src/iris_cli/main.py"
     text = cli_path.read_text(encoding="utf-8")
     pat = re.compile(
-        r'@(create|update|move|delete)_app\.command\(\s*"([a-z_]+)"',
+        r'@(create|update|move|delete)_app\.command\(\s*"([a-z_-]+)"',
     )
     for verb, entity in pat.findall(text):
-        if entity in _KNOWN_ENTITIES:
-            results.add(WriteOp("cli", verb, entity))
+        normalised = entity.replace("-", "_")
+        if normalised in _KNOWN_ENTITIES:
+            results.add(WriteOp("cli", verb, normalised))
     return results
 
 
@@ -124,6 +139,8 @@ def parse_cli_writes() -> set[WriteOp]:
 
 _KNOWN_ENTITIES = frozenset({
     "collection", "set", "package", "diagram", "element",
+    # v6.8.0 (ADR-191) — element templates have full write parity.
+    "element_template",
 })
 
 

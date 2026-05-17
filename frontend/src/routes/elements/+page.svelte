@@ -13,6 +13,8 @@
 	import BatchSetDialog from '$lib/components/BatchSetDialog.svelte';
 	import BatchTagDialog from '$lib/components/BatchTagDialog.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import TemplatesListDialog from '$lib/components/TemplatesListDialog.svelte';
+	import { goto } from '$app/navigation';
 
 	let elements = $state<Element[]>([]);
 	let loading = $state(true);
@@ -24,6 +26,7 @@
 	let availableTags = $state<string[]>([]);
 	let sortField = $state<'name' | 'element_type' | 'updated_at'>('name');
 	let showCreateDialog = $state(false);
+	let showTemplatesDialog = $state(false);
 	let groupMode = $state<'none' | 'type' | 'tag'>(
 		(typeof window !== 'undefined' &&
 			(localStorage.getItem('iris-elements-group') as 'none' | 'type' | 'tag')) ||
@@ -309,6 +312,13 @@
 			{selectMode ? 'Cancel Select' : 'Select'}
 		</button>
 		<button
+			onclick={() => (showTemplatesDialog = true)}
+			class="rounded px-4 py-2 text-sm"
+			style="border: 1px solid var(--color-border); color: var(--color-fg)"
+		>
+			Templates
+		</button>
+		<button
 			onclick={() => (showCreateDialog = true)}
 			class="rounded px-4 py-2 text-sm text-white"
 			style="background-color: var(--color-primary)"
@@ -562,6 +572,16 @@
 	mode="create"
 	onsave={handleCreate}
 	oncancel={() => (showCreateDialog = false)}
+/>
+
+<TemplatesListDialog
+	open={showTemplatesDialog}
+	setId={currentSetId}
+	oncancel={() => (showTemplatesDialog = false)}
+	onuse={(newId) => {
+		showTemplatesDialog = false;
+		goto(`/elements/${newId}`);
+	}}
 />
 
 <BatchSetDialog

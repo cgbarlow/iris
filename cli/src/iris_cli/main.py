@@ -37,6 +37,10 @@ app = typer.Typer(
 
 diagrams_app = typer.Typer(help="Diagram commands.", no_args_is_help=True)
 elements_app = typer.Typer(help="Element commands.", no_args_is_help=True)
+element_templates_app = typer.Typer(
+    help="Element template commands (v6.8.0, ADR-191).",
+    no_args_is_help=True,
+)
 packages_app = typer.Typer(help="Package commands.", no_args_is_help=True)
 sets_app = typer.Typer(help="Set commands.", no_args_is_help=True)
 collections_app = typer.Typer(help="Collection commands.", no_args_is_help=True)
@@ -46,11 +50,16 @@ conversations_app = typer.Typer(help="Conversation commands.", no_args_is_help=T
 # v6.4.0 (ADR-180): write-tool parity with MCP.
 create_app = typer.Typer(help="Create new entities.", no_args_is_help=True)
 update_app = typer.Typer(help="Update entity metadata (partial).", no_args_is_help=True)
+delete_app = typer.Typer(
+    help="Delete entities (currently: element-template only — ADR-191).",
+    no_args_is_help=True,
+)
 move_app = typer.Typer(help="Re-parent entities (diagram / package / set).", no_args_is_help=True)
 render_app = typer.Typer(help="Render diagrams or markdown to md/docx/pdf artefacts.", no_args_is_help=True)
 
 app.add_typer(diagrams_app, name="diagrams")
 app.add_typer(elements_app, name="elements")
+app.add_typer(element_templates_app, name="element-templates")
 app.add_typer(packages_app, name="packages")
 app.add_typer(sets_app, name="sets")
 app.add_typer(collections_app, name="collections")
@@ -58,6 +67,7 @@ app.add_typer(export_app, name="export")
 app.add_typer(conversations_app, name="conversations")
 app.add_typer(create_app, name="create")
 app.add_typer(update_app, name="update")
+app.add_typer(delete_app, name="delete")
 app.add_typer(move_app, name="move")
 app.add_typer(render_app, name="render")
 
@@ -339,6 +349,66 @@ def elements_get(element_id: str) -> None:
         d = element.model_dump()
         for k in ("id", "name", "element_type", "notation", "current_version"):
             typer.echo(f"{k}: {d.get(k)}")
+
+
+# --- Element templates (v6.8.0, ADR-191) ------------------------------------
+
+
+@element_templates_app.command("list")
+def element_templates_list(
+    set_id: str | None = typer.Option(None, "--set-id"),
+    include_global: bool = typer.Option(
+        True, "--include-global/--no-include-global",
+    ),
+    page: int = typer.Option(1, "--page", min=1),
+    page_size: int = typer.Option(50, "--page-size", min=1, max=100),
+) -> None:
+    async def _do() -> list[Any]:
+        async with _client() as c:
+            params: dict[str, Any] = {
+                "page": page, "page_size": page_size,
+                "include_global": include_global,
+            }
+            if set_id is not None:
+                params["set_id"] = set_id
+            resp = await c._request(
+                "GET", "/api/element-templates", params=params,
+            )
+            return resp.json().get("items", [])
+
+    rows = _run(_do())
+    if state.as_json:
+        output.print_json(rows)
+    else:
+        output.print_table(
+            rows,
+            columns=["id", "name", "set_name", "is_global", "updated_at"],
+            title=f"Element Templates ({len(rows)})",
+        )
+
+
+@element_templates_app.command("get")
+def element_templates_get(template_id: str) -> None:
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "GET", f"/api/element-templates/{template_id}",
+            )
+            return resp.json()
+
+    output.print_json(_run(_do()))
+
+
+@element_templates_app.command("delete")
+def element_templates_delete(template_id: str) -> None:
+    """Soft-delete an element template."""
+    async def _do() -> Any:
+        async with _client() as c:
+            await c._request(
+                "DELETE", f"/api/element-templates/{template_id}",
+            )
+            return {"deleted": True, "template_id": template_id}
+    output.print_json(_run(_do()))
 
 
 # --- Packages / Sets / Collections ------------------------------------------
@@ -700,8 +770,8 @@ def create_package_cmd(
 
 @create_app.command("element")
 def create_element_cmd(
-    name: str = typer.Option(..., "--name"),
-    element_type: str = typer.Option(..., "--element-type"),
+    name: str | None = typer.Option(None, "--name"),
+    element_type: str | None = typer.Option(None, "--element-type"),
     set_id: str | None = typer.Option(None, "--set-id"),
     package_id: str | None = typer.Option(
         None, "--package-id",
@@ -711,17 +781,28 @@ def create_element_cmd(
     description: str | None = typer.Option(None, "--description"),
     data_json: str | None = typer.Option(None, "--data-json"),
     metadata_json: str | None = typer.Option(None, "--metadata-json"),
+    template_id: str | None = typer.Option(
+        None, "--template-id",
+        help=(
+            "Optional element template (v6.8.0, ADR-191) to "
+            "pre-fill whitelisted fields. Explicit options always win."
+        ),
+    ),
 ) -> None:
     """Create a standalone Element in a set's element pool.
 
     For drawing elements onto a diagram in one step, use
     `iris diagrams ...` flows or the API/MCP `apply_diagram_creation`
     tool instead.
+
+    When ``--template-id`` is supplied, ``--name`` and
+    ``--element-type`` are optional (the template can provide them).
     """
-    body: dict[str, Any] = {
-        "element_type": element_type,
-        "name": name,
-    }
+    body: dict[str, Any] = {}
+    if element_type is not None:
+        body["element_type"] = element_type
+    if name is not None:
+        body["name"] = name
     if set_id is not None:
         body["set_id"] = set_id
     if package_id is not None:
@@ -730,6 +811,8 @@ def create_element_cmd(
         body["notation"] = notation
     if description is not None:
         body["description"] = description
+    if template_id is not None:
+        body["template_id"] = template_id
     data = _parse_json_opt(data_json, "--data-json")
     if data is not None:
         body["data"] = data
@@ -934,6 +1017,136 @@ def update_element_cmd(
                 "PUT", f"/api/elements/{element_id}", json=body, headers=headers,
             )
             return resp.json()
+    output.print_json(_run(_do()))
+
+
+# ── iris create / update element-template (v6.8.0, ADR-191) ───────────────
+
+
+def _parse_csv_opt(raw: str | None, flag: str) -> list[str] | None:
+    if raw is None:
+        return None
+    items = [s.strip() for s in raw.split(",") if s.strip()]
+    if not items:
+        raise typer.BadParameter(
+            f"{flag} must contain at least one field name",
+        )
+    return items
+
+
+@create_app.command("element-template")
+def create_element_template_cmd(
+    source_element: str = typer.Option(..., "--source-element"),
+    name: str = typer.Option(..., "--name"),
+    include: str = typer.Option(
+        ..., "--include",
+        help=(
+            "Comma-separated whitelist of element fields to carry "
+            "into the template (e.g. name,description,data,tags). "
+            "Non-whitelisted fields are dropped silently."
+        ),
+    ),
+    set_id: str | None = typer.Option(
+        None, "--set-id",
+        help=(
+            "Set to scope the template under. Required for "
+            "non-global templates; omit when --global is passed."
+        ),
+    ),
+    is_global: bool = typer.Option(
+        False, "--global/--no-global",
+        help="Promote the template to global (visible from any set).",
+    ),
+    description: str | None = typer.Option(None, "--description"),
+) -> None:
+    """Capture an element template from an existing element."""
+    body: dict[str, Any] = {
+        "source_element_id": source_element,
+        "name": name,
+        "included_fields": _parse_csv_opt(include, "--include"),
+        "is_global": is_global,
+    }
+    if description is not None:
+        body["description"] = description
+    if set_id is not None:
+        body["set_id"] = set_id
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", "/api/element-templates", json=body,
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@update_app.command("element-template")
+def update_element_template_cmd(
+    template_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    include: str | None = typer.Option(
+        None, "--include",
+        help=(
+            "Replacement comma-separated field list. Triggers a "
+            "template_data re-projection if the source element is "
+            "still alive."
+        ),
+    ),
+    set_id: str | None = typer.Option(
+        None, "--set-id",
+        help=(
+            "New set scope. Pass the literal 'null' to clear (when "
+            "promoting to global)."
+        ),
+    ),
+    is_global: bool | None = typer.Option(
+        None, "--global/--no-global",
+        help="Promote to global or demote back.",
+    ),
+) -> None:
+    """Update an element template (no versioning — no If-Match)."""
+    body: dict[str, Any] = {}
+    if name is not None:
+        body["name"] = name
+    if description is not None:
+        body["description"] = description
+    fields = _parse_csv_opt(include, "--include")
+    if fields is not None:
+        body["included_fields"] = fields
+    if set_id is not None:
+        body["set_id"] = _resolve_null(set_id)
+    if is_global is not None:
+        body["is_global"] = is_global
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "PUT", f"/api/element-templates/{template_id}", json=body,
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@delete_app.command("element-template")
+def delete_element_template_cmd(
+    template_id: str = typer.Argument(...),
+) -> None:
+    """Soft-delete an element template (v6.8.0, ADR-191).
+
+    Mirrors the `iris element-templates delete` sibling command for
+    parity with `iris create element-template` and
+    `iris update element-template`. Required under Protocol §14 /
+    ADR-182 (see scripts/check_surface_parity.py) — `delete_*`
+    parity is NOT under the issue-#133 deferral blanket for new
+    entities introduced after that blanket was written.
+    """
+    async def _do() -> Any:
+        async with _client() as c:
+            await c._request(
+                "DELETE", f"/api/element-templates/{template_id}",
+            )
+            return {"deleted": True, "template_id": template_id}
     output.print_json(_run(_do()))
 
 
