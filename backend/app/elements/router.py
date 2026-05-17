@@ -17,6 +17,10 @@ from app.elements.models import (
     ElementVersionResponse,
 )
 from app.elements.models import _UNSET as _ELEMENT_UPDATE_UNSET
+from app.element_templates.service import (
+    apply_template_to_create_body,
+    get_element_template,
+)
 from app.elements.service import (
     ElementPackageInvariantError,
     cascade_delete_element,
@@ -39,23 +43,74 @@ async def create(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> ElementResponse:
-    """Create a new element."""
+    """Create a new element. When ``template_id`` is supplied, the
+    named template pre-fills whitelisted fields (ADR-191) — explicit
+    request fields always win over template defaults.
+    """
     db = request.app.state.db_manager.main_db
+    fields = body.model_dump(exclude_unset=True)
+    template_id = fields.pop("template_id", None)
+    template_tags: list[str] = []
+    if template_id:
+        template = await get_element_template(db, template_id)
+        if template is None:
+            raise HTTPException(
+                status_code=404, detail=f"Template {template_id} not found",
+            )
+        fields = apply_template_to_create_body(template, fields)
+        # Tags are written to a separate table after the element is
+        # created; pop them off the create body so they don't reach
+        # the service signature.
+        template_tags = list(fields.pop("tags", None) or [])
+
+    # Post-merge required-field validation.
+    element_type = fields.get("element_type") or ""
+    name = fields.get("name") or ""
+    if not element_type:
+        raise HTTPException(
+            status_code=422,
+            detail="element_type is required (provide explicitly or via template)",
+        )
+    if not name:
+        raise HTTPException(
+            status_code=422,
+            detail="name is required (provide explicitly or via template)",
+        )
+
     try:
         result = await create_element(
             db,
-            element_type=body.element_type,
-            name=body.name,
-            description=body.description,
-            data=body.data,
+            element_type=element_type,
+            name=name,
+            description=fields.get("description"),
+            data=fields.get("data") or {},
             created_by=current_user["id"],
-            set_id=body.set_id,
-            package_id=body.package_id,
-            metadata=body.metadata,
-            notation=body.notation,
+            set_id=fields.get("set_id"),
+            package_id=fields.get("package_id"),
+            metadata=fields.get("metadata"),
+            notation=fields.get("notation") or "simple",
         )
     except ElementPackageInvariantError as exc:
         raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
+
+    # Apply template-supplied tags (if any) to the element_tags table.
+    if template_tags:
+        now = datetime.now(tz=UTC).isoformat()
+        for tag in template_tags:
+            tag = str(tag).strip()
+            if not tag or len(tag) > 50:
+                continue
+            try:
+                await db.execute(
+                    "INSERT INTO element_tags (element_id, tag, "
+                    "created_at, created_by) VALUES (?, ?, ?, ?)",
+                    (result["id"], tag, now, current_user["id"]),
+                )
+            except Exception:
+                # Tag already exists — skip silently.
+                pass
+        await db.commit()
+
     # Re-read so we pick up package_name/set_name without re-issuing joins
     # in the create path.
     fresh = await get_element(db, result["id"])

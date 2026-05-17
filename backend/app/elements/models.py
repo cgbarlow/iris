@@ -14,16 +14,22 @@ _UNSET: Any = object()
 
 
 class ElementCreate(BaseModel):
-    """Request body for creating an element."""
+    """Request body for creating an element.
 
-    element_type: str = Field(min_length=1)
-    name: str = Field(min_length=1, max_length=255)
+    ``template_id`` (v6.8.0, ADR-191) pre-fills any whitelisted fields
+    from the named template. Explicit fields on the request always
+    win over template defaults.
+    """
+
+    element_type: str = Field(default="", min_length=0)
+    name: str = Field(default="", min_length=0, max_length=255)
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     set_id: str | None = None
     package_id: str | None = None
     metadata: dict[str, object] | None = None
     notation: str = "simple"
+    template_id: str | None = None
 
 
 class ElementUpdate(BaseModel):

@@ -149,6 +149,12 @@ A hand-written user guide at `/guide` covers every user-facing capability across
 - **Auto-membership** — saving a view's canvas automatically moves referenced entities into the view's set
 - **Set Selector** — dropdown on views, entities, and import pages for filtering and assignment
 
+### Element Templates
+
+- **Save as template** on the element detail page captures a user-chosen subset of fields (name, description, element_type, notation, data, metadata, package_id, tags) into a reusable template (v6.8.0, ADR-191)
+- **Templates** browser on the elements list shows set-scoped and global templates; "Use" pre-fills a new element from the template's snapshot (server-side merge — explicit fields always win)
+- Templates are set-scoped by default with an optional Make Global flag; full CRUD on REST (`/api/element-templates`), MCP (`create_element_template` / `list_element_templates` / `get_element_template` / `update_element_template` / `delete_element_template`), and CLI (`iris create element-template …`, etc.). `create_element` on all three surfaces accepts an optional `template_id`
+
 ### Batch Operations
 
 - Select mode toggle on views and entities list pages with checkboxes on each item

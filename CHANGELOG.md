@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.0] - 2026-05-17
+
+### Added
+
+- **Element Templates** (ADR-191, SPEC-191-A, issue
+  [#153](https://github.com/cgbarlow/iris/issues/153)). Capture a
+  user-selected subset of fields from an existing element into a
+  reusable template, then pre-fill new elements from any template via
+  REST, MCP, or CLI.
+  - Set-scoped by default; opt-in `is_global` flag for templates that
+    should be reusable across sets. A CHECK constraint enforces that
+    exactly one of "scoped to a set" or "global" is true at any time.
+  - Field whitelist of eight keys (`name`, `description`,
+    `element_type`, `notation`, `data`, `metadata`, `package_id`,
+    `tags`) — anything outside the whitelist is silently dropped at
+    write time.
+  - Full CRUD on three surfaces (per Protocol §14 / ADR-182): REST
+    routes under `/api/element-templates`, five MCP tools
+    (`create_*` / `list_*` / `get_*` / `update_*` /
+    `delete_element_template`), and a new `element-template` entity
+    on the CLI. `POST /api/elements` and the matching MCP / CLI
+    create surfaces gain an optional `template_id` parameter that
+    pre-fills whitelisted fields server-side (explicit fields always
+    win).
+  - Frontend: **Templates** button on `/elements` opens a
+    `TemplatesListDialog` (set-scoped + global) with per-row
+    "Use" buttons; **Save as template** on `/elements/[id]` opens a
+    `CreateTemplateDialog` with field checkboxes and a "Make
+    global" toggle; new `/element-templates/[id]` detail page renders
+    the captured snapshot with a "Create element from template"
+    affordance and Delete.
+  - 74 new tests across backend (34), MCP (12), CLI (8), and frontend
+    (20).
+  - `scripts/check_surface_parity.py` updated to register the new
+    `element_template` entity and to accept kebab-case CLI entity
+    names (normalised to underscore for the cross-surface compare).
+    `delete_element_template` joins the documented
+    "delete deferred — needs audit/undo ADR" asymmetry list.
+
+### Migrations
+
+- SQLite `m067_element_templates.py` — table + CHECK + two partial
+  indexes. Wired into `backend/app/startup.py:_initialize_sqlite`.
+- Supabase mirror `m071_element_templates.sql` — same shape with
+  `BOOLEAN` `is_global` / `is_deleted` (Protocol §15 boolean literal
+  convention; `m067_*.sql` was already taken by the
+  doview_analysis pointer fix, so the Supabase numbering steps to
+  `m071`). Applied via `scripts/supabase-migrate.sh` **before** the
+  Render code deploy.
+
 ## [6.7.4] - 2026-05-16
 
 ### Added

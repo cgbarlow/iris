@@ -18,6 +18,7 @@
 	import TagInput from '$lib/components/TagInput.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
+	import CreateTemplateDialog from '$lib/components/CreateTemplateDialog.svelte';
 	import { Accordion } from 'bits-ui';
 	import DOMPurify from 'dompurify';
 	import {
@@ -39,6 +40,7 @@
 	let error = $state<string | null>(null);
 	let activeTab = $state<'details' | 'versions' | 'relationships' | 'diagrams'>('details');
 	let showDeleteDialog = $state(false);
+	let showSaveTemplateDialog = $state(false);
 	let isBookmarked = $state(false);
 	let bookmarkLoading = $state(false);
 
@@ -408,6 +410,13 @@
 				style="border: 1px solid var(--color-border); color: var(--color-fg)"
 			>
 				Clone
+			</button>
+			<button
+				onclick={() => (showSaveTemplateDialog = true)}
+				class="rounded px-4 py-2 text-sm"
+				style="border: 1px solid var(--color-border); color: var(--color-fg)"
+			>
+				Save as template
 			</button>
 			<button
 				onclick={() => (showDeleteDialog = true)}
@@ -915,5 +924,17 @@
 		confirmLabel="Delete"
 		onconfirm={handleDelete}
 		oncancel={() => (showDeleteDialog = false)}
+	/>
+
+	<CreateTemplateDialog
+		open={showSaveTemplateDialog}
+		sourceElementId={entity.id}
+		sourceElementName={entity.name}
+		setId={entity.set_id ?? null}
+		oncancel={() => (showSaveTemplateDialog = false)}
+		oncreated={(templateId) => {
+			showSaveTemplateDialog = false;
+			goto(`/element-templates/${templateId}`);
+		}}
 	/>
 {/if}
