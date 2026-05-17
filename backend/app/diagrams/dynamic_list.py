@@ -23,13 +23,15 @@ if TYPE_CHECKING:
 
 
 _PLACEHOLDER = "_No items yet._"
-_FOOTER = "###### (Dynamic list — auto-generated)"
 
 
 def _bullet(name: str, description: str | None, show_description: bool) -> str:
     if show_description and description is not None and description.strip() != "":
         return f"- **{name}** ({description})"
-    return f"- **{name}"
+    # Issue #170: previously emitted ``- **{name}`` with no closing
+    # ``**`` — markdown rendered the literal asterisks instead of bolding
+    # the name when descriptions were hidden.
+    return f"- **{name}**"
 
 
 async def _fetch_diagram_header(
@@ -168,4 +170,6 @@ async def compute_dynamic_list_content(
         body = await _diagram_relationships_body(
             db, diagram_id, show_description=show_description,
         )
-    return f"{header}\n\n{body}\n\n{_FOOTER}\n"
+    # Issue #170(a): no auto-generated footer — the markdown now ends at
+    # the body so the user-visible content is uncluttered.
+    return f"{header}\n\n{body}\n"
