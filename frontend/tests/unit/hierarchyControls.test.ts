@@ -66,6 +66,40 @@ describe('HierarchyControls (issue #27)', () => {
 	});
 });
 
+describe('HierarchyControls — dropdowns escape overflow containers (issue #169)', () => {
+	it('binds the trigger buttons so the dropdown can read their bounding box', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		// Both trigger buttons get a `bind:this` so we can call
+		// getBoundingClientRect() on them before opening the menu.
+		expect(src).toMatch(/bind:this=\{newButtonEl\}/);
+		expect(src).toMatch(/bind:this=\{showButtonEl\}/);
+	});
+
+	it('positions each dropdown with position: fixed so it escapes overflow ancestors', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		// The Tailwind `absolute` positioning was being clipped by
+		// `overflow-y: auto` / `overflow: hidden` on the parent asides
+		// (Dashboard, View detail, Packages detail). Switching to
+		// `position: fixed` removes that constraint.
+		const fixedHits = src.match(/position:\s*fixed/g) ?? [];
+		expect(fixedHits.length).toBeGreaterThanOrEqual(2);
+		// The old absolute classes should no longer be on the menu containers.
+		expect(src).not.toMatch(/<div\s+role="menu"\s+class="absolute/);
+	});
+
+	it('computes the menu position from the trigger button rect on open', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		expect(src).toMatch(/getBoundingClientRect\(\)/);
+	});
+
+	it('closes the dropdowns on scroll so they do not detach from the trigger', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		// Fixed-position menus stay glued to the viewport; close on
+		// scroll so the user never sees a floating orphan.
+		expect(src).toMatch(/addEventListener\(['"]scroll['"]/);
+	});
+});
+
 describe('HierarchyControls — compact sizing (issue #162)', () => {
 	it('the "+ New" and "Show" trigger buttons use compact px-2 py-1 text-xs', () => {
 		const src = readFileSync(COMPONENT, 'utf-8');

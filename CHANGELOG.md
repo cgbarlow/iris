@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.2] - 2026-05-17
+
+### Fixed
+
+- **HierarchyControls "Show" / "+ New" dropdowns clipped inside narrow
+  sidebars** (issue
+  [#169](https://github.com/cgbarlow/iris/issues/169)). On the
+  packages-detail page (and any other surface where the hierarchy
+  panel sits inside an `overflow-y: auto` / `overflow: hidden`
+  container), the dropdown menus were anchored with Tailwind
+  `absolute left-0`, so they got clipped at the ancestor's right
+  edge — the "Packages are always shown." footer ran off the visible
+  area. The menus now render with `position: fixed`, with viewport
+  coordinates computed from the trigger button's
+  `getBoundingClientRect()`. Fixed-position menus stay anchored to
+  the viewport, so they close on any scroll.
+
 ## [6.8.1] - 2026-05-17
 
 ### Fixed

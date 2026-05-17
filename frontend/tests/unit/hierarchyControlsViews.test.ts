@@ -38,9 +38,11 @@ describe('HierarchyControls (v5.4.1, issue #46 items #2 + #3)', () => {
 	});
 
 	it('+New dropdown lists Package above View, with View indented', () => {
-		// Locate the +New menu block (between "+ New ▾" and the closing
-		// Show ▾ trigger).
-		const newMenuMatch = SRC.match(/\+\s*New\s*▾[\s\S]*?Show\s*▾/);
+		// Issue #169: the menu now lives in a top-level {#if newOpen}
+		// block (separate from the trigger button) because it's
+		// position:fixed. Locate it by its min-w-[160px] signature and
+		// the closing </div> of that menu.
+		const newMenuMatch = SRC.match(/min-w-\[160px\][\s\S]*?<\/div>\s*\{\/if\}/);
 		expect(newMenuMatch, '+New menu block found').not.toBeNull();
 		const newBlock = newMenuMatch![0];
 
