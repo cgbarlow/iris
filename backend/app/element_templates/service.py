@@ -127,12 +127,18 @@ async def create_element_template(
     template_data = _project_template_data(src, filtered)
     template_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
+    # Literal ``, 0)`` for is_deleted caused HTTP 500 on Supabase —
+    # PostgreSQL BOOLEAN columns reject integer literals (Protocol §15).
+    # The adapter rewrites ``is_xxx = 0/1`` equality and retries int
+    # params as booleans, but cannot rewrite a bare literal in VALUES.
+    # Both schemas DEFAULT is_deleted to the correct false value, so
+    # omit the column entirely and let the default apply.
     await db.execute(
         "INSERT INTO element_templates "
         "(id, name, description, set_id, is_global, source_element_id, "
         "included_fields, template_data, created_by, created_at, "
-        "updated_at, is_deleted) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+        "updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             template_id, name, description, set_id, 1 if is_global else 0,
             source_element_id, json.dumps(filtered),

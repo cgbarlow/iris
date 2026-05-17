@@ -303,6 +303,184 @@ class TestPackageElementsMode:
         assert "_No items yet._" in body
 
 
+class TestCosmeticTweaks:
+    """Issue #170 — three small Dynamic List polish fixes."""
+
+    async def test_no_auto_generated_footer(
+        self,
+        client_db: tuple[httpx.AsyncClient, DatabaseManager],
+    ) -> None:
+        """The '(Dynamic list — auto-generated)' footer is removed."""
+        client, db_manager = client_db
+        from app.diagrams.dynamic_list import compute_dynamic_list_content
+
+        h = await _auth(client)
+        set_id = await _create_set(client, h)
+        a = await _create_element(client, h, name="A", set_id=set_id)
+        b = await _create_element(client, h, name="B", set_id=set_id)
+        await _create_relationship(client, h, source=a, target=b)
+        diagram_id = await _create_dynamic_list_diagram(
+            client, h, set_id=set_id, elements_on_canvas=[a, b],
+            dynamic_source={"mode": "diagram_relationships"},
+        )
+
+        db = db_manager.main_db
+        body = await compute_dynamic_list_content(
+            db, diagram_id, mode="diagram_relationships",
+            package_id=None, show_description=False,
+        )
+        assert "Dynamic list" not in body
+        assert "auto-generated" not in body
+
+    async def test_bullets_have_closing_bold_marker(
+        self,
+        client_db: tuple[httpx.AsyncClient, DatabaseManager],
+    ) -> None:
+        """With ``show_description=False`` the bullet was '- **Name' with
+        no closing ``**`` (rendered as literal '**Name' in markdown).
+        Every bullet must have a matching closing marker.
+        """
+        client, db_manager = client_db
+        from app.diagrams.dynamic_list import compute_dynamic_list_content
+
+        h = await _auth(client)
+        set_id = await _create_set(client, h)
+        pkg = await _create_package(client, h, set_id=set_id, name="Pantry")
+        await _create_element(
+            client, h, name="Caster sugar", set_id=set_id, package_id=pkg,
+        )
+        diagram_id = await _create_dynamic_list_diagram(
+            client, h, set_id=set_id, elements_on_canvas=[],
+            dynamic_source={"mode": "package_elements", "package_id": pkg},
+        )
+
+        db = db_manager.main_db
+        for show_desc in (False, True):
+            body = await compute_dynamic_list_content(
+                db, diagram_id, mode="package_elements",
+                package_id=pkg, show_description=show_desc,
+            )
+            bullets = [line for line in body.splitlines() if line.startswith("- ")]
+            assert bullets
+            for line in bullets:
+                # Each bullet should have an even (matching) count of
+                # ``**`` markers — i.e. every opening has a closing.
+                assert line.count("**") % 2 == 0, (
+                    f"unmatched **: {line!r} (show_description={show_desc})"
+                )
+            # Specifically the name renders as ``**Caster sugar**``.
+            assert "**Caster sugar**" in body
+
+
+class TestParentPackageDefault:
+    """Issue #170(c): a fresh dynamic_list diagram inside a package
+    defaults to mode='package_elements' with package_id = the diagram's
+    parent_package_id.
+    """
+
+    async def test_no_source_in_data_defaults_to_parent_package_elements(
+        self,
+        client_db: tuple[httpx.AsyncClient, DatabaseManager],
+    ) -> None:
+        client, db_manager = client_db
+        h = await _auth(client)
+        set_id = await _create_set(client, h)
+        pkg = await _create_package(client, h, set_id=set_id, name="Pantry")
+        await _create_element(
+            client, h, name="Caster sugar", set_id=set_id, package_id=pkg,
+        )
+
+        # Diagram created WITH parent_package_id but WITHOUT dynamic_source.
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "dynamic_list",
+                "notation": "markdown",
+                "name": "Pantry list",
+                "set_id": set_id,
+                "parent_package_id": pkg,
+                "data": {"nodes": [], "edges": []},
+            },
+            headers=h,
+        )
+        assert resp.status_code == 201, resp.text
+        diagram_id = resp.json()["id"]
+
+        # On read, the synthesised content reflects package_elements
+        # with the parent package.
+        read = await client.get(f"/api/diagrams/{diagram_id}", headers=h)
+        assert read.status_code == 200
+        data = read.json()["data"]
+        assert "**Caster sugar**" in data["content"]
+        # The resolved dynamic_source is echoed on read so the frontend
+        # picker shows the right state.
+        src = data.get("dynamic_source") or {}
+        assert src.get("mode") == "package_elements"
+        assert src.get("package_id") == pkg
+
+    async def test_no_parent_package_falls_back_to_diagram_relationships(
+        self,
+        client_db: tuple[httpx.AsyncClient, DatabaseManager],
+    ) -> None:
+        client, db_manager = client_db
+        h = await _auth(client)
+        set_id = await _create_set(client, h)
+
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "dynamic_list",
+                "notation": "markdown",
+                "name": "Orphan list",
+                "set_id": set_id,
+                "data": {"nodes": [], "edges": []},
+            },
+            headers=h,
+        )
+        assert resp.status_code == 201, resp.text
+        diagram_id = resp.json()["id"]
+
+        read = await client.get(f"/api/diagrams/{diagram_id}", headers=h)
+        src = read.json()["data"].get("dynamic_source") or {}
+        assert src.get("mode") == "diagram_relationships"
+
+    async def test_explicit_source_overrides_defaults(
+        self,
+        client_db: tuple[httpx.AsyncClient, DatabaseManager],
+    ) -> None:
+        """An explicit ``dynamic_source`` in the stored data wins over
+        the parent-package fallback.
+        """
+        client, db_manager = client_db
+        h = await _auth(client)
+        set_id = await _create_set(client, h)
+        pkg = await _create_package(client, h, set_id=set_id, name="Pantry")
+
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "dynamic_list",
+                "notation": "markdown",
+                "name": "Explicit",
+                "set_id": set_id,
+                "parent_package_id": pkg,
+                "data": {
+                    "nodes": [],
+                    "edges": [],
+                    "dynamic_source": {
+                        "mode": "diagram_relationships",
+                        "show_description": True,
+                    },
+                },
+            },
+            headers=h,
+        )
+        diagram_id = resp.json()["id"]
+        read = await client.get(f"/api/diagrams/{diagram_id}", headers=h)
+        src = read.json()["data"].get("dynamic_source") or {}
+        assert src.get("mode") == "diagram_relationships"
+
+
 class TestReadTimeSynthesis:
     async def test_get_diagram_populates_content_and_lock_flag(
         self,

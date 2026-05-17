@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.3] - 2026-05-17
+
+### Fixed
+
+- **HTTP 500 on `POST /api/element-templates` in Supabase** (the
+  surfaced as CORS error in the UAT browser because the failure
+  short-circuited the CORS middleware). The `INSERT INTO
+  element_templates` statement embedded a literal `0` for
+  `is_deleted` in the `VALUES` clause — PostgreSQL rejects integer
+  literals for `BOOLEAN` columns (Protocol §15). The adapter's
+  retry-with-bool-coercion only fires for *bound* int parameters,
+  and the `is_xxx = 0/1` regex rewrite doesn't catch bare literals
+  inside `VALUES`. `is_deleted` is dropped from the INSERT column
+  list — both schemas default it correctly (`0` on SQLite, `FALSE`
+  on Supabase).
+- **Dynamic List bullet missing closing `**`** (issue
+  [#170](https://github.com/cgbarlow/iris/issues/170)). When
+  `show_description=False`, `_bullet` emitted `- **{name}` (no
+  closing `**`), so markdown rendered the literal asterisks instead
+  of bolding the name. Now emits `- **{name}**`.
+
+### Changed
+
+- **Dynamic List defaults to enclosing-package contents** (issue
+  [#170](https://github.com/cgbarlow/iris/issues/170)). A fresh
+  `dynamic_list` diagram created inside a package now defaults to
+  `mode='package_elements'` with `package_id` = the diagram's
+  `parent_package_id`. Diagrams without a parent package fall back
+  to the previous `diagram_relationships` default. The synthesised
+  `data.dynamic_source` is echoed on read so the frontend picker
+  reflects the applied defaults. The auto-generated footer
+  ("(Dynamic list — auto-generated)") is removed from the
+  rendered markdown. The mode dropdown labels are simplified to
+  "Package elements" and "Diagram relationships" (no "Default" prefix).
+
 ## [6.8.2] - 2026-05-17
 
 ### Fixed

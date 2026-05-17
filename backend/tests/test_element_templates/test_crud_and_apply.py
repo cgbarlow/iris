@@ -216,6 +216,35 @@ class TestCreate:
         assert r.status_code == 201, r.text
         assert r.json()["included_fields"] == ["name"]
 
+    async def test_insert_statement_has_no_literal_boolean_integers(
+        self, client: httpx.AsyncClient,  # noqa: ARG002
+    ) -> None:
+        """Protocol §15: PostgreSQL rejects integer literals for
+        BOOLEAN columns. The adapter rewrites bound integer params and
+        ``is_xxx = 0/1`` equality patterns, but cannot rewrite literal
+        integers inside ``VALUES (..., 0)``. Regression test for the
+        v6.8.0 → v6.8.x production 500 on POST /api/element-templates.
+        """
+        from pathlib import Path
+        svc = Path(__file__).resolve().parents[2] / "app" / "element_templates" / "service.py"
+        src = svc.read_text(encoding="utf-8")
+        # The INSERT statement for element_templates must not embed a
+        # literal ``0`` for ``is_deleted`` (the column has DEFAULT 0 /
+        # DEFAULT FALSE in both DBs — let the default apply).
+        insert_block_start = src.index("INSERT INTO element_templates")
+        insert_block_end = src.index("await db.commit()", insert_block_start)
+        insert_block = src[insert_block_start:insert_block_end]
+        # No literal boolean integers in the column list or VALUES.
+        assert ", 0)" not in insert_block.replace("\n", " "), (
+            f"INSERT for element_templates still has a literal 0 — "
+            f"Supabase BOOLEAN columns will reject this. Block:\n{insert_block}"
+        )
+        assert "is_deleted" not in insert_block, (
+            "is_deleted should be omitted from the INSERT — let the "
+            "column DEFAULT apply (0 on SQLite, FALSE on Supabase). "
+            f"Block:\n{insert_block}"
+        )
+
     async def test_create_rejects_unknown_source_element(
         self, client: httpx.AsyncClient,
     ) -> None:

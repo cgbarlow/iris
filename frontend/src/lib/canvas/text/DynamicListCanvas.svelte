@@ -118,8 +118,11 @@
 						class="rounded border px-2 py-1 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 					>
-						<option value="diagram_relationships">Default (diagram relationships)</option>
+						<!-- Issue #170(c): default mode is now Package elements
+							 when the diagram is inside a package; "Default" no
+							 longer maps to one option, so the labels are plain. -->
 						<option value="package_elements">Package elements</option>
+						<option value="diagram_relationships">Diagram relationships</option>
 					</select>
 				</label>
 

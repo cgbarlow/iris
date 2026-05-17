@@ -215,18 +215,38 @@ async def _maybe_synthesise_content(
     src = data.get("dynamic_source") or {}
     if not isinstance(src, dict):
         src = {}
-    mode = src.get("mode") or "diagram_relationships"
+
+    # Issue #170(c): when ``dynamic_source`` is unset, default to
+    # listing the elements of the diagram's enclosing package. Falls
+    # back to the original ``diagram_relationships`` mode when the
+    # diagram has no parent package.
+    parent_pkg = diagram.get("parent_package_id")
+    parent_pkg = parent_pkg if isinstance(parent_pkg, str) else None
+    mode = src.get("mode")
+    if not mode:
+        mode = "package_elements" if parent_pkg else "diagram_relationships"
     package_id = src.get("package_id")
+    if not isinstance(package_id, str):
+        package_id = parent_pkg if mode == "package_elements" else None
     show_description = bool(src.get("show_description", False))
+
     rendered = await compute_dynamic_list_content(
         db,
         str(diagram["id"]),
         mode=str(mode),
-        package_id=package_id if isinstance(package_id, str) else None,
+        package_id=package_id,
         show_description=show_description,
     )
     data["content"] = rendered
     data["is_content_locked"] = True
+    # Echo the resolved source so the frontend picker shows the defaults
+    # that were applied (instead of an empty dropdown that mismatches
+    # the rendered content).
+    data["dynamic_source"] = {
+        "mode": mode,
+        "package_id": package_id,
+        "show_description": show_description,
+    }
     diagram["data"] = data
 
 
