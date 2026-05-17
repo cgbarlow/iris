@@ -498,3 +498,66 @@ class TestApplyTemplate:
             headers=h,
         )
         assert r.status_code == 404
+
+    async def test_template_captures_class_attributes(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """Issue #165: class element ``attributes`` are part of
+        ``element_versions.data`` JSON, so checking the 'data' field
+        in the dialog must round-trip them through the template into
+        a new element.
+        """
+        h = await _auth(client)
+        set_id = await _create_set(client, h)
+        attrs = [
+            {"name": "price", "type": "string", "scope": "Private"},
+            {"name": "qty", "type": "int"},
+        ]
+        # Source element: a UML class with structured attributes.
+        src = await client.post(
+            "/api/elements",
+            json={
+                "set_id": set_id,
+                "element_type": "class",
+                "notation": "uml",
+                "name": "Order",
+                "data": {"attributes": attrs, "operations": ["ship()"]},
+            },
+            headers=h,
+        )
+        assert src.status_code == 201, src.text
+        src_id = src.json()["id"]
+
+        # Build a template that captures the data field only.
+        tpl = await client.post(
+            "/api/element-templates",
+            json={
+                "source_element_id": src_id,
+                "name": "Class with attrs",
+                "included_fields": ["element_type", "notation", "data"],
+                "set_id": set_id,
+                "is_global": False,
+            },
+            headers=h,
+        )
+        assert tpl.status_code == 201, tpl.text
+        tpl_data = tpl.json()["template_data"]
+        assert tpl_data["data"]["attributes"] == attrs
+        assert tpl_data["data"]["operations"] == ["ship()"]
+
+        # Create a new element from the template — attributes carry through.
+        new_el = await client.post(
+            "/api/elements",
+            json={
+                "set_id": set_id,
+                "template_id": tpl.json()["id"],
+                "name": "Order Copy",
+            },
+            headers=h,
+        )
+        assert new_el.status_code == 201, new_el.text
+        body = new_el.json()
+        assert body["element_type"] == "class"
+        assert body["notation"] == "uml"
+        assert body["data"]["attributes"] == attrs
+        assert body["data"]["operations"] == ["ship()"]

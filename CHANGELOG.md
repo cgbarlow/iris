@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.1] - 2026-05-17
+
+### Fixed
+
+- **Dynamic List view crashes with `marked(): input parameter is
+  undefined or null`** (issue
+  [#167](https://github.com/cgbarlow/iris/issues/167)). Two-part
+  fix: `DynamicListCanvas` now passes the markdown content under
+  the prop name `MarkdownView` actually declares (`source`, not
+  `markdown`); `renderMarkdown()` coalesces `undefined` / `null`
+  to `''` defensively so the same class of bug can't bite other
+  callers. DOMPurify still runs after `marked` per Protocol §7.
+- **Class element attributes inconsistent across diagrams** (ADR-192,
+  SPEC-192-A, issue
+  [#164](https://github.com/cgbarlow/iris/issues/164)). The canvas
+  used to mint nodes with only `label / entityType / description /
+  entityId / notation`, dropping class attributes, operations,
+  literals and visual overrides. Three near-identical mini-builders
+  on `views/[id]/+page.svelte` now route through a new shared
+  `elementToNodeData()` helper, so the renderer always sees a
+  complete shape and `refreshNodeDescriptions` carries
+  backend-authored attributes forward.
+- **Package Relationships tab always empty** (issue
+  [#166](https://github.com/cgbarlow/iris/issues/166)). The
+  frontend asked for `?page_size=200` on
+  `GET /api/packages/{id}/elements`; the router capped at
+  `le=100`, so every request 422'd and the silent catch on the
+  frontend hid the failure as "No elements in this package."
+  Backend cap raised to `le=500`; frontend surfaces fetch errors
+  in a banner instead of swallowing them.
+
+### Changed
+
+- **Hierarchy sidebar uniformity** (ADR-194, SPEC-194-A, issue
+  [#162](https://github.com/cgbarlow/iris/issues/162)).
+  `HierarchyControls` defaults shrunk to compact density
+  (`px-2 py-1 text-xs` triggers; `px-3 py-1 text-xs` menu items).
+  The packages-detail sidebar drops its bespoke "+ Child" dropdown
+  and inline `Diagrams` toggle and adopts the shared
+  `HierarchyControls` + `showDiagrams` / `showText` model that
+  Dashboard / Views list / View detail already use. All four
+  hierarchy surfaces now read visually identical.
+- **"Save as template" dialog clarifies the `Data` field** (issue
+  [#165](https://github.com/cgbarlow/iris/issues/165)). The
+  ambiguous "Data payload" label is renamed to "Data (attributes,
+  operations, visual…)" and the dialog gains help text explaining
+  what `Data` vs `Metadata` capture — class element attributes
+  already round-tripped through templates via the `data` field;
+  users couldn't tell from the old label.
+
 ## [6.8.0] - 2026-05-17
 
 ### Added

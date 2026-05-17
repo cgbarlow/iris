@@ -11,12 +11,16 @@
 	import DOMPurify from 'dompurify';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 
+	// Issue #165: the original "Data payload" label hid the fact that
+	// class elements' attributes / operations / literals all live
+	// inside element.data. Users assumed they had to be promoted
+	// individually and gave up. The expanded label spells it out.
 	const FIELD_OPTIONS: { value: string; label: string }[] = [
 		{ value: 'name', label: 'Name' },
 		{ value: 'description', label: 'Description' },
 		{ value: 'element_type', label: 'Type' },
 		{ value: 'notation', label: 'Notation' },
-		{ value: 'data', label: 'Data payload' },
+		{ value: 'data', label: 'Data (attributes, operations, visual…)' },
 		{ value: 'metadata', label: 'Metadata' },
 		{ value: 'package_id', label: 'Package membership' },
 		{ value: 'tags', label: 'Tags' },
@@ -159,6 +163,10 @@
 						</label>
 					{/each}
 				</div>
+				<p class="mt-2 text-xs" style="color: var(--color-muted)">
+					'Data' captures the element's structured contents — for class elements that includes its
+					attributes and operations. 'Metadata' is admin info like timestamps and author.
+				</p>
 			</fieldset>
 
 			<label class="flex items-center gap-2 text-sm">

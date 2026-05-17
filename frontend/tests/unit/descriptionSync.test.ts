@@ -30,9 +30,11 @@ describe('Node description sync', () => {
 	it('fetches element data for nodes with entityId', () => {
 		// The function should fetch element data for nodes with entityId
 		expect(pageSrc).toContain("node.data?.entityId");
-		// And update label and description
-		expect(pageSrc).toContain('element.name');
-		expect(pageSrc).toContain('element.description');
+		// ADR-192 (issue #164): label + description (and all other
+		// renderer-visible fields) now flow through the shared
+		// elementToNodeData() helper.
+		expect(pageSrc).toContain('elementToNodeData(element)');
+		expect(pageSrc).toMatch(/hydrated\.(label|description)/);
 	});
 
 	it('uses Promise.all for parallel entity fetching', () => {

@@ -70,3 +70,25 @@ describe('Package detail relationships tab — UI affordance', () => {
 		expect(pkgPageSrc).toContain('!packageElementsLoaded');
 	});
 });
+
+describe('Package detail relationships tab — fetch error handling (issue #166)', () => {
+	it('declares packageElementsError state', () => {
+		expect(pkgPageSrc).toContain('packageElementsError');
+	});
+
+	it('captures the error in loadPackageElements catch instead of swallowing it', () => {
+		// The earlier "catch {…}" silently hid the 422 produced by the
+		// page_size cap mismatch. Verify the new shape captures e.message.
+		expect(pkgPageSrc).toMatch(/catch\s*\(e\)/);
+		expect(pkgPageSrc).toContain('packageElementsError = e instanceof ApiError');
+	});
+
+	it("renders an alert banner when packageElementsError is set", () => {
+		expect(pkgPageSrc).toContain('Failed to load package elements');
+		expect(pkgPageSrc).toMatch(/role="alert"/);
+	});
+
+	it('clears any prior error at the start of a new load', () => {
+		expect(pkgPageSrc).toContain('packageElementsError = null');
+	});
+});

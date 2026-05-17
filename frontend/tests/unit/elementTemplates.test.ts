@@ -117,6 +117,18 @@ describe('CreateTemplateDialog — field whitelist + scoping', () => {
 	it('flips set_id to null when promoting to global', () => {
 		expect(createTemplateDialogSrc).toContain('set_id: isGlobal ? null : setId');
 	});
+
+	it("clarifies the 'data' label so users know it covers class attributes (issue #165)", () => {
+		// The opaque "Data payload" label hid the fact that class
+		// attributes / operations / literals all live in element.data.
+		expect(createTemplateDialogSrc).not.toMatch(/label:\s*'Data payload'/);
+		expect(createTemplateDialogSrc).toMatch(/label:\s*'Data \(attributes, operations, visual…\)'/);
+	});
+
+	it('renders help text explaining what Data vs Metadata capture', () => {
+		expect(createTemplateDialogSrc).toContain('class elements');
+		expect(createTemplateDialogSrc).toContain('attributes and operations');
+	});
 });
 
 describe('Element template detail page', () => {

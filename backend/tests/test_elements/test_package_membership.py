@@ -364,6 +364,56 @@ class TestPackageElementsEndpoint:
         assert in_b["body"]["id"] not in ids
         assert body["total"] == 1
 
+    async def test_empty_package_returns_empty_list(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """Issue #166: empty package returns 200 + [], not an error."""
+        headers = await _auth_headers(client)
+        set_id = await _create_set(client, headers)
+        pkg = await _create_package(client, headers, set_id=set_id)
+
+        resp = await client.get(f"/api/packages/{pkg}/elements")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["items"] == []
+        assert body["total"] == 0
+
+    async def test_page_size_200_accepted(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """Issue #166 root cause: frontend asked page_size=200 and the
+        router's ``le=100`` cap returned 422. The cap is now ``le=500``
+        so the relationships tab loads.
+        """
+        headers = await _auth_headers(client)
+        set_id = await _create_set(client, headers)
+        pkg = await _create_package(client, headers, set_id=set_id)
+        await _create_element(
+            client, headers, set_id=set_id, package_id=pkg, name="Only",
+        )
+
+        resp = await client.get(
+            f"/api/packages/{pkg}/elements?page_size=200",
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["page_size"] == 200
+        assert body["total"] == 1
+        assert len(body["items"]) == 1
+
+    async def test_page_size_over_cap_returns_422(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """Cap is raised to 500 — anything beyond still 422."""
+        headers = await _auth_headers(client)
+        set_id = await _create_set(client, headers)
+        pkg = await _create_package(client, headers, set_id=set_id)
+
+        resp = await client.get(
+            f"/api/packages/{pkg}/elements?page_size=501",
+        )
+        assert resp.status_code == 422
+
 
 class TestDiagramRelationshipsAugmentation:
     """GET /api/diagrams/{id}/relationships gains element_package_memberships."""

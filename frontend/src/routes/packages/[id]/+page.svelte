@@ -4,6 +4,7 @@
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
+	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
 	import PackagePicker from '$lib/components/PackagePicker.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
@@ -61,6 +62,7 @@
 	let packageElementsLoading = $state(false);
 	let packageElementsTotal = $state(0);
 	let packageElementsLoaded = $state(false);
+	let packageElementsError = $state<string | null>(null);
 	let showDeleteDialog = $state(false);
 	let deleteMessage = $state('Are you sure you want to delete this package? This action cannot be undone.');
 	let cloneLoading = $state(false);
@@ -71,7 +73,6 @@
 	let contextItems = $derived(getAiContextItems());
 	let isInContext = $derived(pkg ? contextItems.some((i) => i.id === pkg!.id) : false);
 	let showParentPicker = $state(false);
-	let showChildMenu = $state(false);
 	let showCreateChildDiagramDialog = $state(false);
 	let showCreateChildPackageDialog = $state(false);
 	let childPackageName = $state('');
@@ -94,7 +95,12 @@
 	let hierarchyTree = $state<DiagramHierarchyNode[]>([]);
 	let hierarchyLoading = $state(false);
 	let treeSearchQuery = $state('');
-	let treeDiagramsOnly = $state(false);
+	// ADR-194 / issue #162: align tree filters with the shared
+	// HierarchyControls model (showDiagrams / showText). The earlier
+	// ``treeDiagramsOnly`` boolean only filtered packages with content,
+	// which was inconsistent with Dashboard / Views detail.
+	let showDiagrams = $state(true);
+	let showText = $state(true);
 	let treeExpandedIds = $state(new Set<string>());
 
 	$effect(() => {
@@ -158,7 +164,14 @@
 		// Lazy-loaded the first time the Relationships tab is opened
 		// (issue #157, ADR-188). Uses the existing
 		// GET /api/packages/{id}/elements endpoint from ADR-184.
+		//
+		// Issue #166: the previous ``?page_size=200`` violated the
+		// router's old ``le=100`` cap and 422'd silently — every
+		// package looked empty. Backend cap is now ``le=500`` and the
+		// frontend asks for 200; errors surface in
+		// ``packageElementsError`` instead of being swallowed.
 		packageElementsLoading = true;
+		packageElementsError = null;
 		try {
 			const resp = await apiFetch<{
 				items: PackageElement[];
@@ -168,9 +181,10 @@
 			}>(`/api/packages/${id}/elements?page_size=200`);
 			packageElements = resp.items;
 			packageElementsTotal = resp.total;
-		} catch {
+		} catch (e) {
 			packageElements = [];
 			packageElementsTotal = 0;
+			packageElementsError = e instanceof ApiError ? e.message : 'Failed to load package elements';
 		}
 		packageElementsLoaded = true;
 		packageElementsLoading = false;
@@ -503,55 +517,19 @@
 			>
 				<div class="flex items-center justify-between p-3" style="border-bottom: 1px solid var(--color-border)">
 					<span class="text-sm font-semibold" style="color: var(--color-fg)">Hierarchy</span>
-					<div class="flex items-center gap-1">
-						<button
-							onclick={() => (treeDiagramsOnly = !treeDiagramsOnly)}
-							class="rounded px-2 py-1 text-xs"
-							style="border: 1px solid {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-border)'}; color: {treeDiagramsOnly ? 'var(--color-primary)' : 'var(--color-fg)'}; background: {treeDiagramsOnly ? 'var(--color-surface, transparent)' : 'transparent'}"
-							title="Show only items with child diagrams"
-							aria-pressed={treeDiagramsOnly}
-						>
-							Diagrams
-						</button>
-						<div style="position: relative">
-							<button
-								onclick={() => (showChildMenu = !showChildMenu)}
-								class="rounded px-2 py-1 text-xs"
-								style="background: var(--color-primary); color: white"
-								title="Create child item"
-							>
-								+ Child
-							</button>
-							{#if showChildMenu}
-								<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div
-									style="position: fixed; inset: 0; z-index: 9"
-									onclick={() => (showChildMenu = false)}
-									onkeydown={(e) => { if (e.key === 'Escape') showChildMenu = false; }}
-								></div>
-								<div
-									style="position: absolute; top: 100%; right: 0; z-index: 10; min-width: 120px"
-									class="mt-1 rounded border shadow-md"
-									style:border-color="var(--color-border)"
-									style:background-color="var(--color-surface)"
-								>
-									<button
-										onclick={() => { showCreateChildDiagramDialog = true; showChildMenu = false; }}
-										class="block w-full px-3 py-2 text-left text-xs hover:opacity-80"
-										style="color: var(--color-fg)"
-									>
-										Diagram
-									</button>
-									<button
-										onclick={() => { showCreateChildPackageDialog = true; showChildMenu = false; }}
-										class="block w-full px-3 py-2 text-left text-xs hover:opacity-80"
-										style="color: var(--color-fg); border-top: 1px solid var(--color-border)"
-									>
-										Package
-									</button>
-								</div>
-							{/if}
-						</div>
+					<div class="flex items-center gap-2">
+						<!-- ADR-194 (issue #162): shared HierarchyControls so the
+							 toolbar matches Dashboard / Views detail. + New here
+							 creates a CHILD of the current package, hence the
+							 packages-page-specific dialog handlers. -->
+						<HierarchyControls
+							{showDiagrams}
+							{showText}
+							onShowDiagrams={(v) => (showDiagrams = v)}
+							onShowText={(v) => (showText = v)}
+							oncreateview={() => (showCreateChildDiagramDialog = true)}
+							oncreatepackage={() => (showCreateChildPackageDialog = true)}
+						/>
 						<button
 							onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
 							class="rounded p-1 text-xs"
@@ -580,7 +558,7 @@
 					{:else}
 						<ul role="tree">
 							{#each hierarchyTree as node (node.id)}
-								<TreeNode {node} currentDiagramId={pkg.id} searchQuery={treeSearchQuery} showDiagramsOnly={treeDiagramsOnly} expandedIds={treeExpandedIds} />
+								<TreeNode {node} currentDiagramId={pkg.id} searchQuery={treeSearchQuery} {showDiagrams} {showText} expandedIds={treeExpandedIds} />
 							{/each}
 						</ul>
 					{/if}
@@ -868,6 +846,11 @@
 				</h2>
 				{#if packageElementsLoading}
 					<p class="text-sm" style="color: var(--color-muted)">Loading elements…</p>
+				{:else if packageElementsError}
+					<p class="rounded border px-3 py-2 text-sm" role="alert"
+						style="color: var(--color-danger); border-color: var(--color-danger); background: var(--color-surface)">
+						Failed to load package elements: {packageElementsError}
+					</p>
 				{:else if packageElements.length === 0}
 					<p class="text-sm" style="color: var(--color-muted)">No elements in this package.</p>
 				{:else}

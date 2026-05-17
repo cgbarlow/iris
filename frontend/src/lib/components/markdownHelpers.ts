@@ -86,7 +86,9 @@ export interface RenderedMarkdown {
  * caller's CSS can apply muted colour (issue #26).
  */
 export function renderMarkdown(source: string, textDiagramIds?: Set<string>): RenderedMarkdown {
-	const raw = marked.parse(source, { async: false }) as string;
+	// Issue #167: defend against undefined/null. Fresh Dynamic List views
+	// can arrive with no body yet; marked throws on non-string input.
+	const raw = marked.parse(source ?? '', { async: false }) as string;
 
 	// Issue #32 reopen: User Guide images use absolute paths (e.g.
 	// `/guide/dashboard.png`) — those have no scheme so the original
