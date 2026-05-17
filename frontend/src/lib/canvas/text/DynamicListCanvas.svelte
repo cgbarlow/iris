@@ -89,7 +89,7 @@
 
 <div class="dynamic-list-canvas" style="padding: 1rem">
 	<MarkdownView
-		markdown={content}
+		source={content}
 		{textDiagramIds}
 		{onheadings}
 	/>

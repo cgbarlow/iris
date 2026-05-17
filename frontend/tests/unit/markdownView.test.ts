@@ -12,6 +12,26 @@ import {
 	urlIsAllowed,
 } from '$lib/components/markdownHelpers';
 
+describe('renderMarkdown — null/empty input safety (issue #167)', () => {
+	it('returns empty html when source is undefined', () => {
+		const { html, links } = renderMarkdown(undefined as unknown as string);
+		expect(html).toBe('');
+		expect(links).toEqual([]);
+	});
+
+	it('returns empty html when source is null', () => {
+		const { html, links } = renderMarkdown(null as unknown as string);
+		expect(html).toBe('');
+		expect(links).toEqual([]);
+	});
+
+	it('returns empty html when source is the empty string', () => {
+		const { html, links } = renderMarkdown('');
+		expect(html).toBe('');
+		expect(links).toEqual([]);
+	});
+});
+
 describe('renderMarkdown — sanitisation (protocol #7)', () => {
 	it('strips <script> tags from the source', () => {
 		const { html } = renderMarkdown('# Heading\n\n<script>window.__pwned = true;</script>\n\nBody.');

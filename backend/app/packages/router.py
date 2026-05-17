@@ -188,7 +188,10 @@ async def get_package_elements_route(
     package_id: str,
     request: Request,
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=50, ge=1, le=100),
+    # Issue #166: cap raised from 100 → 500 so callers (notably the
+    # /packages/[id] Relationships tab) can request a comfortable
+    # page_size without 422-ing.
+    page_size: int = Query(default=50, ge=1, le=500),
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> ElementListResponse:
     """List elements that belong to this package (ADR-184)."""

@@ -46,6 +46,7 @@
 	import { getActiveThemeId, loadThemes, areThemesLoaded, resolveNodeVisual } from '$lib/stores/themeStore.svelte';
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
+	import { elementToNodeData } from '$lib/canvas/elementToNodeData';
 	import { createLockManager } from '$lib/utils/locks.svelte';
 	import DOMPurify from 'dompurify';
 	import type { Element, DiagramHierarchyNode, Package } from '$lib/types/api';
@@ -610,7 +611,10 @@
 		loading = false;
 	}
 
-	/** Sync node descriptions from linked elements (WP-5). */
+	/** Sync node data from linked elements. Originally label+description
+	 *  only (WP-5); now hydrates via elementToNodeData() so class
+	 *  attributes/operations/literals authored later on /elements/[id]
+	 *  appear on the canvas without a hard reload (ADR-192, issue #164). */
 	async function refreshNodeDescriptions() {
 		let updated = false;
 		const refreshed = await Promise.all(
@@ -619,19 +623,26 @@
 				if (!entityId) return node;
 				try {
 					const element = await apiFetch<Element>(`/api/elements/${entityId}`);
-					const rawDesc = element.description ?? '';
-					const desc = rawDesc.startsWith(node.data.label) ? rawDesc.slice(rawDesc.indexOf('\n') + 1).replace(/^\r?\n/, '') : rawDesc;
-					if (desc !== node.data.description || element.name !== node.data.label || (node.data as Record<string, unknown>).diagramUsageCount !== (element.diagram_usage_count ?? 0)) {
+					const hydrated = elementToNodeData(element);
+					// Keep the description's "starts-with-label" trim so
+					// BPMN-style payloads don't double-show the title.
+					const rawDesc = hydrated.description;
+					const desc = rawDesc.startsWith(hydrated.label)
+						? rawDesc.slice(rawDesc.indexOf('\n') + 1).replace(/^\r?\n/, '')
+						: rawDesc;
+					const prev = node.data as Record<string, unknown>;
+					const next: Record<string, unknown> = { ...node.data, ...hydrated, description: desc };
+					const diffKeys = [
+						'label', 'description', 'diagramUsageCount',
+						'attributes', 'operations', 'literals',
+						'stereotype', 'qualifier',
+					];
+					const changed = diffKeys.some((k) =>
+						JSON.stringify(next[k]) !== JSON.stringify(prev[k]),
+					);
+					if (changed) {
 						updated = true;
-						return {
-							...node,
-							data: {
-								...node.data,
-								label: element.name,
-								description: desc,
-								diagramUsageCount: element.diagram_usage_count ?? 0,
-							},
-						};
+						return { ...node, data: next as typeof node.data };
 					}
 				} catch { /* element may be deleted */ }
 				return node;
@@ -1159,13 +1170,12 @@
 				type: elementType,
 				position: findOpenPosition(),
 				width: 200,
-				data: {
-					label: name,
-					entityType: elementType,
-					description,
-					entityId: created.id,
-					notation: effectiveNotation,
-				},
+				// ADR-192 (issue #164): hydrate the node from the backend
+				// element so class compartments / visuals / stereotypes
+				// stay in sync. New elements still arrive with empty
+				// data, but any future enrichment is picked up by
+				// refreshNodeDescriptions.
+				data: elementToNodeData(created),
 			};
 			history.pushState(canvasNodes, canvasEdges);
 			canvasNodes = [...canvasNodes, newNode];
@@ -1559,13 +1569,10 @@
 			type: elementType,
 			position: findOpenPosition(),
 			width: 200,
-			data: {
-				label: element.name,
-				entityType: elementType,
-				description: element.description ?? '',
-				entityId: element.id,
-				notation: element.notation ?? 'simple',
-			},
+			// ADR-192 (issue #164): use the shared hydrator so class
+			// attributes/operations/literals authored on /elements/[id]
+			// show up the moment the element is linked onto the canvas.
+			data: elementToNodeData(element),
 		};
 		history.pushState(canvasNodes, canvasEdges);
 		canvasNodes = [...canvasNodes, newNode];

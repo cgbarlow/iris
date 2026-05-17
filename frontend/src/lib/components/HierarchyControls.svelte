@@ -44,7 +44,7 @@
 		<button
 			type="button"
 			onclick={() => { newOpen = !newOpen; showOpen = false; }}
-			class="whitespace-nowrap rounded px-3 py-1.5 text-sm text-white"
+			class="whitespace-nowrap rounded px-2 py-1 text-xs text-white"
 			style="background-color: var(--color-primary)"
 			aria-haspopup="menu"
 			aria-expanded={newOpen}
@@ -62,7 +62,7 @@
 				<button
 					role="menuitem"
 					onclick={() => { oncreatepackage(); closeAll(); }}
-					class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
+					class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
 					style="color: var(--color-fg)"
 				>
 					Package
@@ -70,7 +70,7 @@
 				<button
 					role="menuitem"
 					onclick={() => { oncreateview(); closeAll(); }}
-					class="block w-full px-4 py-1.5 text-left text-sm hover:opacity-80"
+					class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
 					style="color: var(--color-fg); padding-left: 2rem"
 				>
 					View
@@ -83,7 +83,7 @@
 		<button
 			type="button"
 			onclick={() => { showOpen = !showOpen; newOpen = false; }}
-			class="whitespace-nowrap rounded border px-3 py-1.5 text-sm"
+			class="whitespace-nowrap rounded border px-2 py-1 text-xs"
 			style="border-color: var(--color-border); color: var(--color-fg)"
 			aria-haspopup="menu"
 			aria-expanded={showOpen}
@@ -107,7 +107,7 @@
 					Views
 				</div>
 				<label
-					class="flex cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:opacity-80"
+					class="flex cursor-pointer items-center gap-2 px-3 py-1 text-xs hover:opacity-80"
 					style="color: var(--color-fg)"
 				>
 					<input
@@ -118,7 +118,7 @@
 					Diagrams
 				</label>
 				<label
-					class="flex cursor-pointer items-center gap-2 px-4 py-1.5 text-sm hover:opacity-80"
+					class="flex cursor-pointer items-center gap-2 px-3 py-1 text-xs hover:opacity-80"
 					style="color: var(--color-fg)"
 				>
 					<input

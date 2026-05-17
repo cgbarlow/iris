@@ -65,3 +65,25 @@ describe('HierarchyControls (issue #27)', () => {
 		expect(src).toMatch(/isPackage \|\| /);
 	});
 });
+
+describe('HierarchyControls — compact sizing (issue #162)', () => {
+	it('the "+ New" and "Show" trigger buttons use compact px-2 py-1 text-xs', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		// Both top-level buttons render at the smaller density now.
+		const triggers = src.match(/whitespace-nowrap rounded[^"]*px-2 py-1 text-xs/g) ?? [];
+		expect(triggers.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it('the dropdown menu items use compact px-3 py-1 text-xs', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		const items = src.match(/block w-full px-3 py-1 text-left text-xs/g) ?? [];
+		// Two top-level menus + Diagrams/Text checkboxes use the compact style.
+		expect(items.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it('does not use the old larger px-3 py-1.5 text-sm sizing anywhere', () => {
+		const src = readFileSync(COMPONENT, 'utf-8');
+		expect(src).not.toMatch(/px-3 py-1\.5 text-sm/);
+		expect(src).not.toMatch(/px-4 py-1\.5 text-sm/);
+	});
+});
