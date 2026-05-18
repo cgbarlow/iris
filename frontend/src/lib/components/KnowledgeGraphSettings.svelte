@@ -7,12 +7,16 @@
 		onchange: (settings: GraphSettings) => void;
 		isAdmin?: boolean;
 		onSaveDefault?: (settings: GraphSettings) => void | Promise<void>;
-		onResetToDefaults?: (tab: 'visibility' | 'display') => void;
+		onResetToDefaults?: (tab: 'nodes' | 'relationships' | 'display') => void;
 	}
 
 	let { settings, onchange, isAdmin = false, onSaveDefault, onResetToDefaults }: Props = $props();
 
-	let activeTab = $state<'visibility' | 'display'>('visibility');
+	// Issue #173 item 4: split former 'visibility' tab into 'nodes' and
+	// 'relationships' so node-type and relationship-type toggles each
+	// own their own column. Default opens on 'nodes' (preserves the
+	// "first thing you see" behaviour).
+	let activeTab = $state<'nodes' | 'relationships' | 'display'>('nodes');
 
 	const EDGE_GROUPS: { label: string; items: { key: string; label: string }[] }[] = [
 		{
@@ -28,6 +32,10 @@
 			items: [
 				{ key: 'hierarchy', label: 'Nesting' },
 				{ key: 'package_relationship', label: 'Relationships' },
+				// Issue #173 item 5: elements belonging to packages get
+				// their own toggle here so users can hide membership
+				// edges without losing package-to-package relationships.
+				{ key: 'element_package', label: 'Elements (membership)' },
 			],
 		},
 		{
@@ -74,13 +82,18 @@
 <div
 	style="position: absolute; top: 100%; right: 0; z-index: 20; margin-top: 4px; min-width: 220px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 0"
 >
-	<!-- Tabs -->
+	<!-- Tabs (issue #173 item 4: Nodes / Relationships / Display) -->
 	<div class="flex" style="border-bottom: 1px solid var(--color-border)">
 		<button
-			onclick={() => (activeTab = 'visibility')}
+			onclick={() => (activeTab = 'nodes')}
 			class="flex-1 px-3 py-2 text-xs font-medium"
-			style="color: {activeTab === 'visibility' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'visibility' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
-		>Visibility</button>
+			style="color: {activeTab === 'nodes' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'nodes' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
+		>Nodes</button>
+		<button
+			onclick={() => (activeTab = 'relationships')}
+			class="flex-1 px-3 py-2 text-xs font-medium"
+			style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
+		>Relationships</button>
 		<button
 			onclick={() => (activeTab = 'display')}
 			class="flex-1 px-3 py-2 text-xs font-medium"
@@ -89,7 +102,7 @@
 	</div>
 
 	<div style="padding: 12px">
-		{#if activeTab === 'visibility'}
+		{#if activeTab === 'nodes'}
 			<!-- Node Types -->
 			<h4 class="mb-2 text-xs font-semibold uppercase" style="color: var(--color-muted)">Node Types</h4>
 			{#each Object.entries(NODE_TYPE_LABELS) as [key, label]}
@@ -99,9 +112,7 @@
 					{label}
 				</label>
 			{/each}
-
-			<hr class="my-2" style="border-color: var(--color-border)" />
-
+		{:else if activeTab === 'relationships'}
 			<!-- Relationship Types -->
 			<h4 class="mb-2 text-xs font-semibold uppercase" style="color: var(--color-muted)">Relationship Types</h4>
 			{#each EDGE_GROUPS as group}
