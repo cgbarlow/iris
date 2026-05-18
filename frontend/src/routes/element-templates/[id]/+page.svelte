@@ -185,9 +185,9 @@
 		<dl class="mt-3 grid gap-3" style="grid-template-columns: auto 1fr">
 			<dt class="text-sm font-medium" style="color: var(--color-muted)">Source element</dt>
 			<dd class="text-sm" style="color: var(--color-fg)">
-				{#if tpl.source_element_id}
+				{#if tpl.source_element_name}
 					<a href="/elements/{tpl.source_element_id}" style="color: var(--color-primary)">
-						{tpl.source_element_name ?? tpl.source_element_id}
+						{tpl.source_element_name}
 					</a>
 				{:else}
 					<span style="color: var(--color-muted)">(source element deleted)</span>
