@@ -80,23 +80,27 @@
 </script>
 
 <div
-	style="position: absolute; top: 100%; right: 0; z-index: 20; margin-top: 4px; min-width: 220px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 0"
+	style="position: absolute; top: 100%; right: 0; z-index: 20; margin-top: 4px; min-width: 300px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: 0 4px 16px rgba(0,0,0,0.18); padding: 0"
 >
-	<!-- Tabs (issue #173 item 4: Nodes / Relationships / Display) -->
+	<!--
+		v6.11.1: bumped min-width from 220 → 300 and added whitespace-nowrap
+		to each tab button so the "Relationships" label introduced in
+		v6.9.0 (ADR-199) renders on one line without wrapping or clipping.
+	-->
 	<div class="flex" style="border-bottom: 1px solid var(--color-border)">
 		<button
 			onclick={() => (activeTab = 'nodes')}
-			class="flex-1 px-3 py-2 text-xs font-medium"
+			class="flex-1 whitespace-nowrap px-3 py-2 text-xs font-medium"
 			style="color: {activeTab === 'nodes' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'nodes' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
 		>Nodes</button>
 		<button
 			onclick={() => (activeTab = 'relationships')}
-			class="flex-1 px-3 py-2 text-xs font-medium"
+			class="flex-1 whitespace-nowrap px-3 py-2 text-xs font-medium"
 			style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
 		>Relationships</button>
 		<button
 			onclick={() => (activeTab = 'display')}
-			class="flex-1 px-3 py-2 text-xs font-medium"
+			class="flex-1 whitespace-nowrap px-3 py-2 text-xs font-medium"
 			style="color: {activeTab === 'display' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'display' ? 'var(--color-primary)' : 'transparent'}; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; margin-bottom: -1px"
 		>Display</button>
 	</div>

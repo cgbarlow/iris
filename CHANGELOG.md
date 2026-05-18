@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.11.1] - 2026-05-18
+
+### Fixed
+
+- **KG settings dropdown "Relationships" tab overflowed**. After
+  v6.9.0 (ADR-199) added the third tab, the 220px min-width
+  popover couldn't fit "Relationships" on one line; it wrapped or
+  clipped. Bumped to 300px and added `whitespace-nowrap` to each
+  tab button so labels stay on a single line regardless of any
+  future container resizing.
+
 ## [6.10.1] - 2026-05-18
 
 ### Fixed
