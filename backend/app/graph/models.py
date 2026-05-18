@@ -43,6 +43,10 @@ class GraphDisplaySettings(BaseModel):
         "collection_membership": True, "set_membership": True, "direct_diagram_links": True,
         "hierarchy": True, "diagram_element": True, "diagram_package": True,
         "diagram_link": True, "package_relationship": True, "element_relationship": True,
+        # Issue #173 item 5 — elements that belong to packages get a
+        # package → element edge so the KG can render package membership
+        # alongside set membership and diagram containment.
+        "element_package": True,
     })
     label_density: int = Field(default=10, ge=1, le=50)
     node_spacing: float = Field(default=1.0, ge=0.2, le=3.0)

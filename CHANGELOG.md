@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.9.0] - 2026-05-18
+
+### Added
+
+- **Knowledge graph models element ↔ package membership as a
+  first-class edge** (issue
+  [#173](https://github.com/cgbarlow/iris/issues/173) item 5,
+  ADR-199). For every element with a non-null `package_id`, the
+  graph now emits a `package → element` edge (direction matches
+  `set_membership` and `hierarchy`). Default visibility ON;
+  toggle lives under the new Relationships tab → Package group →
+  "Elements (membership)".
+
+### Changed
+
+- **KG settings: Visibility tab split into Nodes + Relationships**
+  (issue [#173](https://github.com/cgbarlow/iris/issues/173) item 4,
+  ADR-199). The previous combined column mixed node-type toggles
+  and relationship-type toggles; finding the one you wanted was
+  fiddly. The settings dialog now has three tabs (Nodes /
+  Relationships / Display). Per-tab Reset semantics: each tab
+  resets only its own concern.
+
 ## [6.8.7] - 2026-05-18
 
 ### Fixed

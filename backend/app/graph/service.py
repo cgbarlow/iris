@@ -208,7 +208,7 @@ async def get_graph_data(
 
     # 1. Elements
     cursor = await db.execute(
-        "SELECT e.id, ev.name, e.element_type, ev.description, e.set_id "
+        "SELECT e.id, ev.name, e.element_type, ev.description, e.set_id, e.package_id "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
         f"WHERE e.is_deleted = 0 {entity_filter.format(a='e')}",  # noqa: S608
@@ -375,6 +375,19 @@ async def get_graph_data(
                 "label": None,
                 "edge_type": "set_membership",
             })
+
+    # 8b. Package → Element membership (#173 item 5, ADR-199).
+    # element_rows columns: 0=id, 1=name, 2=type, 3=desc, 4=set_id, 5=package_id
+    for row in element_rows:
+        eid, pkg_id = row[0], row[5]
+        if pkg_id and pkg_id in package_ids:
+            edges.append({
+                "id": str(uuid.uuid4()),
+                "source": pkg_id, "target": eid,
+                "relationship_type": "contains",
+                "label": None,
+                "edge_type": "element_package",
+            })
     for row in diagram_rows:
         did, sid = row[0], row[6]
         if sid and sid in set_ids:
@@ -447,6 +460,7 @@ GRAPH_SETTINGS_DEFAULTS: dict[str, Any] = {
         "diagram_element": True, "diagram_package": True,
         "diagram_link": True, "package_relationship": True,
         "element_relationship": True,
+        "element_package": True,
     },
     "label_density": 10,
     "node_spacing": 1.0,

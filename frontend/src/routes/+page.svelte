@@ -690,8 +690,12 @@
 								onResetToDefaults={async (tab) => {
 									const defaults = await fetchAdminDefaults(setId || undefined, collectionId || undefined);
 									adminDefaults = defaults;
-									if (tab === 'visibility') {
-										graphSettings = { ...graphSettings, nodes: { ...defaults.nodes }, edges: { ...defaults.edges } };
+									// Issue #173 item 4: per-tab reset — each tab resets only its own concern
+									// (Nodes resets node toggles, Relationships resets edge toggles, Display resets physics).
+									if (tab === 'nodes') {
+										graphSettings = { ...graphSettings, nodes: { ...defaults.nodes } };
+									} else if (tab === 'relationships') {
+										graphSettings = { ...graphSettings, edges: { ...defaults.edges } };
 									} else {
 										graphSettings = { ...graphSettings, label_density: defaults.label_density, node_spacing: defaults.node_spacing, size_contrast: defaults.size_contrast, link_length: defaults.link_length };
 									}

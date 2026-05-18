@@ -14,7 +14,7 @@
 		highlightNodeId?: string | null;
 		isAdmin?: boolean;
 		onSaveDefault?: (settings: GraphSettings) => void | Promise<void>;
-		onResetToDefaults?: (tab: 'visibility' | 'display') => void;
+		onResetToDefaults?: (tab: 'nodes' | 'relationships' | 'display') => void;
 	}
 
 	let { nodes, edges, settings, onSettingsChange, onNodeClick, onNodeHover, highlightNodeId = null, isAdmin = false, onSaveDefault, onResetToDefaults }: Props = $props();
