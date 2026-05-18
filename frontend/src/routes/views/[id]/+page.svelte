@@ -582,16 +582,12 @@
 			// string. Without this branch the page lands on Details for
 			// every Text view that has any markdown.
 			if (!userSelectedTab) {
-				const isText = diagram.diagram_type === 'text' || diagram.notation === 'markdown';
-				const hasContent = isText
-					? !!(diagram.data?.content as string | undefined)?.length
-					: diagram.diagram_type === 'sequence'
-						? sequenceData.participants.length > 0
-						: canvasNodes.length > 0;
-				// ADR-204 (v6.14.0): for content-bearing diagrams, defer to
-				// the parent set's view_tab_default; otherwise stay on
-				// Details. Soft-fails to 'canvas' on fetch error.
-				if (hasContent && diagram.set_id) {
+				// ADR-204 (v6.14.0, v6.14.1): the parent set's
+				// view_tab_default always wins when present. The previous
+				// v5.4.0 "details on empty content" heuristic only applies
+				// when the diagram has no parent set (rare). The set
+				// owner is explicitly opting in to a tab; we honour it.
+				if (diagram.set_id) {
 					try {
 						const setData = await apiFetch<{ view_tab_default?: 'canvas' | 'relationships' | 'details' }>(`/api/sets/${diagram.set_id}`);
 						const preferred = setData.view_tab_default;
@@ -604,6 +600,12 @@
 						activeTab = 'canvas';
 					}
 				} else {
+					const isText = diagram.diagram_type === 'text' || diagram.notation === 'markdown';
+					const hasContent = isText
+						? !!(diagram.data?.content as string | undefined)?.length
+						: diagram.diagram_type === 'sequence'
+							? sequenceData.participants.length > 0
+							: canvasNodes.length > 0;
 					activeTab = hasContent ? 'canvas' : 'details';
 				}
 			}

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.14.1] - 2026-05-18
+
+### Fixed
+
+- **View tab default now honoured for empty diagrams** (ADR-204
+  follow-up). The v6.14.0 initialiser only applied the parent set's
+  `view_tab_default` to *content-bearing* diagrams, falling back to
+  Details for empty ones — that masked the user's explicit
+  preference. The set's preference now always wins when the
+  diagram has a `set_id`.
+
+### Changed
+
+- **Renamed `Text` diagram type to `Standard Markdown`** in the
+  registry (id stays `text`; existing diagrams keep working). Reads
+  better next to its siblings `Dynamic List` and `Smart Markdown`
+  under the markdown notation.
+- **Diagram-create picker fallback list now includes Smart Markdown**
+  for the markdown notation, so the entry shows even if the live
+  registry fetch fails or the page has a stale cache. (Hard refresh
+  to clear stale browser state.)
+
+### Migration
+
+- **SQLite m071 + Supabase m075 (paired, §15)** — `UPDATE diagram_types
+  SET name = 'Standard Markdown' WHERE id = 'text'`. Idempotent.
+
 ## [6.14.0] - 2026-05-18
 
 ### Added
