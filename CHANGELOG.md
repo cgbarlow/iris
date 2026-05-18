@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.5] - 2026-05-18
+
+### Fixed
+
+- **Elements page search "flashed away" after typing**  (issue
+  [#173](https://github.com/cgbarlow/iris/issues/173) item 7,
+  ADR-196). Typing "grocery" briefly showed the matching element,
+  then it disappeared as a slower earlier-typed request returned
+  and overwrote the result. Root cause: the search input fired
+  `loadElements()` synchronously on every keystroke with no
+  debounce and no `AbortController`. The fix mirrors the
+  dashboard's pattern — 300 ms debounce, an `AbortController` so
+  newer requests cancel older in-flight ones, and a request-time
+  query capture as a belt-and-braces race guard. Aborted requests
+  no longer surface as a generic "Failed to load elements".
+
 ## [6.8.4] - 2026-05-18
 
 ### Fixed
