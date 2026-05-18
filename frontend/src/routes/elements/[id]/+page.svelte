@@ -320,6 +320,9 @@
 	async function handleClone() {
 		if (!entity) return;
 		try {
+			// Issue #173 item 1: explicitly pass set_id so the clone lands in
+			// the source's set, not the default. The backend's create_element
+			// defaults set_id when absent, which is what produced the bug.
 			const created = await apiFetch<Element>('/api/elements', {
 				method: 'POST',
 				body: JSON.stringify({
@@ -327,6 +330,7 @@
 					name: `${entity.name} (Copy)`,
 					description: entity.description ?? '',
 					data: entity.data ?? {},
+					set_id: entity.set_id,
 				}),
 			});
 			await goto(`/elements/${created.id}`);
