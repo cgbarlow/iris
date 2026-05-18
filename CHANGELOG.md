@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.10.1] - 2026-05-18
+
+### Fixed
+
+- **Relationships tab stayed empty on cross-package navigation**
+  (ADR-201, follows ADR-195). After ADR-195 correctly cleared the
+  previous package's data on navigation, the Relationships tab
+  did not auto-rehydrate when the user navigated from one
+  package to another via the hierarchy sidebar — the list went
+  empty until the user clicked the "Relationships" tab heading.
+  `loadPackage` now triggers `loadPackageElements` automatically
+  if the user is already sitting on the Relationships tab when
+  the new package loads.
+
 ## [6.10.0] - 2026-05-18
 
 ### Added
