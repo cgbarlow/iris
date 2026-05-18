@@ -792,6 +792,18 @@ async def get_diagram_children(
     ]
 
 
+_HIERARCHY_ORDER_BY: dict[str, str] = {
+    # ADR-202: per-set hierarchy sort. Each entry maps a sort key from
+    # ``sets.hierarchy_sort`` to the ORDER BY clause appended to the
+    # UNION query in ``get_diagram_hierarchy``.
+    "manual": "t.node_type, t.sequence_order, t.name",
+    # No node_type tie-break — packages and diagrams interleave by name.
+    "alpha": "LOWER(t.name)",
+    "newest": "t.created_at DESC",
+    "oldest": "t.created_at ASC",
+}
+
+
 async def get_diagram_hierarchy(
     db: DatabasePort,
     root_id: str | None = None,
@@ -805,10 +817,11 @@ async def get_diagram_hierarchy(
     package, and packages can nest via their own parent_package_id.
 
     If root_id is given, returns subtree rooted at that node.
-    If set_id is given, only includes items from that set.
+    If set_id is given, only includes items from that set; the set's
+    ``hierarchy_sort`` preference (ADR-202) selects the ORDER BY clause.
     Otherwise returns all root nodes with their children.
     """
-    params: list[str] = []
+    params: list[object] = []
     pkg_set_filter = ""
     diag_set_filter = ""
     if set_id is not None:
@@ -816,28 +829,47 @@ async def get_diagram_hierarchy(
         diag_set_filter = "AND d.set_id = ? "
         params = [set_id, set_id]
 
+    # ADR-202: resolve sort preference for this scope. Sets without a
+    # set_id (root_id-only or full-repo queries) fall back to 'manual'.
+    sort_key = "manual"
+    if set_id is not None:
+        try:
+            sort_cursor = await db.execute(
+                "SELECT hierarchy_sort FROM sets WHERE id = ?", (set_id,),
+            )
+            sort_row = await sort_cursor.fetchone()
+            if sort_row and sort_row[0] in _HIERARCHY_ORDER_BY:
+                sort_key = sort_row[0]
+        except Exception:
+            # If the column is missing (migration hasn't run on
+            # Supabase yet), gracefully fall back to manual.
+            sort_key = "manual"
+    order_by = _HIERARCHY_ORDER_BY[sort_key]
+
     # Fetch packages and diagrams in a single UNION query so we can
-    # build the full hierarchy in one pass.
+    # build the full hierarchy in one pass. ``created_at`` is selected
+    # so the date-based sorts (newest/oldest) work.
     query = (
         "SELECT t.id, t.name, t.node_type, t.parent_package_id, t.diagram_type, "
-        "t.data, t.notation, t.sequence_order "
+        "t.data, t.notation, t.sequence_order, t.created_at "
         "FROM ("
         "  SELECT p.id, pv.name, 'package' AS node_type, p.parent_package_id, "
         "         NULL AS diagram_type, NULL AS data, NULL AS notation, "
-        "         p.sequence_order "
+        "         p.sequence_order, p.created_at "
         "  FROM packages p "
         "  JOIN package_versions pv ON p.id = pv.package_id "
         "       AND p.current_version = pv.version "
         f"  WHERE p.is_deleted = 0 {pkg_set_filter}"
         "  UNION ALL "
         "  SELECT d.id, dv.name, 'diagram' AS node_type, d.parent_package_id, "
-        "         d.diagram_type, dv.data, d.notation, d.sequence_order "
+        "         d.diagram_type, dv.data, d.notation, d.sequence_order, "
+        "         d.created_at "
         "  FROM diagrams d "
         "  JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "       AND d.current_version = dv.version "
         f"  WHERE d.is_deleted = 0 {diag_set_filter}"
         ") t "
-        "ORDER BY t.node_type, t.sequence_order, t.name"
+        f"ORDER BY {order_by}"  # noqa: S608 - order_by is from _HIERARCHY_ORDER_BY whitelist
     )
     cursor = await db.execute(query, params)
     rows = await cursor.fetchall()

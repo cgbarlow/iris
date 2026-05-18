@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+# ADR-202 (v6.11.0): per-set hierarchy sort preference. Pydantic
+# ``Literal`` enforces the enum at the API boundary so the DB column
+# stays a plain TEXT (keeps SQLite ↔ Supabase migration syntax
+# identical, Protocol §15).
+HierarchySort = Literal["manual", "alpha", "newest", "oldest"]
 
 
 class SetCreate(BaseModel):
@@ -23,6 +31,11 @@ class SetUpdate(BaseModel):
     collection_id: str | None = None
     system_prompt: str | None = None
     mcp_system_context: str | None = None
+    # None means "don't change" — preserves the existing value. Matches
+    # the MCP _put_merge_partial contract and keeps existing PUT
+    # clients (frontend / MCP) from accidentally resetting the field
+    # when they omit it.
+    hierarchy_sort: HierarchySort | None = None
 
 
 class SetResponse(BaseModel):
@@ -49,6 +62,9 @@ class SetResponse(BaseModel):
     thumbnail_diagram_type: str | None = None
     system_prompt: str | None = None
     mcp_system_context: str | None = None
+    # ADR-202 (v6.11.0): always returned, defaults to 'manual' for
+    # both newly-created and pre-migration sets.
+    hierarchy_sort: HierarchySort = "manual"
 
 
 class SetListResponse(BaseModel):

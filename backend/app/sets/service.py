@@ -34,13 +34,17 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
         "collection_name": row[11] if len(row) > 11 else None,
         "system_prompt": row[12] if len(row) > 12 else None,
         "mcp_system_context": row[13] if len(row) > 13 else None,
+        # ADR-202: NULL fallback for pre-migration rows (shouldn't
+        # happen because the column has a DEFAULT, but belt-and-braces).
+        "hierarchy_sort": (row[14] if len(row) > 14 and row[14] else "manual"),
     }
 
 
 _SET_COLUMNS = (
     "s.id, s.name, s.description, s.created_at, s.created_by, "
     "s.updated_at, s.is_deleted, s.thumbnail_source, s.thumbnail_diagram_id, "
-    "s.thumbnail_image IS NOT NULL, s.collection_id, col.name, s.system_prompt, s.mcp_system_context"
+    "s.thumbnail_image IS NOT NULL, s.collection_id, col.name, s.system_prompt, "
+    "s.mcp_system_context, s.hierarchy_sort"
 )
 
 
@@ -84,6 +88,7 @@ async def create_set(
         "has_thumbnail_image": False,
         "system_prompt": None,
         "mcp_system_context": None,
+        "hierarchy_sort": "manual",  # ADR-202 default for new sets
     }
 
 
@@ -224,8 +229,13 @@ async def update_set(
     collection_id: str | None = None,
     system_prompt: str | None = None,
     mcp_system_context: str | None = None,
+    hierarchy_sort: str | None = None,
 ) -> dict[str, object] | None:
-    """Update a set's name, description, thumbnail, collection, system_prompt, and mcp_system_context.
+    """Update a set's metadata (ADR-202 adds hierarchy_sort).
+
+    ``hierarchy_sort`` is tri-stateish: None means "leave alone". The
+    Pydantic Literal on SetUpdate constrains the value space upstream
+    so we accept whatever the caller gave us as-is.
 
     Returns None if not found.
     """
@@ -267,6 +277,15 @@ async def update_set(
             (name, description, now, thumbnail_source, thumbnail_diagram_id,
              collection_id, system_prompt, mcp_system_context, set_id),
         )
+
+    # ADR-202: hierarchy_sort updated separately so the main UPDATE
+    # stays unchanged for callers that don't touch it.
+    if hierarchy_sort is not None:
+        await db.execute(
+            "UPDATE sets SET hierarchy_sort = ?, updated_at = ? WHERE id = ?",
+            (hierarchy_sort, now, set_id),
+        )
+
     await db.commit()
 
     await _index_set(db, set_id=set_id, name=name, description=description)

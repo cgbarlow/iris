@@ -4,7 +4,7 @@
 	import { apiFetch } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
-	import type { IrisSet, IrisCollection, Diagram, PaginatedResponse } from '$lib/types/api';
+	import type { IrisSet, IrisCollection, Diagram, PaginatedResponse, HierarchySort } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
@@ -25,6 +25,8 @@
 	let collectionId = $state<string | null>(null);
 	let systemPrompt = $state('');
 	let mcpSystemContext = $state('');
+	// ADR-202 (v6.11.0): per-set hierarchy sort preference.
+	let hierarchySort = $state<HierarchySort>('manual');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -54,6 +56,7 @@
 			collectionId = setData.collection_id ?? null;
 			systemPrompt = setData.system_prompt ?? '';
 			mcpSystemContext = (setData as IrisSet & { mcp_system_context?: string | null }).mcp_system_context ?? '';
+			hierarchySort = setData.hierarchy_sort ?? 'manual';
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -86,6 +89,7 @@
 					collection_id: collectionId,
 					system_prompt: sanitizedPrompt,
 					mcp_system_context: sanitizedMcpSystemContext,
+					hierarchy_sort: hierarchySort,
 				}),
 			});
 
@@ -213,6 +217,27 @@
 				showAll={true}
 				label="Collection"
 			/>
+		</div>
+
+		<!-- Hierarchy sort (ADR-202, v6.11.0) -->
+		<div class="mt-4">
+			<label for="set-edit-hierarchy-sort" class="text-sm font-medium" style="color: var(--color-fg)">
+				Hierarchy sort
+			</label>
+			<select
+				id="set-edit-hierarchy-sort"
+				bind:value={hierarchySort}
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			>
+				<option value="manual">Manual (drag-and-drop)</option>
+				<option value="alpha">Alphabetical (A → Z)</option>
+				<option value="newest">Newest first</option>
+				<option value="oldest">Oldest first</option>
+			</select>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				Controls how packages and diagrams are ordered in the dashboard tree, the packages-page sidebar, and the views-page tree for this set.
+			</p>
 		</div>
 
 		<!-- System prompt (ADR-150) -->

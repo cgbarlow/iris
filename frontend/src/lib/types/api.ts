@@ -268,6 +268,8 @@ export interface ElementStats {
 	diagram_usage_count: number;
 }
 
+export type HierarchySort = 'manual' | 'alpha' | 'newest' | 'oldest';
+
 export interface IrisSet {
 	id: string;
 	name: string;
@@ -286,6 +288,8 @@ export interface IrisSet {
 	collection_id: string | null;
 	collection_name: string | null;
 	system_prompt?: string | null;
+	// ADR-202 (v6.11.0): per-set hierarchy sort preference.
+	hierarchy_sort: HierarchySort;
 }
 
 export interface IrisCollection {
