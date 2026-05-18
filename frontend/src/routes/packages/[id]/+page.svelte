@@ -158,6 +158,15 @@
 				: 'Failed to load package';
 		}
 		loading = false;
+
+		// v6.10.1 / ADR-201: if the user navigated here while sitting on
+		// the Relationships tab, rehydrate the elements list automatically.
+		// ADR-195 cleared the previous package's data; without this
+		// follow-up the tab would stay empty until the user clicked the
+		// heading (which fires activateRelationshipsTab).
+		if (pkg && activeTab === 'relationships' && !packageElementsLoading) {
+			loadPackageElements(pkg.id);
+		}
 	}
 
 	async function loadVersions(id: string) {
