@@ -680,6 +680,37 @@ def _resolve_null(value: str) -> str | None:
     return None if value.lower() == "null" else value
 
 
+def _load_batch_payload(source: str, *, key: str) -> dict[str, Any]:
+    """Load a {"<key>": [...]} JSON payload from a file path or '-' (stdin).
+
+    Used by ``iris create elements`` / ``iris update elements`` (ADR-200).
+    Validates that the payload is a dict containing ``key`` mapped to a
+    list — bails with a clear error otherwise so the user knows whether
+    the file shape is wrong vs the JSON is malformed.
+    """
+    import sys
+
+    if source == "-":
+        raw = sys.stdin.read()
+    else:
+        try:
+            raw = Path(source).read_text(encoding="utf-8")
+        except OSError as exc:
+            output.print_error(f"--from-json: cannot read {source!r}: {exc}")
+            raise typer.Exit(code=1) from exc
+    try:
+        parsed = json_lib.loads(raw)
+    except json_lib.JSONDecodeError as exc:
+        output.print_error(f"--from-json: invalid JSON ({exc})")
+        raise typer.Exit(code=1) from exc
+    if not isinstance(parsed, dict) or not isinstance(parsed.get(key), list):
+        output.print_error(
+            f"--from-json: payload must be an object with a '{key}' array",
+        )
+        raise typer.Exit(code=1)
+    return parsed
+
+
 # Sentinel for "do not touch" on tri-state CLI flags (e.g. --package-id).
 _UNSET: Any = object()
 
@@ -823,6 +854,33 @@ def create_element_cmd(
     async def _do() -> Any:
         async with _client() as c:
             resp = await c._request("POST", "/api/elements", json=body)
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@create_app.command("elements")
+def create_elements_cmd(
+    from_json: str = typer.Option(
+        ...,
+        "--from-json",
+        help=(
+            "Path to a JSON file containing the bulk-create payload, or "
+            "'-' to read from stdin. Format: "
+            '{"elements": [ {...element fields...}, ... ]}. Each item '
+            "has the same fields as `iris create element` "
+            "(element_type, name, set_id, package_id, notation, "
+            "description, data, metadata). v6.10.0, ADR-200, #173."
+        ),
+    ),
+) -> None:
+    """Bulk-create elements (v6.10.0, ADR-200). Per-item failure isolation."""
+    body = _load_batch_payload(from_json, key="elements")
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", "/api/batch/elements/create", json=body,
+            )
             return resp.json()
     output.print_json(_run(_do()))
 
@@ -1015,6 +1073,33 @@ def update_element_cmd(
             headers = {"If-Match": str(current.get("current_version", 1))}
             resp = await c._request(
                 "PUT", f"/api/elements/{element_id}", json=body, headers=headers,
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@update_app.command("elements")
+def update_elements_cmd(
+    from_json: str = typer.Option(
+        ...,
+        "--from-json",
+        help=(
+            "Path to a JSON file containing the bulk-update payload, or "
+            "'-' to read from stdin. Format: "
+            '{"updates": [{"element_id": "...", '
+            '"expected_version": N, "name": "...", ...}, ...]}. Each '
+            "item carries its own expected_version (per-item optimistic "
+            "concurrency). v6.10.0, ADR-200, #173."
+        ),
+    ),
+) -> None:
+    """Bulk-update elements (v6.10.0, ADR-200). Per-item failure isolation."""
+    body = _load_batch_payload(from_json, key="updates")
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", "/api/batch/elements/update", json=body,
             )
             return resp.json()
     output.print_json(_run(_do()))

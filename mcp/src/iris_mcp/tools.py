@@ -372,6 +372,39 @@ async def _create_package(c: IrisClient, args: dict[str, Any]) -> str:
     return with_web_url(result.model_dump_json(), "package")
 
 
+async def _create_elements(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.10.0 / ADR-200: bulk create elements in one MCP call.
+
+    Avoids N round-trips when ingesting many items (e.g. a grocery
+    list). Per-item failure isolation — a bad row reports an index +
+    reason without sinking the rest of the batch.
+    """
+    body = {"elements": args.get("elements") or []}
+    try:
+        resp = await c._request(
+            "POST", "/api/batch/elements/create", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create elements (batch)")
+    return json.dumps(resp.json())
+
+
+async def _update_elements(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.10.0 / ADR-200: bulk update elements in one MCP call.
+
+    Each update item carries its own ``element_id`` + ``expected_version``;
+    version conflicts surface as per-item failures (not whole-batch).
+    """
+    body = {"updates": args.get("updates") or []}
+    try:
+        resp = await c._request(
+            "POST", "/api/batch/elements/update", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update elements (batch)")
+    return json.dumps(resp.json())
+
+
 async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-178 (v6.4.0): create a standalone Element.
 
@@ -1473,6 +1506,71 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_create_element,
+    ),
+    # ── Bulk element create / update (v6.10.0, ADR-200, #173 item 6) ─────
+    Tool(
+        name="create_elements",
+        description=(
+            "Bulk-create up to 100 elements in one call (v6.10.0, "
+            "ADR-200). Each item is the same shape as `create_element`'s "
+            "input. Per-item failure isolation — a bad row reports an "
+            "index + reason without sinking the rest of the batch. "
+            "Response is a BatchResultWithIds envelope: succeeded, "
+            "failed, errors[], ids[]."
+        ),
+        input_schema=_schema({
+            "elements": (
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": True,
+                    },
+                    "description": (
+                        "List of element create payloads. Each item "
+                        "matches create_element: element_type, name, "
+                        "description, data, set_id, package_id, "
+                        "metadata, notation."
+                    ),
+                },
+                True,
+            ),
+        }),
+        handler=_create_elements,
+    ),
+    Tool(
+        name="update_elements",
+        description=(
+            "Bulk-update up to 100 elements in one call (v6.10.0, "
+            "ADR-200). Each item carries its own element_id + "
+            "expected_version (per-item optimistic concurrency); "
+            "version conflicts surface as per-item failures, not a "
+            "whole-batch 409. Response is a BatchResultWithIds envelope."
+        ),
+        input_schema=_schema({
+            "updates": (
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": True,
+                    },
+                    "description": (
+                        "List of element update payloads. Each item "
+                        "needs element_id and expected_version, plus "
+                        "the same fields as update_element: name "
+                        "(required), description, data, change_summary, "
+                        "metadata, package_id (tri-state: omit/null/uuid)."
+                    ),
+                },
+                True,
+            ),
+        }),
+        handler=_update_elements,
     ),
     # ── Element templates (v6.8.0, ADR-191, issue #153) ────────────────
     Tool(
