@@ -292,6 +292,116 @@ async def batch_delete_elements(
     return {"succeeded": succeeded, "failed": failed, "errors": errors}
 
 
+async def batch_create_elements(
+    db: DatabasePort,
+    elements: list[dict[str, Any]],
+    created_by: str,
+) -> dict[str, Any]:
+    """Bulk create elements with per-item failure isolation (ADR-200, #173)."""
+    from app.elements.models import _UNSET
+    from app.elements.service import create_element, ElementPackageInvariantError
+
+    succeeded = 0
+    failed = 0
+    errors: list[str] = []
+    created_ids: list[str] = []
+
+    for idx, item in enumerate(elements):
+        try:
+            element_type = item.get("element_type") or ""
+            name = item.get("name") or ""
+            if not element_type:
+                raise ValueError("element_type is required")
+            if not name:
+                raise ValueError("name is required")
+            result = await create_element(
+                db,
+                element_type=element_type,
+                name=name,
+                description=item.get("description"),
+                data=item.get("data") or {},
+                created_by=created_by,
+                set_id=item.get("set_id"),
+                package_id=item.get("package_id"),
+                metadata=item.get("metadata"),
+                notation=item.get("notation") or "simple",
+            )
+            created_ids.append(str(result["id"]))
+            succeeded += 1
+        except ElementPackageInvariantError as exc:
+            failed += 1
+            errors.append(f"Element at index {idx}: {exc}")
+        except Exception as exc:
+            failed += 1
+            errors.append(f"Element at index {idx}: {exc}")
+
+    return {
+        "succeeded": succeeded, "failed": failed,
+        "errors": errors, "ids": created_ids,
+    }
+
+
+async def batch_update_elements(
+    db: DatabasePort,
+    updates: list[dict[str, Any]],
+    updated_by: str,
+) -> dict[str, Any]:
+    """Bulk update elements (ADR-200, #173).
+
+    Each item carries its own ``expected_version``; version conflicts
+    surface as per-item failures (not a whole-batch 409).
+    """
+    from app.elements.models import _UNSET
+    from app.elements.service import update_element, ElementPackageInvariantError
+
+    succeeded = 0
+    failed = 0
+    errors: list[str] = []
+    updated_ids: list[str] = []
+
+    for idx, item in enumerate(updates):
+        try:
+            element_id = item.get("element_id")
+            expected_version = item.get("expected_version")
+            if not element_id:
+                raise ValueError("element_id is required")
+            if expected_version is None:
+                raise ValueError("expected_version is required")
+
+            update_kwargs: dict[str, Any] = {
+                "name": item["name"],
+                "description": item.get("description"),
+                "data": item.get("data") or {},
+                "change_summary": item.get("change_summary"),
+                "updated_by": updated_by,
+                "expected_version": int(expected_version),
+                "metadata": item.get("metadata"),
+            }
+            # Tri-state package_id: only forward when the client
+            # explicitly included the key (which exclude_unset captures).
+            if "package_id" in item and item["package_id"] is not _UNSET:
+                update_kwargs["package_id"] = item["package_id"]
+
+            result = await update_element(db, element_id, **update_kwargs)
+            if result is None:
+                raise ValueError(
+                    f"Version conflict (expected {expected_version})",
+                )
+            updated_ids.append(str(element_id))
+            succeeded += 1
+        except ElementPackageInvariantError as exc:
+            failed += 1
+            errors.append(f"Update at index {idx}: {exc}")
+        except Exception as exc:
+            failed += 1
+            errors.append(f"Update at index {idx}: {exc}")
+
+    return {
+        "succeeded": succeeded, "failed": failed,
+        "errors": errors, "ids": updated_ids,
+    }
+
+
 async def batch_clone_elements(
     db: DatabasePort,
     ids: list[str],

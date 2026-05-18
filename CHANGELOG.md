@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.10.0] - 2026-05-18
+
+### Added
+
+- **Batch element create + update across REST, MCP, CLI** (issue
+  [#173](https://github.com/cgbarlow/iris/issues/173) item 6,
+  ADR-200). Creating or updating long lists of elements via the
+  singular `create_element` / `update_element` MCP tools required
+  N round-trips. New plural tools handle up to 100 items in one
+  call:
+  - REST: `POST /api/batch/elements/create`,
+    `POST /api/batch/elements/update`. Both return
+    `BatchResultWithIds { succeeded, failed, errors, ids }`.
+  - MCP: `create_elements`, `update_elements`. Per-item schema
+    is open so callers can construct any subset of the singular
+    fields.
+  - CLI: `iris create elements --from-json <path|->`,
+    `iris update elements --from-json <path|->`. JSON-only input
+    via file or stdin.
+  - Per-item failure isolation — a bad row reports an
+    index-tagged error without sinking the rest of the batch.
+    Per-item optimistic concurrency on update (each item carries
+    its own `expected_version`).
+  - Surface parity (`scripts/check_surface_parity.py`) verified
+    clean.
+
 ## [6.9.0] - 2026-05-18
 
 ### Added
