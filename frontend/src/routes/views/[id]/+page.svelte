@@ -15,6 +15,7 @@
 	import TextCanvas from '$lib/canvas/text/TextCanvas.svelte';
 	import DynamicListCanvas from '$lib/canvas/text/DynamicListCanvas.svelte';
 	import type { DynamicSource } from '$lib/canvas/text/DynamicListCanvas.svelte';
+	import SmartMarkdownCanvas from '$lib/canvas/text/SmartMarkdownCanvas.svelte';
 	import MarkdownToc from '$lib/components/MarkdownToc.svelte';
 	import type { TocHeading } from '$lib/components/MarkdownView.svelte';
 	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
@@ -587,7 +588,24 @@
 					: diagram.diagram_type === 'sequence'
 						? sequenceData.participants.length > 0
 						: canvasNodes.length > 0;
-				activeTab = hasContent ? 'canvas' : 'details';
+				// ADR-204 (v6.14.0): for content-bearing diagrams, defer to
+				// the parent set's view_tab_default; otherwise stay on
+				// Details. Soft-fails to 'canvas' on fetch error.
+				if (hasContent && diagram.set_id) {
+					try {
+						const setData = await apiFetch<{ view_tab_default?: 'canvas' | 'relationships' | 'details' }>(`/api/sets/${diagram.set_id}`);
+						const preferred = setData.view_tab_default;
+						if (preferred === 'canvas' || preferred === 'relationships' || preferred === 'details') {
+							activeTab = preferred;
+						} else {
+							activeTab = 'canvas';
+						}
+					} catch {
+						activeTab = 'canvas';
+					}
+				} else {
+					activeTab = hasContent ? 'canvas' : 'details';
+				}
 			}
 			refreshNodeDescriptions();
 			loadVersions(id);
@@ -1507,6 +1525,12 @@
 			let data: Record<string, unknown>;
 			if (diagram.diagram_type === 'dynamic_list') {
 				data = { dynamic_source: pendingDynamicSource ?? (diagram.data as any)?.dynamic_source ?? { mode: 'diagram_relationships', package_id: null, show_description: false } };
+			} else if (diagram.diagram_type === 'smart_markdown') {
+				// ADR-205 (issue #185): persist only the user-edited source;
+				// data.content is server-synthesised on read.
+				data = {
+					markdown_source: ((diagram.data as Record<string, unknown> | null | undefined)?.markdown_source as string | undefined) ?? '',
+				};
 			} else if (canvasType === 'text') {
 				data = { content: markdownContent };
 			} else {
@@ -2147,7 +2171,9 @@
 			</svg>
 		</button>
 		<div class="flex gap-1" role="tablist" aria-label="Diagram sections">
-			<!-- v5.4.0 (#10): Canvas first — the working content tab leads. -->
+			<!-- v5.4.0 (#10): Canvas first — the working content tab leads.
+			     ADR-204 (v6.14.0): Details moved between Relationships and
+			     Version History. -->
 			<button
 				role="tab"
 				aria-selected={activeTab === 'canvas'}
@@ -2156,15 +2182,6 @@
 				style="color: {activeTab === 'canvas' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'canvas' ? 'var(--color-primary)' : 'transparent'}"
 			>
 				Canvas
-			</button>
-			<button
-				role="tab"
-				aria-selected={activeTab === 'details'}
-				onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
-				class="px-4 py-2 text-sm"
-				style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
-			>
-				Details
 			</button>
 			<button
 				role="tab"
@@ -2181,6 +2198,15 @@
 						aria-label="{_relTotal} relationship{_relTotal === 1 ? '' : 's'}"
 					></span>
 				{/if}
+			</button>
+			<button
+				role="tab"
+				aria-selected={activeTab === 'details'}
+				onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
+				class="px-4 py-2 text-sm"
+				style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
+			>
+				Details
 			</button>
 			<button
 				role="tab"
@@ -3006,6 +3032,22 @@
 									}}
 									onheadings={(h) => (textHeadings = h)}
 								/>
+							{:else if diagram?.diagram_type === 'smart_markdown'}
+								<!-- ADR-205 (issue #185): user authors markdown_source
+									 with tokens; the server resolves tokens at read
+									 time into data.content for view + export pipelines. -->
+								<SmartMarkdownCanvas
+									content={markdownContent}
+									source={(diagram.data?.markdown_source as string | undefined) ?? ''}
+									editing={editing}
+									onsourcechange={(s: string) => {
+										if (diagram) {
+											diagram.data = { ...(diagram.data ?? {}), markdown_source: s };
+											canvasDirty = true;
+										}
+									}}
+									onheadings={(h) => (textHeadings = h)}
+								/>
 							{:else}
 								<TextCanvas
 									bind:textareaEl={textTextareaEl}
@@ -3097,6 +3139,14 @@
 										editing={false}
 										setId={diagram?.set_id ?? null}
 										source={dynamicSource}
+										onheadings={(h) => (textHeadings = h)}
+									/>
+								{:else if diagram?.diagram_type === 'smart_markdown'}
+									<!-- ADR-205 (issue #185): browse-mode Smart Markdown. -->
+									<SmartMarkdownCanvas
+										content={markdownContent}
+										source={(diagram.data?.markdown_source as string | undefined) ?? ''}
+										editing={false}
 										onheadings={(h) => (textHeadings = h)}
 									/>
 								{:else}

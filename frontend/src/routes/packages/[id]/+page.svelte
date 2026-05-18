@@ -57,7 +57,11 @@
 	let versions = $state<PackageVersion[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state<'details' | 'versions' | 'relationships'>('details');
+	// ADR-204 (v6.14.0): default to 'relationships'; reseeded from
+	// the parent set's package_tab_default once that set is fetched.
+	let activeTab = $state<'details' | 'versions' | 'relationships'>('relationships');
+	// Suppresses the set-driven reseed once the user has clicked a tab.
+	let userSelectedTab = $state(false);
 	let packageElements = $state<PackageElement[]>([]);
 	let packageElementsLoading = $state(false);
 	let packageElementsTotal = $state(0);
@@ -144,6 +148,20 @@
 			pkg = await apiFetch<Package>(`/api/packages/${id}`);
 			recordVisit({ id: pkg.id, type: 'package', name: pkg.name, setId: pkg.set_id ?? undefined, setName: pkg.set_name ?? undefined, description: pkg.description ?? undefined, href: `/packages/${pkg.id}` });
 			await loadVersions(id);
+			// ADR-204 (v6.14.0): seed the active tab from the parent
+			// set's package_tab_default. Soft-fails if the set fetch
+			// errors (degraded → defaults to 'relationships').
+			if (pkg.set_id && !userSelectedTab) {
+				try {
+					const setData = await apiFetch<{ package_tab_default?: 'relationships' | 'details' }>(`/api/sets/${pkg.set_id}`);
+					const preferred = setData.package_tab_default;
+					if (preferred === 'details' || preferred === 'relationships') {
+						activeTab = preferred;
+					}
+				} catch {
+					// Pre-migration Supabase or set-not-found → keep default.
+				}
+			}
 			if (pkg.parent_package_id) {
 				try {
 					const parent = await apiFetch<Package>(`/api/packages/${pkg.parent_package_id}`);
@@ -211,6 +229,7 @@
 
 	function activateRelationshipsTab() {
 		activeTab = 'relationships';
+		userSelectedTab = true;
 		if (pkg && !packageElementsLoaded && !packageElementsLoading) {
 			loadPackageElements(pkg.id);
 		}
@@ -595,16 +614,8 @@
 					<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
 				</svg>
 			</button>
+			<!-- ADR-204 (v6.14.0): Relationships first, then Details, then Version History. -->
 			<div class="flex gap-1" role="tablist" aria-label="Package sections">
-				<button
-					role="tab"
-					aria-selected={activeTab === 'details'}
-					onclick={() => { activeTab = 'details'; }}
-					class="px-4 py-2 text-sm"
-					style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
-				>
-					Details
-				</button>
 				<button
 					role="tab"
 					aria-selected={activeTab === 'relationships'}
@@ -616,8 +627,17 @@
 				</button>
 				<button
 					role="tab"
+					aria-selected={activeTab === 'details'}
+					onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
+					class="px-4 py-2 text-sm"
+					style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
+				>
+					Details
+				</button>
+				<button
+					role="tab"
 					aria-selected={activeTab === 'versions'}
-					onclick={() => { activeTab = 'versions'; }}
+					onclick={() => { activeTab = 'versions'; userSelectedTab = true; }}
 					class="px-4 py-2 text-sm"
 					style="color: {activeTab === 'versions' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'versions' ? 'var(--color-primary)' : 'transparent'}"
 				>

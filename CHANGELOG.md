@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.14.0] - 2026-05-18
+
+### Added
+
+- **Smart Markdown view type** (ADR-205, issue
+  [#185](https://github.com/cgbarlow/iris/issues/185)). A new
+  diagram type registered under the existing `markdown` notation.
+  Users author markdown and embed inline references to live entity
+  fields using a `/` slash-picker:
+  - Token format: `{{<entity-type>:<id>:<field-spec>}}`.
+  - Reference any element's `name`, `description`, or custom
+    attribute via `attr:<key>` (e.g. `attr:Unit`).
+  - Reference any package / diagram / set / collection's `name`
+    and `description`.
+  - Unresolvable tokens render as `~~{{...}}~~` so data loss is
+    visible.
+  - Resolution happens server-side on read, so the existing
+    markdown / docx / pdf export renderers pick up the resolved
+    content without any new code (Protocol §13 DRY).
+  - Two new read-only endpoints: `GET /api/search/entities` (the
+    picker's entity step) and `GET /api/elements/{id}/attribute-keys`
+    (the picker's field step for elements).
+  - Two new frontend canvases: `SmartMarkdownCanvas.svelte` and
+    `SmartMarkdownSlashPicker.svelte`.
+
+- **Per-set tab defaults** (ADR-204, issue
+  [#186](https://github.com/cgbarlow/iris/issues/186)). Each set
+  now owns two new preferences:
+  - **Package tab default** — which tab opens on `/packages/{id}`
+    for packages in this set. Options: `relationships` (new
+    default), `details`. The Packages screen tab order is also
+    reordered to lead with Relationships, then Details, then
+    Version History.
+  - **View tab default** — which tab opens on `/views/{id}` for
+    diagrams in this set. Options: `canvas` (new default),
+    `relationships`, `details`. The Views screen tab order moves
+    Details to between Relationships and Version History.
+  - Both surfaced on the set edit page, the MCP `update_set` tool,
+    and the `iris update set` CLI flags (`--package-tab-default`,
+    `--view-tab-default`; ADR-202's `--hierarchy-sort` also got
+    its CLI flag here).
+
+### Migration
+
+- **SQLite m069 + Supabase m073 (paired, §15)** — adds two TEXT
+  columns to `sets`:
+  - `package_tab_default TEXT NOT NULL DEFAULT 'relationships'`
+  - `view_tab_default TEXT NOT NULL DEFAULT 'canvas'`
+  - Enums enforced at the Pydantic layer (no SQL CHECK; Protocol §15).
+  - Existing sets inherit the new defaults — no back-fill needed.
+- **SQLite m070 + Supabase m074 (paired, §15)** — registers
+  `smart_markdown` in `diagram_types` and maps it to the existing
+  `markdown` notation in `diagram_type_notations`. Idempotent via
+  `INSERT OR IGNORE` / `ON CONFLICT DO NOTHING`.
+- **Release ordering for Supabase**: run
+  `scripts/supabase-migrate.sh` against the Supabase DB **before**
+  the code deploys. The service-layer fallbacks keep the API
+  non-fatal in a brief deploy-before-migrate window — set
+  responses degrade to the new defaults; the smart_markdown type
+  simply won't appear in the picker until the migration runs.
+
 ## [6.13.0] - 2026-05-18
 
 ### Added

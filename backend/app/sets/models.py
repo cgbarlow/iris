@@ -12,6 +12,12 @@ from pydantic import BaseModel, Field
 # identical, Protocol §15).
 HierarchySort = Literal["manual", "alpha", "newest", "oldest"]
 
+# ADR-204 (v6.14.0): per-set tab defaults — which tab opens by
+# default on the Packages and Views screens for a given set. Same
+# Pydantic-Literal-in-TEXT-column pattern as HierarchySort.
+PackageTabDefault = Literal["relationships", "details"]
+ViewTabDefault = Literal["canvas", "relationships", "details"]
+
 
 class SetCreate(BaseModel):
     """Request body for creating a set."""
@@ -36,6 +42,9 @@ class SetUpdate(BaseModel):
     # clients (frontend / MCP) from accidentally resetting the field
     # when they omit it.
     hierarchy_sort: HierarchySort | None = None
+    # ADR-204: per-set tab defaults; same None="leave alone" contract.
+    package_tab_default: PackageTabDefault | None = None
+    view_tab_default: ViewTabDefault | None = None
 
 
 class SetResponse(BaseModel):
@@ -65,6 +74,11 @@ class SetResponse(BaseModel):
     # ADR-202 (v6.13.0): always returned, defaults to 'manual' for
     # both newly-created and pre-migration sets.
     hierarchy_sort: HierarchySort = "manual"
+    # ADR-204 (v6.14.0): always returned. Defaults match the new
+    # column defaults so existing rows + pre-migration callers see
+    # the desired "Relationships / Canvas first" behaviour.
+    package_tab_default: PackageTabDefault = "relationships"
+    view_tab_default: ViewTabDefault = "canvas"
 
 
 class SetListResponse(BaseModel):

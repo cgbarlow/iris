@@ -104,6 +104,8 @@ async def update(
             system_prompt=body.system_prompt,
             mcp_system_context=body.mcp_system_context,
             hierarchy_sort=body.hierarchy_sort,
+            package_tab_default=body.package_tab_default,
+            view_tab_default=body.view_tab_default,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

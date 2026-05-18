@@ -202,6 +202,30 @@ async def get_one(
     return ElementResponse(**result)
 
 
+@router.get("/{element_id}/attribute-keys", response_model=list[str])
+async def get_attribute_keys(
+    element_id: str,
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> list[str]:
+    """Return the sorted list of keys in this element's ``data`` JSON.
+
+    ADR-205 (v6.14.0): drives the Smart Markdown picker's field step
+    so the user can insert an ``attr:<key>`` token referencing a
+    custom attribute of the selected element. Returns an empty list
+    if ``data`` is null, missing, or not a dict. 404 if the element
+    doesn't exist or is deleted.
+    """
+    db = request.app.state.db_manager.main_db
+    elem = await get_element(db, element_id)
+    if elem is None:
+        raise HTTPException(status_code=404, detail="Element not found")
+    data = elem.get("data")
+    if not isinstance(data, dict):
+        return []
+    return sorted(str(k) for k in data.keys())
+
+
 @router.put("/{element_id}", response_model=ElementResponse)
 async def update(
     element_id: str,

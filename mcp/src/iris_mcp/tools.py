@@ -680,6 +680,10 @@ _SET_UPDATE_FIELDS = (
     # through _put_merge_partial so MCP clients can read the current
     # value and override it, or leave it alone by omitting.
     "hierarchy_sort",
+    # ADR-204 (v6.14.0): per-set tab defaults for Packages and Views
+    # screens. Same merge-partial behaviour.
+    "package_tab_default",
+    "view_tab_default",
 )
 _SET_METADATA_FIELDS = tuple(f for f in _SET_UPDATE_FIELDS if f != "collection_id")
 _PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
@@ -1867,6 +1871,20 @@ TOOLS: list[Tool] = [
                 "'alpha' (alphabetical by name), 'newest' (created_at DESC), "
                 "'oldest' (created_at ASC). Affects every surface that renders "
                 "this set's hierarchy (dashboard, packages page, views page).",
+                required=False,
+            ),
+            "package_tab_default": _str_arg(
+                "package_tab_default",
+                "Default active tab on /packages/{id} for packages in this "
+                "set (v6.14.0, ADR-204). One of: 'relationships' (default), "
+                "'details'.",
+                required=False,
+            ),
+            "view_tab_default": _str_arg(
+                "view_tab_default",
+                "Default active tab on /views/{id} for diagrams in this "
+                "set (v6.14.0, ADR-204). One of: 'canvas' (default), "
+                "'relationships', 'details'.",
                 required=False,
             ),
         }),
