@@ -1,4 +1,4 @@
-"""Schema test for per-set hierarchy sort migration (v6.11.0, ADR-202).
+"""Schema test for per-set hierarchy sort migration (v6.13.0, ADR-202).
 
 Pairs:
 - SQLite  m068_sets_hierarchy_sort.py

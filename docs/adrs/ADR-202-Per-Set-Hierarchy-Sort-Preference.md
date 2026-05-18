@@ -151,7 +151,7 @@ The release-notes call out the recommended sequence:
   `IrisSet.hierarchy_sort` field.
 - `frontend/src/routes/sets/[id]/+page.svelte` — state, load, save,
   and a `<select>` between Collection and System prompt.
-- CHANGELOG `[6.11.0]`. Minor bump.
+- CHANGELOG `[6.13.0]`. Minor bump.
 
 ## Verification
 

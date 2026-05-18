@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [6.11.0] - 2026-05-18
+## [6.13.0] - 2026-05-18
 
 ### Added
 
@@ -37,6 +37,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the code deploys. The service layer has a defensive fallback so
   a brief window without the migration degrades to manual sort
   rather than 500-ing.
+
+## [6.12.0] - 2026-05-18
+
+### Changed
+
+- **Knowledge graph: packaged elements reached via the package
+  chain only** (issue
+  [#181](https://github.com/cgbarlow/iris/issues/181), ADR-203).
+  Previously, an element belonging to a package rendered both
+  `set → element` (set_membership) and `set → package → element`
+  (chain) — visual redundancy. The direct `set → element` edge
+  is now skipped when the element's package is visible in the
+  current scope. Free-floating elements (no `package_id`) keep
+  their direct edge. If the package is out of scope (soft-
+  deleted, different set), the direct edge falls through so the
+  element isn't visually orphaned. No toggle — the chain conveys
+  containment more usefully and the redundant edge is just
+  clutter.
+
+## [6.11.1] - 2026-05-18
+
+### Fixed
+
+- **KG settings dropdown "Relationships" tab overflowed**. After
+  v6.9.0 (ADR-199) added the third tab, the 220px min-width
+  popover couldn't fit "Relationships" on one line; it wrapped or
+  clipped. Bumped to 300px and added `whitespace-nowrap` to each
+  tab button so labels stay on a single line regardless of any
+  future container resizing.
 
 ## [6.10.1] - 2026-05-18
 

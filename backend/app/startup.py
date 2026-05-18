@@ -170,7 +170,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m065_up(main)  # issue #147, v6.7.0: dynamic_list diagram_type (ADR-186)
     await m066_up(main)  # issue #160, v6.7.4: register (class, simple) diagram_type_notations pair (ADR-188)
     await m067_up(main)  # issue #153, v6.8.0: element_templates table (ADR-191)
-    await m068_up(main)  # v6.11.0: per-set hierarchy sort preference (ADR-202)
+    await m068_up(main)  # v6.13.0: per-set hierarchy sort preference (ADR-202)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

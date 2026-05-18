@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# ADR-202 (v6.11.0): per-set hierarchy sort preference. Pydantic
+# ADR-202 (v6.13.0): per-set hierarchy sort preference. Pydantic
 # ``Literal`` enforces the enum at the API boundary so the DB column
 # stays a plain TEXT (keeps SQLite ↔ Supabase migration syntax
 # identical, Protocol §15).
@@ -62,7 +62,7 @@ class SetResponse(BaseModel):
     thumbnail_diagram_type: str | None = None
     system_prompt: str | None = None
     mcp_system_context: str | None = None
-    # ADR-202 (v6.11.0): always returned, defaults to 'manual' for
+    # ADR-202 (v6.13.0): always returned, defaults to 'manual' for
     # both newly-created and pre-migration sets.
     hierarchy_sort: HierarchySort = "manual"
 

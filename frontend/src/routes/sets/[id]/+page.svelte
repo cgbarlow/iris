@@ -25,7 +25,7 @@
 	let collectionId = $state<string | null>(null);
 	let systemPrompt = $state('');
 	let mcpSystemContext = $state('');
-	// ADR-202 (v6.11.0): per-set hierarchy sort preference.
+	// ADR-202 (v6.13.0): per-set hierarchy sort preference.
 	let hierarchySort = $state<HierarchySort>('manual');
 
 	let showDeleteDialog = $state(false);
@@ -219,7 +219,7 @@
 			/>
 		</div>
 
-		<!-- Hierarchy sort (ADR-202, v6.11.0) -->
+		<!-- Hierarchy sort (ADR-202, v6.13.0) -->
 		<div class="mt-4">
 			<label for="set-edit-hierarchy-sort" class="text-sm font-medium" style="color: var(--color-fg)">
 				Hierarchy sort

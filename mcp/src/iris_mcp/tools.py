@@ -676,7 +676,7 @@ _COLLECTION_UPDATE_FIELDS = (
 _SET_UPDATE_FIELDS = (
     "name", "description", "thumbnail_source", "thumbnail_diagram_id",
     "collection_id", "system_prompt", "mcp_system_context",
-    # ADR-202 (v6.11.0): per-set hierarchy sort preference. Forwarded
+    # ADR-202 (v6.13.0): per-set hierarchy sort preference. Forwarded
     # through _put_merge_partial so MCP clients can read the current
     # value and override it, or leave it alone by omitting.
     "hierarchy_sort",
@@ -1862,7 +1862,7 @@ TOOLS: list[Tool] = [
             ),
             "hierarchy_sort": _str_arg(
                 "hierarchy_sort",
-                "Hierarchy sort order for this set (v6.11.0, ADR-202). "
+                "Hierarchy sort order for this set (v6.13.0, ADR-202). "
                 "One of: 'manual' (drag-and-drop sequence_order, default), "
                 "'alpha' (alphabetical by name), 'newest' (created_at DESC), "
                 "'oldest' (created_at ASC). Affects every surface that renders "

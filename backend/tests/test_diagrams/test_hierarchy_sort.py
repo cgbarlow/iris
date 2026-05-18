@@ -1,4 +1,4 @@
-"""Tests for per-set hierarchy sort preference (v6.11.0, ADR-202).
+"""Tests for per-set hierarchy sort preference (v6.13.0, ADR-202).
 
 Verifies that ``GET /api/diagrams/hierarchy?set_id=X`` honours the
 set's ``hierarchy_sort`` column for ordering returned siblings.

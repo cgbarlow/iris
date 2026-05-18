@@ -288,7 +288,7 @@ export interface IrisSet {
 	collection_id: string | null;
 	collection_name: string | null;
 	system_prompt?: string | null;
-	// ADR-202 (v6.11.0): per-set hierarchy sort preference.
+	// ADR-202 (v6.13.0): per-set hierarchy sort preference.
 	hierarchy_sort: HierarchySort;
 }
 
