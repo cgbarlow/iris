@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.14.2] - 2026-05-18
+
+### Fixed
+
+- **`PUT /api/sets/{id}` no longer hides update failures behind a
+  misleading "duplicate name" 409.** The previous `except Exception`
+  in the sets router caught every error — including transient asyncpg
+  failures, constraint violations on new columns, etc. — and surfaced
+  them as `409 "A set with this name already exists"`. That was the
+  user-visible signal during the v6.14.0 hierarchy-sort persistence
+  report (which the frontend silently displayed without making clear
+  the underlying cause). The handler now logs the full exception and
+  returns `409` with `f"Failed to update set ({type}: {message})"` so
+  the actual cause surfaces to DevTools / the toast.
+
 ## [6.14.1] - 2026-05-18
 
 ### Fixed
