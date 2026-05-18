@@ -205,7 +205,21 @@ async def _maybe_synthesise_content(
     opt-in computed diagram types (ADR-187). Mutates ``diagram`` in
     place. Persisted row is unchanged.
     """
-    if diagram.get("diagram_type") != "dynamic_list":
+    diagram_type = diagram.get("diagram_type")
+    if diagram_type == "smart_markdown":
+        # ADR-205 (v6.14.0): resolve inline-reference tokens against
+        # live entity fields. Stored ``data.markdown_source`` is the
+        # user's draft; ``data.content`` is the resolver output.
+        from app.diagrams.smart_markdown import compute_smart_markdown_content
+        data = diagram.get("data") or {}
+        if not isinstance(data, dict):
+            data = {}
+        rendered = await compute_smart_markdown_content(db, str(diagram["id"]))
+        data["content"] = rendered
+        data["is_content_locked"] = True
+        diagram["data"] = data
+        return
+    if diagram_type != "dynamic_list":
         return
     from app.diagrams.dynamic_list import compute_dynamic_list_content
 

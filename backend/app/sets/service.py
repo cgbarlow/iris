@@ -37,6 +37,13 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
         # ADR-202: NULL fallback for pre-migration rows (shouldn't
         # happen because the column has a DEFAULT, but belt-and-braces).
         "hierarchy_sort": (row[14] if len(row) > 14 and row[14] else "manual"),
+        # ADR-204: same belt-and-braces for the new tab-default columns.
+        "package_tab_default": (
+            row[15] if len(row) > 15 and row[15] else "relationships"
+        ),
+        "view_tab_default": (
+            row[16] if len(row) > 16 and row[16] else "canvas"
+        ),
     }
 
 
@@ -44,7 +51,8 @@ _SET_COLUMNS = (
     "s.id, s.name, s.description, s.created_at, s.created_by, "
     "s.updated_at, s.is_deleted, s.thumbnail_source, s.thumbnail_diagram_id, "
     "s.thumbnail_image IS NOT NULL, s.collection_id, col.name, s.system_prompt, "
-    "s.mcp_system_context, s.hierarchy_sort"
+    "s.mcp_system_context, s.hierarchy_sort, s.package_tab_default, "
+    "s.view_tab_default"
 )
 
 
@@ -89,6 +97,8 @@ async def create_set(
         "system_prompt": None,
         "mcp_system_context": None,
         "hierarchy_sort": "manual",  # ADR-202 default for new sets
+        "package_tab_default": "relationships",  # ADR-204 defaults
+        "view_tab_default": "canvas",
     }
 
 
@@ -230,12 +240,15 @@ async def update_set(
     system_prompt: str | None = None,
     mcp_system_context: str | None = None,
     hierarchy_sort: str | None = None,
+    package_tab_default: str | None = None,
+    view_tab_default: str | None = None,
 ) -> dict[str, object] | None:
-    """Update a set's metadata (ADR-202 adds hierarchy_sort).
+    """Update a set's metadata.
 
-    ``hierarchy_sort`` is tri-stateish: None means "leave alone". The
-    Pydantic Literal on SetUpdate constrains the value space upstream
-    so we accept whatever the caller gave us as-is.
+    ADR-202 adds ``hierarchy_sort``; ADR-204 adds ``package_tab_default``
+    and ``view_tab_default``. All three are tri-stateish: None means
+    "leave alone". The Pydantic Literals on SetUpdate constrain the
+    value space upstream so we accept whatever the caller gave us.
 
     Returns None if not found.
     """
@@ -284,6 +297,18 @@ async def update_set(
         await db.execute(
             "UPDATE sets SET hierarchy_sort = ?, updated_at = ? WHERE id = ?",
             (hierarchy_sort, now, set_id),
+        )
+
+    # ADR-204: same per-field separate UPDATE pattern for tab defaults.
+    if package_tab_default is not None:
+        await db.execute(
+            "UPDATE sets SET package_tab_default = ?, updated_at = ? WHERE id = ?",
+            (package_tab_default, now, set_id),
+        )
+    if view_tab_default is not None:
+        await db.execute(
+            "UPDATE sets SET view_tab_default = ?, updated_at = ? WHERE id = ?",
+            (view_tab_default, now, set_id),
         )
 
     await db.commit()

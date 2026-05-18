@@ -961,16 +961,27 @@ def update_set_cmd(
     mcp_system_context: str | None = typer.Option(None, "--mcp-system-context"),
     thumbnail_source: str | None = typer.Option(None, "--thumbnail-source"),
     thumbnail_diagram_id: str | None = typer.Option(None, "--thumbnail-diagram-id"),
+    hierarchy_sort: str | None = typer.Option(None, "--hierarchy-sort"),
+    package_tab_default: str | None = typer.Option(None, "--package-tab-default"),
+    view_tab_default: str | None = typer.Option(None, "--view-tab-default"),
 ) -> None:
     """Update a Set's metadata. To move a set between collections, use
     `iris move set` instead — this command deliberately excludes
-    collection_id."""
+    collection_id.
+
+    --hierarchy-sort: manual | alpha | newest | oldest (ADR-202).
+    --package-tab-default: relationships | details (ADR-204).
+    --view-tab-default: canvas | relationships | details (ADR-204).
+    """
     partial = {
         "name": name, "description": description,
         "system_prompt": system_prompt,
         "mcp_system_context": mcp_system_context,
         "thumbnail_source": thumbnail_source,
         "thumbnail_diagram_id": thumbnail_diagram_id,
+        "hierarchy_sort": hierarchy_sort,
+        "package_tab_default": package_tab_default,
+        "view_tab_default": view_tab_default,
     }
 
     async def _do() -> Any:

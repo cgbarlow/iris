@@ -270,6 +270,10 @@ export interface ElementStats {
 
 export type HierarchySort = 'manual' | 'alpha' | 'newest' | 'oldest';
 
+// ADR-204 (v6.14.0): per-set tab defaults for Packages and Views screens.
+export type PackageTabDefault = 'relationships' | 'details';
+export type ViewTabDefault = 'canvas' | 'relationships' | 'details';
+
 export interface IrisSet {
 	id: string;
 	name: string;
@@ -290,6 +294,9 @@ export interface IrisSet {
 	system_prompt?: string | null;
 	// ADR-202 (v6.13.0): per-set hierarchy sort preference.
 	hierarchy_sort: HierarchySort;
+	// ADR-204 (v6.14.0): per-set tab defaults.
+	package_tab_default: PackageTabDefault;
+	view_tab_default: ViewTabDefault;
 }
 
 export interface IrisCollection {

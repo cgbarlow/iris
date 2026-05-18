@@ -78,8 +78,9 @@ class TestNewDiagramTypes:
         resp = await client.get("/api/registry/diagram-types", headers=headers)
         types = resp.json()
         # 7 original + 6 new + 2 DoView + 2 BPMN (ADR-136) + 1 Text (ADR-137)
-        # + 1 doview_analysis (legacy seed) + 1 Dynamic List (ADR-186) = 20
-        assert len(types) == 20
+        # + 1 doview_analysis (legacy seed) + 1 Dynamic List (ADR-186)
+        # + 1 Smart Markdown (ADR-205, v6.14.0) = 21
+        assert len(types) == 21
 
 
 class TestNewNotationMappings:

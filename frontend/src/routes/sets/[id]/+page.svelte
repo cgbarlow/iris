@@ -4,7 +4,15 @@
 	import { apiFetch } from '$lib/utils/api';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
-	import type { IrisSet, IrisCollection, Diagram, PaginatedResponse, HierarchySort } from '$lib/types/api';
+	import type {
+		IrisSet,
+		IrisCollection,
+		Diagram,
+		PaginatedResponse,
+		HierarchySort,
+		PackageTabDefault,
+		ViewTabDefault,
+	} from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
@@ -27,6 +35,9 @@
 	let mcpSystemContext = $state('');
 	// ADR-202 (v6.13.0): per-set hierarchy sort preference.
 	let hierarchySort = $state<HierarchySort>('manual');
+	// ADR-204 (v6.14.0): per-set tab defaults for Packages/Views screens.
+	let packageTabDefault = $state<PackageTabDefault>('relationships');
+	let viewTabDefault = $state<ViewTabDefault>('canvas');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -57,6 +68,8 @@
 			systemPrompt = setData.system_prompt ?? '';
 			mcpSystemContext = (setData as IrisSet & { mcp_system_context?: string | null }).mcp_system_context ?? '';
 			hierarchySort = setData.hierarchy_sort ?? 'manual';
+			packageTabDefault = setData.package_tab_default ?? 'relationships';
+			viewTabDefault = setData.view_tab_default ?? 'canvas';
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -90,6 +103,8 @@
 					system_prompt: sanitizedPrompt,
 					mcp_system_context: sanitizedMcpSystemContext,
 					hierarchy_sort: hierarchySort,
+					package_tab_default: packageTabDefault,
+					view_tab_default: viewTabDefault,
 				}),
 			});
 
@@ -237,6 +252,45 @@
 			</select>
 			<p class="mt-1 text-xs" style="color: var(--color-muted)">
 				Controls how packages and diagrams are ordered in the dashboard tree, the packages-page sidebar, and the views-page tree for this set.
+			</p>
+		</div>
+
+		<!-- Package tab default (ADR-204, v6.14.0) -->
+		<div class="mt-4">
+			<label for="set-edit-package-tab-default" class="text-sm font-medium" style="color: var(--color-fg)">
+				Package tab default
+			</label>
+			<select
+				id="set-edit-package-tab-default"
+				bind:value={packageTabDefault}
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			>
+				<option value="relationships">Relationships</option>
+				<option value="details">Details</option>
+			</select>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				Which tab opens by default when a user visits a package in this set.
+			</p>
+		</div>
+
+		<!-- View tab default (ADR-204, v6.14.0) -->
+		<div class="mt-4">
+			<label for="set-edit-view-tab-default" class="text-sm font-medium" style="color: var(--color-fg)">
+				View tab default
+			</label>
+			<select
+				id="set-edit-view-tab-default"
+				bind:value={viewTabDefault}
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			>
+				<option value="canvas">Canvas</option>
+				<option value="relationships">Relationships</option>
+				<option value="details">Details</option>
+			</select>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				Which tab opens by default when a user visits a view (diagram) in this set.
 			</p>
 		</div>
 
