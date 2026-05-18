@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.4] - 2026-05-18
+
+### Fixed
+
+- **Stale elements rendered on package Relationships tab after
+  navigation** (issue
+  [#173](https://github.com/cgbarlow/iris/issues/173) item 3,
+  ADR-195). Navigating from package A to package B left A's
+  elements visible on B's Relationships tab until a hard browser
+  refresh. Root cause: `loadPackage` reset top-level state
+  (`pkg`, `error`, `parentPackageName`) but not the lazy-loaded
+  relationships state (`packageElementsLoaded`, `packageElements`,
+  `packageElementsTotal`, `packageElementsLoading`,
+  `packageElementsError`), so the activation-side guard
+  short-circuited the re-fetch. Also resets inline edit state
+  (`editingDetails`, `detailsDirty`) so edit mode doesn't bleed
+  across packages.
+
 ## [6.8.3] - 2026-05-17
 
 ### Fixed

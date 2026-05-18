@@ -130,6 +130,16 @@
 		loading = true;
 		error = null;
 		parentPackageName = null;
+		// Issue #173 item 3: reset per-package derived state so navigating
+		// from package A → B doesn't leave A's relationships / edit state
+		// rendered until a hard refresh.
+		packageElementsLoaded = false;
+		packageElementsLoading = false;
+		packageElements = [];
+		packageElementsTotal = 0;
+		packageElementsError = null;
+		editingDetails = false;
+		detailsDirty = false;
 		try {
 			pkg = await apiFetch<Package>(`/api/packages/${id}`);
 			recordVisit({ id: pkg.id, type: 'package', name: pkg.name, setId: pkg.set_id ?? undefined, setName: pkg.set_name ?? undefined, description: pkg.description ?? undefined, href: `/packages/${pkg.id}` });
