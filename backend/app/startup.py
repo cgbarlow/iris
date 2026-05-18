@@ -74,6 +74,7 @@ from app.migrations.m067_element_templates import up as m067_up
 from app.migrations.m068_sets_hierarchy_sort import up as m068_up
 from app.migrations.m069_sets_default_tabs import up as m069_up
 from app.migrations.m070_smart_markdown_diagram_type import up as m070_up
+from app.migrations.m071_rename_text_to_standard_markdown import up as m071_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -175,6 +176,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m068_up(main)  # v6.13.0: per-set hierarchy sort preference (ADR-202)
     await m069_up(main)  # issue #186, v6.14.0: per-set tab defaults (ADR-204)
     await m070_up(main)  # issue #185, v6.14.0: smart_markdown diagram_type (ADR-205)
+    await m071_up(main)  # v6.14.1: rename 'text' diagram type display label to 'Standard Markdown'
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

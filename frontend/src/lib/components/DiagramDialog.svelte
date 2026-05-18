@@ -98,8 +98,9 @@
 			{ value: 'free_form', label: 'Free Form' },
 		],
 		markdown: [
-			{ value: 'text', label: 'Text' },
+			{ value: 'text', label: 'Standard Markdown' },
 			{ value: 'dynamic_list', label: 'Dynamic List' },
+			{ value: 'smart_markdown', label: 'Smart Markdown' },
 		],
 	};
 
