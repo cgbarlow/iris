@@ -63,7 +63,29 @@
 		}
 	});
 
+	// Issue #173 item 7: search-race fix. Each keystroke previously
+	// fired loadElements() synchronously with no debounce or abort, so
+	// late responses overwrote recent ones (the "grocery" flash). We
+	// mirror the dashboard's 300ms debounce and add an AbortController
+	// so the newest request cancels older in-flight ones. A captured
+	// requestedQuery is compared against the current searchQuery at
+	// response time as a belt-and-braces guard.
+	let searchTimeout: ReturnType<typeof setTimeout> | undefined;
+	let loadController: AbortController | undefined;
+
+	function onSearchInput() {
+		clearTimeout(searchTimeout);
+		searchTimeout = setTimeout(() => {
+			page = 1;
+			loadElements();
+		}, 300);
+	}
+
 	async function loadElements() {
+		loadController?.abort();
+		loadController = new AbortController();
+		const controller = loadController;
+		const requestedQuery = searchQuery.trim();
 		loading = true;
 		try {
 			const params = new URLSearchParams();
@@ -72,15 +94,19 @@
 			if (currentSetId) params.set('set_id', currentSetId);
 			else if (currentCollectionId) params.set('collection_id', currentCollectionId);
 			if (notationFilter) params.set('notation', notationFilter);
-			if (searchQuery.trim()) params.set('search', searchQuery.trim());
-			const data = await apiFetch<PaginatedResponse<Element>>(`/api/elements?${params}`);
+			if (requestedQuery) params.set('search', requestedQuery);
+			const data = await apiFetch<PaginatedResponse<Element>>(`/api/elements?${params}`, { signal: controller.signal });
+			// Race guard: drop the result if the user has typed past this query.
+			if (requestedQuery !== searchQuery.trim()) return;
 			elements = data.items;
 			total = data.total;
 			loadAvailableTags();
-		} catch {
+		} catch (e) {
+			if (e instanceof DOMException && e.name === 'AbortError') return;
 			error = 'Failed to load elements';
+		} finally {
+			if (controller === loadController) loading = false;
 		}
-		loading = false;
 	}
 
 	async function loadAvailableTags() {
@@ -337,7 +363,7 @@
 		<input
 			id="element-search"
 			bind:value={searchQuery}
-			oninput={() => { page = 1; loadElements(); }}
+			oninput={onSearchInput}
 			type="search"
 			placeholder="Search elements..."
 			class="rounded border px-3 py-2 text-sm"
