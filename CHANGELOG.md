@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.7] - 2026-05-18
+
+### Fixed
+
+- **Cloning an element from /elements/{id} dropped it into the
+  default set** (issue
+  [#173](https://github.com/cgbarlow/iris/issues/173) item 1,
+  ADR-198). The detail-page Clone button POSTed to
+  `/api/elements` without `set_id`, so the backend's
+  `create_element` fell back to `DEFAULT_SET_ID`. Now passes
+  `set_id: entity.set_id`. Batch clone path
+  (`POST /api/batch/elements/clone`) was already correct; a
+  regression test now locks in that invariant explicitly.
+
 ## [6.8.6] - 2026-05-18
 
 ### Fixed
