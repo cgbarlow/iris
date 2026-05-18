@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.13.0] - 2026-05-18
+
+### Added
+
+- **Per-set hierarchy sort preference** (ADR-202). Each set can
+  now choose how its packages and diagrams are ordered in the
+  hierarchy views (dashboard tree, packages page sidebar, views
+  page tree). Four options on the set edit page (Edit Set →
+  Hierarchy sort):
+  - **Manual** (drag-and-drop sequence_order — current behaviour,
+    default for new and existing sets).
+  - **Alphabetical** (A → Z, case-insensitive, interleaves
+    packages and diagrams).
+  - **Newest first** (`created_at DESC`).
+  - **Oldest first** (`created_at ASC`).
+  - Also surfaced on the MCP `update_set` tool. New `hierarchy_sort`
+    field round-trips through `SetResponse` / `SetUpdate`.
+
+### Migration
+
+- **SQLite m068 + Supabase m072 (paired, §15)** — adds
+  `hierarchy_sort TEXT NOT NULL DEFAULT 'manual'` to `sets`. Enum
+  enforced at the Pydantic layer (no SQL CHECK, so SQLite and
+  Supabase syntax stay identical). Existing sets inherit the
+  `'manual'` default — no back-fill needed.
+- **Release ordering for Supabase**: run
+  `scripts/supabase-migrate.sh` against the Supabase DB **before**
+  the code deploys. The service layer has a defensive fallback so
+  a brief window without the migration degrades to manual sort
+  rather than 500-ing.
+
 ## [6.12.0] - 2026-05-18
 
 ### Changed
