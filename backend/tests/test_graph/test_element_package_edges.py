@@ -158,6 +158,71 @@ class TestGraphEmitsElementPackageEdges:
         ep_edges = [e for e in body["edges"] if e["edge_type"] == "element_package"]
         assert ep_edges == []
 
+    async def test_no_redundant_set_membership_when_element_packaged(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        """ADR-203 / issue #181: the set → package → element chain
+        replaces the direct set → element edge for packaged elements.
+        Only the un-packaged element's set_membership edge remains."""
+        h = await _auth(client)
+        set_resp = await client.post(
+            "/api/sets", json={"name": "GraphSet"}, headers=h,
+        )
+        set_id = set_resp.json()["id"]
+
+        pkg_resp = await client.post(
+            "/api/packages",
+            json={"name": "Pantry", "set_id": set_id},
+            headers=h,
+        )
+        pkg_id = pkg_resp.json()["id"]
+
+        packaged = (await client.post(
+            "/api/elements",
+            json={
+                "element_type": "component",
+                "name": "Tinned Tomatoes",
+                "data": {},
+                "set_id": set_id,
+                "package_id": pkg_id,
+            },
+            headers=h,
+        )).json()
+        free_floating = (await client.post(
+            "/api/elements",
+            json={
+                "element_type": "component",
+                "name": "FreeFloating",
+                "data": {},
+                "set_id": set_id,
+            },
+            headers=h,
+        )).json()
+
+        graph_resp = await client.get(f"/api/graph?set_id={set_id}", headers=h)
+        body = graph_resp.json()
+
+        set_member_targets = {
+            e["target"] for e in body["edges"]
+            if e["edge_type"] == "set_membership" and e["source"] == set_id
+        }
+        # Free-floating element keeps its direct set→element edge.
+        assert free_floating["id"] in set_member_targets
+        # Packaged element does NOT — reachable via set → package → element.
+        assert packaged["id"] not in set_member_targets, (
+            "ADR-203: packaged elements must not duplicate their "
+            "containment as a direct set → element edge"
+        )
+        # set → package edge still present (separate rule).
+        assert pkg_id in set_member_targets
+
+        # The element_package chain works.
+        ep_edges = [e for e in body["edges"] if e["edge_type"] == "element_package"]
+        assert any(
+            e["source"] == pkg_id and e["target"] == packaged["id"]
+            for e in ep_edges
+        )
+
     async def test_node_type_remains_element_not_package(
         self, client: httpx.AsyncClient,
     ) -> None:

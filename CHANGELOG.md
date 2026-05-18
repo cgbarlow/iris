@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.12.0] - 2026-05-18
+
+### Changed
+
+- **Knowledge graph: packaged elements reached via the package
+  chain only** (issue
+  [#181](https://github.com/cgbarlow/iris/issues/181), ADR-203).
+  Previously, an element belonging to a package rendered both
+  `set → element` (set_membership) and `set → package → element`
+  (chain) — visual redundancy. The direct `set → element` edge
+  is now skipped when the element's package is visible in the
+  current scope. Free-floating elements (no `package_id`) keep
+  their direct edge. If the package is out of scope (soft-
+  deleted, different set), the direct edge falls through so the
+  element isn't visually orphaned. No toggle — the chain conveys
+  containment more usefully and the redundant edge is just
+  clutter.
+
 ## [6.11.1] - 2026-05-18
 
 ### Fixed
