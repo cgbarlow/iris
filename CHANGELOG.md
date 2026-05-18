@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.8.6] - 2026-05-18
+
+### Fixed
+
+- **Template viewer rendered a broken link to a deleted source
+  element** (issue
+  [#173](https://github.com/cgbarlow/iris/issues/173) item 2,
+  ADR-197). Two-half cause: (a) the backend subquery that
+  resolves `source_element_name` did not filter on
+  `elements.is_deleted = 0`, so a soft-deleted source still
+  produced a name; (b) the frontend's `{#if}` was keyed on
+  `source_element_id` — but the id stays populated as a dangling
+  FK after source deletion, so the "(source element deleted)"
+  fallback was unreachable. Backend subqueries now filter
+  `e.is_deleted = 0` (db-adapter rewrites to `FALSE` on Supabase
+  per §15); frontend conditional now keys on
+  `source_element_name`.
+
 ## [6.8.5] - 2026-05-18
 
 ### Fixed
