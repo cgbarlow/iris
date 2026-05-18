@@ -365,8 +365,17 @@ async def get_graph_data(
             })
 
     # 8. Set → Element/Diagram/Package membership
+    # ADR-203 (issue #181): when an element has a package_id that's
+    # visible in the current scope, skip the direct set → element
+    # edge. The set → package → element chain conveys containment
+    # more usefully; the direct edge would be redundant clutter.
+    # If the package is out-of-scope (e.g. soft-deleted, or in a
+    # different set), fall through and emit the direct edge so the
+    # element isn't visually orphaned.
     for row in element_rows:
-        eid, sid = row[0], row[4]
+        eid, sid, pkg_id = row[0], row[4], row[5]
+        if pkg_id and pkg_id in package_ids:
+            continue  # ADR-203: chain via package, skip direct edge.
         if sid and sid in set_ids:
             edges.append({
                 "id": str(uuid.uuid4()),
