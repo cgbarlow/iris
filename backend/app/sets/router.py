@@ -109,9 +109,17 @@ async def update(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception:
+    except Exception as exc:
+        # v6.14.2: surface the real failure cause so future regressions
+        # like the hierarchy_sort-not-persisting report can be diagnosed.
+        # Most legitimate constraint failures still map to 409; everything
+        # else surfaces the exception type and message so the frontend
+        # can show it and DevTools captures the trace.
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).exception("update_set failed: %s", exc)
+        msg = str(exc) or type(exc).__name__
         raise HTTPException(  # noqa: B904
-            status_code=409, detail="A set with this name already exists"
+            status_code=409, detail=f"Failed to update set ({type(exc).__name__}: {msg})",
         )
     if result is None:
         raise HTTPException(status_code=404, detail="Set not found")
