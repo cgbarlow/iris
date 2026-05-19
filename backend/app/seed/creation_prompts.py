@@ -949,6 +949,82 @@ Use `boundary`-style containment: place inner elements inside the outer element'
 Place load balancers, firewalls, gateways, DNS as `infrastructure_node` (120×80) at the edges of the diagram."""
 
 
+SMART_MARKDOWN_PROMPT = """## Markdown → Smart Markdown Authoring
+
+For markdown/smart_markdown diagrams (ADR-205, ADR-206):
+
+### data shape
+Provide `data.markdown_source` as a string. The render pipeline
+resolves inline reference tokens at GET time and writes the result
+to `data.content`. Never write `data.content` directly; it is
+synthesised server-side.
+
+### Token syntax
+```
+{{<entity-type>:<id>:<field-spec>}}
+```
+
+- `<entity-type>` ∈ `element` | `package` | `diagram` | `set` | `collection`
+- `<id>` is the entity's GUID
+- `<field-spec>` is:
+    - `name`
+    - `description`
+    - `attr:<key>` (elements only) — top-level key in `element.data`
+    - `attr:<seg>/<seg>/<seg>...` (elements only) — nested path into
+      `element.data`. At each step the walker resolves:
+        * dict node + matching key → take it
+        * list node + numeric segment → index
+        * list of dicts each with a `name` field + non-numeric
+          segment → find item where `name == segment`
+
+### Examples
+```
+{{element:abc-123:name}}                       → "Pork mince"
+{{element:abc-123:attr:Unit}}                  → "g"
+{{element:abc-123:attr:attributes/Unit/type}}  → "g" (named array drill)
+{{package:def-456:name}}                       → "Groceries"
+```
+
+### Failure mode
+Unresolvable tokens render as `~~{{...}}~~` (strikethrough) so the
+user sees the token rather than silent data loss.
+
+### When to choose this type
+Use `smart_markdown` whenever the markdown body must reference live
+Iris entity fields (recipes, meal plans, generated reports, status
+docs whose numbers come from element attributes). Use plain
+`text` (Standard Markdown) for static notes."""
+
+
+DYNAMIC_LIST_PROMPT = """## Markdown → Dynamic List Authoring
+
+For markdown/dynamic_list diagrams (ADR-186):
+
+### data shape
+Provide:
+
+- `data.source` ∈ `diagram_relationships` | `package_elements`
+- `data.show_description` (bool) — when true, each bullet is
+  suffixed with the entity's description in parentheses.
+
+The server emits the bullet list at GET time into `data.content`.
+Never write `data.content` directly.
+
+### source semantics
+- `diagram_relationships`: emits two bullets per intra-diagram
+  relationship (source name, then target name). Non-deduplicated
+  by design.
+- `package_elements`: emits one bullet per element in the package
+  this diagram points at, sorted alphabetically by name. Requires
+  the diagram to have a `package_id` set.
+
+### When to choose this type
+Use `dynamic_list` when the markdown body is a self-rendering
+bullet list of relationships or package members that should track
+the underlying data automatically. For mixed markdown + live
+references, use `smart_markdown` instead."""
+
+
 # ── Row definitions for the expansion seed ─────────────────────────────────
 
 _EXPANSION_ROWS = [
@@ -1108,6 +1184,29 @@ _EXPANSION_ROWS = [
         "diagram_type": "deployment",
         "prompt_text": C4_DEPLOYMENT_PROMPT,
         "display_order": 410,
+    },
+    # Diagram-type layer — Markdown (ADR-206, v6.15.0): authoring
+    # rules for the markdown-notation types whose `data` shape is
+    # not obvious to programmatic creators (MCP / CLI / local AI).
+    {
+        "id": "creation-md-smart-markdown-v1",
+        "name": "Smart Markdown Authoring",
+        "description": "Authoring rules for markdown/smart_markdown — token syntax and `data.markdown_source` shape.",
+        "layer": "diagram_type",
+        "notation": None,
+        "diagram_type": "smart_markdown",
+        "prompt_text": SMART_MARKDOWN_PROMPT,
+        "display_order": 510,
+    },
+    {
+        "id": "creation-md-dynamic-list-v1",
+        "name": "Dynamic List Authoring",
+        "description": "Authoring rules for markdown/dynamic_list — `data.source` and `data.show_description`.",
+        "layer": "diagram_type",
+        "notation": None,
+        "diagram_type": "dynamic_list",
+        "prompt_text": DYNAMIC_LIST_PROMPT,
+        "display_order": 520,
     },
 ]
 

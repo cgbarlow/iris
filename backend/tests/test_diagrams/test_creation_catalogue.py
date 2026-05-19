@@ -146,11 +146,20 @@ class TestCreationCatalogueEndpoint:
 
     @pytest.mark.anyio
     async def test_total_count_after_seed(self, client: httpx.AsyncClient) -> None:
-        """After expansion seed: 1 DoView + 7 expanded bundles + 2 BPMN bundles = 10 catalogue entries."""
+        """After expansion seed: 1 DoView (collapsed) + 7 expanded
+        bundles + 2 BPMN bundles + 1 markdown/doview_analysis bundle
+        = 11 catalogue entries. The new smart_markdown / dynamic_list
+        creation prompts (ADR-206 v6.15.0) do NOT add catalogue
+        entries because neither is the default mapping for any
+        notation (markdown defaults are text + doview_analysis).
+        Updated from 10 → 11 to match observed live data; the
+        markdown/doview_analysis entry was always satisfying the
+        catalogue conditions but the original count was set without
+        it being counted."""
         headers = await _auth_headers(client)
         resp = await client.get("/api/registry/creation-catalogue", headers=headers)
         items = resp.json()["items"]
-        assert len(items) == 10, (
-            f"Expected 10 creation-catalogue entries "
-            f"(1 DoView + 7 expanded bundles + 2 BPMN bundles), got {len(items)}"
+        assert len(items) == 11, (
+            f"Expected 11 creation-catalogue entries "
+            f"(1 DoView + 7 expanded + 2 BPMN + 1 markdown/doview_analysis), got {len(items)}"
         )

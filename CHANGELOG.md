@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.15.0] - 2026-05-19
+
+### Added
+
+- **Smart Markdown picker: hierarchical browse, recent chips, and
+  nested attribute drill** (ADR-206, issue
+  [#185](https://github.com/cgbarlow/iris/issues/185) follow-ups).
+  Pressing `/` in a Smart Markdown view now opens with a discoverable
+  browser: Recent chips (entities already referenced in this diagram,
+  derived from the live source — no new state) → breadcrumb →
+  collections list. Click drills into a collection's sets, then into
+  a set's Packages / Diagrams / Elements buckets with counts (zero
+  buckets hidden), then into the entity list. Reset button on the
+  breadcrumb returns to root.
+- **Nested attribute drill** for elements whose `data` contains
+  arrays-of-dicts (the ArchiMate-style attribute pattern). After
+  picking an element, the picker collapses into an IDE-style
+  autocomplete strip `[entity].<field>`. Typing `.` or Tab drills;
+  arrow keys highlight; Enter inserts. Token format extends to
+  `attr:SEG/SEG/SEG` with named lookup for arrays of dicts whose
+  items have a `name` field (e.g. `attr:attributes/Unit/type` →
+  resolves to `g`). Backward compatible with v6.14.x single-key
+  tokens.
+- **`GET /api/picker/browse`** — uniform breadcrumb + items +
+  counts response across the four hierarchy scopes (`root`,
+  `collection`, `set`, `set_bucket`). Drives the new picker browse
+  mode.
+- **`GET /api/elements/{id}/data-tree`** — tree descriptor for the
+  drill UI (kind = dict | list_of_named | list | primitive). The
+  legacy `/attribute-keys` endpoint stays for backwards
+  compatibility.
+- **Creation-format prompts** for `smart_markdown` and
+  `dynamic_list` diagram types (Protocol §14 follow-up). MCP and
+  CLI clients now have authoritative documentation of each type's
+  `data` shape via `get_creation_prompts(diagram_type=...,
+  purpose='creation_format')`.
+
+### Changed
+
+- **`/api/search/entities` is now substring-matching** (was
+  prefix-only). Searching "mince" now finds "pork mince". Plus
+  optional `set_id` / `collection_id` query params to scope results
+  to a set or a collection's subtree.
+- **Diagram-type dropdown is alphabetical**
+  (`frontend/src/lib/components/DiagramDialog.svelte`). The
+  `markdown` notation now lists `Dynamic List`, `Smart Markdown`,
+  `Standard Markdown` rather than registry order. Registry
+  ordering (`display_order, name`) is preserved server-side for
+  other consumers.
+
+### Migration
+
+- No DB schema changes. `creation_prompts.py` is re-seeded on
+  startup (idempotent `INSERT OR IGNORE` + `UPDATE`). No paired
+  Supabase migration; no `supabase-migrate.sh` step required.
+
 ## [6.14.2] - 2026-05-18
 
 ### Fixed
