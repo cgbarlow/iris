@@ -215,6 +215,10 @@ async def get_attribute_keys(
     custom attribute of the selected element. Returns an empty list
     if ``data`` is null, missing, or not a dict. 404 if the element
     doesn't exist or is deleted.
+
+    ADR-206 (v6.15.0): superseded by ``/data-tree`` for the new
+    drill UI; this endpoint is retained for backwards compat with
+    any cached v6.14.x frontend.
     """
     db = request.app.state.db_manager.main_db
     elem = await get_element(db, element_id)
@@ -224,6 +228,101 @@ async def get_attribute_keys(
     if not isinstance(data, dict):
         return []
     return sorted(str(k) for k in data.keys())
+
+
+def _describe_node(node: Any) -> dict[str, Any]:
+    """Return the tree-descriptor for a node (ADR-206).
+
+    Shapes (one of):
+      {"kind": "dict",          "keys":  [...]}
+      {"kind": "list_of_named", "names": [...]}
+      {"kind": "list",          "length": N}
+      {"kind": "primitive",     "value": "..."}
+      {"kind": "empty"}             # node is None
+    """
+    if node is None:
+        return {"kind": "empty"}
+    if isinstance(node, dict):
+        return {"kind": "dict", "keys": sorted(str(k) for k in node.keys())}
+    if isinstance(node, list):
+        if node and all(
+            isinstance(item, dict) and "name" in item for item in node
+        ):
+            return {
+                "kind": "list_of_named",
+                "names": [str(item.get("name", "")) for item in node],
+            }
+        return {"kind": "list", "length": len(node)}
+    # primitive
+    return {"kind": "primitive", "value": str(node)}
+
+
+def _walk_node(node: Any, segments: list[str]) -> Any | None:
+    """Walk along segments using the same rules as the resolver
+    (ADR-206 `_resolve_attr_path`)."""
+    for seg in segments:
+        if isinstance(node, dict):
+            if seg in node:
+                node = node[seg]
+                continue
+            return None
+        if isinstance(node, list):
+            if seg.isdigit():
+                idx = int(seg)
+                if 0 <= idx < len(node):
+                    node = node[idx]
+                    continue
+                return None
+            if node and all(
+                isinstance(item, dict) and "name" in item for item in node
+            ):
+                match = next(
+                    (item for item in node if item.get("name") == seg), None,
+                )
+                if match is None:
+                    return None
+                node = match
+                continue
+            return None
+        # primitive but more segments remain
+        return None
+    return node
+
+
+_NODE_NOT_FOUND = object()
+
+
+@router.get("/{element_id}/data-tree")
+async def get_data_tree(
+    element_id: str,
+    request: Request,
+    path: str | None = Query(default=None),
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> dict[str, Any]:
+    """Tree descriptor for the Smart Markdown picker drill UI (ADR-206).
+
+    Walks ``element.data`` along ``path`` (optional, ``/``-separated
+    using the same lookup rules as the resolver: dict-key, numeric
+    index, or named-array-lookup for arrays of dicts with a ``name``
+    field). Returns a single-level descriptor of the resolved node.
+
+    404 if the element is missing/deleted, or if the path doesn't
+    resolve. Path = empty / omitted → descriptor of the root.
+    """
+    db = request.app.state.db_manager.main_db
+    elem = await get_element(db, element_id)
+    if elem is None:
+        raise HTTPException(status_code=404, detail="Element not found")
+    data = elem.get("data")
+    segments = [s for s in (path or "").split("/") if s] if path else []
+    if not segments:
+        return _describe_node(data if data is not None else None)
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=404, detail="Path not found")
+    node = _walk_node(data, segments)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Path not found")
+    return _describe_node(node)
 
 
 @router.put("/{element_id}", response_model=ElementResponse)

@@ -146,6 +146,7 @@
 			<SmartMarkdownSlashPicker
 				oninsert={onTokenInsert}
 				onclose={onPickerClose}
+				existingSource={source ?? ''}
 			/>
 		{/if}
 	{:else}

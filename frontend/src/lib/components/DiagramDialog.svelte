@@ -98,20 +98,22 @@
 			{ value: 'free_form', label: 'Free Form' },
 		],
 		markdown: [
-			{ value: 'text', label: 'Standard Markdown' },
 			{ value: 'dynamic_list', label: 'Dynamic List' },
 			{ value: 'smart_markdown', label: 'Smart Markdown' },
+			{ value: 'text', label: 'Standard Markdown' },
 		],
 	};
 
-	/** Diagram types filtered by the selected notation. */
+	/** Diagram types filtered by the selected notation.
+	 * ADR-206 (v6.15.0): always alphabetical by label. Registry
+	 * ordering stays `display_order, name` for other consumers. */
 	let filteredTypes = $derived.by(() => {
-		if (registryTypes.length > 0) {
-			return registryTypes
+		const types = (registryTypes.length > 0)
+			? registryTypes
 				.filter((t) => t.notations.some((n) => n.notation_id === notation))
-				.map((t) => ({ value: t.id, label: t.name }));
-		}
-		return NOTATION_TYPE_FALLBACK[notation] ?? NOTATION_TYPE_FALLBACK['simple'];
+				.map((t) => ({ value: t.id, label: t.name }))
+			: (NOTATION_TYPE_FALLBACK[notation] ?? NOTATION_TYPE_FALLBACK['simple']);
+		return [...types].sort((a, b) => a.label.localeCompare(b.label));
 	});
 
 	async function loadRegistry() {

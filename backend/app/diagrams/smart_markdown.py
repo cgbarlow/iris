@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
@@ -63,6 +63,49 @@ async def _read_source(db: DatabasePort, diagram_id: str) -> str:
     return src if isinstance(src, str) else ""
 
 
+def _resolve_attr_path(node: Any, segments: list[str]) -> Any | None:
+    """Walk ``node`` along ``segments``. Returns the resolved value, or None.
+
+    Per ADR-206:
+    - dict node + segment matching a key → take ``node[seg]``.
+    - list node + numeric segment → index into the list.
+    - list node + non-numeric segment where every item is a dict
+      with a ``name`` field → find first item where ``item['name']``
+      equals the segment.
+    - primitive node with more segments remaining → unresolvable.
+
+    Numeric segments always index even when items happen to have
+    ``name`` fields (explicit index wins).
+    """
+    for seg in segments:
+        if isinstance(node, dict):
+            if seg in node:
+                node = node[seg]
+                continue
+            return None
+        if isinstance(node, list):
+            if seg.isdigit():
+                idx = int(seg)
+                if 0 <= idx < len(node):
+                    node = node[idx]
+                    continue
+                return None
+            if node and all(
+                isinstance(item, dict) and "name" in item for item in node
+            ):
+                match = next(
+                    (item for item in node if item.get("name") == seg), None,
+                )
+                if match is None:
+                    return None
+                node = match
+                continue
+            return None
+        # primitive but more segments remain
+        return None
+    return node
+
+
 async def _fetch_element_field(
     db: DatabasePort, entity_id: str, field_spec: str,
 ) -> str | None:
@@ -81,7 +124,10 @@ async def _fetch_element_field(
     if field_spec == "description":
         return row[1]
     if field_spec.startswith("attr:"):
-        key = field_spec[len("attr:"):]
+        raw_path = field_spec[len("attr:"):]
+        segments = [s for s in raw_path.split("/") if s]
+        if not segments:
+            return None
         raw = row[2]
         if raw is None:
             return None
@@ -91,10 +137,15 @@ async def _fetch_element_field(
             return None
         if not isinstance(data, dict):
             return None
-        val = data.get(key)
-        if val is None:
+        resolved = _resolve_attr_path(data, segments)
+        if resolved is None:
             return None
-        return str(val)
+        # Legacy v6.14.x: single-segment tokens that landed on a dict
+        # or list rendered the JSON literal. Preserve that — new
+        # tokens with a multi-segment path simply drill further.
+        if isinstance(resolved, (dict, list)):
+            return str(resolved)
+        return str(resolved)
     return None
 
 

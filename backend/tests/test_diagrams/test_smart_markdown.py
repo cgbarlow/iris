@@ -255,3 +255,166 @@ async def test_get_diagram_populates_data_content(
     assert g.status_code == 200
     body = g.json()
     assert body["data"]["content"] == "Hi Foo!"
+
+
+# ──────────────────────────────────────────────────────────────────
+# ADR-206 / v6.15.0: nested-path drill resolution
+# ──────────────────────────────────────────────────────────────────
+
+_RECIPE_ATTRS = [
+    {"name": "Unit", "type": "g", "scope": "Public", "notes": ""},
+    {"name": "Products", "type": "WW Pork Rump", "scope": "Public", "notes": ""},
+    {"name": "Preferred", "type": "WW Pork Fillet", "scope": "Public", "notes": ""},
+]
+
+
+@pytest.mark.asyncio
+async def test_named_lookup_in_array_of_dicts(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: `attr:attributes/Unit/type` resolves via name-match
+    in the array-of-dicts, then takes the named sub-field."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="Pork mince", data={"attributes": _RECIPE_ATTRS},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"500{{{{element:{eid}:attr:attributes/Unit/type}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == "500g"
+
+
+@pytest.mark.asyncio
+async def test_numeric_index_in_list(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: `attr:tags/0` indexes a list positionally."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E", data={"tags": ["alpha", "beta", "gamma"]},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:tags/1}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == "beta"
+
+
+@pytest.mark.asyncio
+async def test_numeric_index_into_named_array_still_works(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: numeric segments index even when the array's items
+    have a `name` field — explicit index wins."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E", data={"attributes": _RECIPE_ATTRS},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:attributes/0/type}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == "g"  # first item is Unit, its type is "g"
+
+
+@pytest.mark.asyncio
+async def test_missing_path_segment_renders_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: missing intermediate or terminal segment → fail-loud."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E", data={"attributes": _RECIPE_ATTRS},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:attributes/Missing/type}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == f"~~{{{{element:{eid}:attr:attributes/Missing/type}}}}~~"
+
+
+@pytest.mark.asyncio
+async def test_legacy_single_key_on_container_renders_literal(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206 backward-compat: existing v6.14.x tokens like
+    `attr:attributes` that land on a list still render the JSON
+    literal (the v6.14.0 behaviour). New tokens drill further."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E", data={"attributes": _RECIPE_ATTRS},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:attributes}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # not strikethrough — we render some kind of stringification
+    assert not rendered.startswith("~~"), rendered
+    assert "Unit" in rendered  # the list literal contains the name
+
+
+@pytest.mark.asyncio
+async def test_dict_key_matches_before_named_lookup(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: at a dict node, a matching key always wins.
+    Named-lookup is only attempted on list nodes."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E",
+        data={"profile": {"name": "Alice", "role": "admin"}},
+    )
+    # `profile/name` is a dict key match, not a named-array lookup.
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:profile/name}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == "Alice"
+
+
+@pytest.mark.asyncio
+async def test_deeply_nested_path(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: 4+ segments walking dict → list_of_named → dict → primitive."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E",
+        data={
+            "groups": [
+                {"name": "alpha", "members": [{"name": "a1", "level": 7}]},
+                {"name": "beta", "members": [{"name": "b1", "level": 3}]},
+            ],
+        },
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:groups/beta/members/0/level}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == "3"
+
+
+@pytest.mark.asyncio
+async def test_primitive_then_more_segments_renders_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-206: trying to drill past a primitive is unresolvable."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="E", data={"unit": "g"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:unit/extra}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == f"~~{{{{element:{eid}:attr:unit/extra}}}}~~"

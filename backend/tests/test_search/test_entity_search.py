@@ -128,3 +128,110 @@ async def test_returns_id_entity_type_name(client: httpx.AsyncClient) -> None:
             assert row["entity_type"] in {
                 "element", "package", "diagram", "set", "collection",
             }
+
+
+# ──────────────────────────────────────────────────────────────────
+# ADR-206 / v6.15.0: substring + scoped search
+# ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_substring_match_finds_middle_token(
+    client: httpx.AsyncClient,
+) -> None:
+    """ADR-206: `mince` now finds `Pork mince` (was prefix-only)."""
+    h = await _auth(client)
+    s = (await client.post("/api/sets", json={"name": "S"}, headers=h)).json()["id"]
+    await client.post(
+        "/api/elements",
+        json={"name": "Pork mince", "element_type": "application", "set_id": s},
+        headers=h,
+    )
+    r = await client.get("/api/search/entities?q=mince", headers=h)
+    assert r.status_code == 200
+    names = [row["name"] for row in r.json()]
+    assert "Pork mince" in names
+
+
+@pytest.mark.asyncio
+async def test_substring_case_insensitive(client: httpx.AsyncClient) -> None:
+    h = await _auth(client)
+    s = (await client.post("/api/sets", json={"name": "S"}, headers=h)).json()["id"]
+    await client.post(
+        "/api/elements",
+        json={"name": "Pork Mince", "element_type": "application", "set_id": s},
+        headers=h,
+    )
+    r = await client.get("/api/search/entities?q=MINCE", headers=h)
+    assert r.status_code == 200
+    names = [row["name"] for row in r.json()]
+    assert "Pork Mince" in names
+
+
+@pytest.mark.asyncio
+async def test_set_id_scopes_results_to_that_set(
+    client: httpx.AsyncClient,
+) -> None:
+    """ADR-206: passing set_id narrows element/package/diagram results
+    to that set; sets and collections are excluded."""
+    h = await _auth(client)
+    s1 = (await client.post("/api/sets", json={"name": "S1"}, headers=h)).json()["id"]
+    s2 = (await client.post("/api/sets", json={"name": "S2"}, headers=h)).json()["id"]
+    await client.post(
+        "/api/elements",
+        json={"name": "Pork mince", "element_type": "application", "set_id": s1},
+        headers=h,
+    )
+    await client.post(
+        "/api/elements",
+        json={"name": "Pork roast", "element_type": "application", "set_id": s2},
+        headers=h,
+    )
+
+    r = await client.get(f"/api/search/entities?q=pork&set_id={s1}", headers=h)
+    assert r.status_code == 200
+    rows = r.json()
+    names = [row["name"] for row in rows]
+    assert "Pork mince" in names
+    assert "Pork roast" not in names
+    # set itself excluded from results
+    assert not any(row["entity_type"] == "set" for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_collection_id_scopes_to_subtree(
+    client: httpx.AsyncClient,
+) -> None:
+    """ADR-206: collection_id includes sets in that collection AND
+    entities under those sets."""
+    h = await _auth(client)
+    coll_a = (await client.post(
+        "/api/collections", json={"name": "Coll A"}, headers=h,
+    )).json()["id"]
+    coll_b = (await client.post(
+        "/api/collections", json={"name": "Coll B"}, headers=h,
+    )).json()["id"]
+    s_a = (await client.post(
+        "/api/sets", json={"name": "S in A", "collection_id": coll_a}, headers=h,
+    )).json()["id"]
+    s_b = (await client.post(
+        "/api/sets", json={"name": "S in B", "collection_id": coll_b}, headers=h,
+    )).json()["id"]
+    await client.post(
+        "/api/elements",
+        json={"name": "Pork mince", "element_type": "application", "set_id": s_a},
+        headers=h,
+    )
+    await client.post(
+        "/api/elements",
+        json={"name": "Pork roast", "element_type": "application", "set_id": s_b},
+        headers=h,
+    )
+
+    r = await client.get(
+        f"/api/search/entities?q=pork&collection_id={coll_a}", headers=h,
+    )
+    assert r.status_code == 200
+    names = [row["name"] for row in r.json()]
+    assert "Pork mince" in names
+    assert "Pork roast" not in names
