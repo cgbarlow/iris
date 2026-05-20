@@ -23,7 +23,10 @@ import { markdownMermaidExtension } from './markdownMermaidExtension';
 marked.use(markdownMermaidExtension());
 
 export interface ExtractedLink {
-	kind: 'diagram' | 'element';
+	/** ADR-209 (v6.17.0): widened from {diagram|element} to the full
+	 *  five-entity-type alphabet so Smart Markdown's resolved entity
+	 *  references are first-class members of the link manifest. */
+	kind: IrisHrefKind;
 	id: string;
 	label: string;
 }
@@ -36,10 +39,15 @@ export interface TocHeading {
 
 export const ALLOWED_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'iris:']);
 
-export function parseIrisHref(href: string): { kind: 'diagram' | 'element'; id: string } | null {
-	const m = /^iris:\/\/(diagram|element)\/([A-Za-z0-9_\-:.]+)$/.exec(href);
+/** ADR-209 (v6.17.0): extended to all five entity types so that
+ *  resolved Smart Markdown entity references click through to their
+ *  detail pages. Original v6.x supported only diagram + element. */
+export type IrisHrefKind = 'diagram' | 'element' | 'set' | 'package' | 'collection';
+
+export function parseIrisHref(href: string): { kind: IrisHrefKind; id: string } | null {
+	const m = /^iris:\/\/(diagram|element|set|package|collection)\/([A-Za-z0-9_\-:.]+)$/.exec(href);
 	if (!m) return null;
-	return { kind: m[1] as 'diagram' | 'element', id: m[2] };
+	return { kind: m[1] as IrisHrefKind, id: m[2] };
 }
 
 export function urlIsAllowed(href: string): boolean {

@@ -367,6 +367,49 @@ class IrisClient:
         response = await self._request("GET", f"/api/collections/{collection_id}")
         return Collection.model_validate(response.json())
 
+    # --- Entity image attachments (ADR-209, v6.17.0) ------------------------
+
+    async def attach_entity_image(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+        image_id: str,
+    ) -> dict[str, Any]:
+        """Attach an existing image to an entity (Protocol §14 mirror)."""
+        response = await self._request(
+            "POST",
+            f"/api/{entity_type}/{entity_id}/images/attach",
+            json={"image_id": image_id},
+        )
+        return response.json()
+
+    async def detach_entity_image(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+        attachment_id: str,
+    ) -> None:
+        """Detach an image from an entity. Underlying image is not deleted."""
+        await self._request(
+            "DELETE",
+            f"/api/{entity_type}/{entity_id}/images/{attachment_id}",
+        )
+
+    async def list_entity_images(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+    ) -> list[dict[str, Any]]:
+        """List images attached to an entity."""
+        response = await self._request(
+            "GET",
+            f"/api/{entity_type}/{entity_id}/images",
+        )
+        return response.json()
+
     # --- Entity creation (ADR-161, v5.16.0) ---------------------------------
 
     async def create_collection(

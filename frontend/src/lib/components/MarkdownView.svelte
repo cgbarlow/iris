@@ -57,7 +57,15 @@
 		const id = t.getAttribute('data-iris-id');
 		if (!kind || !id) return;
 		e.preventDefault();
-		const path = kind === 'diagram' ? `/views/${id}` : `/elements/${id}`;
+		// ADR-209 (v6.17.0): route all five entity kinds. Default falls
+		// back to elements/<id> to keep legacy behaviour for any link
+		// not yet recognised.
+		let path: string;
+		if (kind === 'diagram') path = `/views/${id}`;
+		else if (kind === 'set') path = `/sets/${id}`;
+		else if (kind === 'package') path = `/packages/${id}`;
+		else if (kind === 'collection') path = `/collections/${id}`;
+		else path = `/elements/${id}`;
 		goto(path);
 	}
 

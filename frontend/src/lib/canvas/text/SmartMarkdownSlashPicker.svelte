@@ -105,6 +105,25 @@
 	let drillParentStack = $state<EntitySearchResult[]>([]);
 	const NON_ELEMENT_FIELDS = ['name', 'description'];
 
+	// ADR-209 (v6.17.0): images attached to the drilled entity, surfaced
+	// as picker items above name/description. Clicking an image opens
+	// the sizing chooser.
+	interface EntityImage {
+		id: string;
+		image_id: string;
+		image_mime: string;
+		image_size_bytes: number;
+		display_order: number;
+	}
+	let attachedImages = $state<EntityImage[]>([]);
+	type ImagePickerState = {
+		chosen: EntityImage;
+		axis: 'original' | 'width' | 'height';
+		value: number;
+		unit: '%' | 'px';
+	} | null;
+	let imageSizer = $state<ImagePickerState>(null);
+
 	let rootEl = $state<HTMLDivElement | undefined>(undefined);
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let drillInputEl = $state<HTMLInputElement | undefined>(undefined);
@@ -136,14 +155,24 @@
 	// ── Derived menu for drill mode ──────────────────────────────
 	type DrillItem =
 		| { kind: 'primitive'; label: string }
-		| { kind: 'container'; label: string };
+		| { kind: 'container'; label: string }
+		| { kind: 'image'; label: string; image: EntityImage };
 	const drillMenuItems = $derived.by((): DrillItem[] => {
+		// ADR-209 (v6.17.0): images attached to the chosen entity are
+		// surfaced as `image` items at the top of the menu. Clicking
+		// them opens the sizing chooser.
+		const imageItems: DrillItem[] = attachedImages.map((img, idx) => ({
+			kind: 'image' as const,
+			label: `Image ${idx + 1}`,
+			image: img,
+		}));
 		// ADR-207 v6.16.1: non-element drill exposes name + description
 		// only. Their children are reachable via browse mode at the
 		// parent breadcrumb level (a package now appears as a browse
 		// scope, not a drill).
 		if (chosenEntity && chosenEntity.entity_type !== 'element') {
 			const items: DrillItem[] = [
+				...imageItems,
 				{ kind: 'primitive' as const, label: 'name' },
 				{ kind: 'primitive' as const, label: 'description' },
 			];
@@ -175,9 +204,11 @@
 		})();
 		// At the root of an element drill, also expose name + description
 		// as "shortcut" primitives so the user can pick them without
-		// drilling. For non-elements these are the only options.
+		// drilling. Images (ADR-209) sit above them. For non-elements
+		// only the shortcuts apply (handled above).
 		const withTopShortcuts: DrillItem[] = (drillPath.length === 0)
 			? [
+				...imageItems,
 				...NON_ELEMENT_FIELDS.map((f) => ({
 					label: f, kind: 'primitive' as const,
 				})),
@@ -405,6 +436,8 @@
 	// set_bucket); their own name/description is picked via the
 	// "Pick this {entity}" shortcut, which lands here in drill mode
 	// with no children to show.
+	// ADR-209 (v6.17.0): also fetch attached images so they appear as
+	// pick-this-image items at the top of the menu.
 	async function enterDrill(entity: EntitySearchResult, opts: { resetStack?: boolean } = {}) {
 		const { resetStack = true } = opts;
 		if (resetStack) drillParentStack = [];
@@ -415,6 +448,10 @@
 		mode = 'drill';
 		drillNode = null;
 		containerChildren = [];
+		imageSizer = null;
+		// Fetch attached images for the entity (parallel with drill node fetch).
+		attachedImages = [];
+		void fetchAttachedImages(entity);
 		if (entity.entity_type === 'element') {
 			await fetchDrillNode();
 		} else {
@@ -425,6 +462,42 @@
 		}
 		await tick();
 		drillInputEl?.focus();
+	}
+
+	async function fetchAttachedImages(entity: EntitySearchResult) {
+		try {
+			const rows = await apiFetch<EntityImage[]>(
+				`/api/${entity.entity_type}/${encodeURIComponent(entity.id)}/images`,
+			);
+			// Only apply if still drilling into the same entity.
+			if (chosenEntity?.id === entity.id) {
+				attachedImages = rows ?? [];
+			}
+		} catch {
+			if (chosenEntity?.id === entity.id) attachedImages = [];
+		}
+	}
+
+	function openImageSizer(image: EntityImage) {
+		imageSizer = {
+			chosen: image,
+			axis: 'original',
+			value: 100,
+			unit: '%',
+		};
+	}
+
+	function confirmImageSizing() {
+		if (!imageSizer) return;
+		const { chosen, axis, value, unit } = imageSizer;
+		let token: string;
+		if (axis === 'original') {
+			token = `{{image:${chosen.image_id}}}`;
+		} else {
+			token = `{{image:${chosen.image_id}:${axis}:${value}${unit}}}`;
+		}
+		imageSizer = null;
+		oninsert(token);
 	}
 
 	async function fetchDrillNode() {
@@ -465,6 +538,11 @@
 	}
 
 	async function chooseDrillItem(item: DrillItem) {
+		// ADR-209: image item → open sizing chooser (does not emit yet).
+		if (item.kind === 'image') {
+			openImageSizer(item.image);
+			return;
+		}
 		if (item.kind === 'primitive') {
 			// Top-level name/description shortcuts
 			if (drillPath.length === 0 && NON_ELEMENT_FIELDS.includes(item.label)) {
@@ -744,35 +822,93 @@
 			{/if}
 			<button class="slash-picker__back" onclick={onclose} aria-label="Close">✕</button>
 		</div>
-		<input
-			bind:this={drillInputEl}
-			type="text"
-			class="slash-picker__input slash-picker__input--drill"
-			placeholder="Type . or Tab to drill, Enter to insert"
-			bind:value={drillFilter}
-			onkeydown={handleDrillKey}
-		/>
-		<ul class="slash-picker__list" role="listbox" aria-label="Fields">
-			{#each drillMenuItems as menuItem, i (i + menuItem.label)}
-				<li
-					role="option"
-					aria-selected={i === drillIdx}
-					class="slash-picker__item"
-					class:active={i === drillIdx}
-					onclick={() => chooseDrillItem(menuItem)}
-					onkeydown={(e) => { if (e.key === 'Enter') chooseDrillItem(menuItem); }}
-					tabindex="-1"
-				>
-					<span class="slash-picker__field">{menuItem.label}</span>
-					{#if menuItem.kind === 'container'}
-						<span class="slash-picker__chevron" aria-hidden="true">›</span>
-					{/if}
-				</li>
-			{/each}
-			{#if drillMenuItems.length === 0}
-				<li class="slash-picker__empty">No fields.</li>
-			{/if}
-		</ul>
+
+		{#if imageSizer}
+			<!-- ADR-209 (v6.17.0): image sizing chooser. -->
+			<div class="slash-picker__sizer">
+				<div class="slash-picker__sizer-preview">
+					<img
+						src="/api/images/{imageSizer.chosen.image_id}"
+						alt=""
+						style="max-width: 100%; max-height: 120px; object-fit: contain;"
+					/>
+				</div>
+				<fieldset class="slash-picker__sizer-axis">
+					<label>
+						<input type="radio" bind:group={imageSizer.axis} value="original" />
+						Original size
+					</label>
+					<label>
+						<input type="radio" bind:group={imageSizer.axis} value="width" />
+						Width
+					</label>
+					<label>
+						<input type="radio" bind:group={imageSizer.axis} value="height" />
+						Height
+					</label>
+				</fieldset>
+				{#if imageSizer.axis !== 'original'}
+					<div class="slash-picker__sizer-value">
+						<input
+							type="number"
+							min="1"
+							max="9999"
+							bind:value={imageSizer.value}
+							aria-label="Sizing value"
+						/>
+						<select bind:value={imageSizer.unit} aria-label="Sizing unit">
+							<option value="%">%</option>
+							<option value="px">px</option>
+						</select>
+					</div>
+				{/if}
+				<div class="slash-picker__sizer-actions">
+					<button type="button" onclick={() => (imageSizer = null)}>Cancel</button>
+					<button
+						type="button"
+						class="slash-picker__sizer-confirm"
+						onclick={confirmImageSizing}
+					>Insert image</button>
+				</div>
+			</div>
+		{:else}
+			<input
+				bind:this={drillInputEl}
+				type="text"
+				class="slash-picker__input slash-picker__input--drill"
+				placeholder="Type . or Tab to drill, Enter to insert"
+				bind:value={drillFilter}
+				onkeydown={handleDrillKey}
+			/>
+			<ul class="slash-picker__list" role="listbox" aria-label="Fields">
+				{#each drillMenuItems as menuItem, i (i + menuItem.label)}
+					<li
+						role="option"
+						aria-selected={i === drillIdx}
+						class="slash-picker__item"
+						class:active={i === drillIdx}
+						onclick={() => chooseDrillItem(menuItem)}
+						onkeydown={(e) => { if (e.key === 'Enter') chooseDrillItem(menuItem); }}
+						tabindex="-1"
+					>
+						{#if menuItem.kind === 'image'}
+							<img
+								src="/api/images/{menuItem.image.image_id}"
+								alt=""
+								class="slash-picker__image-thumb"
+							/>
+						{/if}
+						<span class="slash-picker__field">{menuItem.label}</span>
+						{#if menuItem.kind === 'container'}
+							<span class="slash-picker__chevron" aria-hidden="true">›</span>
+						{/if}
+					</li>
+				{/each}
+				{#if drillMenuItems.length === 0}
+					<li class="slash-picker__empty">No fields.</li>
+				{/if}
+			</ul>
+		{/if}
 	{/if}
 </div>
 
@@ -945,5 +1081,55 @@
 		font-family: ui-monospace, monospace;
 		font-size: 11px;
 		color: var(--color-muted, #6b7280);
+	}
+	/* ADR-209: image thumb in drill menu + sizing chooser. */
+	.slash-picker__image-thumb {
+		width: 22px; height: 22px;
+		border-radius: 3px;
+		object-fit: cover;
+		border: 1px solid var(--color-border, #d1d5db);
+		margin-right: 4px;
+	}
+	.slash-picker__sizer {
+		padding: 8px 12px;
+		display: flex; flex-direction: column; gap: 8px;
+	}
+	.slash-picker__sizer-preview {
+		display: flex; justify-content: center;
+		padding: 6px;
+		background: var(--color-surface, #f3f4f6);
+		border-radius: 4px;
+	}
+	.slash-picker__sizer-axis {
+		border: 0; padding: 0; margin: 0;
+		display: flex; flex-direction: column; gap: 4px;
+		font-size: 12px;
+	}
+	.slash-picker__sizer-value {
+		display: flex; gap: 4px;
+	}
+	.slash-picker__sizer-value input,
+	.slash-picker__sizer-value select {
+		padding: 4px 6px;
+		border: 1px solid var(--color-border, #d1d5db);
+		border-radius: 3px;
+		font-size: 12px;
+	}
+	.slash-picker__sizer-value input { flex: 1; }
+	.slash-picker__sizer-actions {
+		display: flex; justify-content: flex-end; gap: 6px;
+	}
+	.slash-picker__sizer-actions button {
+		padding: 4px 10px;
+		font-size: 12px;
+		border: 1px solid var(--color-border, #d1d5db);
+		background: var(--color-bg, #ffffff);
+		border-radius: 3px;
+		cursor: pointer;
+	}
+	.slash-picker__sizer-confirm {
+		background: var(--color-primary, #2563eb) !important;
+		color: white !important;
+		border-color: var(--color-primary, #2563eb) !important;
 	}
 </style>

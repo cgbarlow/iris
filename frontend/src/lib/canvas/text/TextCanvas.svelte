@@ -15,6 +15,7 @@
 	import type { TocHeading } from '$lib/components/markdownHelpers';
 	import MarkdownEditorToolbar from '$lib/canvas/text/MarkdownEditorToolbar.svelte';
 	import { wrapSelection, applyOp, insertAtCursor, uploadPastedImage } from '$lib/canvas/text/markdownEditorToolbarHelpers';
+	import ImageInsertDialog from '$lib/components/ImageInsertDialog.svelte';
 
 	interface Props {
 		/** Markdown source — read from diagram.data.content. */
@@ -47,6 +48,26 @@
 		const value = (e.target as HTMLTextAreaElement).value;
 		content = value;
 		oncontentchange?.(value);
+	}
+
+	// ADR-209: image-insert dialog state for the toolbar button.
+	let imageDialogOpen = $state(false);
+	let imageDialogCaret = $state(0);
+
+	function openImageDialog() {
+		if (textareaEl) imageDialogCaret = textareaEl.selectionStart;
+		imageDialogOpen = true;
+	}
+
+	function onImageInsert(markdown: string) {
+		imageDialogOpen = false;
+		if (!textareaEl) return;
+		textareaEl.focus();
+		textareaEl.setSelectionRange(imageDialogCaret, imageDialogCaret);
+		const op = insertAtCursor(textareaEl, markdown);
+		applyOp(textareaEl, op);
+		content = op.value;
+		oncontentchange?.(op.value);
 	}
 
 	/**
@@ -171,6 +192,7 @@
 		<MarkdownEditorToolbar
 			textareaEl={textareaEl}
 			onchange={(v) => { content = v; oncontentchange?.(v); }}
+			onimage={openImageDialog}
 		/>
 		<textarea
 			bind:this={textareaEl}
@@ -182,6 +204,11 @@
 			placeholder="Write markdown… use [label](iris://diagram/<id>) or iris://element/<id> to link to other Iris models. Tab indents; Esc then Tab moves focus. Paste an image to upload it inline."
 			spellcheck="true"
 		></textarea>
+		<ImageInsertDialog
+			open={imageDialogOpen}
+			oninsert={onImageInsert}
+			oncancel={() => { imageDialogOpen = false; textareaEl?.focus(); }}
+		/>
 	{:else}
 		<div class="text-canvas__view">
 			<MarkdownView source={content ?? ''} {textDiagramIds} {onheadings} />

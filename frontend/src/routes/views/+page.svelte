@@ -404,18 +404,17 @@
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Browse and manage architectural views.</p>
 	</div>
 	<div class="flex items-center gap-2">
-		<!-- v5.4.1 (#46 item #1): HierarchyControls leftmost to match the
-			 dashboard ordering — the +New / Show pair anchors the toolbar; the
-			 page-specific Select sits to its right. -->
-		<HierarchyControls
-			showDiagrams={showDiagrams}
-			showText={showText}
-			onShowDiagrams={(v) => (showDiagrams = v)}
-			onShowText={(v) => (showText = v)}
-			oncreateview={() => (showCreateDialog = true)}
-			oncreatepackage={() => (showCreatePackageDialog = true)}
-			oncreateelement={() => (showCreateElementDialog = true)}
-		/>
+		<!-- v6.17.0 (issue #194 follow-up): revert to a single "New View"
+			 primary button matching the Elements-page button style + size.
+			 HierarchyControls is still used by the dashboard (/) and
+			 packages/[id]; only the views index page steps off it. -->
+		<button
+			onclick={() => (showCreateDialog = true)}
+			class="rounded px-4 py-2 text-sm text-white"
+			style="background-color: var(--color-primary)"
+		>
+			New View
+		</button>
 		<button
 			onclick={() => { selectMode = !selectMode; if (!selectMode) cancelSelection(); }}
 			class="rounded border px-3 py-2 text-sm"

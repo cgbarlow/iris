@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { onDestroy } from 'svelte';
+	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { viewBreadcrumbHref, type BreadcrumbAncestor } from '$lib/utils/viewBreadcrumb';
 	// v6.5.0 (ADR-181): export functions moved into DiagramExportMenu.
@@ -3304,6 +3305,14 @@
 					</div>
 					{/if}
 				{/if}
+			{/if}
+			<!-- ADR-209 (v6.17.0): attached images for this view. -->
+			{#if diagram}
+				<EntityImagesEditor
+					entityType="diagram"
+					entityId={diagram.id}
+					editing={editing}
+				/>
 			{/if}
 		{:else if activeTab === 'relationships'}
 			<!-- Add relationship buttons -->
