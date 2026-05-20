@@ -13,6 +13,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { apiFetch } from '$lib/utils/api';
+	import { imageUrl } from '$lib/utils/imageUrl';
 
 	interface EntityImage {
 		id: string;
@@ -129,7 +130,7 @@
 							aria-label="View image"
 						>
 							<img
-								src="/api/images/{att.image_id}"
+								src={imageUrl(att.image_id)}
 								alt=""
 								loading="lazy"
 							/>
@@ -173,7 +174,7 @@
 		onkeydown={(e) => { if (e.key === 'Escape') lightboxImage = null; }}
 		role="presentation"
 	>
-		<img src="/api/images/{lightboxImage.image_id}" alt="" />
+		<img src={imageUrl(lightboxImage.image_id)} alt="" />
 	</div>
 {/if}
 

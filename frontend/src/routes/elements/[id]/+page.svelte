@@ -880,13 +880,16 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
-			<!-- ADR-209 (v6.17.0): attached images for this element. -->
+			<!-- ADR-209 (v6.17.0 / v6.17.3): attached images for this
+				 element. Always-editable (matches collections/sets) — image
+				 attachments are committed atomically by the backend, so they
+				 shouldn't gate the form's save/discard flow. -->
 			<div class="mt-4">
 				<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
 				<EntityImagesEditor
 					entityType="element"
 					entityId={entity.id}
-					editing={editingDetails}
+					editing={true}
 				/>
 			</div>
 		{:else if activeTab === 'relationships'}

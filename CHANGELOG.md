@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.3] - 2026-05-20
+
+### Fixed
+
+- **Attached images now render in production.** v6.17.0/.1/.2's
+  `<img src="/api/images/<id>">` was a relative URL — the SvelteKit
+  SPA doesn't proxy `/api/*` to the backend in production, so the
+  browser loaded the SPA's `index.html` as image bytes and showed
+  a broken icon. New `frontend/src/lib/utils/imageUrl.ts` helper
+  prepends `API_BASE_URL`; used by `EntityImagesEditor` (grid +
+  lightbox) and `SmartMarkdownSlashPicker` (drill thumbs + sizer
+  preview).
+- **Smart Markdown `<img>` tags in browse mode also resolve.**
+  The resolver emits relative `/api/images/<id>` server-side;
+  `markdownHelpers.ts` now post-processes the sanitised HTML to
+  rewrite those `<img src>` attributes to absolute backend URLs.
+  Same rewriter, single source of truth.
+- **Element + package save button no longer gated by image
+  attachments.** Image attachments commit atomically server-side
+  on upload, so they shouldn't block the form's save/discard. The
+  Images section on `/elements/[id]` and `/packages/[id]` now
+  always shows the upload affordance regardless of edit mode —
+  matching the collections / sets pattern.
+
+### Migration
+
+- None.
+
 ## [6.17.2] - 2026-05-20
 
 ### Fixed

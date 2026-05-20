@@ -24,6 +24,7 @@
 	 *   - Mouse click → equivalent to highlight + Tab.
 	 */
 	import { apiFetch } from '$lib/utils/api';
+	import { imageUrl } from '$lib/utils/imageUrl';
 	import { onMount, tick } from 'svelte';
 
 	type EntityType = 'element' | 'package' | 'diagram' | 'set' | 'collection';
@@ -828,7 +829,7 @@
 			<div class="slash-picker__sizer">
 				<div class="slash-picker__sizer-preview">
 					<img
-						src="/api/images/{imageSizer.chosen.image_id}"
+						src={imageUrl(imageSizer.chosen.image_id)}
 						alt=""
 						style="max-width: 100%; max-height: 120px; object-fit: contain;"
 					/>
@@ -893,7 +894,7 @@
 					>
 						{#if menuItem.kind === 'image'}
 							<img
-								src="/api/images/{menuItem.image.image_id}"
+								src={imageUrl(menuItem.image.image_id)}
 								alt=""
 								class="slash-picker__image-thumb"
 							/>
