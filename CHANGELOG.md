@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.1] - 2026-05-20
+
+### Fixed
+
+- **Images section now appears on views (`/views/[id]`)** — was
+  using the canvas-edit flag rather than always-allow-upload, so the
+  section never surfaced unless the user entered canvas edit mode.
+  Now uses `editing={true}` and renders an `Images` heading (issue
+  #194 follow-up).
+- **Element details page now shows the `Images` heading** for
+  consistency with the other entity types.
+- **Packages page Images section now has a heading** to match the
+  other entity types.
+- **Backend image-attachment endpoints return a graceful 503**
+  (instead of an unhandled 500) when the underlying table doesn't
+  exist (Supabase migration m078 not yet applied). The 503 carries
+  CORS headers so the browser shows the real cause instead of a
+  misleading CORS error; the detail message tells the operator to
+  run `scripts/supabase-migrate.sh`.
+
 ## [6.17.0] - 2026-05-20
 
 ### Added
