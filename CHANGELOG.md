@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.5] - 2026-05-20
+
+### Changed
+
+- **All four component version numbers are now bumped together** on
+  every Iris release. v6.17.4 added the `/version` page but the
+  per-component pyproject versions (backend 1.2.0 / mcp 6.13.0 /
+  cli 0.1.0) had drifted years behind the frontend's release-tag
+  cadence, so the page showed misleading stale numbers. Synced all
+  four to `6.17.5`; future releases follow this convention.
+- **`/version` page now leads with the Iris release tag** (from
+  `frontend/package.json`) and the build's git commit sha, with
+  the per-component versions as a secondary table. A warning row
+  flags any version divergence between components so a stuck
+  deploy is obvious.
+
+### Added
+
+- **`GET /api/version` now returns `git_sha`** — sourced from
+  `IRIS_GIT_SHA` / `RENDER_GIT_COMMIT` env vars at backend startup,
+  with a `git rev-parse HEAD` fallback for local dev. The
+  ground-truth signal when package numbers are out of sync.
+
+### Migration
+
+- None.
+
 ## [6.17.4] - 2026-05-20
 
 ### Fixed
