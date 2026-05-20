@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.2] - 2026-05-20
+
+### Fixed
+
+- **Image upload now actually persists on Supabase**. v6.17.0's
+  paired Supabase migration m078 declared
+  `entity_images.created_at TEXT NOT NULL`, but Iris's asyncpg adapter
+  (`_convert_params` in `backend/app/db/adapter.py`) unconditionally
+  converts ISO-format string parameters into native `datetime`
+  objects. asyncpg then rejected the INSERT with
+  `DataError: invalid input for query argument $6 (expected str, got
+  datetime)`. Other Iris tables (m002, m006, m007, …) already use
+  `TIMESTAMPTZ`; m078 was the outlier. Updated m078 to
+  `TIMESTAMPTZ NOT NULL` for new installs and to `ALTER COLUMN ...
+  TYPE TIMESTAMPTZ` for existing installs. The v6.17.1 graceful 503
+  handler made this diagnosable from the response body.
+
+### Migration
+
+- **Supabase m078 needs to be re-run** by the operator
+  (`scripts/supabase-migrate.sh`). The script is idempotent: on
+  databases where `created_at` is already TEXT, it converts in
+  place; on fresh installs it skips the ALTER and creates the
+  column with the right type.
+
 ## [6.17.1] - 2026-05-20
 
 ### Fixed
