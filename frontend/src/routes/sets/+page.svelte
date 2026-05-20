@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
+	import { API_BASE_URL } from '$lib/config.js';
 	import { getActiveSetId, clearActiveSet, setActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import { setActiveCollection, clearActiveCollection, getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
@@ -94,8 +95,12 @@
 	}
 
 	function getImageThumbnailUrl(set: IrisSet): string | null {
-		if (set.thumbnail_source === 'image' && set.has_thumbnail_image) {
-			return `/api/sets/${set.id}/thumbnail`;
+		// v6.17.4 (ADR-209): also true when an entity_images attachment
+		// exists, so an image uploaded via the set Details Images section
+		// surfaces as the gallery tile. Backend get_set_thumbnail resolves
+		// in the right priority: model → image → attachment.
+		if (set.has_thumbnail_image) {
+			return `${API_BASE_URL}/api/sets/${set.id}/thumbnail`;
 		}
 		return null;
 	}

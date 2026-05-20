@@ -219,6 +219,7 @@
 			entityType="collection"
 			entityId={collection?.id ?? ''}
 			editing={true}
+			maxImages={1}
 		/>
 	</div>
 

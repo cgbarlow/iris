@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { API_BASE_URL } from '$lib/config.js';
 	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
@@ -715,9 +716,15 @@
 						{/if}
 						<a href="/views/{model.id}" class="flex flex-col">
 							<div class="flex h-28 items-center justify-center overflow-hidden" style="border-bottom: 1px solid var(--color-border)">
-								{#if thumbnailMode === 'png' && !thumbnailErrors.has(model.id)}
+								{#if (thumbnailMode === 'png' || model.notation === 'markdown') && !thumbnailErrors.has(model.id)}
+									<!-- v6.17.4: markdown-notation views also try the
+										 backend thumbnail URL so an attached image
+										 (entity_images) surfaces as the tile. SVG-mode
+										 DiagramThumbnail can't render markdown text into
+										 a thumbnail, so this is the only path to a
+										 meaningful tile for those views. -->
 									<img
-										src="/api/diagrams/{model.id}/thumbnail?theme={currentTheme}"
+										src="{API_BASE_URL}/api/diagrams/{model.id}/thumbnail?theme={currentTheme}"
 										alt="Thumbnail for {model.name}"
 										class="h-full w-full object-contain"
 										loading="lazy"

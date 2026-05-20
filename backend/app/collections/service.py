@@ -36,7 +36,12 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
 _COLLECTION_COLUMNS = (
     "c.id, c.name, c.description, c.created_at, c.created_by, "
     "c.updated_at, c.is_deleted, c.thumbnail_source, c.thumbnail_diagram_id, "
-    "c.thumbnail_image IS NOT NULL, c.system_prompt, c.mcp_system_context"
+    # ADR-209 (v6.17.4): has_thumbnail_image is true when EITHER the
+    # legacy BLOB column has bytes OR an entity_images attachment exists.
+    "(c.thumbnail_image IS NOT NULL "
+    " OR EXISTS (SELECT 1 FROM entity_images ei "
+    "            WHERE ei.entity_type = 'collection' AND ei.entity_id = c.id)), "
+    "c.system_prompt, c.mcp_system_context"
 )
 
 
@@ -373,5 +378,20 @@ async def get_collection_thumbnail(
 
     if source == "image" and image_blob:
         return image_blob
+
+    # ADR-209 (v6.17.4): fall back to entity_images attachment (the new
+    # collection-level image upload UI) so it doubles as the gallery
+    # tile thumbnail.
+    cursor = await db.execute(
+        "SELECT i.bytes FROM entity_images ei "
+        "JOIN images i ON ei.image_id = i.id "
+        "WHERE ei.entity_type = 'collection' AND ei.entity_id = ? "
+        "ORDER BY ei.display_order, ei.created_at LIMIT 1",
+        (collection_id,),
+    )
+    arow = await cursor.fetchone()
+    if arow is not None and arow[0]:
+        raw = arow[0]
+        return bytes(raw) if not isinstance(raw, bytes) else raw
 
     return None

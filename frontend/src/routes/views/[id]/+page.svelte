@@ -2469,6 +2469,21 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
+			<!-- ADR-209 (v6.17.4 fix): attached images for this view —
+				 now correctly inside the Details branch. v6.17.0–.3 mounted
+				 it at the end of the Canvas branch by mistake (anchored before
+				 the wrong {:else if}), so it never appeared on the Details
+				 tab. -->
+			{#if diagram}
+				<div class="mt-4">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
+					<EntityImagesEditor
+						entityType="diagram"
+						entityId={diagram.id}
+						editing={true}
+					/>
+				</div>
+			{/if}
 		{:else if activeTab === 'canvas'}
 			{#if lockConflictUser}
 				<div class="mb-3 flex items-center gap-2 rounded border px-4 py-2 text-sm" style="border-color: var(--color-warning, #f59e0b); background: rgba(245, 158, 11, 0.1); color: var(--color-fg)">
@@ -3305,21 +3320,6 @@
 					</div>
 					{/if}
 				{/if}
-			{/if}
-			<!-- ADR-209 (v6.17.0): attached images for this view. -->
-			{#if diagram}
-				<div class="mt-4">
-					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
-					<!-- v6.17.1 fix: `editing` here is the canvas-edit flag, not
-						 a details-edit flag. Always allow image upload so the
-						 user doesn't have to enter canvas edit mode just to
-						 attach an image to the view. -->
-					<EntityImagesEditor
-						entityType="diagram"
-						entityId={diagram.id}
-						editing={true}
-					/>
-				</div>
 			{/if}
 		{:else if activeTab === 'relationships'}
 			<!-- Add relationship buttons -->

@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.4] - 2026-05-20
+
+### Fixed
+
+- **Views Details → Images section now actually renders.** v6.17.0
+  mounted the section just before `{:else if activeTab ==
+  'relationships'}` — but by that anchor we were inside the Canvas
+  branch (`{:else if activeTab == 'canvas'}` opens earlier). Moved
+  the mount inside the Details branch so clicking the Details tab
+  shows it.
+- **Elements page Set dropdown now filters by selected Collection**
+  (issue [#200](https://github.com/cgbarlow/iris/issues/200)). The
+  `SetSelector` gains an optional `collectionId` prop; when set,
+  it loads `/api/sets?collection_id=X`. The elements page wires
+  this from its active collection state.
+- **Markdown-notation views now show a thumbnail** in the views
+  gallery. `DiagramThumbnail` can't render markdown content into
+  a tile, so SVG mode left those views with an empty thumbnail.
+  The gallery now also tries the backend `/api/diagrams/{id}/
+  thumbnail` URL for markdown-notation views; the backend
+  `get_thumbnail` falls back to the first `entity_images`
+  attachment so users can pick a thumbnail by attaching an image
+  to the view's Details → Images section.
+- **Sets / collections gallery tiles use attached images.** When
+  a user uploads an image via the new Details → Images section,
+  `has_thumbnail_image` is now true (via SQL subquery that checks
+  `entity_images`) and the gallery renders the thumbnail URL.
+  Backend `get_set_thumbnail` and `get_collection_thumbnail` fall
+  back to the first attachment when no explicit thumbnail is set,
+  preserving the existing priority (model → image → attachment).
+
+### Added
+
+- **Collections and sets are now limited to 1 attached image.** The
+  `EntityImagesEditor` gains a `maxImages` prop; when the cap is
+  reached the upload affordance hides. Sets and collections pass
+  `maxImages={1}` because the attachment doubles as the gallery
+  tile thumbnail. Packages, views, and elements remain unlimited.
+- **`/version` page** lists the deployed version of each Iris
+  component (Frontend, Backend, MCP server, CLI). Backed by a new
+  `GET /api/version` endpoint that reads each component's
+  `pyproject.toml` at startup.
+
+### Migration
+
+- None.
+
 ## [6.17.3] - 2026-05-20
 
 ### Fixed

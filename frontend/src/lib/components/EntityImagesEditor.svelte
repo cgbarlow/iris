@@ -31,9 +31,14 @@
 		entityType: 'collection' | 'set' | 'package' | 'diagram' | 'element';
 		entityId: string;
 		editing?: boolean;
+		/** v6.17.4: cap the number of attachments. When the cap is
+		 *  reached, the upload affordance is hidden. Sets and collections
+		 *  pass `maxImages={1}` because the attached image doubles as the
+		 *  gallery thumbnail. Undefined / 0 means unlimited. */
+		maxImages?: number;
 	}
 
-	let { entityType, entityId, editing = false }: Props = $props();
+	let { entityType, entityId, editing = false, maxImages }: Props = $props();
 
 	let attachments = $state<EntityImage[]>([]);
 	let loading = $state(false);
@@ -146,7 +151,7 @@
 						{/if}
 					</div>
 				{/each}
-				{#if editing}
+				{#if editing && (!maxImages || attachments.length < maxImages)}
 					<label class="ent-images__upload">
 						<input
 							type="file"

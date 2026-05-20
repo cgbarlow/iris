@@ -446,6 +446,7 @@
 			entityType="set"
 			entityId={set?.id ?? ''}
 			editing={true}
+			maxImages={1}
 		/>
 	</div>
 
