@@ -15,6 +15,7 @@
 		Bookmark,
 	} from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import TagInput from '$lib/components/TagInput.svelte';
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
@@ -879,6 +880,12 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
+			<!-- ADR-209 (v6.17.0): attached images for this element. -->
+			<EntityImagesEditor
+				entityType="element"
+				entityId={entity.id}
+				editing={editingDetails}
+			/>
 		{:else if activeTab === 'relationships'}
 			<!-- ADR-208 (v6.16.0): the Relationships tab now hosts three
 				 sections — Package membership, Used in Views, and the

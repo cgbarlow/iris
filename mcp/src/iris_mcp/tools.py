@@ -877,6 +877,46 @@ async def _render_markdown(c: IrisClient, args: dict[str, Any]) -> str:
     return json.dumps(body)
 
 
+# ── Entity image attachments (ADR-209, v6.17.0) ───────────────────────
+
+
+async def _attach_entity_image(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-209: attach an existing image (by image_id) to an Iris
+    entity. Returns the new attachment row."""
+    try:
+        row = await c.attach_entity_image(
+            entity_type=args["entity_type"],
+            entity_id=args["entity_id"],
+            image_id=args["image_id"],
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Attach entity image")
+    return json.dumps(row)
+
+
+async def _detach_entity_image(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-209: detach an image from an entity by attachment_id. The
+    underlying image is not deleted (other entities may reference it)."""
+    try:
+        await c.detach_entity_image(
+            entity_type=args["entity_type"],
+            entity_id=args["entity_id"],
+            attachment_id=args["attachment_id"],
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Detach entity image")
+    return json.dumps({"ok": True})
+
+
+async def _list_entity_images(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-209: list images attached to an entity."""
+    rows = await c.list_entity_images(
+        entity_type=args["entity_type"],
+        entity_id=args["entity_id"],
+    )
+    return json.dumps(rows)
+
+
 TOOLS: list[Tool] = [
     Tool(
         name="search",
@@ -2045,6 +2085,66 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_move_set,
+    ),
+    # ── Entity image attachments (ADR-209, v6.17.0) ───────────────────
+    Tool(
+        name="attach_entity_image",
+        description=(
+            "Attach an existing image (by image_id) to an Iris entity "
+            "(collection/set/package/diagram/element). Use `upload_image` "
+            "first if the bytes aren't yet stored. Idempotent — attaching "
+            "the same image to the same entity twice returns the existing "
+            "attachment row."
+        ),
+        input_schema=_schema({
+            "entity_type": _str_arg(
+                "entity_type",
+                "One of: collection, set, package, diagram, element",
+            ),
+            "entity_id": _str_arg("entity_id", "Entity id"),
+            "image_id": _str_arg(
+                "image_id",
+                "Image id (from images.id, e.g. via /api/images upload)",
+            ),
+        }),
+        handler=_attach_entity_image,
+    ),
+    Tool(
+        name="detach_entity_image",
+        description=(
+            "Detach an image from an Iris entity by attachment_id. "
+            "Does NOT delete the underlying image — other entities may "
+            "still reference it."
+        ),
+        input_schema=_schema({
+            "entity_type": _str_arg(
+                "entity_type",
+                "One of: collection, set, package, diagram, element",
+            ),
+            "entity_id": _str_arg("entity_id", "Entity id"),
+            "attachment_id": _str_arg(
+                "attachment_id",
+                "Attachment row id (returned by attach_entity_image / "
+                "list_entity_images)",
+            ),
+        }),
+        handler=_detach_entity_image,
+    ),
+    Tool(
+        name="list_entity_images",
+        description=(
+            "List images attached to an Iris entity. Returns attachment "
+            "rows joined with image metadata (id, image_id, mime, "
+            "size_bytes, display_order, created_at)."
+        ),
+        input_schema=_schema({
+            "entity_type": _str_arg(
+                "entity_type",
+                "One of: collection, set, package, diagram, element",
+            ),
+            "entity_id": _str_arg("entity_id", "Entity id"),
+        }),
+        handler=_list_entity_images,
     ),
 ]
 

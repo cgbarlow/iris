@@ -26,9 +26,16 @@
 		/** Fired with the new textarea value after each toolbar action so
 		 *  the parent's existing oncontentchange wiring flips canvasDirty. */
 		onchange?: (value: string) => void;
+		/** ADR-209 (v6.17.0): clicking the image toolbar button fires this
+		 *  callback instead of inserting `![alt](path)` directly. The
+		 *  parent opens an ImageInsertDialog with Link vs Upload modes;
+		 *  on confirm the parent splices the resulting markdown at the
+		 *  cursor itself (the dialog returns the full string). When this
+		 *  callback isn't wired, the old inline behaviour is preserved. */
+		onimage?: () => void;
 	}
 
-	let { textareaEl, onchange }: Props = $props();
+	let { textareaEl, onchange, onimage }: Props = $props();
 
 	function fire(op: ReturnType<typeof wrapSelection>) {
 		if (!textareaEl) return;
@@ -48,7 +55,16 @@
 	function ol()   { if (textareaEl) fire(prefixLines(textareaEl, '1. ')); }
 	function quote(){ if (textareaEl) fire(prefixLines(textareaEl, '> ')); }
 
-	function image(){ if (textareaEl) fire(insertAtCursor(textareaEl, '![alt](path)')); }
+	function image() {
+		// ADR-209: prefer the parent-managed chooser dialog if wired.
+		// Falls back to the legacy inline behaviour so older callers
+		// keep working until they opt into the new flow.
+		if (onimage) {
+			onimage();
+			return;
+		}
+		if (textareaEl) fire(insertAtCursor(textareaEl, '![alt](path)'));
+	}
 	function hr()   { if (textareaEl) fire(insertAtCursor(textareaEl, '\n---\n')); }
 </script>
 

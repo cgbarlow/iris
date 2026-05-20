@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.0] - 2026-05-20
+
+### Added
+
+- **Entity image attachments** (ADR-209, issue
+  [#194](https://github.com/cgbarlow/iris/issues/194)). Any
+  collection, set, package, view, or element can now have one or
+  more attached images, surfaced under its Details screen. Edit
+  Details exposes a `+ Upload` button + per-image Remove. Backed
+  by a new junction table `entity_images` (paired SQLite m073 +
+  Supabase m078) that references the existing `images` table.
+- **Picker image references with sizing**. The Smart Markdown
+  picker can now drill into an entity, pick one of its attached
+  images, and choose how to render it: original, width-by-%,
+  width-by-px, height-by-%, height-by-px. Token format:
+  `{{image:<id>}}` or `{{image:<id>:<axis>:<value>}}`. The
+  resolver emits an `<img>` tag with the chosen sizing into
+  `data.content`; `MarkdownView` renders it.
+- **Markdown toolbar image button is now a chooser**: clicking
+  the image button opens a small `ImageInsertDialog` with two
+  tabs — **Link** (paste a URL → `![alt](url)`) and **Upload**
+  (file picker → POST `/api/images` → `![alt](/api/images/<id>)`).
+  Works in both Standard Markdown and Smart Markdown views.
+- **Endpoints**: `POST /api/{entity_type}/{id}/images`,
+  `POST /api/{entity_type}/{id}/images/attach`,
+  `GET /api/{entity_type}/{id}/images`,
+  `DELETE /api/{entity_type}/{id}/images/{attachment_id}`.
+  Whitelisted entity types: `collection|set|package|diagram|element`.
+- **MCP tools + CLI commands** (§14 parity):
+  `attach_entity_image`, `detach_entity_image`,
+  `list_entity_images` — both surfaces.
+
+### Changed
+
+- **Views index** (`/views/`) reverts from `HierarchyControls`
+  to a single primary `+ New View` button matching the
+  Elements-page button style/size. Dashboard and packages-detail
+  keep using `HierarchyControls`.
+
+### Migration
+
+- **SQLite m073 + Supabase m078 (paired §15)** — adds
+  `entity_images` table with indexes and RLS policies. Idempotent.
+  Run `scripts/supabase-migrate.sh` to apply the Supabase mirror.
+
 ## [6.16.1] - 2026-05-20
 
 ### Fixed

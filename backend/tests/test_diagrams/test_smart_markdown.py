@@ -8,10 +8,24 @@ sees the failure rather than silently dropping it.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import httpx
 import pytest
+
+
+# ADR-209 (v6.17.0): resolved entity-field values are wrapped in
+# iris:// markdown links so they're clickable and tooltip-bearing in
+# MarkdownView. Existing tests assert the pre-wrap content — this helper
+# strips the link wrapper so those assertions keep working without
+# rewriting each one. New ADR-209 tests below assert the wrapper itself.
+_LINK_RE = re.compile(r'\[([^\]]*)\]\(iris://[^)]+\)')
+
+
+def _unwrap_iris_links(s: str) -> str:
+    """Strip `[text](iris://...)` wrappers, returning just the text."""
+    return _LINK_RE.sub(r'\1', s)
 
 from app.config import AppConfig, AuthConfig, DatabaseConfig
 from app.database import DatabaseManager
@@ -111,7 +125,7 @@ async def test_resolves_element_name(
         c, h, set_id, f"Buy some {{{{element:{eid}:name}}}} today.",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert "Buy some Pork mince today." == rendered
+    assert _unwrap_iris_links(rendered) == "Buy some Pork mince today."
 
 
 @pytest.mark.asyncio
@@ -125,7 +139,7 @@ async def test_resolves_element_description(
         c, h, set_id, f"Note: {{{{element:{eid}:description}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert "Note: lean cut" == rendered
+    assert _unwrap_iris_links(rendered) == "Note: lean cut"
 
 
 @pytest.mark.asyncio
@@ -142,7 +156,7 @@ async def test_resolves_element_attr(
         f"500{{{{element:{eid}:attr:Unit}}}} {{{{element:{eid}:name}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert "500g Pork mince" == rendered
+    assert _unwrap_iris_links(rendered) == "500g Pork mince"
 
 
 @pytest.mark.asyncio
@@ -195,7 +209,7 @@ async def test_resolves_set_name(
         c, h, set_id, f"In set {{{{set:{set_id}:name}}}}.",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "In set Groceries."
+    assert _unwrap_iris_links(rendered) == "In set Groceries."
 
 
 @pytest.mark.asyncio
@@ -212,7 +226,7 @@ async def test_multiple_tokens_one_line(
         f"- 2{{{{element:{e2}:attr:Unit}}}} {{{{element:{e2}:name}}}}\n",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "- 100g A\n- 2kg B\n"
+    assert _unwrap_iris_links(rendered) == "- 100g A\n- 2kg B\n"
 
 
 @pytest.mark.asyncio
@@ -254,7 +268,7 @@ async def test_get_diagram_populates_data_content(
     g = await c.get(f"/api/diagrams/{diag_id}", headers=h)
     assert g.status_code == 200
     body = g.json()
-    assert body["data"]["content"] == "Hi Foo!"
+    assert _unwrap_iris_links(body["data"]["content"]) == "Hi Foo!"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -283,7 +297,7 @@ async def test_named_lookup_in_array_of_dicts(
         c, h, set_id, f"500{{{{element:{eid}:attr:attributes/Unit/type}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "500g"
+    assert _unwrap_iris_links(rendered) == "500g"
 
 
 @pytest.mark.asyncio
@@ -300,7 +314,7 @@ async def test_numeric_index_in_list(
         c, h, set_id, f"{{{{element:{eid}:attr:tags/1}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "beta"
+    assert _unwrap_iris_links(rendered) == "beta"
 
 
 @pytest.mark.asyncio
@@ -318,7 +332,7 @@ async def test_numeric_index_into_named_array_still_works(
         c, h, set_id, f"{{{{element:{eid}:attr:attributes/0/type}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "g"  # first item is Unit, its type is "g"
+    assert _unwrap_iris_links(rendered) == "g"  # first item is Unit, its type is "g"
 
 
 @pytest.mark.asyncio
@@ -376,7 +390,7 @@ async def test_dict_key_matches_before_named_lookup(
         c, h, set_id, f"{{{{element:{eid}:attr:profile/name}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "Alice"
+    assert _unwrap_iris_links(rendered) == "Alice"
 
 
 @pytest.mark.asyncio
@@ -400,7 +414,171 @@ async def test_deeply_nested_path(
         f"{{{{element:{eid}:attr:groups/beta/members/0/level}}}}",
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
-    assert rendered == "3"
+    assert _unwrap_iris_links(rendered) == "3"
+
+
+# ──────────────────────────────────────────────────────────────────
+# ADR-209 / v6.17.0: entity-reference values wrapped in iris:// links
+# ──────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_element_name_emits_iris_link(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-209: resolved element-name values are wrapped in a markdown
+    link with the entity name as the tooltip title so MarkdownView
+    can render them as clickable links with hover tooltips."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="Pork mince")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:name}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'[Pork mince](iris://element/{eid} "Pork mince")' == rendered
+
+
+@pytest.mark.asyncio
+async def test_element_attr_value_wrapped_with_name_tooltip(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-209: even non-name values (e.g. attribute strings) link back
+    to the parent entity, with the entity name as the tooltip title."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="Pork mince", data={"Unit": "g"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{element:{eid}:attr:Unit}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'[g](iris://element/{eid} "Pork mince")' == rendered
+
+
+@pytest.mark.asyncio
+async def test_set_name_wrapped_in_iris_set_link(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-209: set references use iris://set/<id> so MarkdownView routes
+    the click to /sets/<id>."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h, "Groceries")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"In {{{{set:{set_id}:name}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'iris://set/{set_id}' in rendered
+    assert '[Groceries]' in rendered
+
+
+# ──────────────────────────────────────────────────────────────────
+# ADR-209 / v6.17.0: image tokens
+# ──────────────────────────────────────────────────────────────────
+
+
+_PNG_1X1 = (
+    b"\x89PNG\r\n\x1a\n"
+    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\rIDATx\x9cc\xf8\xcf\xc0\x00\x00\x00\x03\x00\x01]\xcc\x86\xcf"
+    b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+async def _upload_image_for_test(c: httpx.AsyncClient, h: dict[str, str]) -> str:
+    import io
+    r = await c.post(
+        "/api/images",
+        headers=h,
+        files={"file": ("tiny.png", io.BytesIO(_PNG_1X1), "image/png")},
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_image_token_original_renders_img_tag(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-209: `{{image:<id>}}` renders an <img> tag at original size."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    image_id = await _upload_image_for_test(c, h)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"Before {{{{image:{image_id}}}}} after",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'<img src="/api/images/{image_id}" alt="">' in rendered
+    assert rendered.startswith("Before ")
+    assert rendered.endswith(" after")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sizing,style", [
+    ("width:50%", 'style="width:50%"'),
+    ("width:300px", 'style="width:300px"'),
+    ("height:25%", 'style="height:25%"'),
+    ("height:200px", 'style="height:200px"'),
+])
+async def test_image_token_with_sizing(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+    sizing: str, style: str,
+) -> None:
+    """ADR-209: sizing directives emit style attributes."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    image_id = await _upload_image_for_test(c, h)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{image:{image_id}:{sizing}}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'<img src="/api/images/{image_id}" {style} alt="">' == rendered.strip()
+
+
+@pytest.mark.asyncio
+async def test_image_token_original_explicit(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-209: `{{image:<id>:original}}` is the same as `{{image:<id>}}`."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    image_id = await _upload_image_for_test(c, h)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{image:{image_id}:original}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'<img src="/api/images/{image_id}" alt="">' == rendered.strip()
+
+
+@pytest.mark.asyncio
+async def test_missing_image_renders_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, "{{image:00000000-0000-0000-0000-000000000000:width:50%}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == "~~{{image:00000000-0000-0000-0000-000000000000:width:50%}}~~"
+
+
+@pytest.mark.asyncio
+async def test_image_token_invalid_sizing_falls_back_to_original(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """A token with a malformed sizing directive still renders the image —
+    just without style. The image itself is valid; only the directive
+    was unparseable."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    image_id = await _upload_image_for_test(c, h)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{image:{image_id}:gibberish}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert f'<img src="/api/images/{image_id}" alt="">' == rendered.strip()
 
 
 @pytest.mark.asyncio

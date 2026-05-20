@@ -4,6 +4,7 @@
 	import { apiFetch } from '$lib/utils/api';
 	import type { IrisCollection, IrisSet } from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
 	import DOMPurify from 'dompurify';
 
@@ -210,6 +211,16 @@
 			</button>
 		</div>
 	</form>
+
+	<!-- ADR-209 (v6.17.0): attached images for this collection. -->
+	<div class="mt-4" style="max-width: 600px">
+		<h2 class="text-sm font-bold" style="color: var(--color-fg)">Images</h2>
+		<EntityImagesEditor
+			entityType="collection"
+			entityId={collection?.id ?? ''}
+			editing={true}
+		/>
+	</div>
 
 	<!-- Sets in this collection -->
 	<div class="mt-6" style="max-width: 600px">

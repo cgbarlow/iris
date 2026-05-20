@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
 	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
 	import type { SimpleEntityType } from '$lib/types/canvas';
@@ -897,6 +898,14 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
+			<!-- ADR-209 (v6.17.0): attached images for this package. -->
+			{#if pkg}
+				<EntityImagesEditor
+					entityType="package"
+					entityId={pkg.id}
+					editing={editingDetails}
+				/>
+			{/if}
 		{:else if activeTab === 'relationships'}
 			<section aria-labelledby="package-elements-heading">
 				<h2 id="package-elements-heading" class="mb-3 text-base font-semibold" style="color: var(--color-fg)">

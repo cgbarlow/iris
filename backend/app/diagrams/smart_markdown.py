@@ -34,10 +34,17 @@ _PLACEHOLDER = "_No content yet._"
 
 # entity-type, id, field-spec. ID rejects ``:`` and ``}`` so multi-segment
 # field-specs (``attr:<key>``) bind to the third group only.
+# ADR-209 (v6.17.0): `image` is a new entity-type variant. Image tokens
+# may omit the field-spec entirely (`{{image:<id>}}` for original size)
+# or carry a sizing directive (`width:50%`, `width:300px`, `height:N%`,
+# `height:Npx`, or `original`). Making the third segment optional is
+# safe because non-image entity types validate field-spec separately in
+# `_resolve_one` (missing/invalid → strikethrough).
 _TOKEN_RE = re.compile(
-    r"\{\{(element|package|diagram|set|collection):"
-    r"([^:}]+):"
-    r"((?:attr:[^}]+)|name|description)\}\}"
+    r"\{\{(element|package|diagram|set|collection|image):"
+    r"([^:}]+)"
+    r"(?::([^}]*))?"
+    r"\}\}"
 )
 
 
@@ -203,31 +210,151 @@ async def _fetch_collection_field(
     return row[0] if field_spec == "name" else row[1]
 
 
+_IMAGE_SIZING_RE = re.compile(r"^(width|height):(\d{1,4})(%|px)$")
+
+
+def _format_image_style(sizing: str | None) -> str:
+    """Return the inline CSS for an image sizing directive (ADR-209).
+
+    Accepts: ``None`` / "" / "original" → no style.
+             "width:N%" / "width:Npx"   → ``style="width:N%"``.
+             "height:N%" / "height:Npx" → ``style="height:N%"``.
+
+    Anything else → empty (render at original size; the token isn't
+    flagged as unresolvable since the image itself is valid).
+    """
+    if not sizing or sizing == "original":
+        return ""
+    m = _IMAGE_SIZING_RE.fullmatch(sizing.strip())
+    if not m:
+        return ""
+    axis, num, unit = m.group(1), m.group(2), m.group(3)
+    return f'style="{axis}:{num}{unit}"'
+
+
+async def _resolve_image(
+    db: DatabasePort, image_id: str, sizing: str | None,
+) -> str | None:
+    """Resolve an image token to an ``<img>`` tag (ADR-209)."""
+    cursor = await db.execute(
+        "SELECT 1 FROM images WHERE id = ?", (image_id,),
+    )
+    if (await cursor.fetchone()) is None:
+        return None  # → strikethrough fallback
+    style_attr = _format_image_style(sizing)
+    if style_attr:
+        return f'<img src="/api/images/{image_id}" {style_attr} alt="">'
+    return f'<img src="/api/images/{image_id}" alt="">'
+
+
+async def _fetch_entity_display_name(
+    db: DatabasePort, entity_type: str, entity_id: str,
+) -> str | None:
+    """Fetch the display name for an entity (ADR-209, v6.17.0).
+
+    Used to populate the tooltip on the markdown link that wraps a
+    resolved entity-field value, so hovering shows the entity name
+    even when the resolved value is e.g. an attribute string like "g".
+    """
+    if entity_type == "element":
+        cursor = await db.execute(
+            "SELECT ev.name FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id "
+            "  AND e.current_version = ev.version "
+            "WHERE e.id = ? AND e.is_deleted = 0",
+            (entity_id,),
+        )
+    elif entity_type == "package":
+        cursor = await db.execute(
+            "SELECT pv.name FROM packages p "
+            "JOIN package_versions pv ON p.id = pv.package_id "
+            "  AND p.current_version = pv.version "
+            "WHERE p.id = ? AND p.is_deleted = 0",
+            (entity_id,),
+        )
+    elif entity_type == "diagram":
+        cursor = await db.execute(
+            "SELECT dv.name FROM diagrams d "
+            "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+            "  AND d.current_version = dv.version "
+            "WHERE d.id = ? AND d.is_deleted = 0",
+            (entity_id,),
+        )
+    elif entity_type == "set":
+        cursor = await db.execute(
+            "SELECT name FROM sets WHERE id = ? AND is_deleted = 0",
+            (entity_id,),
+        )
+    elif entity_type == "collection":
+        cursor = await db.execute(
+            "SELECT name FROM collections WHERE id = ?", (entity_id,),
+        )
+    else:
+        return None
+    row = await cursor.fetchone()
+    return row[0] if row else None
+
+
+def _markdown_escape_link_text(value: str) -> str:
+    """Escape characters in a string so it's safe as the *text* of a
+    markdown link `[text](url)`. Square brackets break the link
+    syntax; backslash-escape them. Other chars are fine."""
+    return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def _markdown_escape_title(value: str) -> str:
+    """Escape characters in a markdown link title `"<title>"`."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 async def _resolve_one(
-    db: DatabasePort, entity_type: str, entity_id: str, field_spec: str,
+    db: DatabasePort, entity_type: str, entity_id: str, field_spec: str | None,
 ) -> str | None:
     """Return the resolved value, or None if unresolvable.
 
     None signals: entity missing / deleted, field invalid for the type,
     or attribute key missing. Callers turn None into strikethrough.
+
+    ADR-209 (v6.17.0): entity-reference values are wrapped in a markdown
+    link `[value](iris://<type>/<id> "<entity name>")` so MarkdownView
+    routes the click and shows the name as a hover tooltip. Images
+    (`{{image:...}}`) are returned as raw `<img>` HTML and are NOT
+    wrapped.
     """
+    if entity_type == "image":
+        return await _resolve_image(db, entity_id, field_spec)
+    # Non-image entity types require a field_spec.
+    if field_spec is None or field_spec == "":
+        return None
+    raw_value: str | None = None
     if entity_type == "element":
-        return await _fetch_element_field(db, entity_id, field_spec)
-    if entity_type == "package":
-        return await _fetch_named_field(
+        raw_value = await _fetch_element_field(db, entity_id, field_spec)
+    elif entity_type == "package":
+        raw_value = await _fetch_named_field(
             db, table="packages", versions_table="package_versions",
             fk="package_id", entity_id=entity_id, field_spec=field_spec,
         )
-    if entity_type == "diagram":
-        return await _fetch_named_field(
+    elif entity_type == "diagram":
+        raw_value = await _fetch_named_field(
             db, table="diagrams", versions_table="diagram_versions",
             fk="diagram_id", entity_id=entity_id, field_spec=field_spec,
         )
-    if entity_type == "set":
-        return await _fetch_set_field(db, entity_id, field_spec)
-    if entity_type == "collection":
-        return await _fetch_collection_field(db, entity_id, field_spec)
-    return None
+    elif entity_type == "set":
+        raw_value = await _fetch_set_field(db, entity_id, field_spec)
+    elif entity_type == "collection":
+        raw_value = await _fetch_collection_field(db, entity_id, field_spec)
+    else:
+        return None
+
+    if raw_value is None:
+        return None
+
+    # Wrap in an iris:// markdown link so the rendered output is a
+    # clickable, tooltip-bearing reference to the source entity.
+    name = await _fetch_entity_display_name(db, entity_type, entity_id)
+    title = _markdown_escape_title(name or entity_id)
+    text = _markdown_escape_link_text(str(raw_value))
+    return f'[{text}](iris://{entity_type}/{entity_id} "{title}")'
 
 
 async def compute_smart_markdown_content(

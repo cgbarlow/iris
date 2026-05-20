@@ -15,6 +15,7 @@
 		ElementTabDefault,
 	} from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
 	import DOMPurify from 'dompurify';
@@ -437,6 +438,16 @@
 			</button>
 		</div>
 	</form>
+
+	<!-- ADR-209 (v6.17.0): attached images for this set. -->
+	<div class="mt-4" style="max-width: 600px">
+		<h2 class="text-sm font-bold" style="color: var(--color-fg)">Images</h2>
+		<EntityImagesEditor
+			entityType="set"
+			entityId={set?.id ?? ''}
+			editing={true}
+		/>
+	</div>
 
 	<!-- Info -->
 	<div class="mt-6 text-sm" style="color: var(--color-muted); max-width: 600px">

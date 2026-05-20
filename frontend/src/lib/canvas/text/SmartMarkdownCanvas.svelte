@@ -19,6 +19,7 @@
 	import MarkdownEditorToolbar from '$lib/canvas/text/MarkdownEditorToolbar.svelte';
 	import { wrapSelection, applyOp, insertAtCursor } from '$lib/canvas/text/markdownEditorToolbarHelpers';
 	import SmartMarkdownSlashPicker from '$lib/canvas/text/SmartMarkdownSlashPicker.svelte';
+	import ImageInsertDialog from '$lib/components/ImageInsertDialog.svelte';
 
 	interface Props {
 		/** Server-resolved markdown (`data.content`). Shown in view mode. */
@@ -57,6 +58,25 @@
 	// token back in.
 	let pickerOpen = $state(false);
 	let pickerCaret = $state(0);
+
+	// ADR-209: image-insert dialog state (Link vs Upload chooser).
+	let imageDialogOpen = $state(false);
+	let imageDialogCaret = $state(0);
+
+	function onImageInsert(markdown: string) {
+		imageDialogOpen = false;
+		if (!textareaEl) return;
+		textareaEl.focus();
+		textareaEl.setSelectionRange(imageDialogCaret, imageDialogCaret);
+		const op = insertAtCursor(textareaEl, markdown);
+		applyOp(textareaEl, op);
+		commitSource(op.value);
+	}
+
+	function openImageDialog() {
+		if (textareaEl) imageDialogCaret = textareaEl.selectionStart;
+		imageDialogOpen = true;
+	}
 
 	function commitSource(value: string) {
 		source = value;
@@ -138,6 +158,7 @@
 		<MarkdownEditorToolbar
 			textareaEl={textareaEl}
 			onchange={(v) => commitSource(v)}
+			onimage={openImageDialog}
 		/>
 		<textarea
 			bind:this={textareaEl}
@@ -156,6 +177,11 @@
 				contextSetId={contextSetId}
 			/>
 		{/if}
+		<ImageInsertDialog
+			open={imageDialogOpen}
+			oninsert={onImageInsert}
+			oncancel={() => { imageDialogOpen = false; textareaEl?.focus(); }}
+		/>
 	{:else}
 		<div class="smart-markdown-canvas__view">
 			<MarkdownView source={content ?? ''} {textDiagramIds} {onheadings} />
