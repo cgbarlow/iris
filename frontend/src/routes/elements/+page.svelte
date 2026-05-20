@@ -357,7 +357,9 @@
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3">
 	<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
-	<SetSelector value={currentSetId} onchange={handleSetChange} />
+	<!-- v6.17.4 (issue #200): pass the active collection so the Set
+		 dropdown only lists sets within it. Empty/null = all sets. -->
+	<SetSelector value={currentSetId} onchange={handleSetChange} collectionId={currentCollectionId || null} />
 	<div>
 		<label for="element-search" class="sr-only">Search elements</label>
 		<input

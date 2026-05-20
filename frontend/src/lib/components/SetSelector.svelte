@@ -9,9 +9,13 @@
 		label?: string;
 		showNewSet?: boolean;
 		onNewSet?: () => void;
+		/** v6.17.4 (issue #200): constrain the set list to a single
+		 *  collection. When set, the dropdown only shows sets whose
+		 *  collection_id matches; empty/undefined = all sets. */
+		collectionId?: string | null;
 	}
 
-	let { value, onchange, showAll = true, label = 'Set', showNewSet = false, onNewSet }: Props = $props();
+	let { value, onchange, showAll = true, label = 'Set', showNewSet = false, onNewSet, collectionId = null }: Props = $props();
 
 	let sets = $state<IrisSet[]>([]);
 	let loading = $state(true);
@@ -24,7 +28,10 @@
 	async function loadSets() {
 		loading = true;
 		try {
-			const data = await apiFetch<{ items: IrisSet[] }>('/api/sets');
+			const url = collectionId
+				? `/api/sets?collection_id=${encodeURIComponent(collectionId)}`
+				: '/api/sets';
+			const data = await apiFetch<{ items: IrisSet[] }>(url);
 			sets = data.items;
 		} catch {
 			sets = [];
@@ -46,6 +53,9 @@
 	}
 
 	$effect(() => {
+		// Read `collectionId` reactively so changing the collection
+		// re-fetches the constrained set list (issue #200).
+		collectionId;
 		loadSets();
 	});
 </script>

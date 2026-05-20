@@ -155,14 +155,37 @@ async def generate_and_store_thumbnail(
 async def get_thumbnail(
     db: DatabasePort, diagram_id: str, theme: str = "dark",
 ) -> bytes | None:
-    """Get stored thumbnail for a diagram."""
+    """Get stored thumbnail for a diagram.
+
+    ADR-209 (v6.17.4): markdown-notation diagrams have no graphical
+    representation to thumbnail, so they previously returned None and
+    the gallery showed an empty tile. Now: if no canonical thumbnail
+    exists, fall back to the first ``entity_images`` attachment so
+    users can pick their own thumbnail by attaching an image to the
+    view's Details → Images section.
+    """
     cursor = await db.execute(
         "SELECT thumbnail FROM diagram_thumbnails "
         "WHERE diagram_id = ? AND theme = ?",
         (diagram_id, theme),
     )
     row = await cursor.fetchone()
-    return row[0] if row else None
+    if row is not None and row[0]:
+        return row[0]
+
+    # Fall back to attached image.
+    cursor = await db.execute(
+        "SELECT i.bytes FROM entity_images ei "
+        "JOIN images i ON ei.image_id = i.id "
+        "WHERE ei.entity_type = 'diagram' AND ei.entity_id = ? "
+        "ORDER BY ei.display_order, ei.created_at LIMIT 1",
+        (diagram_id,),
+    )
+    arow = await cursor.fetchone()
+    if arow is not None and arow[0]:
+        raw = arow[0]
+        return bytes(raw) if not isinstance(raw, bytes) else raw
+    return None
 
 
 async def regenerate_all_thumbnails(db: DatabasePort) -> int:

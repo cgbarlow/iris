@@ -54,7 +54,14 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
 _SET_COLUMNS = (
     "s.id, s.name, s.description, s.created_at, s.created_by, "
     "s.updated_at, s.is_deleted, s.thumbnail_source, s.thumbnail_diagram_id, "
-    "s.thumbnail_image IS NOT NULL, s.collection_id, col.name, s.system_prompt, "
+    # ADR-209 (v6.17.4): has_thumbnail_image is true when EITHER the
+    # legacy thumbnail_image BLOB column has bytes OR there's at least
+    # one entity_images attachment. The thumbnail GET endpoint resolves
+    # in the right priority (model → image → attachment).
+    "(s.thumbnail_image IS NOT NULL "
+    " OR EXISTS (SELECT 1 FROM entity_images ei "
+    "            WHERE ei.entity_type = 'set' AND ei.entity_id = s.id)), "
+    "s.collection_id, col.name, s.system_prompt, "
     "s.mcp_system_context, s.hierarchy_sort, s.package_tab_default, "
     "s.view_tab_default, s.element_tab_default"
 )
@@ -574,6 +581,21 @@ async def get_set_thumbnail(
 
     if source == "image" and image_blob:
         return image_blob
+
+    # ADR-209 (v6.17.4): if no thumbnail is configured, fall back to the
+    # first attachment from entity_images. Lets the new attach-an-image
+    # UI on the set details page double as the gallery tile thumbnail.
+    cursor = await db.execute(
+        "SELECT i.bytes FROM entity_images ei "
+        "JOIN images i ON ei.image_id = i.id "
+        "WHERE ei.entity_type = 'set' AND ei.entity_id = ? "
+        "ORDER BY ei.display_order, ei.created_at LIMIT 1",
+        (set_id,),
+    )
+    arow = await cursor.fetchone()
+    if arow is not None and arow[0]:
+        raw = arow[0]
+        return bytes(raw) if not isinstance(raw, bytes) else raw
 
     return None
 
