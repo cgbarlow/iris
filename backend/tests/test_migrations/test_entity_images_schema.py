@@ -53,6 +53,17 @@ def test_supabase_m078_creates_table() -> None:
     assert "UNIQUE (entity_type, entity_id, image_id)" in sql
 
 
+def test_supabase_m078_uses_timestamptz_for_created_at() -> None:
+    """v6.17.2 (Iris asyncpg adapter): ISO-string params are converted to
+    native `datetime`. The column must be TIMESTAMPTZ on Supabase or
+    asyncpg refuses the bind with `expected str, got datetime`."""
+    sql = _read("app/migrations/supabase/m078_entity_images.sql")
+    assert "created_at    TIMESTAMPTZ NOT NULL" in sql
+    # Migration also retypes any existing TEXT column to TIMESTAMPTZ
+    # in case a prior version of m078 (with `created_at TEXT`) ran first.
+    assert "ALTER COLUMN created_at TYPE TIMESTAMPTZ" in sql
+
+
 def test_supabase_m078_creates_index() -> None:
     sql = _read("app/migrations/supabase/m078_entity_images.sql")
     assert "CREATE INDEX IF NOT EXISTS idx_entity_images_entity" in sql
