@@ -898,14 +898,16 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
-			<!-- ADR-209 (v6.17.0): attached images for this package. -->
+			<!-- ADR-209 (v6.17.0 / v6.17.3): attached images for this
+				 package. Always-editable — atomic backend commit, no need to
+				 gate on form edit mode. -->
 			{#if pkg}
 				<div class="mt-4">
 					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
 					<EntityImagesEditor
 						entityType="package"
 						entityId={pkg.id}
-						editing={editingDetails}
+						editing={true}
 					/>
 				</div>
 			{/if}

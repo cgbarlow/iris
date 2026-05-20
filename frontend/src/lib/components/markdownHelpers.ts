@@ -14,6 +14,7 @@
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { rewriteImageSrcs } from '$lib/utils/imageUrl';
 import { markdownMermaidExtension } from './markdownMermaidExtension';
 
 // ADR-149: ```mermaid fenced blocks become <pre class="mermaid-block">
@@ -129,6 +130,14 @@ export function renderMarkdown(source: string, textDiagramIds?: Set<string>): Re
 			img.removeAttribute('src');
 		}
 	}
+
+	// v6.17.3 (ADR-209 follow-up): rewrite any surviving relative
+	// `/api/images/<id>` src to the absolute backend URL. The frontend
+	// SPA doesn't proxy /api/* in production, so a relative img src
+	// loads the SPA's index.html as image bytes (broken). Smart
+	// Markdown's resolver emits relative URLs server-side; this rewrite
+	// is the one place to fix them all.
+	tpl.innerHTML = rewriteImageSrcs(tpl.innerHTML);
 
 	const links: ExtractedLink[] = [];
 	for (const a of tpl.content.querySelectorAll('a')) {
