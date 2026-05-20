@@ -900,11 +900,14 @@
 			</Accordion.Root>
 			<!-- ADR-209 (v6.17.0): attached images for this package. -->
 			{#if pkg}
-				<EntityImagesEditor
-					entityType="package"
-					entityId={pkg.id}
-					editing={editingDetails}
-				/>
+				<div class="mt-4">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
+					<EntityImagesEditor
+						entityType="package"
+						entityId={pkg.id}
+						editing={editingDetails}
+					/>
+				</div>
 			{/if}
 		{:else if activeTab === 'relationships'}
 			<section aria-labelledby="package-elements-heading">

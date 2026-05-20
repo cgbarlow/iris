@@ -3308,11 +3308,18 @@
 			{/if}
 			<!-- ADR-209 (v6.17.0): attached images for this view. -->
 			{#if diagram}
-				<EntityImagesEditor
-					entityType="diagram"
-					entityId={diagram.id}
-					editing={editing}
-				/>
+				<div class="mt-4">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
+					<!-- v6.17.1 fix: `editing` here is the canvas-edit flag, not
+						 a details-edit flag. Always allow image upload so the
+						 user doesn't have to enter canvas edit mode just to
+						 attach an image to the view. -->
+					<EntityImagesEditor
+						entityType="diagram"
+						entityId={diagram.id}
+						editing={true}
+					/>
+				</div>
 			{/if}
 		{:else if activeTab === 'relationships'}
 			<!-- Add relationship buttons -->

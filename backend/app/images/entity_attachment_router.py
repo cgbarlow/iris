@@ -110,6 +110,24 @@ async def upload_and_attach(
     except ImageNotFoundError as exc:
         # Shouldn't happen — we just created it.
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        # v6.17.1: most common cause is the Supabase mirror not yet applied —
+        # `entity_images` table doesn't exist. Surface the real error so the
+        # CORS middleware decorates the response (raising an unhandled
+        # exception inside the service can produce a 500 without CORS
+        # headers, which the browser then reports as a confusing CORS error).
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).exception("attach_image failed: %s", exc)
+        msg = str(exc) or type(exc).__name__
+        raise HTTPException(  # noqa: B904
+            status_code=503,
+            detail=(
+                f"Image attachment service unavailable "
+                f"({type(exc).__name__}: {msg}). If this just deployed, "
+                "the operator may need to run scripts/supabase-migrate.sh "
+                "to apply migration m078."
+            ),
+        )
     return EntityImageResponse(**attachment)
 
 
@@ -138,6 +156,20 @@ async def attach_existing(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ImageNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        # v6.17.1: graceful 503 when the entity_images table is missing
+        # (Supabase migration m078 not yet applied) so CORS headers
+        # decorate the response and the real error surfaces to DevTools.
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).exception("attach_image failed: %s", exc)
+        msg = str(exc) or type(exc).__name__
+        raise HTTPException(  # noqa: B904
+            status_code=503,
+            detail=(
+                f"Image attachment service unavailable "
+                f"({type(exc).__name__}: {msg})."
+            ),
+        )
     return EntityImageResponse(**attachment)
 
 
@@ -155,7 +187,20 @@ async def list_attachments(
     `<img>` tags resolve in MarkdownView without auth."""
     et = _check_entity_type(entity_type)
     db = request.app.state.db_manager.main_db
-    rows = await list_entity_images(db, entity_type=et, entity_id=entity_id)
+    try:
+        rows = await list_entity_images(db, entity_type=et, entity_id=entity_id)
+    except Exception as exc:
+        # v6.17.1: graceful 503 on missing table (see attach_existing).
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).exception("list_entity_images failed: %s", exc)
+        msg = str(exc) or type(exc).__name__
+        raise HTTPException(  # noqa: B904
+            status_code=503,
+            detail=(
+                f"Image attachment service unavailable "
+                f"({type(exc).__name__}: {msg})."
+            ),
+        )
     return [EntityImageResponse(**r) for r in rows]
 
 

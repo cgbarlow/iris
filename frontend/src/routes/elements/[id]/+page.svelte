@@ -881,11 +881,14 @@
 				</Accordion.Item>
 			</Accordion.Root>
 			<!-- ADR-209 (v6.17.0): attached images for this element. -->
-			<EntityImagesEditor
-				entityType="element"
-				entityId={entity.id}
-				editing={editingDetails}
-			/>
+			<div class="mt-4">
+				<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Images</h3>
+				<EntityImagesEditor
+					entityType="element"
+					entityId={entity.id}
+					editing={editingDetails}
+				/>
+			</div>
 		{:else if activeTab === 'relationships'}
 			<!-- ADR-208 (v6.16.0): the Relationships tab now hosts three
 				 sections — Package membership, Used in Views, and the
