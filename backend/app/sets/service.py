@@ -44,6 +44,10 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
         "view_tab_default": (
             row[16] if len(row) > 16 and row[16] else "canvas"
         ),
+        # ADR-208 (v6.16.0): sibling to the v6.14.0 columns above.
+        "element_tab_default": (
+            row[17] if len(row) > 17 and row[17] else "relationships"
+        ),
     }
 
 
@@ -52,7 +56,7 @@ _SET_COLUMNS = (
     "s.updated_at, s.is_deleted, s.thumbnail_source, s.thumbnail_diagram_id, "
     "s.thumbnail_image IS NOT NULL, s.collection_id, col.name, s.system_prompt, "
     "s.mcp_system_context, s.hierarchy_sort, s.package_tab_default, "
-    "s.view_tab_default"
+    "s.view_tab_default, s.element_tab_default"
 )
 
 
@@ -99,6 +103,7 @@ async def create_set(
         "hierarchy_sort": "manual",  # ADR-202 default for new sets
         "package_tab_default": "relationships",  # ADR-204 defaults
         "view_tab_default": "canvas",
+        "element_tab_default": "relationships",  # ADR-208 default
     }
 
 
@@ -242,13 +247,15 @@ async def update_set(
     hierarchy_sort: str | None = None,
     package_tab_default: str | None = None,
     view_tab_default: str | None = None,
+    element_tab_default: str | None = None,
 ) -> dict[str, object] | None:
     """Update a set's metadata.
 
     ADR-202 adds ``hierarchy_sort``; ADR-204 adds ``package_tab_default``
-    and ``view_tab_default``. All three are tri-stateish: None means
-    "leave alone". The Pydantic Literals on SetUpdate constrain the
-    value space upstream so we accept whatever the caller gave us.
+    and ``view_tab_default``; ADR-208 adds ``element_tab_default``. All
+    are tri-stateish: None means "leave alone". The Pydantic Literals on
+    SetUpdate constrain the value space upstream so we accept whatever
+    the caller gave us.
 
     Returns None if not found.
     """
@@ -309,6 +316,12 @@ async def update_set(
         await db.execute(
             "UPDATE sets SET view_tab_default = ?, updated_at = ? WHERE id = ?",
             (view_tab_default, now, set_id),
+        )
+    # ADR-208 (v6.16.0): sibling per-field update.
+    if element_tab_default is not None:
+        await db.execute(
+            "UPDATE sets SET element_tab_default = ?, updated_at = ? WHERE id = ?",
+            (element_tab_default, now, set_id),
         )
 
     await db.commit()

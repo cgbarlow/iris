@@ -203,6 +203,95 @@ async def test_invalid_scope_returns_422(
     assert r.status_code == 422
 
 
+# ── ADR-207 (v6.16.0): scope=package + scope=package_bucket ──────────
+
+
+@pytest.mark.asyncio
+async def test_scope_package_returns_element_count(
+    client: httpx.AsyncClient,
+) -> None:
+    h = await _auth(client)
+    s = (await client.post("/api/sets", json={"name": "S"}, headers=h)).json()["id"]
+    p = await client.post(
+        "/api/packages", json={"name": "Pkg", "set_id": s}, headers=h,
+    )
+    pid = p.json()["id"]
+    # Add 3 elements to the package
+    for n in ["A", "B", "C"]:
+        await client.post(
+            "/api/elements",
+            json={"name": n, "element_type": "application",
+                  "set_id": s, "package_id": pid},
+            headers=h,
+        )
+    r = await client.get(
+        f"/api/picker/browse?scope=package&package_id={pid}", headers=h,
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["counts"]["elements"] == 3
+    # Breadcrumb should include Pkg as the last step
+    assert body["breadcrumb"][-1]["label"] == "Pkg"
+    assert body["breadcrumb"][-1]["scope"] == "package"
+
+
+@pytest.mark.asyncio
+async def test_scope_package_bucket_returns_elements(
+    client: httpx.AsyncClient,
+) -> None:
+    h = await _auth(client)
+    s = (await client.post("/api/sets", json={"name": "S"}, headers=h)).json()["id"]
+    p = await client.post(
+        "/api/packages", json={"name": "Pkg", "set_id": s}, headers=h,
+    )
+    pid = p.json()["id"]
+    for n in ["Beef", "Apple"]:
+        await client.post(
+            "/api/elements",
+            json={"name": n, "element_type": "application",
+                  "set_id": s, "package_id": pid},
+            headers=h,
+        )
+    r = await client.get(
+        f"/api/picker/browse?scope=package_bucket&package_id={pid}"
+        "&entity_type=element",
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    names = [i["name"] for i in r.json()["items"]]
+    assert sorted(names) == ["Apple", "Beef"]
+
+
+@pytest.mark.asyncio
+async def test_scope_package_404_on_missing(
+    client: httpx.AsyncClient,
+) -> None:
+    h = await _auth(client)
+    r = await client.get(
+        "/api/picker/browse?scope=package&package_id=no-such-package",
+        headers=h,
+    )
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_scope_package_bucket_requires_element_type(
+    client: httpx.AsyncClient,
+) -> None:
+    h = await _auth(client)
+    s = (await client.post("/api/sets", json={"name": "S"}, headers=h)).json()["id"]
+    p = await client.post(
+        "/api/packages", json={"name": "Pkg", "set_id": s}, headers=h,
+    )
+    pid = p.json()["id"]
+    r = await client.get(
+        f"/api/picker/browse?scope=package_bucket&package_id={pid}"
+        "&entity_type=diagram",
+        headers=h,
+    )
+    assert r.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_soft_deleted_excluded(
     client: httpx.AsyncClient,

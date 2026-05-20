@@ -17,6 +17,12 @@ HierarchySort = Literal["manual", "alpha", "newest", "oldest"]
 # Pydantic-Literal-in-TEXT-column pattern as HierarchySort.
 PackageTabDefault = Literal["relationships", "details"]
 ViewTabDefault = Literal["canvas", "relationships", "details"]
+# ADR-208 (v6.16.0): per-set element tab default. Sibling to the
+# v6.14.0 columns above. The 'diagrams' value is accepted for forward
+# compat with rows that may carry it before the standalone Used-in-
+# Diagrams tab is removed; the frontend coerces to 'relationships'
+# when no matching tab exists.
+ElementTabDefault = Literal["details", "diagrams", "relationships", "versions"]
 
 
 class SetCreate(BaseModel):
@@ -45,6 +51,8 @@ class SetUpdate(BaseModel):
     # ADR-204: per-set tab defaults; same None="leave alone" contract.
     package_tab_default: PackageTabDefault | None = None
     view_tab_default: ViewTabDefault | None = None
+    # ADR-208 (v6.16.0): sibling.
+    element_tab_default: ElementTabDefault | None = None
 
 
 class SetResponse(BaseModel):
@@ -79,6 +87,10 @@ class SetResponse(BaseModel):
     # the desired "Relationships / Canvas first" behaviour.
     package_tab_default: PackageTabDefault = "relationships"
     view_tab_default: ViewTabDefault = "canvas"
+    # ADR-208 (v6.16.0): always returned. Default matches the
+    # m072 column default so existing rows + pre-migration callers
+    # see the desired "Relationships first" element behaviour.
+    element_tab_default: ElementTabDefault = "relationships"
 
 
 class SetListResponse(BaseModel):

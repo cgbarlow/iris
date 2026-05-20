@@ -29,7 +29,7 @@ class BrowseBreadcrumb(BaseModel):
     """One breadcrumb step in the picker browse response (ADR-206)."""
 
     label: str
-    scope: Literal["collection", "set", "set_bucket"] | None = None
+    scope: Literal["collection", "set", "set_bucket", "package"] | None = None
     id: str | None = None
     entity_type: Literal["element", "package", "diagram"] | None = None
 
@@ -246,6 +246,21 @@ async def _build_breadcrumb_for_set(
     return crumbs
 
 
+async def _fetch_package_row(db: Any, package_id: str) -> tuple[str, str | None] | None:
+    """Return (package_name, set_id) or None if missing/deleted."""
+    cursor = await db.execute(
+        "SELECT pv.name, p.set_id FROM packages p "
+        "JOIN package_versions pv ON p.id = pv.package_id "
+        "  AND p.current_version = pv.version "
+        "WHERE p.id = ? AND p.is_deleted = 0",
+        (package_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    return (row[0], row[1])
+
+
 @router.get(
     "/api/picker/browse",
     response_model=BrowseResponse,
@@ -253,14 +268,15 @@ async def _build_breadcrumb_for_set(
 )
 async def picker_browse_endpoint(
     request: Request,
-    scope: Literal["root", "collection", "set", "set_bucket"],
+    scope: Literal["root", "collection", "set", "set_bucket", "package", "package_bucket"],
     collection_id: str | None = Query(default=None),
     set_id: str | None = Query(default=None),
+    package_id: str | None = Query(default=None),
     entity_type: Literal["element", "package", "diagram"] | None = Query(default=None),
     limit: int = Query(default=200, ge=1, le=500),
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> BrowseResponse:
-    """Hierarchical browse for the Smart Markdown picker (ADR-206).
+    """Hierarchical browse for the Smart Markdown picker (ADR-206/207).
 
     Scopes:
       - root → list of collections
@@ -268,6 +284,11 @@ async def picker_browse_endpoint(
       - set (set_id required) → empty items; counts per bucket
       - set_bucket (set_id + entity_type required) → entities in that
         set of that type
+      - package (package_id required) → empty items; counts of children
+        the package contains (elements only; diagrams not modelled as
+        package-children today)
+      - package_bucket (package_id + entity_type=element required) →
+        elements with that package_id
     """
     db = request.app.state.db_manager.main_db
 
@@ -312,6 +333,87 @@ async def picker_browse_endpoint(
             ],
             items=items,
         )
+
+    # ADR-207 (v6.16.0): scope=package returns counts; scope=package_bucket
+    # returns the elements directly inside the package.
+    if scope == "package":
+        if not package_id:
+            raise HTTPException(
+                status_code=422, detail="package_id is required for scope=package",
+            )
+        pkg_row = await _fetch_package_row(db, package_id)
+        if pkg_row is None:
+            raise HTTPException(status_code=404, detail="Package not found")
+        pkg_name, pkg_set_id = pkg_row
+        ec = await db.execute(
+            "SELECT COUNT(*) FROM elements "
+            "WHERE package_id = ? AND is_deleted = 0",
+            (package_id,),
+        )
+        elements_count = (await ec.fetchone())[0]
+        # Build a Root → Collection → Set → Package breadcrumb.
+        crumbs: list[BrowseBreadcrumb] = []
+        if pkg_set_id:
+            set_row = await _fetch_set_row(db, pkg_set_id)
+            if set_row is not None:
+                crumbs = await _build_breadcrumb_for_set(
+                    db, pkg_set_id, set_row[0], set_row[1],
+                )
+        if not crumbs:
+            crumbs = [BrowseBreadcrumb(label="Root")]
+        crumbs.append(BrowseBreadcrumb(
+            label=pkg_name, scope="package", id=package_id,
+        ))
+        return BrowseResponse(
+            breadcrumb=crumbs, items=[],
+            counts=BrowseCounts(
+                packages=0, diagrams=0, elements=elements_count,
+            ),
+        )
+
+    if scope == "package_bucket":
+        if not package_id:
+            raise HTTPException(
+                status_code=422, detail="package_id is required for scope=package_bucket",
+            )
+        if entity_type != "element":
+            raise HTTPException(
+                status_code=422,
+                detail="entity_type=element required for scope=package_bucket",
+            )
+        pkg_row = await _fetch_package_row(db, package_id)
+        if pkg_row is None:
+            raise HTTPException(status_code=404, detail="Package not found")
+        pkg_name, pkg_set_id = pkg_row
+        cursor = await db.execute(
+            "SELECT e.id, ev.name FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id "
+            "  AND e.current_version = ev.version "
+            "WHERE e.package_id = ? AND e.is_deleted = 0 "
+            "ORDER BY LOWER(ev.name) LIMIT ?",
+            (package_id, limit),
+        )
+        items = [
+            EntitySearchResult(id=r[0], entity_type="element", name=r[1] or "")
+            for r in await cursor.fetchall()
+        ]
+        crumbs = []
+        if pkg_set_id:
+            set_row = await _fetch_set_row(db, pkg_set_id)
+            if set_row is not None:
+                crumbs = await _build_breadcrumb_for_set(
+                    db, pkg_set_id, set_row[0], set_row[1],
+                )
+        if not crumbs:
+            crumbs = [BrowseBreadcrumb(label="Root")]
+        crumbs.append(BrowseBreadcrumb(
+            label=pkg_name, scope="package", id=package_id,
+        ))
+        crumbs.append(BrowseBreadcrumb(
+            label="Elements", scope="set_bucket", id=package_id,
+            entity_type="element",
+        ))
+        return BrowseResponse(breadcrumb=crumbs, items=items)
 
     if scope == "set":
         if not set_id:

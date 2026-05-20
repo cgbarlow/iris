@@ -27,6 +27,7 @@
 		onShowText: (v: boolean) => void;
 		oncreateview: () => void;
 		oncreatepackage: () => void;
+		oncreateelement?: () => void;
 	}
 
 	let {
@@ -36,6 +37,7 @@
 		onShowText,
 		oncreateview,
 		oncreatepackage,
+		oncreateelement,
 	}: Props = $props();
 
 	let newOpen = $state(false);
@@ -84,7 +86,7 @@
 			bind:this={newButtonEl}
 			type="button"
 			onclick={toggleNew}
-			class="whitespace-nowrap rounded px-2 py-1 text-xs text-white"
+			class="whitespace-nowrap rounded border border-transparent px-2 py-1 text-xs text-white"
 			style="background-color: var(--color-primary)"
 			aria-haspopup="menu"
 			aria-expanded={newOpen}
@@ -132,6 +134,19 @@
 		>
 			View
 		</button>
+		{#if oncreateelement}
+			<!-- Issue #191: Element below View, indented to convey the
+			     view → element containment hint (a view is composed
+			     of elements). -->
+			<button
+				role="menuitem"
+				onclick={() => { oncreateelement?.(); closeAll(); }}
+				class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
+				style="color: var(--color-fg); padding-left: 2rem"
+			>
+				Element
+			</button>
+		{/if}
 	</div>
 {/if}
 

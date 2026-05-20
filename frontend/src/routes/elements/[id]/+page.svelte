@@ -38,7 +38,12 @@
 	let allTags = $state<string[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let activeTab = $state<'details' | 'versions' | 'relationships' | 'diagrams'>('details');
+	// ADR-208 (v6.16.0): tab order Relationships, Details, Version History.
+	// The `diagrams` value is accepted but coerced to 'relationships' if a
+	// persisted set preference still carries it from before the merge.
+	let activeTab = $state<'details' | 'versions' | 'relationships'>('relationships');
+	let userSelectedTab = $state(false);
+	let packageMemberships = $state<{id: string; name: string}[]>([]);
 	let showDeleteDialog = $state(false);
 	let showSaveTemplateDialog = $state(false);
 	let isBookmarked = $state(false);
@@ -119,15 +124,42 @@
 				loadVersions(id),
 				loadRelationships(id),
 				loadDiagrams(id),
+				loadPackageMemberships(id),
 				loadAllTags(),
 				loadBookmarkStatus(id),
 			]);
+			// ADR-208 (v6.16.0): seed activeTab from the parent set's
+			// element_tab_default unless the user has already clicked a
+			// tab. Mirrors the v6.14.0 view-page pattern.
+			if (!userSelectedTab && entity.set_id) {
+				try {
+					const setData = await apiFetch<{element_tab_default?: string}>(`/api/sets/${entity.set_id}`);
+					const preferred = setData.element_tab_default;
+					if (preferred === 'relationships' || preferred === 'details' || preferred === 'versions') {
+						activeTab = preferred;
+					} else {
+						// 'diagrams' or any unknown value → coerce to relationships
+						// (the standalone diagrams tab no longer exists).
+						activeTab = 'relationships';
+					}
+				} catch {
+					activeTab = 'relationships';
+				}
+			}
 		} catch (e) {
 			error = e instanceof ApiError && e.status === 404
 				? 'Element not found'
 				: 'Failed to load element';
 		}
 		loading = false;
+	}
+
+	async function loadPackageMemberships(id: string) {
+		try {
+			packageMemberships = await apiFetch<{id: string; name: string}[]>(`/api/elements/${id}/package-memberships`);
+		} catch {
+			packageMemberships = [];
+		}
 	}
 
 	async function loadVersions(id: string) {
@@ -432,12 +464,30 @@
 		</div>
 	</div>
 
-	<!-- Tab navigation -->
+	<!-- Tab navigation. ADR-208 (v6.16.0): Relationships first; the
+		 old "Used In Diagrams" tab is folded into Relationships as a
+		 section, alongside the new Package membership section. -->
 	<div class="mt-6 flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Element sections">
 		<button
 			role="tab"
+			aria-selected={activeTab === 'relationships'}
+			onclick={() => { activeTab = 'relationships'; userSelectedTab = true; }}
+			class="px-4 py-2 text-sm"
+			style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}"
+		>
+			Relationships
+			{#if relationships.length > 0 || usedInModels.length > 0 || packageMemberships.length > 0}
+				{@const _relTotal = relationships.length + usedInModels.length + packageMemberships.length}
+				<span
+					style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-primary); margin-left: 4px; vertical-align: middle;"
+					aria-label="{_relTotal} relationship{_relTotal === 1 ? '' : 's'}"
+				></span>
+			{/if}
+		</button>
+		<button
+			role="tab"
 			aria-selected={activeTab === 'details'}
-			onclick={() => (activeTab = 'details')}
+			onclick={() => { activeTab = 'details'; userSelectedTab = true; }}
 			class="px-4 py-2 text-sm"
 			style="color: {activeTab === 'details' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'details' ? 'var(--color-primary)' : 'transparent'}"
 		>
@@ -445,32 +495,8 @@
 		</button>
 		<button
 			role="tab"
-			aria-selected={activeTab === 'diagrams'}
-			onclick={() => (activeTab = 'diagrams')}
-			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'diagrams' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'diagrams' ? 'var(--color-primary)' : 'transparent'}"
-		>
-			Used In Diagrams
-		</button>
-		<button
-			role="tab"
-			aria-selected={activeTab === 'relationships'}
-			onclick={() => (activeTab = 'relationships')}
-			class="px-4 py-2 text-sm"
-			style="color: {activeTab === 'relationships' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'}"
-		>
-			Relationships
-			{#if relationships.length > 0}
-				<span
-					style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-primary); margin-left: 4px; vertical-align: middle;"
-					aria-label="{relationships.length} relationship{relationships.length === 1 ? '' : 's'}"
-				></span>
-			{/if}
-		</button>
-		<button
-			role="tab"
 			aria-selected={activeTab === 'versions'}
-			onclick={() => (activeTab = 'versions')}
+			onclick={() => { activeTab = 'versions'; userSelectedTab = true; }}
 			class="px-4 py-2 text-sm"
 			style="color: {activeTab === 'versions' ? 'var(--color-primary)' : 'var(--color-muted)'}; border-bottom: 2px solid {activeTab === 'versions' ? 'var(--color-primary)' : 'transparent'}"
 		>
@@ -853,64 +879,91 @@
 					</Accordion.Content>
 				</Accordion.Item>
 			</Accordion.Root>
-		{:else if activeTab === 'diagrams'}
-			{#if diagramsLoading}
-				<p style="color: var(--color-muted)">Loading diagrams...</p>
-			{:else if usedInModels.length === 0}
-				<p style="color: var(--color-muted)">Not used in any diagrams.</p>
-			{:else}
-				<ul class="flex flex-col gap-2">
-					{#each usedInModels as model}
-						<li>
-							<a
-								href="/views/{model.diagram_id}"
-								class="flex items-center gap-3 rounded border block p-3"
-								style="border-color: var(--color-border); color: var(--color-primary)"
-							>
-								<span class="font-medium">{model.name}</span>
-								<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
-									{model.diagram_type}
-								</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
-			{/if}
 		{:else if activeTab === 'relationships'}
-			{#if relationshipsLoading}
-				<p style="color: var(--color-muted)">Loading relationships...</p>
-			{:else if relationships.length === 0}
-				<p style="color: var(--color-muted)">No relationships yet. Relationships are created automatically when elements are connected by edges in a diagram canvas.</p>
-			{:else}
-				<table class="w-full text-sm">
-					<thead>
-						<tr style="border-bottom: 1px solid var(--color-border)">
-							<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Source</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Target</th>
-							<th class="py-2 text-left" style="color: var(--color-muted)">Label</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each relationships as rel}
-							<tr style="border-bottom: 1px solid var(--color-border)">
-								<td class="py-2" style="color: var(--color-fg)">{rel.relationship_type}</td>
-								<td class="py-2">
-									<a href="/elements/{rel.source_element_id}" style="color: var(--color-primary)">
-										{rel.source_element_id === entity.id ? entity.name : (rel.source_element_name || rel.source_element_id)}
-									</a>
-								</td>
-								<td class="py-2">
-									<a href="/elements/{rel.target_element_id}" style="color: var(--color-primary)">
-										{rel.target_element_id === entity.id ? entity.name : (rel.target_element_name || rel.target_element_id)}
-									</a>
-								</td>
-								<td class="py-2" style="color: var(--color-fg)">{rel.label ?? '—'}</td>
-							</tr>
+			<!-- ADR-208 (v6.16.0): the Relationships tab now hosts three
+				 sections — Package membership, Used in Views, and the
+				 explicit Relationships table. Empty sections are hidden. -->
+
+			{#if packageMemberships.length > 0}
+				<section class="mb-6">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Package membership</h3>
+					<ul class="flex flex-col gap-2">
+						{#each packageMemberships as pkg (pkg.id)}
+							<li>
+								<a
+									href="/packages/{pkg.id}"
+									class="flex items-center gap-3 rounded border block p-3"
+									style="border-color: var(--color-border); color: var(--color-primary)"
+								>
+									<span class="font-medium">{pkg.name}</span>
+								</a>
+							</li>
 						{/each}
-					</tbody>
-				</table>
+					</ul>
+				</section>
 			{/if}
+
+			{#if diagramsLoading}
+				<p style="color: var(--color-muted)">Loading views…</p>
+			{:else if usedInModels.length > 0}
+				<section class="mb-6">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Used in Views</h3>
+					<ul class="flex flex-col gap-2">
+						{#each usedInModels as model}
+							<li>
+								<a
+									href="/views/{model.diagram_id}"
+									class="flex items-center gap-3 rounded border block p-3"
+									style="border-color: var(--color-border); color: var(--color-primary)"
+								>
+									<span class="font-medium">{model.name}</span>
+									<span class="rounded px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-muted)">
+										{model.diagram_type}
+									</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+
+			<section>
+				<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Relationships</h3>
+				{#if relationshipsLoading}
+					<p style="color: var(--color-muted)">Loading relationships…</p>
+				{:else if relationships.length === 0}
+					<p style="color: var(--color-muted)">No relationships yet. Relationships are created automatically when elements are connected by edges in a view canvas.</p>
+				{:else}
+					<table class="w-full text-sm">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--color-border)">
+								<th class="py-2 text-left" style="color: var(--color-muted)">Type</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Source</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Target</th>
+								<th class="py-2 text-left" style="color: var(--color-muted)">Label</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each relationships as rel}
+								<tr style="border-bottom: 1px solid var(--color-border)">
+									<td class="py-2" style="color: var(--color-fg)">{rel.relationship_type}</td>
+									<td class="py-2">
+										<a href="/elements/{rel.source_element_id}" style="color: var(--color-primary)">
+											{rel.source_element_id === entity.id ? entity.name : (rel.source_element_name || rel.source_element_id)}
+										</a>
+									</td>
+									<td class="py-2">
+										<a href="/elements/{rel.target_element_id}" style="color: var(--color-primary)">
+											{rel.target_element_id === entity.id ? entity.name : (rel.target_element_name || rel.target_element_id)}
+										</a>
+									</td>
+									<td class="py-2" style="color: var(--color-fg)">{rel.label ?? '—'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/if}
+			</section>
 		{:else if activeTab === 'versions'}
 			<VersionHistory {versions} loading={versionsLoading} currentVersion={entity?.current_version} onrollback={handleElementRollback} />
 		{/if}

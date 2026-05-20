@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.16.0] - 2026-05-20
+
+### Fixed
+
+- **Smart Markdown picker search now works** (ADR-207, issue
+  [#185](https://github.com/cgbarlow/iris/issues/185) follow-up).
+  The v6.15.0 input wired search via a `$effect` that didn't track
+  the `query` state, so typing never re-triggered the search. The
+  input now uses an explicit `oninput` handler matching the
+  v6.14.x pattern.
+- **Picker drill keystrokes** (`.`/Tab/typing-to-filter) now work
+  in production. `handleDrillKey` was only calling
+  `preventDefault()` when the menu had items; Tab without
+  preventDefault tabbed focus away from the picker entirely. Tab
+  and `.` are now unconditionally consumed in drill mode.
+- **Hierarchy view 'New' button is now the same height as 'Show'**
+  (issue [#185](https://github.com/cgbarlow/iris/issues/185)).
+  The 'Show' button has a 1px border; the 'New' button now carries
+  `border border-transparent` so the box models match.
+
+### Added
+
+- **Drill into contained children** (ADR-207). The picker drill
+  mode for collections, sets, and packages now surfaces the
+  entity's contained children alongside `name`/`description`.
+  Clicking a child drills into that child. Closes the gap in
+  ADR-206 where non-element drill only exposed top-level fields.
+- **'Pick this {entity}' shortcut** at non-root breadcrumb levels
+  in the picker browse mode. Picks the breadcrumb-leaf entity and
+  opens its drill view — so a set's or collection's own
+  name/description is reachable from inside the browse tree.
+- **`GET /api/picker/browse?scope=package`** and **`scope=package_bucket`** —
+  new picker browse scopes for drilling into a package's contents.
+  Mirrors the existing `set`/`set_bucket` shape.
+- **'Element' option in the 'New' dropdown** (issue
+  [#191](https://github.com/cgbarlow/iris/issues/191)). Appears
+  beneath 'View' across all three call sites that use the shared
+  `HierarchyControls.svelte` component. Opens the existing
+  `EntityDialog` in create mode.
+- **Per-set `element_tab_default` preference** (ADR-208, issue
+  [#192](https://github.com/cgbarlow/iris/issues/192)). Sibling to
+  the v6.14.0 `package_tab_default` and `view_tab_default` columns.
+  Default `relationships`. Element detail page seeds its
+  `activeTab` from this value (same shape as the view-detail
+  initialiser).
+- **`GET /api/elements/{id}/package-memberships`** — returns the
+  package(s) this element belongs to. Reads the existing
+  `elements.package_id` column (ADR-184); empty list when null.
+
+### Changed
+
+- **Element detail screen tab order**: Relationships is now the
+  first tab (was Details). The standalone "Used in Diagrams" tab
+  is folded into Relationships as a section, alongside a new
+  "Package membership" section. DRY of the v6.10.x package screen
+  pattern that already shows contained elements under Relationships
+  (issue [#192](https://github.com/cgbarlow/iris/issues/192)).
+- **Picker badge colours now align with the Knowledge Graph colour
+  key** (ADR-207). Existing pale palette stays; mappings rotate so
+  collection → pale pink (KG red), set → pale purple (KG violet),
+  package → pale amber (KG amber, unchanged), view → pale green
+  (KG green), element → pale blue (KG blue, unchanged).
+- **Picker label "Diagrams" → "Views"** (badge text + bucket
+  label). Backend `entity_type` still says `'diagram'` — this is
+  a presentation-only mapping inside
+  `SmartMarkdownSlashPicker.svelte`. The wider Iris rename is a
+  separate ticket.
+
+### Migration
+
+- **SQLite m072 + Supabase m077 (paired, §15)** — `ALTER TABLE sets
+  ADD COLUMN element_tab_default TEXT NOT NULL DEFAULT
+  'relationships'`. Idempotent. Run
+  `scripts/supabase-migrate.sh` after deploy to apply the
+  Supabase mirror.
+
 ## [6.15.0] - 2026-05-19
 
 ### Added

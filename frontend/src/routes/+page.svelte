@@ -7,6 +7,8 @@
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
+	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
+	import type { SimpleEntityType } from '$lib/types/canvas';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import KnowledgeGraph from '$lib/components/KnowledgeGraph.svelte';
 	import { getNodeTypeColor } from '$lib/utils/graphColors';
@@ -102,6 +104,27 @@
 	let showCreatePackageDialog = $state(false);
 	let newPackageName = $state('');
 	let newPackageDescription = $state('');
+	// Issue #191: create-element dialog reachable from HierarchyControls.
+	let showCreateElementDialog = $state(false);
+	async function handleCreateElement(name: string, elementType: SimpleEntityType, description: string) {
+		try {
+			const body: Record<string, unknown> = {
+				element_type: elementType,
+				name,
+				description,
+				data: {},
+			};
+			const setId = getActiveSetId();
+			if (setId) body.set_id = setId;
+			await apiFetch('/api/elements', { method: 'POST', body: JSON.stringify(body) });
+			showCreateElementDialog = false;
+			// Optional: refresh hierarchy data — left to the caller's own
+			// reactivity since the dashboard's tree fetches on collection
+			// activation rather than on every entity create.
+		} catch (e) {
+			console.warn('create element failed', e);
+		}
+	}
 
 	// Dashboard tabs
 	let dashboardTab = $state<'discover' | 'history'>('discover');
@@ -635,6 +658,7 @@
 								onShowText={(v) => (showText = v)}
 								oncreateview={() => { createInitialNotation = undefined; showCreateDiagramDialog = true; }}
 								oncreatepackage={() => (showCreatePackageDialog = true)}
+								oncreateelement={() => (showCreateElementDialog = true)}
 							/>
 							<button
 								onclick={() => { reorderMode = !reorderMode; }}
@@ -1012,6 +1036,13 @@
 	initialNotation={createInitialNotation}
 	onsave={handleCreateDiagram}
 	oncancel={() => { showCreateDiagramDialog = false; createInitialNotation = undefined; }}
+/>
+
+<EntityDialog
+	open={showCreateElementDialog}
+	mode="create"
+	onsave={handleCreateElement}
+	oncancel={() => (showCreateElementDialog = false)}
 />
 
 {#if showCreatePackageDialog}
