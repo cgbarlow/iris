@@ -86,6 +86,12 @@
 	let drillFilter = $state('');
 	let drillIdx = $state(0);
 	let drillSeq = 0;
+	// ADR-207: contained children surfaced when drilling into a
+	// non-element entity (collection → sets, set → all-buckets-flat,
+	// package → elements). Clicking a child enters drill for that
+	// child; Backspace pops back up the parent stack.
+	let containerChildren = $state<EntitySearchResult[]>([]);
+	let drillParentStack = $state<EntitySearchResult[]>([]);
 	const NON_ELEMENT_FIELDS = ['name', 'description'];
 
 	let rootEl = $state<HTMLDivElement | undefined>(undefined);
@@ -94,9 +100,51 @@
 
 	const TOKEN_RE = /\{\{(element|package|diagram|set|collection):([^:}]+):[^}]+\}\}/g;
 
+	// ADR-207: backend still uses 'diagram' internally; the picker displays
+	// 'view' to match the user-facing term elsewhere in Iris.
+	function displayType(t: EntityType): string {
+		return t === 'diagram' ? 'view' : t;
+	}
+
+	// ADR-207: at non-root browse levels, expose a "Pick this {entity}"
+	// shortcut so the breadcrumb-leaf collection/set is itself selectable
+	// (otherwise the user has to navigate up a level to pick it).
+	const browseLeafEntity = $derived.by((): EntitySearchResult | null => {
+		const last = breadcrumb[breadcrumb.length - 1];
+		if (!last.scope || !last.id) return null;
+		if (last.scope === 'collection' || last.scope === 'set') {
+			return {
+				id: last.id,
+				entity_type: last.scope,
+				name: last.label,
+			};
+		}
+		return null;
+	});
+
 	// ── Derived menu for drill mode ──────────────────────────────
-	type DrillItem = { label: string; kind: 'container' | 'primitive' };
+	type DrillItem =
+		| { kind: 'primitive'; label: string }
+		| { kind: 'container'; label: string }
+		| { kind: 'child_entity'; label: string; entity: EntitySearchResult };
 	const drillMenuItems = $derived.by((): DrillItem[] => {
+		// ADR-207: non-element drill surfaces name/description PLUS
+		// contained children, so the user can pick the entity's own
+		// fields OR drill into one of its children.
+		if (chosenEntity && chosenEntity.entity_type !== 'element') {
+			const items: DrillItem[] = [
+				{ kind: 'primitive' as const, label: 'name' },
+				{ kind: 'primitive' as const, label: 'description' },
+				...containerChildren.map((c) => ({
+					kind: 'child_entity' as const,
+					label: c.name,
+					entity: c,
+				})),
+			];
+			const filt = drillFilter.toLowerCase();
+			if (!filt) return items;
+			return items.filter((it) => it.label.toLowerCase().includes(filt));
+		}
 		if (!drillNode) return [];
 		const raw: DrillItem[] = (() => {
 			if (drillNode.kind === 'dict') {
@@ -252,7 +300,7 @@
 	async function clickBucket(entity_type: 'element' | 'package' | 'diagram') {
 		const setStep = [...breadcrumb].reverse().find((s) => s.scope === 'set');
 		if (!setStep || !setStep.id) return;
-		const labels = { element: 'Elements', package: 'Packages', diagram: 'Diagrams' };
+		const labels = { element: 'Elements', package: 'Packages', diagram: 'Views' };
 		breadcrumb = [
 			...breadcrumb,
 			{ label: labels[entity_type], scope: 'set_bucket', id: setStep.id, entity_type },
@@ -298,20 +346,61 @@
 	}
 
 	// ── Drill mode behaviour ─────────────────────────────────────
-	async function enterDrill(entity: EntitySearchResult) {
+	async function enterDrill(entity: EntitySearchResult, opts: { resetStack?: boolean } = {}) {
+		const { resetStack = true } = opts;
+		if (resetStack) drillParentStack = [];
 		chosenEntity = entity;
 		drillPath = [];
 		drillFilter = '';
 		drillIdx = 0;
 		mode = 'drill';
+		drillNode = null;
+		containerChildren = [];
 		if (entity.entity_type === 'element') {
 			await fetchDrillNode();
 		} else {
-			// Non-elements have no `data`; expose name + description only.
-			drillNode = { kind: 'empty' };
+			// ADR-207: non-element drill surfaces contained children
+			// alongside name/description. The drillMenuItems derived
+			// reads `containerChildren` for these entity types.
+			await fetchContainerChildren(entity);
 		}
 		await tick();
 		drillInputEl?.focus();
+	}
+
+	async function fetchContainerChildren(entity: EntitySearchResult) {
+		const mySeq = ++drillSeq;
+		try {
+			let url = '';
+			if (entity.entity_type === 'collection') {
+				url = `/api/picker/browse?scope=collection&collection_id=${encodeURIComponent(entity.id)}`;
+			} else if (entity.entity_type === 'set') {
+				// Set has 3 buckets — concatenate in display order.
+				const all: EntitySearchResult[] = [];
+				for (const t of ['element', 'package', 'diagram'] as const) {
+					try {
+						const r = await apiFetch<BrowseResponse>(
+							`/api/picker/browse?scope=set_bucket&set_id=${encodeURIComponent(entity.id)}&entity_type=${t}`,
+						);
+						all.push(...(r.items ?? []));
+					} catch { /* skip unavailable bucket */ }
+				}
+				if (mySeq !== drillSeq) return;
+				containerChildren = all;
+				return;
+			} else if (entity.entity_type === 'package') {
+				url = `/api/picker/browse?scope=package_bucket&package_id=${encodeURIComponent(entity.id)}&entity_type=element`;
+			} else {
+				containerChildren = [];
+				return;
+			}
+			const r = await apiFetch<BrowseResponse>(url);
+			if (mySeq !== drillSeq) return;
+			containerChildren = r.items ?? [];
+		} catch {
+			if (mySeq !== drillSeq) return;
+			containerChildren = [];
+		}
 	}
 
 	async function fetchDrillNode() {
@@ -363,7 +452,17 @@
 			emitToken();
 			return;
 		}
-		// Container: push the segment, fetch next descriptor.
+		// ADR-207: a child_entity item drills into that contained
+		// entity, pushing the current entity onto the parent stack so
+		// Backspace pops back.
+		if (item.kind === 'child_entity') {
+			if (chosenEntity) {
+				drillParentStack = [...drillParentStack, chosenEntity];
+			}
+			await enterDrill(item.entity, { resetStack: false });
+			return;
+		}
+		// Element data drill: container item → push the segment.
 		drillPath = [...drillPath, item.label];
 		drillFilter = '';
 		await fetchDrillNode();
@@ -377,10 +476,20 @@
 			return;
 		}
 		if (drillPath.length === 0) {
+			// ADR-207: if we drilled into a child entity, pop back to the
+			// parent entity's drill instead of going all the way back to
+			// browse mode.
+			if (drillParentStack.length > 0) {
+				const parent = drillParentStack[drillParentStack.length - 1];
+				drillParentStack = drillParentStack.slice(0, -1);
+				await enterDrill(parent, { resetStack: false });
+				return;
+			}
 			// Pop entity selection — back to browse.
 			mode = 'browse';
 			chosenEntity = null;
 			drillNode = null;
+			containerChildren = [];
 			await tick();
 			inputEl?.focus();
 			return;
@@ -426,21 +535,32 @@
 			drillBackspace();
 			return;
 		}
-		if (e.key === '.' || e.key === 'Tab' || e.key === 'Enter') {
+		// ADR-207 fix: Tab and `.` must ALWAYS preventDefault. Tab without
+		// preventDefault tabs focus out of the picker entirely; `.` without
+		// preventDefault gets inserted as a literal character into the filter.
+		// Enter keeps the menu-non-empty gate so a stray Enter on an empty
+		// menu doesn't no-op an Esc-like dismissal pattern.
+		if (e.key === '.' || e.key === 'Tab') {
+			e.preventDefault();
+			if (menu.length > 0) {
+				chooseDrillItem(menu[Math.min(drillIdx, menu.length - 1)]);
+			}
+			return;
+		}
+		if (e.key === 'Enter') {
 			if (menu.length > 0) {
 				e.preventDefault();
 				chooseDrillItem(menu[Math.min(drillIdx, menu.length - 1)]);
 			}
 			return;
 		}
-		// Letter/digit input narrows the menu. The hidden input handles
-		// the actual character via its bound value (oninput).
+		// Letter/digit input narrows the menu via bind:value={drillFilter}.
 	}
 
-	$effect(() => {
-		// Re-fetch when query changes (browse mode only).
-		if (mode === 'browse') scheduleSearch();
-	});
+	// ADR-207 fix: the v6.15.0 $effect tracked `mode` but not `query`, so
+	// typing in the input never re-fired the search. The browse input now
+	// uses an explicit `oninput={scheduleSearch}` handler instead — see
+	// the input element below.
 
 	$effect(() => {
 		// When the menu shrinks, clamp the highlight index.
@@ -469,7 +589,7 @@
 					<button
 						class="slash-picker__chip slash-picker__badge--{chip.type}"
 						onclick={() => clickChip(chip)}
-						title="{chip.type} · {chip.name}"
+						title="{displayType(chip.type)} · {chip.name}"
 					>{chip.name}</button>
 				{/each}
 			</div>
@@ -500,8 +620,22 @@
 			class="slash-picker__input"
 			placeholder="Search at this level…"
 			bind:value={query}
+			oninput={scheduleSearch}
 			onkeydown={handleBrowseKey}
 		/>
+
+		{#if browseLeafEntity && !query.trim()}
+			<!-- ADR-207: 'Pick this {entity}' shortcut at non-root browse levels. -->
+			<button
+				class="slash-picker__item slash-picker__pick-this"
+				type="button"
+				onclick={() => clickItem(browseLeafEntity!)}
+				title="Open drill for this {displayType(browseLeafEntity.entity_type)}"
+			>
+				<span class="slash-picker__badge slash-picker__badge--{browseLeafEntity.entity_type}">{displayType(browseLeafEntity.entity_type)}</span>
+				<span class="slash-picker__name">Pick this {displayType(browseLeafEntity.entity_type)}: <strong>{browseLeafEntity.name}</strong></span>
+			</button>
+		{/if}
 
 		{#if counts}
 			<ul class="slash-picker__list" role="listbox" aria-label="Buckets">
@@ -540,8 +674,8 @@
 						onkeydown={(e) => { if (e.key === 'Enter') clickBucket('diagram'); }}
 						tabindex="-1"
 					>
-						<span class="slash-picker__badge slash-picker__badge--diagram">diagrams</span>
-						<span class="slash-picker__name">Diagrams ({counts.diagrams})</span>
+						<span class="slash-picker__badge slash-picker__badge--diagram">views</span>
+						<span class="slash-picker__name">Views ({counts.diagrams})</span>
 					</li>
 				{/if}
 				{#if counts.elements === 0 && counts.packages === 0 && counts.diagrams === 0}
@@ -560,7 +694,7 @@
 						onkeydown={(e) => { if (e.key === 'Enter') clickItem(item); }}
 						tabindex="-1"
 					>
-						<span class="slash-picker__badge slash-picker__badge--{item.entity_type}">{item.entity_type}</span>
+						<span class="slash-picker__badge slash-picker__badge--{item.entity_type}">{displayType(item.entity_type)}</span>
 						<span class="slash-picker__name">{item.name}</span>
 					</li>
 				{/each}
@@ -577,7 +711,7 @@
 			<button class="slash-picker__back" onclick={drillBackspace} aria-label="Back">‹</button>
 			<span
 				class="slash-picker__badge slash-picker__badge--{chosenEntity?.entity_type}"
-			>{chosenEntity?.entity_type}</span>
+			>{chosenEntity ? displayType(chosenEntity.entity_type) : ''}</span>
 			<strong class="slash-picker__name">{chosenEntity?.name}</strong>
 			{#if drillPath.length > 0}
 				<span class="slash-picker__drill-path">.{drillPath.join('.')}</span>
@@ -741,11 +875,14 @@
 		background: var(--color-muted-bg, #e5e7eb);
 		color: var(--color-muted, #4b5563);
 	}
+	/* ADR-207: badge palette rotated so each type matches its KG
+	   colour key (frontend/src/lib/utils/graphColors.ts): collection=red,
+	   set=violet, package=amber, diagram=green, element=blue. */
 	.slash-picker__badge--element { background: #dbeafe; color: #1e3a8a; }
 	.slash-picker__badge--package { background: #fef3c7; color: #92400e; }
-	.slash-picker__badge--diagram { background: #fce7f3; color: #831843; }
-	.slash-picker__badge--set { background: #dcfce7; color: #14532d; }
-	.slash-picker__badge--collection { background: #f3e8ff; color: #581c87; }
+	.slash-picker__badge--diagram { background: #dcfce7; color: #14532d; }
+	.slash-picker__badge--set { background: #f3e8ff; color: #581c87; }
+	.slash-picker__badge--collection { background: #fce7f3; color: #831843; }
 	.slash-picker__name {
 		flex: 1;
 		overflow: hidden;
@@ -760,6 +897,23 @@
 	.slash-picker__chevron {
 		color: var(--color-muted, #9ca3af);
 		font-size: 13px;
+	}
+	.slash-picker__pick-this {
+		display: flex; align-items: center; gap: 8px;
+		width: calc(100% - 24px);
+		margin: 0 12px 4px 12px;
+		padding: 6px 12px;
+		background: var(--color-hover, #f3f4f6);
+		border: 1px dashed var(--color-border, #d1d5db);
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 13px;
+		color: var(--color-fg, #111827);
+		text-align: left;
+	}
+	.slash-picker__pick-this:hover {
+		background: var(--color-surface, #ffffff);
+		border-style: solid;
 	}
 	.slash-picker__drill-path {
 		font-family: ui-monospace, monospace;

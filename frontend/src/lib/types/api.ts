@@ -273,6 +273,10 @@ export type HierarchySort = 'manual' | 'alpha' | 'newest' | 'oldest';
 // ADR-204 (v6.14.0): per-set tab defaults for Packages and Views screens.
 export type PackageTabDefault = 'relationships' | 'details';
 export type ViewTabDefault = 'canvas' | 'relationships' | 'details';
+// ADR-208 (v6.16.0): per-set tab default for the Element detail screen.
+// 'diagrams' is accepted for forward compat with pre-merge rows but
+// the frontend coerces to 'relationships' on read.
+export type ElementTabDefault = 'details' | 'diagrams' | 'relationships' | 'versions';
 
 export interface IrisSet {
 	id: string;
@@ -297,6 +301,8 @@ export interface IrisSet {
 	// ADR-204 (v6.14.0): per-set tab defaults.
 	package_tab_default: PackageTabDefault;
 	view_tab_default: ViewTabDefault;
+	// ADR-208 (v6.16.0): per-set element tab default.
+	element_tab_default: ElementTabDefault;
 }
 
 export interface IrisCollection {

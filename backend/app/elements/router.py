@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user, get_optional_user
 from app.elements.models import (
@@ -290,6 +291,39 @@ def _walk_node(node: Any, segments: list[str]) -> Any | None:
 
 
 _NODE_NOT_FOUND = object()
+
+
+class PackageMembership(BaseModel):
+    """One package this element belongs to (ADR-208, v6.16.0)."""
+
+    id: str
+    name: str
+
+
+@router.get("/{element_id}/package-memberships", response_model=list[PackageMembership])
+async def get_package_memberships(
+    element_id: str,
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> list[PackageMembership]:
+    """Return the package(s) this element belongs to (ADR-208, issue #192).
+
+    Reads the existing ``elements.package_id`` column (ADR-184). One row
+    per direct package; empty list if the element has no package_id.
+    Returns a list so future multi-package membership can extend the
+    response without an API break.
+
+    404 if the element is missing or soft-deleted.
+    """
+    db = request.app.state.db_manager.main_db
+    elem = await get_element(db, element_id)
+    if elem is None:
+        raise HTTPException(status_code=404, detail="Element not found")
+    package_id = elem.get("package_id")
+    package_name = elem.get("package_name")
+    if not package_id or not package_name:
+        return []
+    return [PackageMembership(id=str(package_id), name=str(package_name))]
 
 
 @router.get("/{element_id}/data-tree")

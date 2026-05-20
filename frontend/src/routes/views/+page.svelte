@@ -9,6 +9,8 @@
 	let contextItems = $derived(getAiContextItems());
 	let contextItemIds = $derived(new Set(contextItems.map((i) => i.id)));
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
+	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
+	import type { SimpleEntityType } from '$lib/types/canvas';
 	import DiagramThumbnail from '$lib/components/DiagramThumbnail.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
 	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
@@ -35,6 +37,24 @@
 	let showText = $state(true);
 	let showCreateDialog = $state(false);
 	let showCreatePackageDialog = $state(false);
+	// Issue #191: create-element via HierarchyControls dropdown.
+	let showCreateElementDialog = $state(false);
+	async function handleCreateElement(name: string, elementType: SimpleEntityType, description: string) {
+		try {
+			const body: Record<string, unknown> = {
+				element_type: elementType,
+				name,
+				description,
+				data: {},
+			};
+			const setId = getActiveSetId();
+			if (setId) body.set_id = setId;
+			await apiFetch('/api/elements', { method: 'POST', body: JSON.stringify(body) });
+			showCreateElementDialog = false;
+		} catch (e) {
+			console.warn('create element failed', e);
+		}
+	}
 	let newPackageName = $state('');
 	let newPackageDescription = $state('');
 	let viewMode = $state<'list' | 'gallery' | 'tree'>(
@@ -394,6 +414,7 @@
 			onShowText={(v) => (showText = v)}
 			oncreateview={() => (showCreateDialog = true)}
 			oncreatepackage={() => (showCreatePackageDialog = true)}
+			oncreateelement={() => (showCreateElementDialog = true)}
 		/>
 		<button
 			onclick={() => { selectMode = !selectMode; if (!selectMode) cancelSelection(); }}
@@ -790,6 +811,13 @@
 	mode="create"
 	onsave={handleCreate}
 	oncancel={() => (showCreateDialog = false)}
+/>
+
+<EntityDialog
+	open={showCreateElementDialog}
+	mode="create"
+	onsave={handleCreateElement}
+	oncancel={() => (showCreateElementDialog = false)}
 />
 
 <BatchSetDialog

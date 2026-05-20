@@ -12,6 +12,7 @@
 		HierarchySort,
 		PackageTabDefault,
 		ViewTabDefault,
+		ElementTabDefault,
 	} from '$lib/types/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
@@ -38,6 +39,8 @@
 	// ADR-204 (v6.14.0): per-set tab defaults for Packages/Views screens.
 	let packageTabDefault = $state<PackageTabDefault>('relationships');
 	let viewTabDefault = $state<ViewTabDefault>('canvas');
+	// ADR-208 (v6.16.0): per-set element tab default.
+	let elementTabDefault = $state<ElementTabDefault>('relationships');
 
 	let showDeleteDialog = $state(false);
 	let deleting = $state(false);
@@ -70,6 +73,7 @@
 			hierarchySort = setData.hierarchy_sort ?? 'manual';
 			packageTabDefault = setData.package_tab_default ?? 'relationships';
 			viewTabDefault = setData.view_tab_default ?? 'canvas';
+			elementTabDefault = (setData.element_tab_default as ElementTabDefault | undefined) ?? 'relationships';
 		} catch {
 			error = 'Failed to load set';
 		}
@@ -105,6 +109,7 @@
 					hierarchy_sort: hierarchySort,
 					package_tab_default: packageTabDefault,
 					view_tab_default: viewTabDefault,
+					element_tab_default: elementTabDefault,
 				}),
 			});
 
@@ -291,6 +296,26 @@
 			</select>
 			<p class="mt-1 text-xs" style="color: var(--color-muted)">
 				Which tab opens by default when a user visits a view (diagram) in this set.
+			</p>
+		</div>
+
+		<!-- Element tab default (ADR-208, v6.16.0) -->
+		<div class="mt-4">
+			<label for="set-edit-element-tab-default" class="text-sm font-medium" style="color: var(--color-fg)">
+				Element tab default
+			</label>
+			<select
+				id="set-edit-element-tab-default"
+				bind:value={elementTabDefault}
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			>
+				<option value="relationships">Relationships</option>
+				<option value="details">Details</option>
+				<option value="versions">Version History</option>
+			</select>
+			<p class="mt-1 text-xs" style="color: var(--color-muted)">
+				Which tab opens by default when a user visits an element in this set.
 			</p>
 		</div>
 

@@ -4,6 +4,8 @@
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import DiagramDialog from '$lib/components/DiagramDialog.svelte';
+	import EntityDialog from '$lib/canvas/controls/EntityDialog.svelte';
+	import type { SimpleEntityType } from '$lib/types/canvas';
 	import HierarchyControls from '$lib/components/HierarchyControls.svelte';
 	import PackagePicker from '$lib/components/PackagePicker.svelte';
 	import TreeNode from '$lib/components/TreeNode.svelte';
@@ -79,6 +81,25 @@
 	let showParentPicker = $state(false);
 	let showCreateChildDiagramDialog = $state(false);
 	let showCreateChildPackageDialog = $state(false);
+	// Issue #191: create-child element via the HierarchyControls dropdown.
+	// Created elements inherit the current package's set_id.
+	let showCreateChildElementDialog = $state(false);
+	async function handleCreateChildElement(name: string, elementType: SimpleEntityType, description: string) {
+		try {
+			const body: Record<string, unknown> = {
+				element_type: elementType,
+				name,
+				description,
+				data: {},
+			};
+			if (pkg?.set_id) body.set_id = pkg.set_id;
+			if (pkg?.id) body.package_id = pkg.id;
+			await apiFetch('/api/elements', { method: 'POST', body: JSON.stringify(body) });
+			showCreateChildElementDialog = false;
+		} catch (e) {
+			console.warn('create child element failed', e);
+		}
+	}
 	let childPackageName = $state('');
 	let childPackageDescription = $state('');
 
@@ -567,6 +588,7 @@
 							onShowText={(v) => (showText = v)}
 							oncreateview={() => (showCreateChildDiagramDialog = true)}
 							oncreatepackage={() => (showCreateChildPackageDialog = true)}
+							oncreateelement={() => (showCreateChildElementDialog = true)}
 						/>
 						<button
 							onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
@@ -943,6 +965,13 @@
 		initialDescription=""
 		onsave={handleCreateChildDiagram}
 		oncancel={() => (showCreateChildDiagramDialog = false)}
+	/>
+
+	<EntityDialog
+		open={showCreateChildElementDialog}
+		mode="create"
+		onsave={handleCreateChildElement}
+		oncancel={() => (showCreateChildElementDialog = false)}
 	/>
 
 	{#if showCreateChildPackageDialog}
