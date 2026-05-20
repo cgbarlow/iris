@@ -33,6 +33,11 @@
 		onsourcechange?: (source: string) => void;
 		/** Heading list updates — wire to MarkdownToc. */
 		onheadings?: (headings: TocHeading[]) => void;
+		/** ADR-207: the diagram's set_id. The picker uses it to seed
+		 *  its initial breadcrumb at the parent collection (or set if no
+		 *  collection) so the user opens at their current location, not
+		 *  at the global root. */
+		contextSetId?: string | null;
 	}
 
 	let {
@@ -42,6 +47,7 @@
 		textDiagramIds,
 		onsourcechange,
 		onheadings,
+		contextSetId = null,
 	}: Props = $props();
 
 	let textareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
@@ -147,6 +153,7 @@
 				oninsert={onTokenInsert}
 				onclose={onPickerClose}
 				existingSource={source ?? ''}
+				contextSetId={contextSetId}
 			/>
 		{/if}
 	{:else}

@@ -3042,6 +3042,7 @@
 									content={markdownContent}
 									source={(diagram.data?.markdown_source as string | undefined) ?? ''}
 									editing={editing}
+									contextSetId={diagram?.set_id ?? null}
 									onsourcechange={(s: string) => {
 										if (diagram) {
 											diagram.data = { ...(diagram.data ?? {}), markdown_source: s };
@@ -3149,6 +3150,7 @@
 										content={markdownContent}
 										source={(diagram.data?.markdown_source as string | undefined) ?? ''}
 										editing={false}
+										contextSetId={diagram?.set_id ?? null}
 										onheadings={(h) => (textHeadings = h)}
 									/>
 								{:else}

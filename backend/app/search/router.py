@@ -334,8 +334,9 @@ async def picker_browse_endpoint(
             items=items,
         )
 
-    # ADR-207 (v6.16.0): scope=package returns counts; scope=package_bucket
-    # returns the elements directly inside the package.
+    # ADR-207 v6.16.1: scope=package returns its contained elements as
+    # items directly (packages only contain elements — no bucket-card
+    # intermediary needed). scope=package_bucket retained for symmetry.
     if scope == "package":
         if not package_id:
             raise HTTPException(
@@ -345,12 +346,18 @@ async def picker_browse_endpoint(
         if pkg_row is None:
             raise HTTPException(status_code=404, detail="Package not found")
         pkg_name, pkg_set_id = pkg_row
-        ec = await db.execute(
-            "SELECT COUNT(*) FROM elements "
-            "WHERE package_id = ? AND is_deleted = 0",
-            (package_id,),
+        cursor = await db.execute(
+            "SELECT e.id, ev.name FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id "
+            "  AND e.current_version = ev.version "
+            "WHERE e.package_id = ? AND e.is_deleted = 0 "
+            "ORDER BY LOWER(ev.name) LIMIT ?",
+            (package_id, limit),
         )
-        elements_count = (await ec.fetchone())[0]
+        items = [
+            EntitySearchResult(id=r[0], entity_type="element", name=r[1] or "")
+            for r in await cursor.fetchall()
+        ]
         # Build a Root → Collection → Set → Package breadcrumb.
         crumbs: list[BrowseBreadcrumb] = []
         if pkg_set_id:
@@ -364,12 +371,7 @@ async def picker_browse_endpoint(
         crumbs.append(BrowseBreadcrumb(
             label=pkg_name, scope="package", id=package_id,
         ))
-        return BrowseResponse(
-            breadcrumb=crumbs, items=[],
-            counts=BrowseCounts(
-                packages=0, diagrams=0, elements=elements_count,
-            ),
-        )
+        return BrowseResponse(breadcrumb=crumbs, items=items)
 
     if scope == "package_bucket":
         if not package_id:

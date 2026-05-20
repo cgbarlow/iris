@@ -207,9 +207,12 @@ async def test_invalid_scope_returns_422(
 
 
 @pytest.mark.asyncio
-async def test_scope_package_returns_element_count(
+async def test_scope_package_returns_contained_elements(
     client: httpx.AsyncClient,
 ) -> None:
+    """ADR-207 v6.16.1: scope=package returns the elements as items
+    directly (no bucket-card intermediary — packages only contain
+    elements)."""
     h = await _auth(client)
     s = (await client.post("/api/sets", json={"name": "S"}, headers=h)).json()["id"]
     p = await client.post(
@@ -229,7 +232,10 @@ async def test_scope_package_returns_element_count(
     )
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["counts"]["elements"] == 3
+    names = sorted(i["name"] for i in body["items"])
+    assert names == ["A", "B", "C"]
+    # counts omitted (response_model_exclude_none=True)
+    assert "counts" not in body or body["counts"] is None
     # Breadcrumb should include Pkg as the last step
     assert body["breadcrumb"][-1]["label"] == "Pkg"
     assert body["breadcrumb"][-1]["scope"] == "package"

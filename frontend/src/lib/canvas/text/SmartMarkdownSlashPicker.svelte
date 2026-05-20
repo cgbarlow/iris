@@ -36,7 +36,7 @@
 
 	interface BreadcrumbStep {
 		label: string;
-		scope?: 'collection' | 'set' | 'set_bucket';
+		scope?: 'collection' | 'set' | 'set_bucket' | 'package';
 		id?: string;
 		entity_type?: 'element' | 'package' | 'diagram';
 	}
@@ -63,9 +63,17 @@
 		oninsert: (token: string) => void;
 		onclose: () => void;
 		existingSource?: string;
+		/** ADR-207 follow-up: the set the calling view belongs to. The
+		 *  picker opens at the *collection* containing that set (or at
+		 *  the set itself when the set has no parent collection), so the
+		 *  user lands at their current scope instead of at the global
+		 *  root. Search "at this level" then matches the most likely
+		 *  intent (`/Pork` while editing a Groceries view shows Groceries
+		 *  results first). */
+		contextSetId?: string | null;
 	}
 
-	let { oninsert, onclose, existingSource = '' }: Props = $props();
+	let { oninsert, onclose, existingSource = '', contextSetId = null }: Props = $props();
 
 	// ── Browse mode state ────────────────────────────────────────
 	type Mode = 'browse' | 'drill';
@@ -86,10 +94,13 @@
 	let drillFilter = $state('');
 	let drillIdx = $state(0);
 	let drillSeq = 0;
-	// ADR-207: contained children surfaced when drilling into a
-	// non-element entity (collection → sets, set → all-buckets-flat,
-	// package → elements). Clicking a child enters drill for that
-	// child; Backspace pops back up the parent stack.
+	// ADR-207 v6.16.1: non-element entities are navigated via BROWSE
+	// (root → collection → set → package or set_bucket), not drill.
+	// Drill mode is reserved for element data-tree picking + the
+	// name/description shortcut for any entity type.
+	// containerChildren and drillParentStack are retained as no-op
+	// fields for compatibility with the existing derived; they are
+	// always empty.
 	let containerChildren = $state<EntitySearchResult[]>([]);
 	let drillParentStack = $state<EntitySearchResult[]>([]);
 	const NON_ELEMENT_FIELDS = ['name', 'description'];
@@ -112,7 +123,7 @@
 	const browseLeafEntity = $derived.by((): EntitySearchResult | null => {
 		const last = breadcrumb[breadcrumb.length - 1];
 		if (!last.scope || !last.id) return null;
-		if (last.scope === 'collection' || last.scope === 'set') {
+		if (last.scope === 'collection' || last.scope === 'set' || last.scope === 'package') {
 			return {
 				id: last.id,
 				entity_type: last.scope,
@@ -125,21 +136,16 @@
 	// ── Derived menu for drill mode ──────────────────────────────
 	type DrillItem =
 		| { kind: 'primitive'; label: string }
-		| { kind: 'container'; label: string }
-		| { kind: 'child_entity'; label: string; entity: EntitySearchResult };
+		| { kind: 'container'; label: string };
 	const drillMenuItems = $derived.by((): DrillItem[] => {
-		// ADR-207: non-element drill surfaces name/description PLUS
-		// contained children, so the user can pick the entity's own
-		// fields OR drill into one of its children.
+		// ADR-207 v6.16.1: non-element drill exposes name + description
+		// only. Their children are reachable via browse mode at the
+		// parent breadcrumb level (a package now appears as a browse
+		// scope, not a drill).
 		if (chosenEntity && chosenEntity.entity_type !== 'element') {
 			const items: DrillItem[] = [
 				{ kind: 'primitive' as const, label: 'name' },
 				{ kind: 'primitive' as const, label: 'description' },
-				...containerChildren.map((c) => ({
-					kind: 'child_entity' as const,
-					label: c.name,
-					entity: c,
-				})),
 			];
 			const filt = drillFilter.toLowerCase();
 			if (!filt) return items;
@@ -186,9 +192,43 @@
 	// ── Lifecycle ────────────────────────────────────────────────
 	onMount(async () => {
 		recentChips = await deriveRecent(existingSource);
+		await seedBreadcrumbFromContext();
 		await loadBrowse();
 		inputEl?.focus();
 	});
+
+	async function seedBreadcrumbFromContext() {
+		// ADR-207 follow-up: open the picker at the calling view's parent
+		// collection (or at the set when the set has no collection). The
+		// initial breadcrumb is set BEFORE loadBrowse() so the first fetch
+		// uses the right scope.
+		if (!contextSetId) return;
+		try {
+			const setData = await apiFetch<{
+				id: string;
+				name: string;
+				collection_id?: string | null;
+				collection_name?: string | null;
+			}>(`/api/sets/${encodeURIComponent(contextSetId)}`);
+			if (setData.collection_id && setData.collection_name) {
+				breadcrumb = [
+					{ label: 'Root' },
+					{
+						label: setData.collection_name,
+						scope: 'collection',
+						id: setData.collection_id,
+					},
+				];
+				return;
+			}
+			breadcrumb = [
+				{ label: 'Root' },
+				{ label: setData.name || 'Set', scope: 'set', id: setData.id },
+			];
+		} catch {
+			// On error, fall back to the root view. Best effort.
+		}
+	}
 
 	async function deriveRecent(source: string): Promise<RecentChip[]> {
 		const seen = new Set<string>();
@@ -241,6 +281,7 @@
 		if (!last.scope) return 'scope=root';
 		if (last.scope === 'collection') return `scope=collection&collection_id=${encodeURIComponent(last.id ?? '')}`;
 		if (last.scope === 'set') return `scope=set&set_id=${encodeURIComponent(last.id ?? '')}`;
+		if (last.scope === 'package') return `scope=package&package_id=${encodeURIComponent(last.id ?? '')}`;
 		// set_bucket
 		return `scope=set_bucket&set_id=${encodeURIComponent(last.id ?? '')}&entity_type=${last.entity_type}`;
 	}
@@ -310,6 +351,11 @@
 	}
 
 	async function clickItem(item: EntitySearchResult) {
+		// ADR-207 follow-up: containers (collection, set, package) navigate
+		// browse one level deeper so the breadcrumb-leaf entity is reachable
+		// via "Pick this {entity}" and its children render with the same
+		// browse-mode look at every level. Drill mode is reserved for
+		// elements (data-tree picking) and "Pick this" shortcuts.
 		if (item.entity_type === 'collection') {
 			breadcrumb = [
 				...breadcrumb,
@@ -325,7 +371,14 @@
 			await loadBrowse();
 			return;
 		}
-		// element / package / diagram → drill (or insert immediately for non-elements)
+		if (item.entity_type === 'package') {
+			breadcrumb = [...breadcrumb, { label: item.name, scope: 'package', id: item.id }];
+			query = '';
+			await loadBrowse();
+			return;
+		}
+		// element / diagram (view) → drill (data-tree picking for elements;
+		// name/description for views which have no data tree).
 		await enterDrill(item);
 	}
 
@@ -346,6 +399,12 @@
 	}
 
 	// ── Drill mode behaviour ─────────────────────────────────────
+	// ADR-207 follow-up (v6.16.1): drill mode is for ELEMENT field
+	// picking only (data-tree + name/description). Non-elements are
+	// navigated via browse mode (root → collection → set → package or
+	// set_bucket); their own name/description is picked via the
+	// "Pick this {entity}" shortcut, which lands here in drill mode
+	// with no children to show.
 	async function enterDrill(entity: EntitySearchResult, opts: { resetStack?: boolean } = {}) {
 		const { resetStack = true } = opts;
 		if (resetStack) drillParentStack = [];
@@ -359,48 +418,13 @@
 		if (entity.entity_type === 'element') {
 			await fetchDrillNode();
 		} else {
-			// ADR-207: non-element drill surfaces contained children
-			// alongside name/description. The drillMenuItems derived
-			// reads `containerChildren` for these entity types.
-			await fetchContainerChildren(entity);
+			// Non-elements expose name + description only; their
+			// children are reachable via browse mode at the parent
+			// level (no drill children, no clutter).
+			drillNode = { kind: 'empty' };
 		}
 		await tick();
 		drillInputEl?.focus();
-	}
-
-	async function fetchContainerChildren(entity: EntitySearchResult) {
-		const mySeq = ++drillSeq;
-		try {
-			let url = '';
-			if (entity.entity_type === 'collection') {
-				url = `/api/picker/browse?scope=collection&collection_id=${encodeURIComponent(entity.id)}`;
-			} else if (entity.entity_type === 'set') {
-				// Set has 3 buckets — concatenate in display order.
-				const all: EntitySearchResult[] = [];
-				for (const t of ['element', 'package', 'diagram'] as const) {
-					try {
-						const r = await apiFetch<BrowseResponse>(
-							`/api/picker/browse?scope=set_bucket&set_id=${encodeURIComponent(entity.id)}&entity_type=${t}`,
-						);
-						all.push(...(r.items ?? []));
-					} catch { /* skip unavailable bucket */ }
-				}
-				if (mySeq !== drillSeq) return;
-				containerChildren = all;
-				return;
-			} else if (entity.entity_type === 'package') {
-				url = `/api/picker/browse?scope=package_bucket&package_id=${encodeURIComponent(entity.id)}&entity_type=element`;
-			} else {
-				containerChildren = [];
-				return;
-			}
-			const r = await apiFetch<BrowseResponse>(url);
-			if (mySeq !== drillSeq) return;
-			containerChildren = r.items ?? [];
-		} catch {
-			if (mySeq !== drillSeq) return;
-			containerChildren = [];
-		}
 	}
 
 	async function fetchDrillNode() {
@@ -452,16 +476,6 @@
 			emitToken();
 			return;
 		}
-		// ADR-207: a child_entity item drills into that contained
-		// entity, pushing the current entity onto the parent stack so
-		// Backspace pops back.
-		if (item.kind === 'child_entity') {
-			if (chosenEntity) {
-				drillParentStack = [...drillParentStack, chosenEntity];
-			}
-			await enterDrill(item.entity, { resetStack: false });
-			return;
-		}
 		// Element data drill: container item → push the segment.
 		drillPath = [...drillPath, item.label];
 		drillFilter = '';
@@ -509,6 +523,16 @@
 		if (e.key === 'ArrowUp') {
 			e.preventDefault();
 			if (items.length > 0) listIdx = (listIdx - 1 + items.length) % items.length;
+			return;
+		}
+		// ADR-207 v6.16.1: IDE-style — Tab and `.` commit the highlighted
+		// item and navigate/drill, same as Enter or mouse-click. Tab
+		// always preventDefault so focus stays in the picker.
+		if (e.key === 'Tab' || e.key === '.') {
+			e.preventDefault();
+			if (items.length > 0) {
+				clickItem(items[listIdx]);
+			}
 			return;
 		}
 		if (e.key === 'Enter' && items.length > 0) {
@@ -638,20 +662,9 @@
 		{/if}
 
 		{#if counts}
+			<!-- ADR-207 v6.16.1: bucket order Packages → Views → Elements
+				 per user direction. -->
 			<ul class="slash-picker__list" role="listbox" aria-label="Buckets">
-				{#if counts.elements > 0}
-					<li
-						role="option"
-						aria-selected="false"
-						class="slash-picker__item"
-						onclick={() => clickBucket('element')}
-						onkeydown={(e) => { if (e.key === 'Enter') clickBucket('element'); }}
-						tabindex="-1"
-					>
-						<span class="slash-picker__badge slash-picker__badge--element">elements</span>
-						<span class="slash-picker__name">Elements ({counts.elements})</span>
-					</li>
-				{/if}
 				{#if counts.packages > 0}
 					<li
 						role="option"
@@ -676,6 +689,19 @@
 					>
 						<span class="slash-picker__badge slash-picker__badge--diagram">views</span>
 						<span class="slash-picker__name">Views ({counts.diagrams})</span>
+					</li>
+				{/if}
+				{#if counts.elements > 0}
+					<li
+						role="option"
+						aria-selected="false"
+						class="slash-picker__item"
+						onclick={() => clickBucket('element')}
+						onkeydown={(e) => { if (e.key === 'Enter') clickBucket('element'); }}
+						tabindex="-1"
+					>
+						<span class="slash-picker__badge slash-picker__badge--element">elements</span>
+						<span class="slash-picker__name">Elements ({counts.elements})</span>
 					</li>
 				{/if}
 				{#if counts.elements === 0 && counts.packages === 0 && counts.diagrams === 0}
