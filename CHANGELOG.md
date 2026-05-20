@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.16.1] - 2026-05-20
+
+### Fixed
+
+- **Picker opens at the calling view's collection** (issue
+  [#185](https://github.com/cgbarlow/iris/issues/185) regression
+  follow-up). v6.16.0 always opened at the global root; users
+  expected the picker to start at their current scope so search
+  "at this level" matches the intent of the original 2026-05-19
+  comment. SmartMarkdownCanvas now passes the diagram's `set_id`
+  as `contextSetId`; the picker fetches the set, seeds its
+  initial breadcrumb to `Root > {collection}` (or `Root > {set}`
+  if the set has no parent collection), and the first browse
+  fetch uses that scope.
+- **Package drill replaced with browse navigation** — clicking a
+  package in the picker now navigates browse to
+  `scope=package` (showing the breadcrumb + "Pick this package"
+  + contained elements), matching the set-level pattern. The
+  v6.16.0 drill-with-children-list felt off because non-element
+  drill UX visually diverged from set/collection browse.
+- **IDE-style Tab and `.` in browse mode** — Tab or `.` on the
+  highlighted browse item now commits and navigates (or drills
+  for elements), matching the in-drill behaviour. Tab no longer
+  tabs focus out of the picker.
+
+### Changed
+
+- **Bucket order at scope=set is now Packages → Views → Elements**
+  (was Elements → Packages → Views). Matches user direction.
+- **`scope=package` returns the contained elements as items**
+  instead of a `counts` payload. Packages only contain elements,
+  so the bucket-card intermediary added unnecessary friction.
+
+### Migration
+
+- No DB changes. Code-only follow-up to v6.16.0.
+
 ## [6.16.0] - 2026-05-20
 
 ### Fixed
