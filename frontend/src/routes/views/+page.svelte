@@ -429,7 +429,7 @@
 <!-- Filters -->
 <div class="mt-4 flex flex-wrap gap-3">
 	<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
-	<SetSelector value={currentSetId} onchange={handleSetChange} />
+	<SetSelector value={currentSetId} onchange={handleSetChange} collectionId={currentCollectionId || null} />
 	<div>
 		<label for="diagram-search" class="sr-only">Search views</label>
 		<input

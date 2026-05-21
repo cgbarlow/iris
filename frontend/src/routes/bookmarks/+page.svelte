@@ -142,7 +142,7 @@
 	</div>
 	<div class="flex items-center gap-2">
 		<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
-		<SetSelector value={currentSetId} onchange={handleSetChange} />
+		<SetSelector value={currentSetId} onchange={handleSetChange} collectionId={currentCollectionId || null} />
 	</div>
 </div>
 

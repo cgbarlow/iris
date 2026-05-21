@@ -221,9 +221,12 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
 async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     """Run Supabase/PostgreSQL initialization: run idempotent migrations, seed core data.
 
-    FTS rebuild and thumbnail generation are skipped:
-    - FTS uses PostgreSQL tsvector triggers (auto-updated on INSERT/UPDATE)
-    - cairosvg thumbnail generation may not be available in Netlify Function runtime
+    FTS is skipped — PostgreSQL tsvector triggers keep the index live on
+    INSERT/UPDATE. Thumbnail regeneration *was* skipped historically on the
+    assumption cairosvg wouldn't be present on the runtime; the Render
+    Docker image bundles cairo + pango (see backend/Dockerfile), so we
+    now run it on every boot so changes to ``generate_svg_from_diagram_data``
+    propagate to pre-existing diagrams (issue #208).
     """
     # Migrations are run externally via psql (scripts/supabase-migrate.sh or SQL Editor).
     # asyncpg cannot execute dollar-quoted SQL ($$) used in trigger/function definitions.
@@ -325,3 +328,13 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
         "WHERE id::text NOT IN (SELECT id FROM users)"
     )
     await port.commit()
+
+    # v6.17.8 (issue #208): regenerate PNG thumbnails so changes to
+    # ``generate_svg_from_diagram_data`` propagate to pre-existing
+    # diagrams (the markdown-notation preview branch added in v6.17.6
+    # was otherwise dormant on Supabase deployments).
+    try:
+        count = await regenerate_all_thumbnails(port)
+        print(f"[STARTUP] regenerated {count} diagram thumbnails", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[STARTUP] thumbnail regeneration skipped: {exc}", flush=True)
