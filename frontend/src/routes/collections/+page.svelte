@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
+	import { API_BASE_URL } from '$lib/config.js';
 	import { getActiveCollectionId, clearActiveCollection, setActiveCollection } from '$lib/stores/activeCollection.svelte.js';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
@@ -81,6 +82,18 @@
 			const apiErr = e as { status?: number };
 			error = apiErr.status === 409 ? 'A collection with this name already exists' : 'Failed to create collection';
 		}
+	}
+
+	function getImageThumbnailUrl(collection: IrisCollection): string | null {
+		// v6.17.6 (issue #205 item 5): mirror the sets-page logic.
+		// Backend `has_thumbnail_image` is true when either the legacy
+		// thumbnail_image BLOB column has bytes or an entity_images
+		// attachment exists; `get_collection_thumbnail` resolves the
+		// right bytes in priority order.
+		if (collection.has_thumbnail_image) {
+			return `${API_BASE_URL}/api/collections/${collection.id}/thumbnail`;
+		}
+		return null;
 	}
 </script>
 
@@ -224,6 +237,7 @@
 	<!-- Gallery view -->
 	<div class="mt-4 grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
 		{#each filteredCollections as collection}
+			{@const imageUrl = getImageThumbnailUrl(collection)}
 			<div class="card-wrapper" style="position: relative">
 				<button
 					onclick={() => handleCollectionClick(collection)}
@@ -236,7 +250,17 @@
 						class="flex items-center justify-center rounded"
 						style="width: 160px; height: 100px; background-color: var(--color-bg); border: 1px solid var(--color-border); overflow: hidden"
 					>
-						<span class="text-2xl" style="color: var(--color-muted)">C</span>
+						{#if imageUrl}
+							<!-- v6.17.6 (issue #205): render the attached image
+								 as the gallery tile thumbnail. -->
+							<img
+								src={imageUrl}
+								alt="{collection.name} thumbnail"
+								style="max-width: 100%; max-height: 100%; object-fit: contain"
+							/>
+						{:else}
+							<span class="text-2xl" style="color: var(--color-muted)">C</span>
+						{/if}
 					</div>
 					<div class="mt-2 font-medium text-sm" style="color: var(--color-primary)">{collection.name}</div>
 					<div class="mt-1 text-xs" style="color: var(--color-muted)">
