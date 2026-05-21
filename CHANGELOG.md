@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.9] - 2026-05-21
+
+### Changed
+
+- **Smart-markdown thumbnails now show the rendered text**, not the
+  raw `{{element:GUID:field}}` tokens stripped to `[…]`
+  (issue [#208](https://github.com/cgbarlow/iris/issues/208) follow-up).
+  `generate_and_store_thumbnail` now calls
+  `compute_smart_markdown_content` for `smart_markdown` diagrams so
+  the thumbnail reflects what the user sees in the rendered view. The
+  resolver's markdown link syntax (`[value](iris://… "name")`) is
+  stripped to plain text for the tile; inline `<img>` tags become
+  `[image]`; strikethrough'd unresolvable tokens unwrap to the raw
+  token (then `_markdown_preview_lines` applies the old `[…]`
+  placeholder).
+- Falls back to the previous v6.17.6 behaviour (raw source with tokens
+  → `[…]`) if the resolver raises — logged but non-fatal.
+
+### Migration
+
+- None.
+
 ## [6.17.8] - 2026-05-21
 
 ### Fixed
