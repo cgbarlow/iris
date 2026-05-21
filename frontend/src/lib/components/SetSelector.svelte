@@ -22,14 +22,19 @@
 	let previousValue = $state(value);
 
 	export async function reload() {
-		await loadSets();
+		await loadSets(collectionId ?? null);
 	}
 
-	async function loadSets() {
+	// v6.17.6 (issue #205 item 6): `loadSets` takes an explicit
+	// `collectionId` argument so Svelte 5's $effect dependency tracking
+	// is unambiguous. v6.17.4's version read `collectionId` from the
+	// outer closure inside loadSets, which made the read happen *after*
+	// the effect body completed — so refetches were unreliable.
+	async function loadSets(collId: string | null) {
 		loading = true;
 		try {
-			const url = collectionId
-				? `/api/sets?collection_id=${encodeURIComponent(collectionId)}`
+			const url = collId
+				? `/api/sets?collection_id=${encodeURIComponent(collId)}`
 				: '/api/sets';
 			const data = await apiFetch<{ items: IrisSet[] }>(url);
 			sets = data.items;
@@ -53,10 +58,11 @@
 	}
 
 	$effect(() => {
-		// Read `collectionId` reactively so changing the collection
-		// re-fetches the constrained set list (issue #200).
-		collectionId;
-		loadSets();
+		// Pass the reactive collectionId in as an explicit arg so the
+		// $effect's dep tracker sees the read at effect-evaluation time
+		// (not inside the async closure where the tracker has already
+		// closed). issue #200 / issue #205 item 6.
+		loadSets(collectionId ?? null);
 	});
 </script>
 

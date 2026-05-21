@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from html import escape as html_escape
 from typing import TYPE_CHECKING
@@ -40,10 +41,118 @@ THEME_COLORS: dict[str, dict[str, str]] = {
 VALID_THEMES = frozenset(THEME_COLORS.keys())
 
 
+_MARKDOWN_DIAGRAM_TYPES = frozenset(
+    {"smart_markdown", "text", "dynamic_list"},
+)
+
+# Smart Markdown token regex (matches the resolver's in
+# `backend/app/diagrams/smart_markdown.py`) so we can strip tokens
+# from the thumbnail preview without showing raw `{{element:...}}`.
+_SMART_MD_TOKEN_RE = re.compile(
+    r"\{\{(?:element|package|diagram|set|collection|image):"
+    r"[^:}]+(?::[^}]+)?\}\}",
+)
+
+
+def _markdown_preview_lines(data: dict, diagram_type: str) -> list[str]:
+    """Pick a few representative source lines for the thumbnail.
+
+    Per ADR-205 / ADR-206 / ADR-186 each markdown-notation type stores
+    its content in a different field:
+
+      smart_markdown → ``data.markdown_source`` (with `{{...}}` tokens)
+      text           → ``data.content``         (raw markdown)
+      dynamic_list   → ``data.source`` + ``data.show_description``
+                       (no markdown body; the thumbnail shows the
+                       source mode + description toggle instead)
+    """
+    if diagram_type == "smart_markdown":
+        src = str(data.get("markdown_source") or "")
+        # Strip the resolver's tokens so the thumbnail shows plain text.
+        src = _SMART_MD_TOKEN_RE.sub("[…]", src)
+    elif diagram_type == "text":
+        src = str(data.get("content") or "")
+    elif diagram_type == "dynamic_list":
+        mode = str(data.get("source") or "?")
+        show_desc = bool(data.get("show_description"))
+        return [
+            "# Dynamic list",
+            "",
+            f"source: {mode}",
+            f"show description: {'yes' if show_desc else 'no'}",
+        ]
+    else:
+        src = ""
+    # Take first 6 non-trailing-blank lines, truncate each to 60 chars.
+    raw_lines = src.splitlines()
+    out: list[str] = []
+    for line in raw_lines:
+        if len(out) == 0 and not line.strip():
+            continue  # skip leading blank lines
+        out.append(line[:60])
+        if len(out) >= 6:
+            break
+    return out or ["(empty)"]
+
+
+def _generate_markdown_preview_svg(
+    data: dict, diagram_type: str, theme: str = "dark",
+) -> str:
+    """Render a plain-text SVG preview of a markdown-notation diagram
+    (ADR-209 follow-up for issue #205). Pure ``<text>`` elements so
+    cairosvg can rasterise reliably — no foreignObject, no HTML."""
+    colors = THEME_COLORS.get(theme, THEME_COLORS["dark"])
+    width, height = 400, 250
+    lines = _markdown_preview_lines(data, diagram_type)
+
+    svg_parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
+        f'height="{height}" viewBox="0 0 {width} {height}">',
+        f'<rect width="{width}" height="{height}" fill="{colors["bg"]}"/>',
+        f'<rect x="8" y="8" width="{width - 16}" height="{height - 16}" '
+        f'rx="6" fill="{colors["node_fill"]}" '
+        f'stroke="{colors["node_stroke"]}" stroke-width="1"/>',
+    ]
+
+    # Top-of-content y-coord; first heading rendered larger.
+    y = 36
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        is_heading_1 = i == 0 and stripped.startswith("# ")
+        is_heading_n = stripped.startswith(("# ", "## ", "### "))
+        font_size = 18 if is_heading_1 else (15 if is_heading_n else 12)
+        # Render heading text without leading `#` characters for cleaner tile.
+        display = stripped.lstrip("# ").strip() if is_heading_n else line
+        if not display:
+            y += font_size + 4
+            continue
+        svg_parts.append(
+            f'<text x="20" y="{y}" font-family="ui-monospace,monospace" '
+            f'font-size="{font_size}" fill="{colors["text_fill"]}">'
+            f'{html_escape(display)}</text>',
+        )
+        y += font_size + 6
+        if y > height - 16:
+            break
+
+    svg_parts.append("</svg>")
+    return "\n".join(svg_parts)
+
+
 def generate_svg_from_diagram_data(
     data: dict, diagram_type: str, theme: str = "dark",
 ) -> str:
-    """Generate a simple SVG representation of diagram data."""
+    """Generate a simple SVG representation of diagram data.
+
+    v6.17.6 (issue #205 item 3): markdown-notation diagram types
+    (smart_markdown / text / dynamic_list) get a plain-text preview
+    instead of the empty "Empty" placeholder, so the views gallery
+    shows a meaningful tile.
+    """
+    # ADR-209 follow-up: markdown views get a text-preview tile.
+    if diagram_type in _MARKDOWN_DIAGRAM_TYPES:
+        return _generate_markdown_preview_svg(data, diagram_type, theme)
+
     colors = THEME_COLORS.get(theme, THEME_COLORS["dark"])
     nodes = data.get("nodes", [])
     participants = data.get("participants", [])

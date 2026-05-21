@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.6] - 2026-05-21
+
+### Added
+
+- **Markdown-notation views now get auto-generated thumbnails**
+  (issue [#205](https://github.com/cgbarlow/iris/issues/205)
+  item 3). `generate_svg_from_diagram_data` learns to render
+  `smart_markdown` / `text` / `dynamic_list` types as a plain-text
+  SVG preview (first heading + first lines of `data.markdown_source`
+  or `data.content`). cairosvg pipes the SVG through the existing
+  PNG store; `regenerate_all_thumbnails` on startup backfills
+  existing markdown views. v6.17.4 had only added an attached-image
+  fallback — the user wanted the same machinery visual diagrams use,
+  not a fallback.
+
+### Fixed
+
+- **Collections gallery now shows attached image as tile**
+  (issue [#205](https://github.com/cgbarlow/iris/issues/205)
+  item 5). v6.17.4 added the rendering path on the sets gallery
+  but missed `frontend/src/routes/collections/+page.svelte` —
+  collections still hardcoded the "C" placeholder. Added
+  `getImageThumbnailUrl` + `<img>` rendering mirroring the sets
+  page.
+- **Elements page Set dropdown filter by Collection (issue #200)
+  hardened.** v6.17.4's SetSelector relied on Svelte 5's reactive
+  read inside an `$effect` that only bare-touched `collectionId`
+  before calling a closure-capturing `loadSets()`. Refactored
+  `loadSets` to accept the explicit argument so the dependency is
+  unambiguous; the elements page's `currentCollectionId` continues
+  to drive it.
+
+### Migration
+
+- None.
+
 ## [6.17.5] - 2026-05-20
 
 ### Changed
