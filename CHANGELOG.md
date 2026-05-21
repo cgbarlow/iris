@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.7] - 2026-05-21
+
+### Fixed
+
+- **Markdown view thumbnails now actually render text on Render**
+  (issue [#205](https://github.com/cgbarlow/iris/issues/205) item 3
+  regression). v6.17.6's text spans specified
+  `font-family="ui-monospace,monospace"` — on Render's container,
+  Pango couldn't resolve the family and produced text with no
+  visible glyphs (blank background tile). Dropped the font-family
+  attribute so cairosvg uses the same default the visual-diagram
+  thumbnails use successfully.
+- **`generate_and_store_thumbnail` now catches non-ImportError
+  exceptions from cairosvg** so a single rasterisation failure
+  can't break the whole `regenerate_all_thumbnails` startup sweep.
+  Falls back to storing raw SVG bytes — browsers render SVG via
+  `<img>` natively.
+
+### Migration
+
+- None.
+
 ## [6.17.6] - 2026-05-21
 
 ### Added

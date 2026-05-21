@@ -1,6 +1,6 @@
 [project]
 name = "iris-mcp"
-version = "6.17.6"
+version = "6.17.7"
 description = "Stdio MCP server for Iris (ADR-131)"
 requires-python = ">=3.12"
 readme = "README.md"

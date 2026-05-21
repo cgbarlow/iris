@@ -127,7 +127,7 @@ def _generate_markdown_preview_svg(
             y += font_size + 4
             continue
         svg_parts.append(
-            f'<text x="20" y="{y}" font-family="ui-monospace,monospace" '
+            f'<text x="20" y="{y}" '
             f'font-size="{font_size}" fill="{colors["text_fill"]}">'
             f'{html_escape(display)}</text>',
         )
@@ -242,14 +242,28 @@ async def generate_and_store_thumbnail(
     """
     svg_str = generate_svg_from_diagram_data(data, diagram_type, theme=theme)
 
+    png_bytes: bytes
     try:
-        import cairosvg
+        import cairosvg  # noqa: PLC0415
 
         png_bytes = cairosvg.svg2png(
-            bytestring=svg_str.encode(), output_width=400, output_height=250
+            bytestring=svg_str.encode(),
+            output_width=400,
+            output_height=250,
         )
     except ImportError:
         # cairosvg not installed -- store SVG bytes as fallback
+        png_bytes = svg_str.encode()
+    except Exception as exc:  # noqa: BLE001
+        # v6.17.7: defensive — never let a single bad SVG kill the
+        # whole regenerate_all_thumbnails sweep on startup. Log and
+        # store the raw SVG bytes so the gallery still has something
+        # to serve (browsers happily render SVG via <img>).
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).warning(
+            "cairosvg failed for diagram %s theme=%s: %s — storing raw SVG",
+            diagram_id, theme, exc,
+        )
         png_bytes = svg_str.encode()
 
     now = datetime.now(tz=UTC).isoformat()
