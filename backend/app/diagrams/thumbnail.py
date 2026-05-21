@@ -53,6 +53,23 @@ _SMART_MD_TOKEN_RE = re.compile(
     r"[^:}]+(?::[^}]+)?\}\}",
 )
 
+# Markdown link `[text](url "title")` produced by the smart_markdown
+# resolver — for the thumbnail we want just the rendered text.
+_MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+# `<img ...>` tags returned by `_resolve_image` — render as a tag
+# placeholder in the thumbnail; the gallery tile can't show inline imgs.
+_IMG_TAG_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+# Strikethrough markers the resolver wraps around unresolvable tokens.
+_STRIKETHROUGH_RE = re.compile(r"~~(.+?)~~", re.DOTALL)
+
+
+def _resolved_to_plain_text(resolved: str) -> str:
+    """Strip the smart_markdown resolver's markup so the thumbnail
+    shows the rendered text instead of raw markdown link syntax."""
+    resolved = _IMG_TAG_RE.sub("[image]", resolved)
+    resolved = _MARKDOWN_LINK_RE.sub(r"\1", resolved)
+    return _STRIKETHROUGH_RE.sub(r"\1", resolved)
+
 
 def _markdown_preview_lines(data: dict, diagram_type: str) -> list[str]:
     """Pick a few representative source lines for the thumbnail.
@@ -240,6 +257,25 @@ async def generate_and_store_thumbnail(
 
     Falls back to storing SVG as bytes if cairosvg is not available.
     """
+    # v6.17.9 (issue #208): for smart_markdown, resolve `{{...}}` tokens
+    # to their rendered values so the thumbnail shows the actual content
+    # the user sees in the view, not bracket placeholders. The resolver
+    # is async and needs db/diagram_id, so we do it here (not in the
+    # sync SVG generator) and pass the plain text via a synthetic dict.
+    if diagram_type == "smart_markdown":
+        try:
+            from app.diagrams.smart_markdown import (  # noqa: PLC0415
+                compute_smart_markdown_content,
+            )
+            resolved = await compute_smart_markdown_content(db, diagram_id)
+            data = {**data, "markdown_source": _resolved_to_plain_text(resolved)}
+        except Exception as exc:  # noqa: BLE001
+            import logging  # noqa: PLC0415
+            logging.getLogger(__name__).warning(
+                "smart_markdown resolve failed for %s: %s — falling back to raw source",
+                diagram_id, exc,
+            )
+
     svg_str = generate_svg_from_diagram_data(data, diagram_type, theme=theme)
 
     png_bytes: bytes

@@ -8,7 +8,10 @@ plus heading rendering and token-stripping behaviour.
 
 from __future__ import annotations
 
-from app.diagrams.thumbnail import generate_svg_from_diagram_data
+from app.diagrams.thumbnail import (
+    _resolved_to_plain_text,
+    generate_svg_from_diagram_data,
+)
 
 
 def test_smart_markdown_preview_contains_heading() -> None:
@@ -80,6 +83,32 @@ def test_markdown_preview_caps_line_count() -> None:
     assert "line5" in svg
     assert "line6" not in svg
     assert "line19" not in svg
+
+
+def test_resolved_to_plain_text_strips_link_syntax() -> None:
+    """The smart_markdown resolver wraps each token as
+    `[value](iris://... "name")`. For the thumbnail we want just the
+    rendered text, no markdown link noise."""
+    resolved = 'Use 500g of [pork mince](iris://element/abc-123 "Pork Mince") from pantry.'
+    assert _resolved_to_plain_text(resolved) == "Use 500g of pork mince from pantry."
+
+
+def test_resolved_to_plain_text_unwraps_strikethrough_unresolvable() -> None:
+    """The resolver wraps unresolvable tokens in `~~...~~`. Drop the
+    markers so the thumbnail isn't visually noisy."""
+    resolved = "Missing: ~~{{element:gone:name}}~~ here."
+    out = _resolved_to_plain_text(resolved)
+    assert "~~" not in out
+    assert "{{element:gone:name}}" in out  # raw token surfaced as fallback
+
+
+def test_resolved_to_plain_text_replaces_img_with_placeholder() -> None:
+    """Inline `<img>` HTML returned by the image resolver can't render
+    in the cairosvg thumbnail; substitute a short placeholder."""
+    resolved = 'Photo: <img src="data:image/png;base64,abc" alt="x"> below.'
+    out = _resolved_to_plain_text(resolved)
+    assert "<img" not in out
+    assert "[image]" in out
 
 
 def test_visual_diagram_still_uses_nodes_path() -> None:
