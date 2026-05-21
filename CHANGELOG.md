@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.17.8] - 2026-05-21
+
+### Fixed
+
+- **Markdown view thumbnails now actually regenerate on Supabase
+  deployments** (issue [#208](https://github.com/cgbarlow/iris/issues/208)).
+  `_initialize_supabase` was deliberately skipping
+  `regenerate_all_thumbnails` based on a stale comment about
+  "Netlify Function runtime" — Iris runs on Render's Docker image
+  which bundles cairo + pango. As a result, the v6.17.6/v6.17.7
+  markdown-preview SVG generator was dormant for pre-existing
+  diagrams. Now runs on every Supabase startup (soft-fail with a log
+  line if cairosvg is somehow unavailable).
+- **Set filter by collection now applies on the Views and Bookmarks
+  pages** (issue [#208](https://github.com/cgbarlow/iris/issues/208) /
+  issue [#200](https://github.com/cgbarlow/iris/issues/200) follow-up).
+  Both pages rendered `<SetSelector>` without the `collectionId` prop,
+  so the dropdown always loaded the full set list regardless of which
+  collection was picked. Elements page (the original #200 target) was
+  already wired correctly in v6.17.6; the same fix now lands here.
+
+### Migration
+
+- None.
+
 ## [6.17.7] - 2026-05-21
 
 ### Fixed
