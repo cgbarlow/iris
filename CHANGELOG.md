@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.20.0] - 2026-05-22
+
+### Added
+
+- **Generic aggregation engine + profile library**
+  ([ADR-212](docs/adrs/ADR-212-Aggregation-Profiles-And-Engine.md),
+  [SPEC-212-a](docs/adrs/specs/SPEC-212-a-Aggregation-Profile-Schema.md),
+  [SPEC-212-b](docs/adrs/specs/SPEC-212-b-Aggregation-Engine.md),
+  [SPEC-212-c](docs/adrs/specs/SPEC-212-c-Aggregation-Surfaces.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211)). A new
+  `aggregation_profiles` table holds rulesets; the engine in
+  `backend/app/aggregation/` walks a source smart-markdown diagram
+  (optionally recursing one level into referenced diagrams),
+  collects tokens of a configured type, resolves per-use values via
+  ADR-210 `=value` overrides, groups by `(token_id, bucket)`,
+  aggregates with `sum` or `count`, groups again by an output
+  attribute, and renders configurable markdown lines. No domain
+  terminology (recipe / ingredient / sprint / receipt) lives in
+  code — all the flavour is in the profile JSON.
+- **Five seeded global aggregation profiles**:
+  - **Shopping list** — outer: diagram tokens with Diners/Servings
+    multiplier; inner: element tokens with Quantity/Unit; group_by:
+    `element.package_name`. Pairs with the "Quantified item" stamp.
+  - **Sprint points rollup** — story-points sum, grouped by team.
+  - **Time tracker rollup** — hours sum, grouped by client/project.
+  - **Expense report** — amount sum bucketed by currency, grouped by
+    category.
+  - **Reading log rollup** — pages sum, grouped by author.
+
+  Each ships as `is_global = TRUE` with deterministic UUIDv5 ids so
+  re-running migrations is a no-op.
+- **REST endpoints** under `/api/aggregation/`:
+  - `POST /api/aggregation/profiles` (create) + `GET / GET {id} / PUT / DELETE`.
+  - **`POST /api/aggregation/run`** — apply a profile to a source
+    diagram. Returns `{markdown, computed_at, source_versions,
+    row_count, warnings}`. Read-shaped despite POST; no persistence
+    side-effects.
+- **MCP tools**: `create_aggregation_profile`,
+  `list_aggregation_profiles`, `get_aggregation_profile`,
+  `update_aggregation_profile`, `delete_aggregation_profile`, and
+  the linchpin **`aggregate`** (run a profile against a source).
+  Callable directly by Claude Desktop / any agent without ever
+  opening a UI.
+- **CLI subcommands**: `iris aggregation-profile create / list /
+  get / update / delete` plus **`iris aggregate --profile <id>
+  --source <id>`**. The aggregate command is the CLI face of the
+  same engine MCP and REST share.
+
+### Migration
+
+- **SQLite m076 / Supabase m081** — create `aggregation_profiles`
+  table.
+- **SQLite m077 / Supabase m082** — seed five global profiles.
+- Supabase migrations applied to the live DB prior to merge per
+  `feedback_render_supabase_ordering`.
+
 ## [6.19.0] - 2026-05-22
 
 ### Added

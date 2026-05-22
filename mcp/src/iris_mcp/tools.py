@@ -557,6 +557,143 @@ async def _list_element_template_stamps(
     return json.dumps(resp.json().get("items", []))
 
 
+# ── Aggregation profiles + engine (ADR-212, v6.20.0) ────────────────
+
+
+async def _create_aggregation_profile(
+    c: IrisClient, args: dict[str, Any],
+) -> str:
+    """v6.20.0 (ADR-212): create a new aggregation profile.
+
+    A profile is a generic ruleset that drives the aggregation engine.
+    Pair it with a source smart-markdown diagram (via the `aggregate`
+    tool) to produce grouped/summed markdown — useful for shopping-
+    list / sprint-points-rollup / time-tracker / expense-report /
+    reading-log workflows and anything else fitting the
+    "walk + collect + group + fold + format" pattern.
+    """
+    body: dict[str, Any] = {
+        "name": args["name"],
+        "is_global": bool(args.get("is_global", False)),
+        "profile_data": args["profile_data"],
+    }
+    if args.get("description") is not None:
+        body["description"] = args["description"]
+    if args.get("set_id") is not None:
+        body["set_id"] = args["set_id"]
+    if args.get("is_default_for_set") is not None:
+        body["is_default_for_set"] = bool(args["is_default_for_set"])
+    try:
+        resp = await c._request(
+            "POST", "/api/aggregation/profiles", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Create aggregation profile")
+    return json.dumps(resp.json())
+
+
+async def _list_aggregation_profiles(
+    c: IrisClient, args: dict[str, Any],
+) -> str:
+    """v6.20.0 (ADR-212): list aggregation profiles."""
+    params: dict[str, Any] = {
+        "page": int(args.get("page", 1)),
+        "page_size": int(args.get("limit", 50)),
+        "include_global": bool(args.get("include_global", True)),
+    }
+    if args.get("set_id") is not None:
+        params["set_id"] = args["set_id"]
+    try:
+        resp = await c._request(
+            "GET", "/api/aggregation/profiles", params=params,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("List aggregation profiles")
+    return json.dumps(resp.json().get("items", []))
+
+
+async def _get_aggregation_profile(
+    c: IrisClient, args: dict[str, Any],
+) -> str:
+    """v6.20.0 (ADR-212): fetch a single aggregation profile."""
+    try:
+        resp = await c._request(
+            "GET", f"/api/aggregation/profiles/{args['profile_id']}",
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Get aggregation profile")
+    return json.dumps(resp.json())
+
+
+async def _update_aggregation_profile(
+    c: IrisClient, args: dict[str, Any],
+) -> str:
+    """v6.20.0 (ADR-212): update an aggregation profile."""
+    pid = args["profile_id"]
+    body: dict[str, Any] = {}
+    for key in (
+        "name", "description", "is_global", "profile_data",
+        "is_default_for_set",
+    ):
+        if key in args and args[key] is not None:
+            body[key] = args[key]
+    if "set_id" in args:
+        body["set_id"] = args["set_id"]  # may be None
+    try:
+        resp = await c._request(
+            "PUT", f"/api/aggregation/profiles/{pid}", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update aggregation profile")
+    return json.dumps(resp.json())
+
+
+async def _delete_aggregation_profile(
+    c: IrisClient, args: dict[str, Any],
+) -> str:
+    """v6.20.0 (ADR-212): soft-delete an aggregation profile."""
+    try:
+        await c._request(
+            "DELETE", f"/api/aggregation/profiles/{args['profile_id']}",
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Delete aggregation profile")
+    return json.dumps({
+        "success": True, "profile_id": args["profile_id"], "deleted": True,
+    })
+
+
+async def _aggregate(c: IrisClient, args: dict[str, Any]) -> str:
+    """v6.20.0 (ADR-212): run a named aggregation profile against a
+    source smart_markdown diagram.
+
+    Returns aggregated markdown — deduplicated, summed roll-up of
+    structured per-use values referenced across the source (and, if
+    the profile uses a two-level traversal, the diagrams the source
+    references). Use this when you need a shopping list from a meal
+    plan, a points rollup from a sprint backlog, hours by client from
+    a time log, an expense report from receipts, or any pattern that
+    aggregates structured per-use values across a set of smart-
+    markdown documents.
+
+    The response shape includes `markdown`, `computed_at`,
+    `source_versions`, `row_count`, `warnings`. The `markdown` field
+    is the primary payload — present it to the user, or hand it off
+    to a downstream consumer.
+    """
+    body: dict[str, Any] = {
+        "profile_id": args["profile_id"],
+        "source_diagram_id": args["source_diagram_id"],
+    }
+    try:
+        resp = await c._request(
+            "POST", "/api/aggregation/run", json=body,
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Run aggregation")
+    return json.dumps(resp.json())
+
+
 async def _delete_element_template(c: IrisClient, args: dict[str, Any]) -> str:
     """v6.8.0 (ADR-191): soft-delete a template."""
     try:
@@ -1898,6 +2035,156 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_list_element_template_stamps,
+    ),
+    # ── Aggregation profiles + engine (ADR-212, v6.20.0) ─────────────
+    Tool(
+        name="create_aggregation_profile",
+        description=(
+            "Create a generic aggregation profile. A profile is a "
+            "ruleset that drives the aggregation engine — it describes "
+            "which smart-markdown tokens to walk in a source diagram, "
+            "which attribute carries the value to sum, how to scale by "
+            "an optional outer-traversal multiplier, and how to group/"
+            "format output. Pairs with the `aggregate` tool. The five "
+            "seeded global profiles (Shopping list, Sprint points "
+            "rollup, Time tracker rollup, Expense report, Reading log "
+            "rollup) are good templates to clone-and-edit."
+        ),
+        input_schema=_schema({
+            "name": _str_arg("name", "Display name for the profile"),
+            "profile_data": (
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "The profile JSON. Must contain `traversal` "
+                        "(with required `inner` and optional `outer`) "
+                        "and `output`. See ADR-212 / SPEC-212-a."
+                    ),
+                },
+                True,
+            ),
+            "description": _str_arg(
+                "description", "Optional description", required=False,
+            ),
+            "set_id": _str_arg(
+                "set_id",
+                "Set to scope the profile to. Required for non-global "
+                "profiles; must be omitted for `is_global=true`.",
+                required=False,
+            ),
+            "is_global": (
+                {"type": "boolean", "default": False},
+                False,
+            ),
+            "is_default_for_set": (
+                {"type": "boolean", "default": False},
+                False,
+            ),
+        }),
+        handler=_create_aggregation_profile,
+    ),
+    Tool(
+        name="list_aggregation_profiles",
+        description=(
+            "List aggregation profiles with set + global scope. "
+            "v6.20.0 (ADR-212)."
+        ),
+        input_schema=_schema({
+            "set_id": _str_arg(
+                "set_id",
+                "Scope to one set. Combine with `include_global=true` "
+                "to also include globals.",
+                required=False,
+            ),
+            "include_global": (
+                {"type": "boolean", "default": True},
+                False,
+            ),
+            "page": (
+                {"type": "integer", "default": 1},
+                False,
+            ),
+            "limit": (
+                {"type": "integer", "default": 50},
+                False,
+            ),
+        }),
+        handler=_list_aggregation_profiles,
+    ),
+    Tool(
+        name="get_aggregation_profile",
+        description="Fetch one aggregation profile. v6.20.0 (ADR-212).",
+        input_schema=_schema({
+            "profile_id": _str_arg("profile_id", "Profile id"),
+        }),
+        handler=_get_aggregation_profile,
+    ),
+    Tool(
+        name="update_aggregation_profile",
+        description=(
+            "Edit an aggregation profile. v6.20.0 (ADR-212)."
+        ),
+        input_schema=_schema({
+            "profile_id": _str_arg("profile_id", "Profile id"),
+            "name": _str_arg("name", "New name", required=False),
+            "description": _str_arg(
+                "description", "New description", required=False,
+            ),
+            "profile_data": (
+                {
+                    "type": "object", "additionalProperties": True,
+                    "description": "Replacement profile JSON.",
+                },
+                False,
+            ),
+            "is_global": ({"type": "boolean"}, False),
+            "set_id": _str_arg(
+                "set_id",
+                "New scope (null to promote to global).",
+                required=False,
+            ),
+            "is_default_for_set": ({"type": "boolean"}, False),
+        }),
+        handler=_update_aggregation_profile,
+    ),
+    Tool(
+        name="delete_aggregation_profile",
+        description=(
+            "Soft-delete an aggregation profile. v6.20.0 (ADR-212)."
+        ),
+        input_schema=_schema({
+            "profile_id": _str_arg("profile_id", "Profile id"),
+        }),
+        handler=_delete_aggregation_profile,
+    ),
+    Tool(
+        name="aggregate",
+        description=(
+            "Run a named aggregation profile against a source smart-"
+            "markdown diagram. Returns aggregated markdown — "
+            "deduplicated, summed roll-up of structured per-use values "
+            "referenced across the source (and, if the profile uses a "
+            "two-level traversal, the diagrams the source references). "
+            "Use this when you need a shopping list from a meal plan, "
+            "a points rollup from a sprint backlog, hours by client "
+            "from a time log, an expense report from receipts, or any "
+            "pattern that aggregates structured per-use values across "
+            "a set of smart-markdown documents. v6.20.0 (ADR-212)."
+        ),
+        input_schema=_schema({
+            "profile_id": _str_arg(
+                "profile_id",
+                "The aggregation profile to apply. Look up names via "
+                "`list_aggregation_profiles`.",
+            ),
+            "source_diagram_id": _str_arg(
+                "source_diagram_id",
+                "The smart-markdown diagram to walk (commonly the "
+                "outer/aggregation source — e.g., a meal-plan diagram).",
+            ),
+        }),
+        handler=_aggregate,
     ),
     # ── Phase 2 render tools (ADR-179, v6.2.0) ────────────────────────
     Tool(

@@ -41,6 +41,10 @@ element_templates_app = typer.Typer(
     help="Element template commands (v6.8.0, ADR-191).",
     no_args_is_help=True,
 )
+aggregation_profile_app = typer.Typer(
+    help="Aggregation profile commands (v6.20.0, ADR-212).",
+    no_args_is_help=True,
+)
 packages_app = typer.Typer(help="Package commands.", no_args_is_help=True)
 sets_app = typer.Typer(help="Set commands.", no_args_is_help=True)
 collections_app = typer.Typer(help="Collection commands.", no_args_is_help=True)
@@ -60,6 +64,7 @@ render_app = typer.Typer(help="Render diagrams or markdown to md/docx/pdf artefa
 app.add_typer(diagrams_app, name="diagrams")
 app.add_typer(elements_app, name="elements")
 app.add_typer(element_templates_app, name="element-templates")
+app.add_typer(aggregation_profile_app, name="aggregation-profile")
 app.add_typer(packages_app, name="packages")
 app.add_typer(sets_app, name="sets")
 app.add_typer(collections_app, name="collections")
@@ -1302,6 +1307,162 @@ def delete_element_template_cmd(
                 "DELETE", f"/api/element-templates/{template_id}",
             )
             return {"deleted": True, "template_id": template_id}
+    output.print_json(_run(_do()))
+
+
+# ── iris aggregation-profile + iris aggregate (v6.20.0, ADR-212) ─────────
+
+
+@aggregation_profile_app.command("list")
+def aggregation_profile_list_cmd(
+    set_id: str | None = typer.Option(None, "--set-id"),
+    include_global: bool = typer.Option(True, "--include-global/--no-global"),
+    page: int = typer.Option(1, "--page"),
+    page_size: int = typer.Option(50, "--page-size"),
+) -> None:
+    """List aggregation profiles."""
+    async def _do() -> Any:
+        async with _client() as c:
+            params: dict[str, Any] = {
+                "page": page, "page_size": page_size,
+                "include_global": include_global,
+            }
+            if set_id is not None:
+                params["set_id"] = set_id
+            resp = await c._request(
+                "GET", "/api/aggregation/profiles", params=params,
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@aggregation_profile_app.command("get")
+def aggregation_profile_get_cmd(profile_id: str) -> None:
+    """Fetch one aggregation profile."""
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "GET", f"/api/aggregation/profiles/{profile_id}",
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@create_app.command("aggregation-profile")
+def create_aggregation_profile_cmd(
+    name: str = typer.Option(..., "--name"),
+    profile_data_file: str = typer.Option(
+        ..., "--profile-data-file",
+        help="Path to JSON file containing the profile_data ruleset.",
+    ),
+    set_id: str | None = typer.Option(None, "--set-id"),
+    is_global: bool = typer.Option(False, "--global/--no-global"),
+    description: str | None = typer.Option(None, "--description"),
+    is_default_for_set: bool = typer.Option(
+        False, "--default-for-set/--no-default-for-set",
+    ),
+) -> None:
+    """Create an aggregation profile (ADR-212)."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    body: dict[str, Any] = {
+        "name": name, "is_global": is_global,
+        "is_default_for_set": is_default_for_set,
+        "profile_data": _json.loads(_Path(profile_data_file).read_text()),
+    }
+    if description is not None:
+        body["description"] = description
+    if set_id is not None:
+        body["set_id"] = set_id
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", "/api/aggregation/profiles", json=body,
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@update_app.command("aggregation-profile")
+def update_aggregation_profile_cmd(
+    profile_id: str = typer.Argument(...),
+    name: str | None = typer.Option(None, "--name"),
+    description: str | None = typer.Option(None, "--description"),
+    profile_data_file: str | None = typer.Option(None, "--profile-data-file"),
+    set_id: str | None = typer.Option(
+        None, "--set-id",
+        help="New set scope. 'null' to promote to global.",
+    ),
+    is_global: bool | None = typer.Option(None, "--global/--no-global"),
+    is_default_for_set: bool | None = typer.Option(
+        None, "--default-for-set/--no-default-for-set",
+    ),
+) -> None:
+    """Update an aggregation profile (ADR-212)."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    body: dict[str, Any] = {}
+    if name is not None:
+        body["name"] = name
+    if description is not None:
+        body["description"] = description
+    if profile_data_file is not None:
+        body["profile_data"] = _json.loads(_Path(profile_data_file).read_text())
+    if set_id is not None:
+        body["set_id"] = _resolve_null(set_id)
+    if is_global is not None:
+        body["is_global"] = is_global
+    if is_default_for_set is not None:
+        body["is_default_for_set"] = is_default_for_set
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "PUT", f"/api/aggregation/profiles/{profile_id}", json=body,
+            )
+            return resp.json()
+    output.print_json(_run(_do()))
+
+
+@delete_app.command("aggregation-profile")
+def delete_aggregation_profile_cmd(profile_id: str = typer.Argument(...)) -> None:
+    """Soft-delete an aggregation profile (ADR-212)."""
+    async def _do() -> Any:
+        async with _client() as c:
+            await c._request(
+                "DELETE", f"/api/aggregation/profiles/{profile_id}",
+            )
+            return {"deleted": True, "profile_id": profile_id}
+    output.print_json(_run(_do()))
+
+
+@app.command("aggregate")
+def aggregate_cmd(
+    profile: str = typer.Option(
+        ..., "--profile",
+        help="Profile id (UUID).",
+    ),
+    source: str = typer.Option(
+        ..., "--source",
+        help="Source smart_markdown diagram id (UUID).",
+    ),
+) -> None:
+    """Run an aggregation profile against a source diagram (ADR-212).
+
+    Returns the computed markdown plus metadata. Equivalent to
+    `POST /api/aggregation/run`.
+    """
+    body = {"profile_id": profile, "source_diagram_id": source}
+
+    async def _do() -> Any:
+        async with _client() as c:
+            resp = await c._request(
+                "POST", "/api/aggregation/run", json=body,
+            )
+            return resp.json()
     output.print_json(_run(_do()))
 
 
