@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.30.0] - 2026-05-22
+
+### Added
+
+- **Smart-markdown edit-view companion panel**
+  ([SPEC-205-b](docs/adrs/specs/SPEC-205-b-Smart-Markdown-Edit-Preview.md),
+  supersedes [SPEC-210-a §5.1](docs/adrs/specs/SPEC-210-a-Smart-Markdown-Value-Overrides.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211) comment
+  observations C5 + C6). Edit mode in `SmartMarkdownCanvas.svelte`
+  now shows a right-hand panel alongside the source textarea with
+  two sections:
+
+  - **Fill in the blanks.** Every `{{...:attr:<path>=}}` empty-
+    override token (the fillable-slot form from ADR-210) appears as
+    a labeled input row — element name, attribute name, editable
+    field, and a small `↳ "value path Name"` resolved-line preview.
+    Filling the input rewrites the source token in place
+    (byte-position rewrite, not string-replace — duplicate tokens
+    are disambiguated correctly). This finally delivers the
+    inline-editable-spans UX that SPEC-210-a §5.1 specified back
+    when v6.18.0 shipped the backend grammar.
+  - **Tokens preview.** The last-saved resolved markdown
+    (`data.content`) rendered in muted grey via `MarkdownView`. A
+    small `↻ saved` / `* unsaved — preview shows last save`
+    indicator distinguishes saved vs. drafting state. Live full
+    re-render is out of scope (would need either a backend
+    roundtrip per keystroke or a JS port of the resolver — DRY
+    violation §13).
+
+  Element-name lookups are lazy + cached per element-id. Defensive
+  input sanitisation drops `}` and `\` characters to keep the source
+  token shape intact.
+
+- The companion panel collapses below the textarea on viewports <
+  900px so narrow screens stay usable.
+
+### Migration
+
+- None. Pure frontend addition; no schema, no backend change.
+
+### Out of scope (future)
+
+- Live (debounced) full resolved preview as you type.
+- Per-token hover tooltips on the textarea itself.
+- Editing non-fillable tokens (e.g. swapping which element a `:name`
+  token points at).
+
 ## [6.29.0] - 2026-05-22
 
 ### Added

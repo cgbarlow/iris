@@ -19,6 +19,7 @@
 	import MarkdownEditorToolbar from '$lib/canvas/text/MarkdownEditorToolbar.svelte';
 	import { wrapSelection, applyOp, insertAtCursor } from '$lib/canvas/text/markdownEditorToolbarHelpers';
 	import SmartMarkdownSlashPicker from '$lib/canvas/text/SmartMarkdownSlashPicker.svelte';
+	import SmartMarkdownCompanionPanel from '$lib/canvas/text/SmartMarkdownCompanionPanel.svelte';
 	import ImageInsertDialog from '$lib/components/ImageInsertDialog.svelte';
 
 	interface Props {
@@ -160,15 +161,26 @@
 			onchange={(v) => commitSource(v)}
 			onimage={openImageDialog}
 		/>
-		<textarea
-			bind:this={textareaEl}
-			class="smart-markdown-canvas__editor"
-			value={source ?? ''}
-			oninput={onInput}
-			onkeydown={onKeydown}
-			placeholder="Write markdown. Type ‘/’ to insert a reference to an Iris entity field (e.g. an element name or attribute). Tokens render with live values at view time."
-			spellcheck="true"
-		></textarea>
+		<!-- SPEC-205-b (v6.30.0): source textarea + companion panel side-by-side -->
+		<div class="smart-markdown-canvas__split">
+			<textarea
+				bind:this={textareaEl}
+				class="smart-markdown-canvas__editor"
+				value={source ?? ''}
+				oninput={onInput}
+				onkeydown={onKeydown}
+				placeholder="Write markdown. Type ‘/’ to insert a reference to an Iris entity field (e.g. an element name or attribute). Tokens render with live values at view time."
+				spellcheck="true"
+			></textarea>
+			<aside class="smart-markdown-canvas__companion">
+				<SmartMarkdownCompanionPanel
+					source={source ?? ''}
+					content={content ?? ''}
+					canvasDirty={(source ?? '') !== (content ?? '')}
+					onsourcechange={(next) => commitSource(next)}
+				/>
+			</aside>
+		</div>
 		{#if pickerOpen}
 			<SmartMarkdownSlashPicker
 				oninsert={onTokenInsert}
@@ -196,8 +208,15 @@
 		width: 100%; height: 100%;
 		background: var(--color-surface, #ffffff);
 	}
-	.smart-markdown-canvas__editor {
+	.smart-markdown-canvas__split {
 		flex: 1;
+		display: flex;
+		flex-direction: row;
+		min-height: 0;
+	}
+	.smart-markdown-canvas__editor {
+		flex: 1 1 60%;
+		min-width: 0;
 		width: 100%; height: 100%;
 		padding: 16px;
 		border: 0; resize: none; outline: none;
@@ -205,6 +224,23 @@
 		color: var(--color-fg, #202931);
 		font-family: ui-monospace, monospace;
 		font-size: 13px; line-height: 1.55;
+	}
+	.smart-markdown-canvas__companion {
+		flex: 0 0 40%;
+		min-width: 280px;
+		max-width: 480px;
+		border-left: 1px solid var(--color-border, #e5e7eb);
+		background: var(--color-bg, #ffffff);
+		overflow-y: auto;
+	}
+	@media (max-width: 900px) {
+		.smart-markdown-canvas__split { flex-direction: column; }
+		.smart-markdown-canvas__companion {
+			flex: 1 0 auto;
+			max-width: none;
+			border-left: 0;
+			border-top: 1px solid var(--color-border, #e5e7eb);
+		}
 	}
 	.smart-markdown-canvas__view {
 		flex: 1;
