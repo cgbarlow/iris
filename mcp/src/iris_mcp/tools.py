@@ -440,20 +440,33 @@ async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _create_element_template(c: IrisClient, args: dict[str, Any]) -> str:
-    """v6.8.0 (ADR-191): capture a template from an existing element.
+    """v6.8.0 (ADR-191) / v6.19.0 (ADR-211): create a template.
 
-    ``included_fields`` selects which element fields the template
-    carries (whitelist: name, description, element_type, notation,
-    data, metadata, package_id, tags). Templates are set-scoped by
-    default; pass ``is_global=true`` to make a template visible from
-    any set (in which case omit ``set_id``).
+    Content paths (at least one must yield non-empty content):
+      - Snapshot from an existing element: pass ``source_element_id``
+        plus ``included_fields`` (whitelist: name, description,
+        element_type, notation, data, metadata, package_id, tags).
+      - Direct template data: pass ``template_data`` as a dict.
+      - Stamp-only template (ADR-211): pass ``markdown_stamp`` — a
+        smart-markdown fragment using ``{{self:<field-spec>}}``
+        placeholders, substituted by the picker at insert time.
+
+    Templates are set-scoped by default; pass ``is_global=true`` to
+    make a template visible from any set (in which case omit
+    ``set_id``).
     """
     body: dict[str, Any] = {
-        "source_element_id": args["source_element_id"],
         "name": args["name"],
-        "included_fields": args["included_fields"],
         "is_global": bool(args.get("is_global", False)),
     }
+    if args.get("source_element_id") is not None:
+        body["source_element_id"] = args["source_element_id"]
+    if args.get("included_fields") is not None:
+        body["included_fields"] = args["included_fields"]
+    if args.get("template_data") is not None:
+        body["template_data"] = args["template_data"]
+    if args.get("markdown_stamp") is not None:
+        body["markdown_stamp"] = args["markdown_stamp"]
     if args.get("description") is not None:
         body["description"] = args["description"]
     if args.get("set_id") is not None:
@@ -499,11 +512,15 @@ async def _get_element_template(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _update_element_template(c: IrisClient, args: dict[str, Any]) -> str:
-    """v6.8.0 (ADR-191): edit a template (no If-Match — templates are
-    not versioned). Only the keys present in ``args`` are sent."""
+    """v6.8.0 (ADR-191) / v6.19.0 (ADR-211): edit a template (no If-Match
+    — templates are not versioned). Only the keys present in ``args``
+    are sent. ADR-211 adds ``template_data`` and ``markdown_stamp``."""
     template_id = args["template_id"]
     body: dict[str, Any] = {}
-    for key in ("name", "description", "included_fields", "is_global"):
+    for key in (
+        "name", "description", "included_fields", "is_global",
+        "template_data", "markdown_stamp",
+    ):
         if key in args and args[key] is not None:
             body[key] = args[key]
     # set_id is tri-state-friendly: caller may pass None to mean
@@ -517,6 +534,27 @@ async def _update_element_template(c: IrisClient, args: dict[str, Any]) -> str:
     except IrisAuthError:
         return _auth_required_payload("Update element template")
     return with_web_url(json.dumps(resp.json()), "element-template")
+
+
+async def _list_element_template_stamps(
+    c: IrisClient, args: dict[str, Any],
+) -> str:
+    """v6.19.0 (ADR-211): list in-scope stamps for an element.
+
+    Returns templates whose ``markdown_stamp`` is non-empty and whose
+    scope (global or set-matching) and ``element_type`` (if captured)
+    match the element. Each stamp's body comes back with
+    ``{{self:…}}`` already rewritten to ``{{element:<id>:…}}`` so it
+    can be pasted into a smart-markdown source as-is.
+    """
+    try:
+        resp = await c._request(
+            "GET", "/api/element-templates/stamps",
+            params={"element_id": args["element_id"]},
+        )
+    except IrisAuthError:
+        return _auth_required_payload("List element template stamps")
+    return json.dumps(resp.json().get("items", []))
 
 
 async def _delete_element_template(c: IrisClient, args: dict[str, Any]) -> str:
@@ -1624,35 +1662,64 @@ TOOLS: list[Tool] = [
     Tool(
         name="create_element_template",
         description=(
-            "Capture a saved template from an existing element. The "
-            "template snapshots a user-chosen subset of the element's "
-            "fields (whitelist: name, description, element_type, "
-            "notation, data, metadata, package_id, tags) so future "
-            "`create_element` calls can pre-fill from it via "
-            "`template_id`. Set-scoped by default; pass "
-            "`is_global=true` to share across sets (and omit "
-            "`set_id`). v6.8.0, ADR-191, issue #153."
+            "Create a template. Content sources (alternatives — at least "
+            "one must yield non-empty content):\n"
+            "  - Snapshot from an existing element: pass "
+            "`source_element_id` + `included_fields` (whitelist: name, "
+            "description, element_type, notation, data, metadata, "
+            "package_id, tags) — the template snapshots that element.\n"
+            "  - Direct content: pass `template_data` (object) — used "
+            "as-is when creating elements from this template.\n"
+            "  - Stamp-only: pass `markdown_stamp` — a smart-markdown "
+            "fragment using `{{self:<field-spec>}}` placeholders that "
+            "the picker substitutes at insert time (ADR-211, v6.19.0).\n"
+            "Set-scoped by default; pass `is_global=true` to share "
+            "across sets (and omit `set_id`). v6.8.0 (ADR-191) / "
+            "v6.19.0 (ADR-211)."
         ),
         input_schema=_schema({
-            "source_element_id": _str_arg(
-                "source_element_id",
-                "ID of the element to snapshot the template from",
-            ),
             "name": _str_arg(
                 "name", "Display name for the template",
+            ),
+            "source_element_id": _str_arg(
+                "source_element_id",
+                "Optional: snapshot the template from this element.",
+                required=False,
             ),
             "included_fields": (
                 {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": (
-                        "Element fields to carry into the template. "
+                        "Element fields to carry into the template "
+                        "when snapshotting from `source_element_id`. "
                         "Anything outside the whitelist is dropped "
-                        "silently. At least one whitelisted field is "
-                        "required."
+                        "silently."
                     ),
                 },
-                True,
+                False,
+            ),
+            "template_data": (
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "Optional: direct template content. Used when "
+                        "creating elements from this template. "
+                        "Required if neither `source_element_id` nor "
+                        "`markdown_stamp` is set."
+                    ),
+                },
+                False,
+            ),
+            "markdown_stamp": _str_arg(
+                "markdown_stamp",
+                "ADR-211: smart-markdown fragment using `{{self:…}}` "
+                "placeholders that the picker substitutes with the "
+                "selected element's ID at insert time. Optional; if "
+                "set, makes this template available in the smart-"
+                "markdown picker's Stamps section.",
+                required=False,
             ),
             "description": _str_arg(
                 "description", "Optional template description",
@@ -1778,6 +1845,23 @@ TOOLS: list[Tool] = [
                 },
                 False,
             ),
+            "template_data": (
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "ADR-211: replace `template_data` directly "
+                        "without snapshotting from a source element."
+                    ),
+                },
+                False,
+            ),
+            "markdown_stamp": _str_arg(
+                "markdown_stamp",
+                "ADR-211: update the markdown stamp (smart-markdown "
+                "fragment using `{{self:…}}` placeholders).",
+                required=False,
+            ),
         }),
         handler=_update_element_template,
     ),
@@ -1792,6 +1876,28 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_delete_element_template,
+    ),
+    Tool(
+        name="list_element_template_stamps",
+        description=(
+            "v6.19.0 (ADR-211): list in-scope markdown stamps for an "
+            "element. A stamp is a smart-markdown fragment using "
+            "`{{self:<field-spec>}}` placeholders. Returned stamps "
+            "have `self` already substituted with the element's id, "
+            "so the body can be inserted into a smart-markdown source "
+            "unchanged. Use this when authoring a smart-markdown "
+            "diagram and you want a one-pick insertion of multi-token "
+            "lines (e.g. quantity + unit + name)."
+        ),
+        input_schema=_schema({
+            "element_id": _str_arg(
+                "element_id",
+                "ID of the element to fetch stamps for. The element's "
+                "set_id and element_type drive the scope and "
+                "applicability filter.",
+            ),
+        }),
+        handler=_list_element_template_stamps,
     ),
     # ── Phase 2 render tools (ADR-179, v6.2.0) ────────────────────────
     Tool(

@@ -158,7 +158,12 @@ class TestGetTemplateAfterSourceSoftDelete:
             f"/api/element-templates?set_id={set_id}", headers=h,
         )
         assert list_resp.status_code == 200, list_resp.text
-        items = list_resp.json()["items"]
+        # ADR-211 v6.19.0: globals include the 5 seeded stamps. Filter
+        # to the user-created template (created_by non-null).
+        items = [
+            i for i in list_resp.json()["items"]
+            if i["created_by"] is not None
+        ]
         assert len(items) == 1
         assert items[0]["source_element_name"] is None
         assert items[0]["source_element_id"] == source["id"]

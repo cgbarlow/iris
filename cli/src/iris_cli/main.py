@@ -1132,14 +1132,36 @@ def _parse_csv_opt(raw: str | None, flag: str) -> list[str] | None:
 
 @create_app.command("element-template")
 def create_element_template_cmd(
-    source_element: str = typer.Option(..., "--source-element"),
     name: str = typer.Option(..., "--name"),
-    include: str = typer.Option(
-        ..., "--include",
+    source_element: str | None = typer.Option(
+        None, "--source-element",
         help=(
-            "Comma-separated whitelist of element fields to carry "
-            "into the template (e.g. name,description,data,tags). "
+            "Optional: snapshot the template from this element. Combine "
+            "with --include. Mutually compatible with --template-data-file "
+            "and --markdown-stamp — at least one content source required."
+        ),
+    ),
+    include: str | None = typer.Option(
+        None, "--include",
+        help=(
+            "Comma-separated whitelist of element fields to snapshot "
+            "from --source-element (e.g. name,description,data,tags). "
             "Non-whitelisted fields are dropped silently."
+        ),
+    ),
+    template_data_file: str | None = typer.Option(
+        None, "--template-data-file",
+        help=(
+            "ADR-211: path to a JSON file containing template_data "
+            "directly. Alternative to --source-element."
+        ),
+    ),
+    markdown_stamp: str | None = typer.Option(
+        None, "--markdown-stamp",
+        help=(
+            "ADR-211: smart-markdown fragment using `{{self:<field-spec>}}` "
+            "placeholders. Picker substitutes `self` with the selected "
+            "element's id at insert time."
         ),
     ),
     set_id: str | None = typer.Option(
@@ -1155,13 +1177,29 @@ def create_element_template_cmd(
     ),
     description: str | None = typer.Option(None, "--description"),
 ) -> None:
-    """Capture an element template from an existing element."""
+    """Create an element template.
+
+    Three content paths (at least one required):
+      - --source-element + --include: snapshot from an element.
+      - --template-data-file: direct content from JSON file.
+      - --markdown-stamp: stamp-only template (ADR-211).
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
     body: dict[str, Any] = {
-        "source_element_id": source_element,
         "name": name,
-        "included_fields": _parse_csv_opt(include, "--include"),
         "is_global": is_global,
     }
+    if source_element is not None:
+        body["source_element_id"] = source_element
+    inc = _parse_csv_opt(include, "--include")
+    if inc is not None:
+        body["included_fields"] = inc
+    if template_data_file is not None:
+        body["template_data"] = _json.loads(_Path(template_data_file).read_text())
+    if markdown_stamp is not None:
+        body["markdown_stamp"] = markdown_stamp
     if description is not None:
         body["description"] = description
     if set_id is not None:
@@ -1200,8 +1238,25 @@ def update_element_template_cmd(
         None, "--global/--no-global",
         help="Promote to global or demote back.",
     ),
+    template_data_file: str | None = typer.Option(
+        None, "--template-data-file",
+        help=(
+            "ADR-211: path to a JSON file replacing template_data "
+            "directly (skips re-projection from source element)."
+        ),
+    ),
+    markdown_stamp: str | None = typer.Option(
+        None, "--markdown-stamp",
+        help=(
+            "ADR-211: replace the markdown_stamp body. Pass an empty "
+            "string to clear."
+        ),
+    ),
 ) -> None:
     """Update an element template (no versioning — no If-Match)."""
+    import json as _json
+    from pathlib import Path as _Path
+
     body: dict[str, Any] = {}
     if name is not None:
         body["name"] = name
@@ -1214,6 +1269,10 @@ def update_element_template_cmd(
         body["set_id"] = _resolve_null(set_id)
     if is_global is not None:
         body["is_global"] = is_global
+    if template_data_file is not None:
+        body["template_data"] = _json.loads(_Path(template_data_file).read_text())
+    if markdown_stamp is not None:
+        body["markdown_stamp"] = markdown_stamp
 
     async def _do() -> Any:
         async with _client() as c:

@@ -1,10 +1,10 @@
-"""Element template CRUD service (ADR-191, issue #153).
+"""Element template CRUD service (ADR-191, issue #153; ADR-211, v6.19.0).
 
-Templates capture a snapshot of selected fields from a source element
-so later element creation can be pre-filled. Set-scoped by default;
-``is_global`` promotes a template across sets. ``included_fields`` is
-filtered against ``INCLUDED_FIELD_WHITELIST`` to keep the surface
-narrow.
+Templates carry reusable element content: either a snapshot of an
+existing element (ADR-191) or direct content with an optional
+``markdown_stamp`` (ADR-211). Set-scoped by default; ``is_global``
+promotes a template across sets. ``included_fields`` is filtered
+against ``INCLUDED_FIELD_WHITELIST`` to keep the surface narrow.
 
 Row access is positional throughout (Protocol §15) so the same code
 runs on SQLite and Supabase.
@@ -13,6 +13,7 @@ runs on SQLite and Supabase.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -21,6 +22,22 @@ from app.element_templates.models import INCLUDED_FIELD_WHITELIST
 
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
+
+
+# ADR-211: `{{self:<field-spec>}}` placeholder used in markdown_stamp.
+_SELF_TOKEN_RE = re.compile(r"\{\{self:([^}]+)\}\}")
+
+
+def substitute_self(stamp_body: str, element_id: str) -> str:
+    """Rewrite ``{{self:<field-spec>}}`` → ``{{element:<element_id>:<field-spec>}}``.
+
+    Used at picker insert time so the resulting body is a normal smart-
+    markdown fragment with concrete element IDs. ADR-211.
+    """
+    return _SELF_TOKEN_RE.sub(
+        lambda m: f"{{{{element:{element_id}:{m.group(1)}}}}}",
+        stamp_body,
+    )
 
 
 class ElementTemplateScopeError(ValueError):
@@ -106,25 +123,47 @@ def _project_template_data(
 async def create_element_template(
     db: DatabasePort,
     *,
-    source_element_id: str,
+    source_element_id: str | None,
     name: str,
     description: str | None,
     included_fields: list[str],
     set_id: str | None,
     is_global: bool,
     created_by: str,
+    template_data_direct: dict[str, Any] | None = None,
+    markdown_stamp: str | None = None,
 ) -> dict[str, Any]:
-    """Create a new template by snapshotting an element."""
+    """Create a new template (ADR-191 + ADR-211).
+
+    Three content paths:
+      1. ``source_element_id`` + ``included_fields`` → snapshot from element.
+      2. ``template_data_direct`` (non-empty) → use as-is.
+      3. ``markdown_stamp`` only → stamp-only template.
+
+    At least one path must yield non-empty content.
+    """
     _validate_scope(set_id=set_id, is_global=is_global)
+
     filtered = _filter_included_fields(included_fields)
-    if not filtered:
+    template_data: dict[str, Any] = {}
+
+    if source_element_id is not None:
+        src = await _load_source_element(db, source_element_id)
+        if filtered:
+            template_data = _project_template_data(src, filtered)
+    elif template_data_direct is not None:
+        template_data = dict(template_data_direct)
+
+    has_data = bool(template_data)
+    has_stamp = bool(markdown_stamp and markdown_stamp.strip())
+
+    if not has_data and not has_stamp:
         msg = (
-            "included_fields must contain at least one whitelisted "
-            f"field. Whitelist: {sorted(INCLUDED_FIELD_WHITELIST)}"
+            "Template must have at least one of: a source_element_id "
+            "with included_fields, template_data, or markdown_stamp."
         )
         raise ElementTemplateScopeError(msg)
-    src = await _load_source_element(db, source_element_id)
-    template_data = _project_template_data(src, filtered)
+
     template_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     # Literal ``, 0)`` for is_deleted caused HTTP 500 on Supabase —
@@ -136,13 +175,15 @@ async def create_element_template(
     await db.execute(
         "INSERT INTO element_templates "
         "(id, name, description, set_id, is_global, source_element_id, "
-        "included_fields, template_data, created_by, created_at, "
-        "updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "included_fields, template_data, markdown_stamp, created_by, "
+        "created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             template_id, name, description, set_id, 1 if is_global else 0,
             source_element_id, json.dumps(filtered),
-            json.dumps(template_data), created_by, now, now,
+            json.dumps(template_data),
+            markdown_stamp if has_stamp else None,
+            created_by, now, now,
         ),
     )
     await db.commit()
@@ -162,7 +203,7 @@ async def get_element_template(
         "  AND e.current_version = ev.version "
         "  AND e.is_deleted = 0) AS source_name, "
         "t.included_fields, t.template_data, t.created_by, "
-        "u.username, t.created_at, t.updated_at "
+        "u.username, t.created_at, t.updated_at, t.markdown_stamp "
         "FROM element_templates t "
         "LEFT JOIN sets s ON s.id = t.set_id "
         "LEFT JOIN users u ON u.id = t.created_by "
@@ -187,6 +228,7 @@ async def get_element_template(
         "created_by_username": row[11] or "Unknown",
         "created_at": row[12],
         "updated_at": row[13],
+        "markdown_stamp": row[14],
     }
 
 
@@ -238,7 +280,7 @@ async def list_element_templates(
         "  AND e.current_version = ev.version "
         "  AND e.is_deleted = 0) AS source_name, "
         "t.included_fields, t.template_data, t.created_by, "
-        "u.username, t.created_at, t.updated_at "
+        "u.username, t.created_at, t.updated_at, t.markdown_stamp "
         "FROM element_templates t "
         "LEFT JOIN sets s ON s.id = t.set_id "
         "LEFT JOIN users u ON u.id = t.created_by "
@@ -264,6 +306,7 @@ async def list_element_templates(
             "created_by_username": r[11] or "Unknown",
             "created_at": r[12],
             "updated_at": r[13],
+            "markdown_stamp": r[14],
         }
         for r in rows
     ]
@@ -279,6 +322,8 @@ async def update_element_template(
     included_fields: list[str] | None = None,
     set_id: str | None | type[Ellipsis] = ...,  # ... = "not touched"
     is_global: bool | None = None,
+    template_data_direct: dict[str, Any] | None | type[Ellipsis] = ...,
+    markdown_stamp: str | None | type[Ellipsis] = ...,
 ) -> dict[str, Any] | None:
     """Edit a template's mutable fields.
 
@@ -286,6 +331,10 @@ async def update_element_template(
     ``included_fields`` changes AND the source element is still alive.
     If the source has been deleted, the existing ``template_data`` is
     filtered down to the intersection with the new ``included_fields``.
+
+    ADR-211: ``markdown_stamp`` and ``template_data_direct`` are
+    sentinel-or-value parameters (``...`` means "not touched"). Setting
+    ``markdown_stamp`` to ``None`` clears it.
     """
     existing = await get_element_template(db, template_id)
     if existing is None:
@@ -305,20 +354,23 @@ async def update_element_template(
         new_set_id = set_id  # may be None or a string
     _validate_scope(set_id=new_set_id, is_global=new_is_global)
 
-    new_included = (
-        _filter_included_fields(included_fields)
-        if included_fields is not None
-        else list(existing["included_fields"])
-    )
-    if not new_included:
-        msg = "included_fields must contain at least one whitelisted field"
-        raise ElementTemplateScopeError(msg)
-
-    new_data = existing["template_data"]
+    # included_fields: optional. ADR-211 relaxes the prior "must be
+    # non-empty" rule — a stamp-only template can carry an empty list.
+    new_included: list[str]
     if included_fields is not None:
-        # Re-project: prefer fresh data from the source element if it
-        # still exists; otherwise keep the prior snapshot for fields
-        # that survived the included_fields filter.
+        new_included = _filter_included_fields(included_fields)
+    else:
+        new_included = list(existing["included_fields"])
+
+    # template_data:
+    #   - If the caller passed template_data_direct (sentinel not Ellipsis),
+    #     use that directly (write-through).
+    #   - Else if included_fields was reshaped, re-project from source.
+    #   - Else carry forward existing.
+    new_data: dict[str, Any]
+    if template_data_direct is not ...:
+        new_data = dict(template_data_direct) if template_data_direct else {}
+    elif included_fields is not None and new_included:
         try:
             src = await _load_source_element(
                 db, existing["source_element_id"],
@@ -328,18 +380,39 @@ async def update_element_template(
         if src is not None:
             new_data = _project_template_data(src, new_included)
         else:
-            new_data = {k: existing["template_data"].get(k) for k in new_included}
+            new_data = {
+                k: existing["template_data"].get(k) for k in new_included
+            }
+    else:
+        new_data = existing["template_data"]
+
+    # markdown_stamp: ... = no change; None = clear; str = set.
+    new_stamp: str | None
+    if markdown_stamp is ...:
+        new_stamp = existing.get("markdown_stamp")
+    else:
+        new_stamp = markdown_stamp
+
+    # Validation: template still must have at least one of data/stamp/included
+    if not new_data and not (new_stamp and new_stamp.strip()) and not new_included:
+        msg = (
+            "Template must keep at least one of: included_fields, "
+            "template_data, or markdown_stamp"
+        )
+        raise ElementTemplateScopeError(msg)
 
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
         "UPDATE element_templates SET "
         "name = ?, description = ?, set_id = ?, is_global = ?, "
-        "included_fields = ?, template_data = ?, updated_at = ? "
+        "included_fields = ?, template_data = ?, markdown_stamp = ?, "
+        "updated_at = ? "
         "WHERE id = ? AND is_deleted = 0",
         (
             new_name, new_description, new_set_id,
             1 if new_is_global else 0,
-            json.dumps(new_included), json.dumps(new_data), now,
+            json.dumps(new_included), json.dumps(new_data), new_stamp,
+            now,
             template_id,
         ),
     )
@@ -381,3 +454,62 @@ def apply_template_to_create_body(
         if key in data:
             merged[key] = data[key]
     return merged
+
+
+async def list_stamps_for_element(
+    db: DatabasePort, element_id: str,
+) -> list[dict[str, Any]]:
+    """Return in-scope stamps for an element (ADR-211 scope rules).
+
+    A stamp is in-scope when:
+      - The template has a non-empty ``markdown_stamp``.
+      - The template is global (``is_global = 1``) OR set-scoped to
+        the element's set.
+      - The template's captured ``element_type`` matches the element's
+        ``element_type`` (or the template doesn't capture an
+        element_type — then it's offered for any).
+
+    Each returned ``markdown_stamp`` has ``{{self:…}}`` already
+    substituted with the element's ID so the picker can paste it
+    directly.
+    """
+    # Resolve element's set_id + element_type.
+    cursor = await db.execute(
+        "SELECT e.set_id, e.element_type FROM elements e "
+        "WHERE e.id = ? AND e.is_deleted = 0",
+        (element_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return []
+    set_id, element_type = row[0], row[1]
+
+    cursor = await db.execute(
+        "SELECT id, name, description, set_id, is_global, "
+        "template_data, markdown_stamp "
+        "FROM element_templates "
+        "WHERE is_deleted = 0 "
+        "AND markdown_stamp IS NOT NULL AND markdown_stamp != '' "
+        "AND (is_global = 1 OR set_id = ?) "
+        "ORDER BY is_global DESC, name ASC",
+        (set_id,),
+    )
+    rows = await cursor.fetchall()
+
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        td = json.loads(r[5]) if r[5] else {}
+        td_etype = td.get("element_type") if isinstance(td, dict) else None
+        if td_etype and td_etype != element_type:
+            continue
+        stamp_body = r[6] or ""
+        resolved = substitute_self(stamp_body, element_id)
+        out.append({
+            "id": r[0],
+            "name": r[1],
+            "description": r[2],
+            "set_id": r[3],
+            "is_global": bool(r[4]),
+            "markdown_stamp": resolved,
+        })
+    return out
