@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.30.1] - 2026-05-22
+
+### Fixed
+
+- **UML attribute `notes` field is editable in element edit mode.**
+  Browse view already displayed the `notes` column under Attributes;
+  the edit view's attribute table had Scope / Name / Type / Lower /
+  Upper but **no Notes input** — values typed via API/CLI persisted
+  fine but couldn't be added or changed in the browser. Edit mode now
+  has a Notes column that round-trips the value. The underlying
+  edit-state mapping in `startEdit` already preserved notes; only the
+  UI was missing.
+
+### Migration
+
+- None. Pure frontend addition (one column + one input).
+
 ## [6.30.0] - 2026-05-22
 
 ### Added
