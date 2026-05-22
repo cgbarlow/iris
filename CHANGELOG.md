@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.23.0] - 2026-05-22
+
+### Added
+
+- **Smart-markdown picker — Stamps section**
+  ([SPEC-211-b](docs/adrs/specs/SPEC-211-b-Picker-Stamps-Section.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211),
+  follow-up to v6.19.0). When the picker enters drill mode against an
+  element, it fetches in-scope stamps via
+  `GET /api/element-templates/stamps?element_id=<id>` and surfaces
+  them as one-pick rows at the top of the drill menu. Backend has
+  already substituted `{{self:…}}` → `{{element:<id>:…}}` so the
+  body is paste-ready. Selecting a stamp emits its body verbatim
+  via `oninsert`; downstream tokens behave like any author-typed
+  tokens.
+- Stamp rows display as `Stamp: <template name>`. Keyboard
+  navigation (arrows / Enter / Tab / `.`) inherits from the existing
+  drill menu — no new keys.
+- Compresses the common multi-token recipe-author line (quantity +
+  unit + name) from three picker round-trips to one.
+
+### Changed
+
+- For non-element entities (collection, set, package, diagram) the
+  picker is unchanged — stamps don't apply (the endpoint requires an
+  element id).
+
+### Migration
+
+- None. Pure frontend addition.
+
 ## [6.22.0] - 2026-05-22
 
 ### Added
