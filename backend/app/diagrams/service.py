@@ -219,6 +219,42 @@ async def _maybe_synthesise_content(
         data["is_content_locked"] = True
         diagram["data"] = data
         return
+    if diagram_type == "aggregation_list":
+        # ADR-213 (v6.21.0): synth-on-read aggregation. Storage is minimal
+        # config (data.source_diagram_id + data.profile_id); the engine
+        # fills data.content at GET time. Any engine error renders an
+        # informative placeholder rather than crashing the GET.
+        from app.aggregation import engine as agg_engine
+        from app.aggregation.exceptions import (
+            AggregationProfileNotFound,
+            AggregationSourceNotFound,
+        )
+        data = diagram.get("data") or {}
+        if not isinstance(data, dict):
+            data = {}
+        src = data.get("source_diagram_id")
+        profile_id = data.get("profile_id")
+        if src and profile_id:
+            try:
+                result = await agg_engine.run(
+                    db,
+                    profile_id=str(profile_id),
+                    source_diagram_id=str(src),
+                )
+                data["content"] = result.markdown
+            except AggregationProfileNotFound:
+                data["content"] = "_Aggregation profile not found._"
+            except AggregationSourceNotFound:
+                data["content"] = "_Source diagram not found._"
+            except Exception as exc:  # noqa: BLE001
+                data["content"] = f"_Aggregation failed: {exc}_"
+        else:
+            data["content"] = (
+                "_Pick a source diagram and aggregation profile to compute._"
+            )
+        data["is_content_locked"] = True
+        diagram["data"] = data
+        return
     if diagram_type != "dynamic_list":
         return
     from app.diagrams.dynamic_list import compute_dynamic_list_content

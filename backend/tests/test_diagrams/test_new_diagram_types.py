@@ -80,7 +80,7 @@ class TestNewDiagramTypes:
         # 7 original + 6 new + 2 DoView + 2 BPMN (ADR-136) + 1 Text (ADR-137)
         # + 1 doview_analysis (legacy seed) + 1 Dynamic List (ADR-186)
         # + 1 Smart Markdown (ADR-205, v6.14.0) = 21
-        assert len(types) == 21
+        assert len(types) == 22  # +1 for aggregation_list (ADR-213, v6.21.0)
 
 
 class TestNewNotationMappings:

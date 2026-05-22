@@ -69,7 +69,7 @@ class TestListDiagramTypes:
         # 7 original + 6 new (ADR-082) + 2 DoView (ADR-094) + 2 BPMN (ADR-136)
         # + 1 Text (ADR-137) + 1 doview_analysis (legacy seed) + 1 Dynamic List
         # (ADR-186) + 1 Smart Markdown (ADR-205, v6.14.0) = 21.
-        assert len(types) == 21
+        assert len(types) == 22  # +1 for aggregation_list (ADR-213, v6.21.0)
         type_ids = [t["id"] for t in types]
         assert "component" in type_ids
         assert "sequence" in type_ids
