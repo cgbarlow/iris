@@ -17,6 +17,7 @@
 	import DynamicListCanvas from '$lib/canvas/text/DynamicListCanvas.svelte';
 	import type { DynamicSource } from '$lib/canvas/text/DynamicListCanvas.svelte';
 	import SmartMarkdownCanvas from '$lib/canvas/text/SmartMarkdownCanvas.svelte';
+	import AggregationListCanvas from '$lib/canvas/text/AggregationListCanvas.svelte';
 	import MarkdownToc from '$lib/components/MarkdownToc.svelte';
 	import type { TocHeading } from '$lib/components/MarkdownView.svelte';
 	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
@@ -3067,6 +3068,29 @@
 									}}
 									onheadings={(h) => (textHeadings = h)}
 								/>
+							{:else if diagram?.diagram_type === 'aggregation_list'}
+								<!-- ADR-213 (v6.21.0): pickers in edit mode for source +
+									 profile; engine fills data.content at GET time. -->
+								<AggregationListCanvas
+									content={markdownContent}
+									editing={editing}
+									setId={diagram?.set_id ?? null}
+									source={{
+										source_diagram_id: (diagram.data?.source_diagram_id as string | null | undefined) ?? null,
+										profile_id: (diagram.data?.profile_id as string | null | undefined) ?? null,
+									}}
+									onsourcechange={(next) => {
+										if (diagram) {
+											diagram.data = {
+												...(diagram.data ?? {}),
+												source_diagram_id: next.source_diagram_id ?? null,
+												profile_id: next.profile_id ?? null,
+											};
+											canvasDirty = true;
+										}
+									}}
+									onheadings={(h) => (textHeadings = h)}
+								/>
 							{:else}
 								<TextCanvas
 									bind:textareaEl={textTextareaEl}
@@ -3167,6 +3191,14 @@
 										source={(diagram.data?.markdown_source as string | undefined) ?? ''}
 										editing={false}
 										contextSetId={diagram?.set_id ?? null}
+										onheadings={(h) => (textHeadings = h)}
+									/>
+								{:else if diagram?.diagram_type === 'aggregation_list'}
+									<!-- ADR-213: browse-mode shows the synthesised content only. -->
+									<AggregationListCanvas
+										content={markdownContent}
+										editing={false}
+										setId={diagram?.set_id ?? null}
 										onheadings={(h) => (textHeadings = h)}
 									/>
 								{:else}

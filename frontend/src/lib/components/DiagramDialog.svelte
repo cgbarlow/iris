@@ -98,6 +98,7 @@
 			{ value: 'free_form', label: 'Free Form' },
 		],
 		markdown: [
+			{ value: 'aggregation_list', label: 'Aggregation list' },
 			{ value: 'dynamic_list', label: 'Dynamic List' },
 			{ value: 'smart_markdown', label: 'Smart Markdown' },
 			{ value: 'text', label: 'Standard Markdown' },
