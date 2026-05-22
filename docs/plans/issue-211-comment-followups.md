@@ -25,6 +25,7 @@ The user surfaced six observations after exercising the v6.18.0–v6.26.1 releas
 | **C2** | Clarifying Q: how do users create stamps & edit aggregation profiles? | Answered inline (existing flows + planned improvements) | n/a |
 | **C3** | Rename seeded **"Quantified item"** → **"Ingredient"** | **Seed rename** | PR 13 |
 | **C4** | "Add Clone-from-existing for element templates too (parallel UX)" | **Missing UX affordance** | PR 13 |
+| **C5** | "In smart_markdown edit view, show a tip (grey text, uneditable, right of the token codes) so I can see what each resolves to — e.g. `500 g Pork Mince`" | **Missing UX affordance** — token codes are opaque without resolved preview | PR 14 |
 
 ---
 
@@ -211,39 +212,93 @@ The banned-string list (`scripts/check_aggregation_genericness.py`) **already** 
 
 ---
 
-## 6. Protocol checklist (per PR)
+## 6. PR 14 — Smart-markdown edit-view resolved-preview tips (v6.30.0)
 
-Per [`docs/protocols.md`](../protocols.md):
+**Type:** UX enhancement — spec extension on ADR-205. No new ADR.
 
-| Protocol | PR 11 | PR 12 | PR 13 |
-|---|---|---|---|
-| §1 ADR | **ADR-215** (stamp body-parsing filter) | **ADR-216** (set-create inherits collection) | _(spec extensions; no new ADR)_ |
-| §2 SPEC | SPEC-211-d (stamp filter) | SPEC-216-a (set-create) | SPEC-212-e (profile editor) + SPEC-211-e (template clone) |
-| §3 TDD | backend tests | frontend test | frontend + backend tests |
-| §4 Feature branch | `feature/stamp-filter-by-attribute` | `feature/set-create-inherits-collection` | `feature/ux-consistency-pass` |
-| §5 CHANGELOG | entry | entry | entry |
-| §6 Release | tag + GH Release | tag + GH Release | tag + GH Release |
-| §7 `{@html}` | none | none | none |
-| §8 Context7 | not needed | not needed | not needed |
-| §9 Production code | yes | yes | yes |
-| §11 Latest deps | no new deps | no new deps | no new deps |
-| §12 README | no change | no change | no change |
-| §13 DRY | clone-helpers extracted if used by both profile + template clones | no duplication | yes — shared clone logic |
-| §14 Surface parity | no new writes | no new writes (frontend-only) | no new writes |
-| §15 SQLite ↔ Supabase | no DB changes | no DB changes | **m079 + m084 pair** for the rename |
-| ADR-214 genericness | clean | clean | clean (Ingredient in allow-listed paths only) |
+### 6.1 Problem (C5)
+
+`SmartMarkdownCanvas.svelte` edit mode shows raw markdown source — tokens are opaque blobs like `{{element:a8db…:attr:attributes/Quantity/type=500}}`. The user has to mentally translate them to know what the line will render as. There's already a clean rendered form available (`data.content`, synthesised by the resolver) — the edit view just doesn't show it.
+
+### 6.2 Decision
+
+Add a **right-hand resolved-preview pane** to `SmartMarkdownCanvas.svelte` in edit mode. The textarea stays on the left; on the right is a read-only, grey-styled, line-aligned render of what each token resolves to.
+
+```
+┌─ source (editable) ──────────────┬─ preview (grey, read-only) ───────┐
+│ - {{element:abc:name}}           │   - Pork mince                    │
+│ - {{element:abc:attr:Q/type=500}} │   - 500                           │
+│   {{element:abc:attr:U/type}}    │     g                             │
+│   {{element:abc:name}}           │     Pork mince                    │
+└──────────────────────────────────┴───────────────────────────────────┘
+```
+
+The preview reflects the **last saved** resolved content (`data.content`) on first render, then refreshes after Save. We don't try to live-resolve as the user types — that would either hit the backend on every keystroke (heavy) or require re-implementing the resolver in TypeScript (DRY violation §13 of protocols).
+
+This matches the user's request semantically — "tip text, right of the codes, showing what each refers to" — without committing to per-token inline annotations, which would require replacing the textarea with a custom contenteditable editor (out of scope for v1).
+
+### 6.3 Spec (SPEC-205-b)
+
+- New `<RightSidePreview>` sub-component (or inline pane) inside `SmartMarkdownCanvas.svelte`.
+- Edit mode layout: 50/50 split (or 60/40 source-favoured), source textarea on left, `<MarkdownView source={content} />` on right with a `.preview-muted` class that overrides colour to a muted grey.
+- Preview shows `data.content` (the last-saved resolved markdown). After Save, the resolved content updates and the preview re-renders.
+- A small "↻ Saved" / "* unsaved" indicator above the preview pane signals whether the preview reflects the current draft. No live-render churn.
+- Read view (non-editing) unchanged — already renders `data.content` full-width.
+
+### 6.4 Stretch (out of scope for v6.30.0)
+
+- Per-token hover tooltips ("hover this token to see what it resolves to") — would need cursor-position tracking against the textarea and a token-boundary scanner. Pragmatic v2 if users ask for it.
+- Live (debounced) re-render against the resolver — would need either a backend-roundtrip-per-keystroke or a JS port of the resolver. Defer.
+
+### 6.5 Tests
+
+- `frontend/tests/unit/smartMarkdownPreview.test.ts` covers the saved/unsaved state flag logic.
+- Visual verification post-deploy: open Spaghetti recipe in edit mode → preview pane on the right shows the rendered ingredients with resolved names/values.
+
+### 6.6 Genericness (ADR-214)
+
+Pure UI layout change in a generic component. Clean.
+
+### 6.7 Risk
+
+- Low. The pane is additive to the existing edit view; saving still works the same; the canvas remains usable for narrow viewports by collapsing the preview pane into a tab toggle if width < ~900px.
 
 ---
 
-## 7. Release sequencing
+## 7. Protocol checklist (per PR)
 
-Three feature PRs, each on its own branch, each tagging a minor:
+Per [`docs/protocols.md`](../protocols.md):
+
+| Protocol | PR 11 | PR 12 | PR 13 | PR 14 |
+|---|---|---|---|---|
+| §1 ADR | **ADR-215** (stamp body-parsing filter) | **ADR-216** (set-create inherits collection) | _(spec extensions; no new ADR)_ | _(spec extension on ADR-205)_ |
+| §2 SPEC | SPEC-211-d | SPEC-216-a | SPEC-212-e + SPEC-211-e | SPEC-205-b |
+| §3 TDD | backend tests | frontend test | frontend + backend tests | frontend test |
+| §4 Feature branch | `feature/stamp-filter-by-attribute` | `feature/set-create-inherits-collection` | `feature/ux-consistency-pass` | `feature/smart-markdown-edit-preview` |
+| §5 CHANGELOG | entry | entry | entry | entry |
+| §6 Release | tag + GH Release | tag + GH Release | tag + GH Release | tag + GH Release |
+| §7 `{@html}` | none | none | none | none — preview reuses `MarkdownView` which goes through marked + DOMPurify |
+| §8 Context7 | not needed | not needed | not needed | not needed |
+| §9 Production code | yes | yes | yes | yes |
+| §11 Latest deps | no new deps | no new deps | no new deps | no new deps |
+| §12 README | no change | no change | no change | no change |
+| §13 DRY | clone-helpers extracted if used by both profile + template clones | no duplication | yes — shared clone logic | reuses `MarkdownView` for rendering (no duplicate resolver) |
+| §14 Surface parity | no new writes | no new writes (frontend-only) | no new writes | no new writes (frontend-only) |
+| §15 SQLite ↔ Supabase | no DB changes | no DB changes | **m079 + m084 pair** for the rename | no DB changes |
+| ADR-214 genericness | clean | clean | clean (Ingredient in allow-listed paths only) | clean |
+
+---
+
+## 8. Release sequencing
+
+Four feature PRs, each on its own branch, each tagging a minor:
 
 | Version | What |
 |---|---|
 | **v6.27.0** | PR 11 — stamp body-parsing filter (ADR-215, SPEC-211-d) |
 | **v6.28.0** | PR 12 — set creation inherits current collection (ADR-216, SPEC-216-a) |
 | **v6.29.0** | PR 13 — UX consistency pass: friendly copy + clone for profiles & templates + Ingredient rename (SPEC-212-e + SPEC-211-e + m079/m084) |
+| **v6.30.0** | PR 14 — smart-markdown edit-view resolved-preview pane (SPEC-205-b) |
 
 **v6.29.0 is the only one with a DB change** (the m079/m084 rename pair). Supabase ordering per memory `feedback_render_supabase_ordering`:
 
@@ -251,18 +306,19 @@ Three feature PRs, each on its own branch, each tagging a minor:
 2. Run `scripts/supabase-migrate.sh "$SUPABASE_DB_URL_DIRECT"` against the live DB. (Or apply m084 directly via `psql -f` as we've done for prior PRs.)
 3. The merged code uses the new name in seed constants; existing data is renamed by m084.
 
-Render auto-deploys on merge to main for all three.
+Render auto-deploys on merge to main for all four. PRs can ship in any order since none depend on each other.
 
 ---
 
-## 8. Definition of done
+## 9. Definition of done
 
-After all three PRs ship and the user's live DB has m084 applied:
+After all four PRs ship and the user's live DB has m084 applied:
 
 - The smart-markdown picker only offers stamps whose body-referenced attributes the target element actually has. Sausages → Ingredient stamp only.
 - "Create new set" from a collection-filtered view → new set is in the right collection.
 - "Aggregation profiles for this set" section has a Clone-from-existing button alongside + New, with friendly help copy.
 - Elements list "Templates" dialog has a Clone-template button alongside Use.
 - The seeded "Quantified item" stamp is now named "Ingredient" everywhere — pickers, listings, MCP responses, CLI output.
+- Smart-markdown diagrams in edit mode show a grey resolved-preview pane on the right of the source textarea so users can see what each token line renders to (e.g. `500 g Pork mince`) without leaving edit mode.
 - Genericness invariant still clean; no new `{@html}` paths; SQLite ↔ Supabase parity preserved.
-- All issue #211 observations from the 2026-05-22 comment are closed.
+- All issue #211 observations and clarifications from the 2026-05-22 comment + follow-on exchange are closed.
