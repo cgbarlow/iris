@@ -1,0 +1,369 @@
+# Plan — Issue #211 comment follow-ups (2026-05-22)
+
+**Status:** Draft, awaiting review (do not start implementation)
+**Source:** [Issue #211 comment of 2026-05-22T20:34Z](https://github.com/cgbarlow/iris/issues/211) + clarifying exchange that followed
+**Companion docs:**
+- [`docs/plans/issue-211-shopping-list-implementation.md`](./issue-211-shopping-list-implementation.md)
+- [`docs/plans/issue-211-followups-implementation.md`](./issue-211-followups-implementation.md)
+
+The user surfaced six observations after exercising the v6.18.0–v6.26.1 release stack, plus two clarifying questions that refined PR 11's algorithm and added a seed-rename. This plan consolidates everything into three feature PRs, each on its own branch, following [`docs/protocols.md`](../protocols.md).
+
+---
+
+## 1. Observations & clarifications
+
+| # | Observation / question | Classification | PR |
+|---|---|---|---|
+| **O1** | "Is there a section in admin settings based on the 10 PRs?" | Discoverability / info — **no code change** | n/a |
+| **O2** | "Picker shows 'Sized story' stamp for a 'sausages' element — too broad" | **Real bug**: scope filter is `element_type` only, which is `class` for everything → all stamps match | PR 11 |
+| **O3** | "Which stamp do I pick for pork mince?" | Symptom of O2 + missing UI affordance. Resolved by O2's fix. | covered by PR 11 |
+| **O4** | "Renamed Meal Plan → Recipes, created Weekly Meal Plan set" | Context, not a request | n/a |
+| **O5** | "Creating a new set from a collection-filtered view should auto-attach to that collection" | **Real UX gap** | PR 12 |
+| **O6** | "Set-edit aggregation profiles help text mentions ADRs — make it friendlier" | **Copy fix** | PR 13 |
+| **O7** | "Should be a picker to clone from an existing seeded profile when creating set-scoped" | **Missing UX affordance** | PR 13 |
+| **C1** | Clarifying Q: how does PR 11 know which attributes a stamp expects? | **Algorithm refinement** → use stamp **body parsing**, not the source-element snapshot's blueprint | PR 11 §3 |
+| **C2** | Clarifying Q: how do users create stamps & edit aggregation profiles? | Answered inline (existing flows + planned improvements) | n/a |
+| **C3** | Rename seeded **"Quantified item"** → **"Ingredient"** | **Seed rename** | PR 13 |
+| **C4** | "Add Clone-from-existing for element templates too (parallel UX)" | **Missing UX affordance** | PR 13 |
+| **C5** | "In smart_markdown edit view, show a tip (grey text, uneditable, right of the token codes) so I can see what each resolves to — e.g. `500 g Pork Mince`" | **Missing UX affordance** — token codes are opaque without resolved preview | PR 14 |
+| **C6** | "If I paste an Ingredient stamp for broccoli, there should be a placeholder for quantity I can update easily — all I see is the code" | **Deferred functionality from SPEC-210-a §5.1** (v6.18.0 shipped the backend grammar but never built the inline editable spans the spec promised) | PR 14 |
+
+---
+
+## 2. O1 answer (information, no PR)
+
+For the record — where the issue-#211 surfaces live today:
+
+- **Admin home (`/admin`)** has the "Aggregation profiles" card (v6.25.0). Same page as Users / Audit / Settings.
+- **Per-set aggregation profiles** appear at the **bottom of the set edit page** (`/sets/{id}`), above the Danger zone (v6.25.0).
+- **Element-template stamps** appear on each **element template detail page** (`/element-templates/{id}`) under a "Markdown stamp" section (v6.24.0).
+- **Smart-markdown picker stamps** show up when you press `/` in a smart_markdown editor → drill into an element → top of the drill menu (v6.23.0).
+- **Aggregation list diagrams** are created via the existing **New Diagram** dialog → notation `markdown` → "Aggregation list" type (v6.26.0).
+- **Element creation from a template** is on the **elements list page (`/elements`)** → "Templates" button (v6.8.0, pre-dates issue #211).
+
+No global "Issue #211 hub" page — the workflow is deliberately threaded through existing screens so the primitives feel native rather than ghettoised. If discoverability becomes a real complaint, we'd revisit; for now we lean on the natural placements.
+
+---
+
+## 3. PR 11 — Stamp scope filter: body-parsing attribute match (v6.27.0)
+
+**Type:** Architectural change — adds an ADR.
+
+### 3.1 Problem
+
+`GET /api/element-templates/stamps?element_id=<id>` filters by:
+1. Scope (global or matching set).
+2. **`template_data.element_type` matches element's `element_type`.**
+
+All groceries are `class`-typed; the five seeded stamps all target `element_type=class`. Result: every grocery element gets all five stamps in the picker, including the "Sized story" one that makes no sense for a sausage.
+
+### 3.2 Decision (ADR-215)
+
+Add a third filter step that matches stamps to elements by **attribute presence** — but the source of "which attributes does this stamp need?" is **the stamp body itself**, not the source element's snapshot.
+
+```
+required = { ATTR_NAME for every {{self:attr:attributes/ATTR_NAME/<...>}}
+             token in stamp.markdown_stamp }
+element_attrs = { a.name for a in element.data.attributes }
+stamp_in_scope = required ⊆ element_attrs
+```
+
+Why **body-parsing** and not **template_data blueprint**:
+
+- The template's `template_data.data.attributes` is a snapshot of *every* attribute the source element had at template-creation time (e.g. a sausage element has Unit, Products, Preferred product, Quantity, …).
+- The stamp body usually references only a subset (e.g. just Quantity + Unit + name).
+- Using the blueprint would over-constrain: a stamp captured from a sausage would only show on elements that also have Products and Preferred product — way too narrow.
+- The body is the **authoritative** statement of which attributes the stamp will render. Anything not referenced doesn't matter.
+
+After the fix:
+- Sausages (Quantity + Unit + Products + Preferred product) → seeded **Ingredient** stamp shown; Sized story / Logged work / Line item / Read entry hidden.
+- A story element with Points → **Sized story** shown.
+- Stamps whose body references no attributes (just `{{self:name}}` etc.) match any element (current behaviour preserved).
+
+### 3.3 Spec (SPEC-211-d)
+
+Backend `list_stamps_for_element` (in `backend/app/element_templates/service.py`):
+
+```python
+import re
+_BODY_ATTR_RE = re.compile(r"\{\{self:attr:attributes/([^/}]+)/[^}]+\}\}")
+
+def _required_attrs(stamp_body: str) -> set[str]:
+    return set(_BODY_ATTR_RE.findall(stamp_body or ""))
+
+# Inside the existing filter loop:
+required = _required_attrs(stamp.markdown_stamp)
+element_attrs = {a["name"] for a in element_data.get("attributes", [])
+                 if isinstance(a, dict) and "name" in a}
+if required and not required.issubset(element_attrs):
+    continue   # stamp doesn't apply
+```
+
+- Endpoint shape unchanged; only the filter logic changes.
+- `element_type` filter stays (still the cheap first pass).
+- A stamp body that references no attribute paths (e.g. just `{{self:name}}`) keeps the previous behaviour — applicable to any matching-element_type element.
+
+### 3.4 Tests
+
+`backend/tests/test_element_templates/test_stamps.py` extended:
+
+- Stamp body with `{{self:attr:attributes/Points/type=}}` hidden from an element with only Quantity + Unit.
+- Stamp body with Quantity + Unit shown when both present on the element.
+- Stamp body with no `attr:` tokens shown for any element (regression of existing behaviour).
+- Stamp body referencing an attribute the user added by hand (no `template_data` blueprint mention) is correctly detected.
+
+### 3.5 Genericness (ADR-214)
+
+Pure logic change — no new domain terminology in code. Clean.
+
+---
+
+## 4. PR 12 — Set creation inherits current collection (v6.28.0)
+
+**Type:** UX behaviour change — adds a small ADR.
+
+### 4.1 Problem
+
+From `/collections/{id}` (or `/sets?collection_id=<id>`) the user clicks "Create new set". The new set is created globally with no collection. Friction.
+
+### 4.2 Decision (ADR-216)
+
+When the user is viewing the sets list filtered by a collection (or browsing inside a collection), the **"Create new set"** action carries the active collection_id through into the create payload. Backend already supports `collection_id` association; the frontend just reads the current filter state.
+
+### 4.3 Spec (SPEC-216-a)
+
+- Frontend `/sets/+page.svelte` (and `/collections/[id]/+page.svelte` if it has a create-set affordance) reads the `?collection_id` query param OR the in-page filter state, and passes it as `collection_id` in the `POST /api/sets` body.
+- Backend behaviour unchanged.
+- Test: create-set on a collection-filtered view → resulting set has the expected `collection_id`.
+
+### 4.4 Risk
+
+- Low. The behaviour is opt-in based on the URL/state; sets created from the unfiltered list remain collection-less (current behaviour).
+
+---
+
+## 5. PR 13 — UX consistency pass (v6.29.0)
+
+**Type:** Spec extensions + a data migration for the seed rename. No new ADR.
+
+### 5.1 Friendly copy in the aggregation-profile editor (O6)
+
+Replace the help text in `AggregationProfileEditor.svelte`:
+
+> "Profiles drive the aggregation engine (ADR-212). Edit as JSON; schema is documented in SPEC-212-a. Seeded global profiles are good clone templates — duplicate one and edit the fields you need."
+
+with:
+
+> "Aggregation profiles describe how to roll up data across a group of documents. They drive features like deduplicated lists with summed quantities, sprint-points totals, time tracker rollups, expense reports. Pick a seeded profile as a starting point and duplicate-and-edit it for your use case."
+
+Same on the admin home page card description.
+
+### 5.2 Clone-from-existing in the aggregation-profile editor (O7)
+
+Add a parallel **+ Clone from existing** action next to **+ New profile** in `AggregationProfileEditor.svelte`:
+
+- Click → small inline picker lists in-scope profiles (globals + same-set).
+- Selecting one prefills the editor with that profile's name (+ " (copy)"), description, and `profile_data`.
+- User edits → Save creates a new row (set-scoped if invoked from set page; global if from admin page — matches the editor's existing scope rules).
+
+### 5.3 Clone-from-existing for element templates (C4)
+
+Add the parallel UX on the **elements list** page:
+
+- Today the `/elements` page has a **Templates** button → `TemplatesListDialog` lists templates with a **"Use"** action that creates a *new element* from the template.
+- Extend `TemplatesListDialog` with a second action **"Clone template"** next to **Use** on each row.
+- "Clone template" → opens the existing `CreateTemplateDialog` (the "Save as template" flow) prefilled with the source template's name (+ " (copy)") and `markdown_stamp`, ready to edit and save as a new template.
+
+This gives users a symmetric clone affordance for both stampable artefacts — aggregation profiles and element templates.
+
+### 5.4 Rename seeded "Quantified item" → "Ingredient" (C3)
+
+The user has named the workflow domain (Groceries / Recipes / Weekly Meal Plan) and the seeded template should match.
+
+- **Renames the seed name only.** Doesn't change anything in code paths (which never reference the name).
+- New idempotent data migration **SQLite m079** / **Supabase m084**: `UPDATE element_templates SET name = 'Ingredient' WHERE id = '<deterministic-quantified-item-uuid>' AND name = 'Quantified item'` (guard on the original name so re-running is a no-op once renamed).
+- m075 (SQLite) / m080 (Supabase) seed migrations are **not edited** — they're already applied to live; touching them would not affect existing rows and would inflate the diff. The new m079/m084 covers both pre-existing rows and fresh installs (because the seed m075/m080 runs first creating "Quantified item", then m079/m084 renames it).
+- Backend constants in `seed/example_models.py::SEEDED_STAMPS` updated to use "Ingredient" so fresh code paths and any future re-seeds use the new name. (The actual rename comes from the new migration, not from re-running the seed.)
+- The stamp body is unchanged — still `{{self:attr:attributes/Quantity/type=}} {{self:attr:attributes/Unit/type}} {{self:name}}`.
+
+### 5.5 Genericness invariant note (ADR-214)
+
+The banned-string list (`scripts/check_aggregation_genericness.py`) **already** has `ingredient` and `ingredients` listed — but the script excludes `backend/app/migrations/` and `backend/app/seed/` AND any `*.md` file. So:
+
+- Seed migration **m079** with literal `'Ingredient'` → allowed (in `migrations/`).
+- Constant in `seed/example_models.py` named `"Ingredient"` → allowed (in `seed/`).
+- CHANGELOG, ADR, spec mentions → allowed (`.md` files).
+- The friendly-copy help text in the editor component must avoid the word — it lives in `frontend/src/lib/components/` which IS scanned. Current planned copy doesn't mention ingredients. ✓
+
+### 5.6 Tests
+
+`frontend/tests/unit/aggregationProfileEditor.test.ts` extended with clone-prefill round-trip.
+
+`frontend/tests/unit/templatesListDialog.test.ts` new — clone-prefill round-trip for element templates.
+
+`backend/tests/test_migrations/test_seed_rename_quantified_to_ingredient.py` new — m079 schema test: row exists with name="Ingredient" after migration; re-running migration is a no-op.
+
+`backend/tests/test_seed/test_example_models.py` updated for the rename if any assertion still expects "Quantified item".
+
+### 5.7 Migration parity (§15)
+
+- **SQLite m079** + **Supabase m084** ship in the same PR.
+- Both idempotent: SQLite `UPDATE ... WHERE name = 'Quantified item'`; Supabase same. Re-running after rename has zero affected rows.
+- Schema test asserts both halves.
+
+---
+
+## 6. PR 14 — Smart-markdown edit-view companion panel (v6.30.0)
+
+**Type:** UX enhancement — spec extension on ADR-205. No new ADR.
+
+### 6.1 Problem (C5 + C6)
+
+`SmartMarkdownCanvas.svelte` edit mode shows raw markdown source — tokens are opaque blobs like `{{element:a8db…-…:attr:attributes/Quantity/type=}}`. Two related complaints:
+
+- **C5**: user can't tell what each line resolves to.
+- **C6**: fillable slots (the trailing-`=` form) require manual cursor work inside a long token blob to type in a quantity — fiddly and non-obvious.
+
+The deferral admission: **SPEC-210-a §5.1 specified inline editable spans for fillable slots** when shipping ADR-210 (v6.18.0). The backend grammar shipped; the canvas editor UX did not. This PR is delivering that deferred piece, combined with the C5 tip ask.
+
+### 6.2 Decision
+
+Add a **right-hand companion panel** to `SmartMarkdownCanvas.svelte` in edit mode. The textarea stays on the left; the right is split into two stacked sections:
+
+#### 6.2.1 Top: "Fill in the blanks" — editable fillable-slot list
+
+For every `{{...:attr:<path>=}}` empty-override token in `markdown_source`, render a labeled input row:
+
+```
+┌─ source (editable) ──────────────┬─ Fill in the blanks ──────────────┐
+│ - {{element:abc:...Quantity/...=}}│  Broccoli — Quantity              │
+│   {{element:abc:...Unit/type}}    │  [    2    ]                      │
+│   {{element:abc:name}}            │  ↳ "2 head Broccoli"              │
+│ - {{element:def:...Quantity/...=}}│                                   │
+│   {{element:def:...Unit/type}}    │  Pork mince — Quantity            │
+│   {{element:def:name}}            │  [   500   ]                      │
+│                                   │  ↳ "500 g Pork mince"             │
+│                                   ├─ Tokens preview (read-only) ──────┤
+│                                   │  - Broccoli                       │
+│                                   │  - 2 head Broccoli                │
+│                                   │  - 500 g Pork mince               │
+└──────────────────────────────────┴───────────────────────────────────┘
+```
+
+Each row carries:
+
+- **Element name** (resolved by client-side fetch of the token's element_id via existing `/api/elements/{id}` endpoint, cached per session).
+- **Attribute path label** (humanised — e.g. `attributes/Quantity/type` → `Quantity`).
+- **Editable text input** for the value.
+- **Resolved-line preview** (`↳ "500 g Pork mince"`) showing what the line containing this token will render to once filled. Updated immediately as the input changes — the substitution is purely string-level, no resolver call needed.
+
+On `<input>` blur (or change), the panel rewrites that specific token in `data.markdown_source` from `=` to `=<value>`. The textarea text updates atomically; existing on-source-change wiring fires; on Save, the diagram persists.
+
+#### 6.2.2 Bottom: "Tokens preview" — read-only resolved view
+
+The same right-side area, below the fill-in form, shows the **last-saved** resolved markdown (`data.content`) in a muted grey style. This is the "tip showing what each token will display" that C5 asked for, scoped to "what was resolved last time the diagram was saved" rather than live keystrokes.
+
+A small "↻ Saved" / "* unsaved" indicator distinguishes whether the preview reflects current draft vs. last save.
+
+### 6.3 Why this design
+
+- **Solves both C5 + C6 in one panel.** The fill-in form gives users a discoverable, non-fiddly way to set fillable-slot values. The tokens preview answers "what will this line render to."
+- **No client-side resolver port.** Fillable-slot editing only needs string rewriting on the source — we already have the element name + attribute path from the token itself + a cheap GET on the element. We don't try to live-resolve every other token type.
+- **No replacement of the textarea.** Source stays editable as raw markdown; the panel is an additional surface, not a replacement. Power users can ignore it.
+- **Honours SPEC-210-a §5.1's intent** (make the empty-override `=` form editable) without committing to a full contenteditable rebuild of the canvas (the more aggressive interpretation of the original spec).
+
+### 6.4 Spec (SPEC-205-b — supersedes SPEC-210-a §5.1)
+
+- New component `frontend/src/lib/canvas/text/SmartMarkdownCompanionPanel.svelte`.
+- Mounted inside `SmartMarkdownCanvas.svelte` when `editing=true`. Layout: source 60% / panel 40% on wide screens; tabbed (Source / Panel) on narrow screens (< 900px).
+- Panel state derives from `data.markdown_source` (the `=`-empty-token regex from SPEC-210-a) and `data.content` (the resolved preview).
+- Element-name fetch: lazy GET `/api/elements/{id}?fields=name,data` per unique element-id seen in fillable tokens. Cache in a `Map<elementId, {name, attributes}>`.
+- Source rewrite: when an input's value changes, find the exact `{{...path=}}` substring in `data.markdown_source` (by token position from the regex match), splice in `=<escaped-value>`. Bubble up via `onsourcechange` (existing wiring from PR 1's canvas).
+- Tokens-preview pane: just a `<MarkdownView source={content}>` with a `.preview-muted` style modifier (sets `opacity: 0.75` and a grey overlay tone). Read-only.
+
+### 6.5 Tests
+
+- `frontend/tests/unit/smartMarkdownCompanion.test.ts`:
+  - Regex extraction: source with two fillable tokens → two panel rows.
+  - Source rewrite: setting an input value to "500" replaces `=` with `=500` in the right token, leaves others alone.
+  - Escape handling: setting a value containing `}` or `\` is rejected or escaped (decided in spec, currently: strip `}` and `\` before splice).
+  - Element-name resolution cache: same element-id used twice → one GET.
+- Visual verification post-deploy: paste Ingredient stamp for broccoli in a recipe → see "Broccoli — Quantity [ ]" appear in the panel → type "2" → source updates → preview shows "2 head Broccoli".
+
+### 6.6 Stretch (out of scope, future v6.30.x)
+
+- **Per-token hover tooltips on the textarea itself** ("hover this token to see what it resolves to"). Pragmatic v2 if the panel + preview combo isn't enough.
+- **Live (debounced) full re-render against the resolver.** Would need either backend-roundtrip-per-keystroke (chatty) or a JS port of the resolver (DRY violation §13). The fillable-slot rewrite is purely local; the tokens preview stays "saved-state" until you click Save.
+- **Editing for non-fillable tokens** (e.g. clicking a `name` token to change which element it points at). Deferred — the panel only handles `=`-fillable slots in v1.
+
+### 6.7 Genericness (ADR-214)
+
+Pure UI logic in a generic component. No domain terminology. Clean.
+
+### 6.8 Risk
+
+- The element-name fetch adds N requests on first render of a recipe with N distinct elements. Mitigated by request coalescing and the existing API's <100ms response on UAT. Could batch via `/api/elements/batch?ids=...` if it becomes a hotspot (out of scope for v1).
+- Substring-based source rewrite is sensitive to token-string uniqueness. If two fillable tokens happen to be identical substrings (same element, same attribute path), the rewrite would target both. The regex matcher already returns byte positions, so we rewrite by index, not by string replace — disambiguates correctly.
+
+---
+
+## 7. Protocol checklist (per PR)
+
+Per [`docs/protocols.md`](../protocols.md):
+
+| Protocol | PR 11 | PR 12 | PR 13 | PR 14 |
+|---|---|---|---|---|
+| §1 ADR | **ADR-215** (stamp body-parsing filter) | **ADR-216** (set-create inherits collection) | _(spec extensions; no new ADR)_ | _(spec extension on ADR-205)_ |
+| §2 SPEC | SPEC-211-d | SPEC-216-a | SPEC-212-e + SPEC-211-e | SPEC-205-b |
+| §3 TDD | backend tests | frontend test | frontend + backend tests | frontend test |
+| §4 Feature branch | `feature/stamp-filter-by-attribute` | `feature/set-create-inherits-collection` | `feature/ux-consistency-pass` | `feature/smart-markdown-edit-preview` |
+| §5 CHANGELOG | entry | entry | entry | entry |
+| §6 Release | tag + GH Release | tag + GH Release | tag + GH Release | tag + GH Release |
+| §7 `{@html}` | none | none | none | none — preview reuses `MarkdownView` which goes through marked + DOMPurify |
+| §8 Context7 | not needed | not needed | not needed | not needed |
+| §9 Production code | yes | yes | yes | yes |
+| §11 Latest deps | no new deps | no new deps | no new deps | no new deps |
+| §12 README | no change | no change | no change | no change |
+| §13 DRY | clone-helpers extracted if used by both profile + template clones | no duplication | yes — shared clone logic | reuses `MarkdownView` for rendering (no duplicate resolver) |
+| §14 Surface parity | no new writes | no new writes (frontend-only) | no new writes | no new writes (frontend-only) |
+| §15 SQLite ↔ Supabase | no DB changes | no DB changes | **m079 + m084 pair** for the rename | no DB changes |
+| ADR-214 genericness | clean | clean | clean (Ingredient in allow-listed paths only) | clean |
+
+---
+
+## 8. Release sequencing
+
+Four feature PRs, each on its own branch, each tagging a minor:
+
+| Version | What |
+|---|---|
+| **v6.27.0** | PR 11 — stamp body-parsing filter (ADR-215, SPEC-211-d) |
+| **v6.28.0** | PR 12 — set creation inherits current collection (ADR-216, SPEC-216-a) |
+| **v6.29.0** | PR 13 — UX consistency pass: friendly copy + clone for profiles & templates + Ingredient rename (SPEC-212-e + SPEC-211-e + m079/m084) |
+| **v6.30.0** | PR 14 — smart-markdown edit-view resolved-preview pane (SPEC-205-b) |
+
+**v6.29.0 is the only one with a DB change** (the m079/m084 rename pair). Supabase ordering per memory `feedback_render_supabase_ordering`:
+
+1. Merge PR 13 (includes both code + migration files).
+2. Run `scripts/supabase-migrate.sh "$SUPABASE_DB_URL_DIRECT"` against the live DB. (Or apply m084 directly via `psql -f` as we've done for prior PRs.)
+3. The merged code uses the new name in seed constants; existing data is renamed by m084.
+
+Render auto-deploys on merge to main for all four. PRs can ship in any order since none depend on each other.
+
+---
+
+## 9. Definition of done
+
+After all four PRs ship and the user's live DB has m084 applied:
+
+- The smart-markdown picker only offers stamps whose body-referenced attributes the target element actually has. Sausages → Ingredient stamp only.
+- "Create new set" from a collection-filtered view → new set is in the right collection.
+- "Aggregation profiles for this set" section has a Clone-from-existing button alongside + New, with friendly help copy.
+- Elements list "Templates" dialog has a Clone-template button alongside Use.
+- The seeded "Quantified item" stamp is now named "Ingredient" everywhere — pickers, listings, MCP responses, CLI output.
+- Smart-markdown diagrams in edit mode show a companion panel on the right:
+  - **Fill in the blanks**: every fillable slot (`{{...path=}}`) appears as a labeled input — element name, attribute path, easy text field. Editing rewrites the source token in place.
+  - **Tokens preview**: the last-saved resolved markdown rendered in muted grey, so users can see what each token line renders to (e.g. `500 g Pork mince`) without leaving edit mode.
+- The deferred fillable-slot editor UX from SPEC-210-a §5.1 (v6.18.0) is finally delivered.
+- Genericness invariant still clean; no new `{@html}` paths; SQLite ↔ Supabase parity preserved.
+- All issue #211 observations and clarifications from the 2026-05-22 comment + follow-on exchange are closed.
