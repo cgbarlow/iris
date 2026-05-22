@@ -306,14 +306,20 @@ class TestListAndGet:
         )
         assert r.status_code == 201
 
-        # set_id=A + include_global → A's 2 + 1 global = 3
+        # set_id=A + include_global → A's 2 + 1 user-global + 5 seeded
+        # globals (Quantified item / Sized story / Logged work / Line item
+        # / Read entry per ADR-211). Filter to user-created entries to keep
+        # the assertion stable across future seeded additions.
         r = await client.get(
             f"/api/element-templates?set_id={set_a}&include_global=true",
             headers=h,
         )
         assert r.status_code == 200
-        names = sorted(t["name"] for t in r.json()["items"])
-        assert names == ["A1", "A2", "G1"]
+        user_names = sorted(
+            t["name"] for t in r.json()["items"]
+            if t["created_by"] is not None  # exclude seeded (created_by NULL)
+        )
+        assert user_names == ["A1", "A2", "G1"]
 
         # set_id=A + include_global=false → A's 2 only
         r = await client.get(
@@ -323,12 +329,16 @@ class TestListAndGet:
         names = sorted(t["name"] for t in r.json()["items"])
         assert names == ["A1", "A2"]
 
-        # set_id absent + include_global → globals only
+        # set_id absent + include_global → globals only (user G1 +
+        # the 5 seeded stamps per ADR-211; filter by created_by).
         r = await client.get(
             "/api/element-templates?include_global=true", headers=h,
         )
-        names = sorted(t["name"] for t in r.json()["items"])
-        assert names == ["G1"]
+        user_names = sorted(
+            t["name"] for t in r.json()["items"]
+            if t["created_by"] is not None
+        )
+        assert user_names == ["G1"]
 
     async def test_get_one_returns_full_template(
         self, client: httpx.AsyncClient,

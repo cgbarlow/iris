@@ -11,6 +11,8 @@ from app.element_templates.models import (
     ElementTemplateCreate,
     ElementTemplateListResponse,
     ElementTemplateResponse,
+    ElementTemplateStampListResponse,
+    ElementTemplateStampResponse,
     ElementTemplateUpdate,
 )
 from app.element_templates.service import (
@@ -20,6 +22,7 @@ from app.element_templates.service import (
     delete_element_template,
     get_element_template,
     list_element_templates,
+    list_stamps_for_element,
     update_element_template,
 )
 
@@ -32,7 +35,12 @@ async def create(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> ElementTemplateResponse:
-    """Create a template from an existing element."""
+    """Create a template (ADR-191 + ADR-211).
+
+    Content sources are alternatives: snapshot from ``source_element_id``,
+    direct ``template_data``, or a ``markdown_stamp``. At least one must
+    yield non-empty content.
+    """
     db = request.app.state.db_manager.main_db
     try:
         result = await create_element_template(
@@ -44,6 +52,8 @@ async def create(
             set_id=body.set_id,
             is_global=body.is_global,
             created_by=current_user["id"],
+            template_data_direct=body.template_data,
+            markdown_stamp=body.markdown_stamp,
         )
     except ElementTemplateScopeError as exc:
         raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
@@ -75,6 +85,28 @@ async def list_all(
         total=total,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get(
+    "/stamps",
+    response_model=ElementTemplateStampListResponse,
+)
+async def list_stamps(
+    request: Request,
+    element_id: str = Query(..., min_length=1),
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> ElementTemplateStampListResponse:
+    """ADR-211: list in-scope stamps for an element.
+
+    Each ``markdown_stamp`` is pre-resolved — ``{{self:…}}`` is already
+    rewritten to ``{{element:<element_id>:…}}`` so the body can be
+    pasted into a smart-markdown source unchanged.
+    """
+    db = request.app.state.db_manager.main_db
+    items = await list_stamps_for_element(db, element_id)
+    return ElementTemplateStampListResponse(
+        items=[ElementTemplateStampResponse(**i) for i in items],
     )
 
 
@@ -118,6 +150,10 @@ async def update(
         kwargs["is_global"] = raw["is_global"]
     if "set_id" in raw:
         kwargs["set_id"] = raw["set_id"]  # may be None
+    if "template_data" in raw:
+        kwargs["template_data_direct"] = raw["template_data"]
+    if "markdown_stamp" in raw:
+        kwargs["markdown_stamp"] = raw["markdown_stamp"]
     try:
         result = await update_element_template(db, template_id, **kwargs)
     except ElementTemplateScopeError as exc:

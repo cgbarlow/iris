@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.19.0] - 2026-05-22
+
+### Added
+
+- **Markdown stamps on element templates**
+  ([ADR-211](docs/adrs/ADR-211-Element-Template-Stamps.md),
+  [SPEC-211-a](docs/adrs/specs/SPEC-211-a-Element-Template-Stamps.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211)).
+  `element_templates` gains a new `markdown_stamp TEXT` column that
+  holds a smart-markdown fragment using `{{self:<field-spec>}}`
+  placeholders. At smart-markdown insert time the picker substitutes
+  `self` with the selected element's ID, so a single pick yields a
+  multi-token line (e.g. quantity + unit + name) instead of three
+  separate picker round-trips. Stamps live on element_templates so
+  they reuse the existing scope (`is_global` / `set_id`) and
+  management UX.
+- **`POST` / `PUT /api/element-templates` accept `markdown_stamp`
+  and direct `template_data`**. `source_element_id` is now optional —
+  a template can carry direct content via `template_data`, a stamp
+  via `markdown_stamp`, or both. At least one of the three (source,
+  data, stamp) must yield non-empty content; empty templates are
+  rejected with 422.
+- **`GET /api/element-templates/stamps?element_id=<id>`** — new read
+  endpoint returning in-scope stamps for an element. Scope rules:
+  template is global OR set-matches the element's set; if the
+  template's captured `element_type` is set, it must match the
+  element's. Each returned `markdown_stamp` has `{{self:…}}` already
+  rewritten to `{{element:<element-id>:…}}` so the body is paste-ready.
+- **MCP tool `list_element_template_stamps`** — calls the new
+  endpoint. Discoverable by Claude Desktop / any agent during smart-
+  markdown authoring sessions.
+- **MCP `create_element_template` and `update_element_template`** accept
+  the new `markdown_stamp` and `template_data` arguments. CLI
+  `iris create / update element-template` gain `--markdown-stamp`
+  and `--template-data-file` flags.
+- **Five seeded global element-template stamps** ship in m075 / m080:
+  - **Quantified item** — `{{self:attr:attributes/Quantity/type=}} {{self:attr:attributes/Unit/type}} {{self:name}}`
+  - **Sized story** — `{{self:attr:attributes/Points/type=}} pts — {{self:name}}`
+  - **Logged work** — `{{self:attr:attributes/Hours/type=}}h — {{self:name}}`
+  - **Line item** — `{{self:attr:attributes/Currency/type}}{{self:attr:attributes/Amount/type=}} — {{self:name}}`
+  - **Read entry** — `{{self:attr:attributes/Pages/type=}} pages — "{{self:name}}" by {{self:attr:attributes/Author/type}}`
+
+  Each carries a pre-filled `data.attributes` blueprint so creating an
+  element from the template yields the slots its stamp expects. All
+  ship as `is_global = TRUE` with `created_by = NULL`.
+
+### Changed
+
+- `element_templates.created_by` is now nullable in the response
+  model — seeded global templates have no authoring user. Existing
+  user-created templates always carry the author's id (unchanged).
+
+### Migration
+
+- **SQLite m074** — `markdown_stamp` column added to
+  `element_templates`. Idempotent.
+- **Supabase m079** — mirror of m074. Apply via
+  `scripts/supabase-migrate.sh` before rolling forward.
+- **SQLite m075 / Supabase m080** — seed the five global stamps with
+  deterministic UUIDv5 ids so re-running is a no-op.
+- Order per memory `feedback_render_supabase_ordering`: apply Supabase
+  migrations first, then merge to `main` so Render serves code with
+  the column already present.
+
 ## [6.18.0] - 2026-05-22
 
 ### Added
