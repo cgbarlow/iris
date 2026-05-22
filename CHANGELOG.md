@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.28.0] - 2026-05-22
+
+### Changed
+
+- **Set creation inherits the active collection filter**
+  ([ADR-216](docs/adrs/ADR-216-Set-Creation-Inherits-Collection.md),
+  [SPEC-216-a](docs/adrs/specs/SPEC-216-a-Set-Creation-Inherits-Collection.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211) comment
+  observation O5). When the sets list page (`/sets`) is filtered by a
+  collection (via `?collection_id=…` or the active-collection store),
+  clicking "Create new set" now passes that collection id through to
+  the backend so the new set is born in that collection. Sets
+  created from the unfiltered view remain collection-less (current
+  behaviour preserved).
+
+### Migration
+
+- None. Pure frontend change in `frontend/src/routes/sets/+page.svelte`.
+
 ## [6.27.0] - 2026-05-22
 
 ### Changed

@@ -82,10 +82,17 @@
 	}
 
 	async function handleCreate(name: string, description: string | null) {
+		// ADR-216 (v6.28.0): a new set created from a collection-filtered
+		// view inherits that collection, so the user doesn't have to
+		// re-attach it manually after creation.
+		const body: Record<string, unknown> = { name, description };
+		if (collectionId) {
+			body.collection_id = collectionId;
+		}
 		try {
 			await apiFetch<IrisSet>('/api/sets', {
 				method: 'POST',
-				body: JSON.stringify({ name, description }),
+				body: JSON.stringify(body),
 			});
 			showCreateDialog = false;
 			await loadSets();
