@@ -117,6 +117,17 @@
 		display_order: number;
 	}
 	let attachedImages = $state<EntityImage[]>([]);
+	// ADR-211 (v6.19.1): stamps in scope for the drilled element. The
+	// backend has already substituted `{{self:…}}` with concrete element
+	// references in `markdown_stamp`, so the body is paste-ready.
+	interface StampEntry {
+		id: string;
+		name: string;
+		description: string | null;
+		is_global: boolean;
+		markdown_stamp: string;
+	}
+	let attachedStamps = $state<StampEntry[]>([]);
 	type ImagePickerState = {
 		chosen: EntityImage;
 		axis: 'original' | 'width' | 'height';
@@ -157,7 +168,8 @@
 	type DrillItem =
 		| { kind: 'primitive'; label: string }
 		| { kind: 'container'; label: string }
-		| { kind: 'image'; label: string; image: EntityImage };
+		| { kind: 'image'; label: string; image: EntityImage }
+		| { kind: 'stamp'; label: string; stamp: StampEntry };
 	const drillMenuItems = $derived.by((): DrillItem[] => {
 		// ADR-209 (v6.17.0): images attached to the chosen entity are
 		// surfaced as `image` items at the top of the menu. Clicking
@@ -167,11 +179,21 @@
 			label: `Image ${idx + 1}`,
 			image: img,
 		}));
+		// ADR-211 (v6.19.1): stamps as top-of-menu one-pick rows.
+		// Backend resolves `{{self:…}}` → `{{element:UUID:…}}` so the
+		// body is paste-ready.
+		const stampItems: DrillItem[] = attachedStamps.map((s) => ({
+			kind: 'stamp' as const,
+			label: `Stamp: ${s.name}`,
+			stamp: s,
+		}));
 		// ADR-207 v6.16.1: non-element drill exposes name + description
 		// only. Their children are reachable via browse mode at the
 		// parent breadcrumb level (a package now appears as a browse
 		// scope, not a drill).
 		if (chosenEntity && chosenEntity.entity_type !== 'element') {
+			// Stamps don't apply to non-element entities (the
+			// /stamps endpoint requires an element id).
 			const items: DrillItem[] = [
 				...imageItems,
 				{ kind: 'primitive' as const, label: 'name' },
@@ -205,10 +227,12 @@
 		})();
 		// At the root of an element drill, also expose name + description
 		// as "shortcut" primitives so the user can pick them without
-		// drilling. Images (ADR-209) sit above them. For non-elements
-		// only the shortcuts apply (handled above).
+		// drilling. Stamps (ADR-211) and images (ADR-209) sit above
+		// them. For non-elements only the shortcuts apply (handled
+		// above).
 		const withTopShortcuts: DrillItem[] = (drillPath.length === 0)
 			? [
+				...stampItems,
 				...imageItems,
 				...NON_ELEMENT_FIELDS.map((f) => ({
 					label: f, kind: 'primitive' as const,
@@ -453,6 +477,11 @@
 		// Fetch attached images for the entity (parallel with drill node fetch).
 		attachedImages = [];
 		void fetchAttachedImages(entity);
+		// ADR-211 (v6.19.1): fetch stamps available for this element.
+		attachedStamps = [];
+		if (entity.entity_type === 'element') {
+			void fetchAttachedStamps(entity);
+		}
 		if (entity.entity_type === 'element') {
 			await fetchDrillNode();
 		} else {
@@ -463,6 +492,22 @@
 		}
 		await tick();
 		drillInputEl?.focus();
+	}
+
+	async function fetchAttachedStamps(entity: EntitySearchResult) {
+		// ADR-211: only elements have applicable stamps. Failure is
+		// silently treated as "no stamps" so the picker degrades to
+		// pre-v6.19.1 behaviour.
+		try {
+			const resp = await apiFetch<{ items: StampEntry[] }>(
+				`/api/element-templates/stamps?element_id=${encodeURIComponent(entity.id)}`,
+			);
+			if (chosenEntity?.id === entity.id) {
+				attachedStamps = resp?.items ?? [];
+			}
+		} catch {
+			if (chosenEntity?.id === entity.id) attachedStamps = [];
+		}
 	}
 
 	async function fetchAttachedImages(entity: EntitySearchResult) {
@@ -548,6 +593,13 @@
 			openImageSizer(item.image);
 			return;
 		}
+		// ADR-211 (v6.19.1): stamp item — emit the resolved body
+		// verbatim. `fillable` doesn't apply (stamps embed their own
+		// `=` placeholders already).
+		if (item.kind === 'stamp') {
+			oninsert(item.stamp.markdown_stamp);
+			return;
+		}
 		if (item.kind === 'primitive') {
 			// Top-level name/description shortcuts
 			if (drillPath.length === 0 && NON_ELEMENT_FIELDS.includes(item.label)) {
@@ -587,6 +639,8 @@
 			chosenEntity = null;
 			drillNode = null;
 			containerChildren = [];
+			attachedStamps = [];
+			attachedImages = [];
 			await tick();
 			inputEl?.focus();
 			return;
