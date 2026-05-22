@@ -1,6 +1,6 @@
 [project]
 name = "iris-client"
-version = "6.21.1"
+version = "6.22.0"
 description = "Async Python client for the Iris HTTP API (ADR-132)"
 requires-python = ">=3.12"
 readme = "README.md"

@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.22.0] - 2026-05-22
+
+### Added
+
+- **Three operator-run migration scripts** for the meal-plan →
+  shopping-list demo workflow (issue #211):
+  - `scripts/backfill_quantity_attribute.py` — adds a blank
+    `Quantity` attribute to every element in a target set so authors
+    can write `=<value>` overrides without first editing each
+    element's data.
+  - `scripts/migrate_recipes_to_quantity_tokens.py` — rewrites the
+    legacy free-text quantity pattern
+    `NNN {{element:UUID:attr:.../Unit/type}} {{element:UUID:name}}`
+    into the ADR-210 structured form
+    `{{element:UUID:attr:attributes/Quantity/type=NNN}} {{element:UUID:attr:attributes/Unit/type}} {{element:UUID:name}}`.
+    Renders identically; now machine-parseable by the v6.20.0
+    aggregation engine.
+  - `scripts/backfill_servings_on_recipes.py` — sets
+    `data.servings` on smart_markdown diagrams so the Shopping list
+    profile's diner-count multiplier has a denominator.
+- All three scripts: argparse CLI; dry-run mode; idempotent;
+  `--created-by <uuid>` for Supabase NOT-NULL attribution (auto-
+  detected from existing rows in the set when omitted).
+- Pure-function regex tests in
+  `backend/tests/test_scripts/test_migrate_recipes_regex.py`.
+- **Live demo data migrated**: 178 grocery elements gained a
+  Quantity attribute; 124 quantity prefixes rewritten across 29
+  recipes; 34 recipes gained `data.servings = 4`. Issue #211
+  end-to-end workflow is now exercisable.
+
+### Migration
+
+- Operator-run, not in the SQLite startup runner (target sets are
+  environment-specific). The three scripts are pure data
+  transforms — no schema changes. Already applied to the live UAT/
+  prod data.
+
 ## [6.21.1] - 2026-05-22
 
 ### Added
