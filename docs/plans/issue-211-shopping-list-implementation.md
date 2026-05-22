@@ -50,15 +50,19 @@ Combined, these four primitives — none of which carry recipe semantics in thei
 
 ## 2. ADRs required
 
-Per protocol §1, each architectural decision below gets its own ADR in `docs/adrs/`. Numbers are placeholders; assign at PR time from the next available number after the current highest (ADR-209 per recent commits → start at ADR-210).
+Per protocol §1, each architectural decision below gets its own ADR in `docs/adrs/`. Numbers assigned from the next available after the current highest on `origin/main` (ADR-209).
 
 | ADR | Title | Decides | Supersedes |
 |---|---|---|---|
-| **ADR-A** | Smart-markdown token `=value` overrides and blank-attribute editable spans | Grammar extension (`{{...:attr:path=value}}`); resolver precedence (override → stored → blank); canvas behaviour: blank tokens render as editable inputs that persist via in-place markdown source rewrite | Extends ADR-205, ADR-206 |
-| **ADR-B** | Markdown stamps on element templates | New `markdown_stamp` column on `element_templates`; `{{self:…}}` self-reference token variant; substitution at insert time; picker integration (top section before fields); stamp authoring uses smart_markdown editor in self-mode | Extends ADR-191 (element templates) and ADR-205 |
-| **ADR-C** | Generic aggregation profiles and aggregation engine | New `aggregation_profiles` table; profile_data JSON schema (traversal/output rules); engine module `backend/app/aggregation/`; surfaces (API/MCP/CLI); read-only, idempotent compute | Establishes new module |
-| **ADR-D** | `aggregation_list` diagram type | Synth-on-read diagram type that delegates compute to the aggregation engine; configuration in `data.source_diagram_id` + `data.profile_id` | Extends ADR-186, ADR-187, ADR-205 |
-| **ADR-E** | Genericness invariant for shopping-list workflow | Codifies that no code in `backend/app/` (excluding seed/migrations/tests/docs) may reference recipe-domain strings; CI check enforces this; rationale and exception list | Establishes new invariant; references ADR-182 (parity discipline pattern) |
+| **ADR-210** | Smart-markdown token `=value` overrides and blank-attribute editable spans | Grammar extension (`{{...:attr:path=value}}`); resolver precedence (override → stored → blank); canvas behaviour: blank tokens render as editable inputs that persist via in-place markdown source rewrite | Extends ADR-205, ADR-206 |
+| **ADR-211** | Markdown stamps on element templates | New `markdown_stamp` column on `element_templates`; `{{self:…}}` self-reference token variant; substitution at insert time; picker integration (top section before fields); stamp authoring uses smart_markdown editor in self-mode | Extends ADR-191 (element templates) and ADR-205 |
+| **ADR-212** | Generic aggregation profiles and aggregation engine | New `aggregation_profiles` table; profile_data JSON schema (traversal/output rules); engine module `backend/app/aggregation/`; surfaces (API/MCP/CLI); read-only, idempotent compute | Establishes new module |
+| **ADR-213** | `aggregation_list` diagram type | Synth-on-read diagram type that delegates compute to the aggregation engine; configuration in `data.source_diagram_id` + `data.profile_id` | Extends ADR-186, ADR-187, ADR-205 |
+| **ADR-214** | Genericness invariant for shopping-list workflow | Codifies that no code in `backend/app/` (excluding seed/migrations/tests/docs) may reference recipe-domain strings; CI check enforces this; rationale and exception list | Establishes new invariant; references ADR-182 (parity discipline pattern) |
+
+**Spec ↔ ADR mapping:** SPEC-210-a, SPEC-211-a, SPEC-212-a/b/c, SPEC-213-a, SPEC-214-a.
+
+**Migration numbering (origin/main HEAD at PR-1 time):** next SQLite migration is `m074`; next Supabase migration is `m079`. Numbering is independent per family per protocol §15.
 
 Each ADR includes the rejected alternatives (Path A — element-graph recipes; Path B — domain-specific `ingredient`/`meal` token variants) and the rationale for rejecting them, per protocol §1.
 
@@ -70,13 +74,13 @@ Per protocol §2, each implementation-bearing ADR gets a SPEC. Filenames follow 
 
 | Spec | Pairs with | Scope |
 |---|---|---|
-| **SPEC-A-a-Smart-Markdown-Value-Overrides.md** | ADR-A | Grammar regex; resolver precedence; in-canvas inline-edit behaviour; persistence path; cursor / focus rules; edge cases (escaping `=`, multi-character values, special characters in values) |
-| **SPEC-B-a-Element-Template-Stamps.md** | ADR-B | Schema; `{{self:…}}` substitution algorithm; picker UI integration; stamp-author editor UI in self-mode; in-scope-filter rules (template's captured element_type narrows applicability) |
-| **SPEC-C-a-Aggregation-Profile-Schema.md** | ADR-C | Profile JSON schema (traversal, multiplier, output); SQLite + Supabase table; CRUD endpoints; scope rules (global vs set) |
-| **SPEC-C-b-Aggregation-Engine.md** | ADR-C | Compute algorithm (pseudocode → Python); attribute-path resolution; multiplier resolution; aggregation function set (sum / mean / count); format string grammar; performance notes |
-| **SPEC-C-c-Aggregation-Surfaces.md** | ADR-C | REST endpoints; MCP tools; CLI subcommands; surface parity; auth/RBAC; rate limiting (anonymous Ask-AI-style); audit-log entries on profile writes |
-| **SPEC-D-a-Aggregation-List-Diagram-Type.md** | ADR-D | Diagram-type registration; data shape; synth-on-read hook; UI source/profile pickers in the create dialog |
-| **SPEC-E-a-Genericness-Invariant.md** | ADR-E | List of banned strings; allow-listed paths (seed/, migrations/, tests/, docs/); `scripts/check_aggregation_genericness.py`; CI wiring |
+| **SPEC-210-a-Smart-Markdown-Value-Overrides.md** | ADR-210 | Grammar regex; resolver precedence; in-canvas inline-edit behaviour; persistence path; cursor / focus rules; edge cases (escaping `=`, multi-character values, special characters in values) |
+| **SPEC-211-a-Element-Template-Stamps.md** | ADR-211 | Schema; `{{self:…}}` substitution algorithm; picker UI integration; stamp-author editor UI in self-mode; in-scope-filter rules (template's captured element_type narrows applicability) |
+| **SPEC-212-a-Aggregation-Profile-Schema.md** | ADR-212 | Profile JSON schema (traversal, multiplier, output); SQLite + Supabase table; CRUD endpoints; scope rules (global vs set) |
+| **SPEC-212-b-Aggregation-Engine.md** | ADR-212 | Compute algorithm (pseudocode → Python); attribute-path resolution; multiplier resolution; aggregation function set (sum / mean / count); format string grammar; performance notes |
+| **SPEC-212-c-Aggregation-Surfaces.md** | ADR-212 | REST endpoints; MCP tools; CLI subcommands; surface parity; auth/RBAC; rate limiting (anonymous Ask-AI-style); audit-log entries on profile writes |
+| **SPEC-213-a-Aggregation-List-Diagram-Type.md** | ADR-213 | Diagram-type registration; data shape; synth-on-read hook; UI source/profile pickers in the create dialog |
+| **SPEC-214-a-Genericness-Invariant.md** | ADR-214 | List of banned strings; allow-listed paths (seed/, migrations/, tests/, docs/); `scripts/check_aggregation_genericness.py`; CI wiring |
 
 ---
 
@@ -170,7 +174,7 @@ ON CONFLICT (id) DO NOTHING;
 
 ### 4.4 Seed global element templates (with stamps)
 
-All seeded with `is_global = 1/TRUE`, `set_id = NULL`. Ships in the same release as ADR-B (v6.14.0) — once the `markdown_stamp` column exists. Each template's `template_data` pre-fills `element_type` and a `data.attributes` blueprint so creating an element from the template yields the attribute slots its stamp expects.
+All seeded with `is_global = 1/TRUE`, `set_id = NULL`. Ships in the same release as ADR-211 (v6.19.0) — once the `markdown_stamp` column exists. Each template's `template_data` pre-fills `element_type` and a `data.attributes` blueprint so creating an element from the template yields the attribute slots its stamp expects.
 
 **SQLite** (`m{N+3a}_seed_global_element_templates.py`) **+ Supabase** mirror.
 
@@ -192,7 +196,7 @@ Schema/seed tests in `backend/tests/test_migrations/test_global_element_template
 
 ### 4.5 Seed global aggregation profiles
 
-All seeded with `is_global = 1/TRUE`, `set_id = NULL`. Ships in the same release as ADR-C (v6.15.0) — once the `aggregation_profiles` table exists.
+All seeded with `is_global = 1/TRUE`, `set_id = NULL`. Ships in the same release as ADR-212 (v6.20.0) — once the `aggregation_profiles` table exists.
 
 **SQLite** (`m{N+3b}_seed_global_aggregation_profiles.py`) **+ Supabase** mirror.
 
@@ -394,13 +398,13 @@ Existing `iris element-template create`/`update` accept a new `--markdown-stamp`
 
 ## 9. Frontend changes
 
-### 9.1 Smart-markdown canvas (per ADR-A)
+### 9.1 Smart-markdown canvas (per ADR-210)
 
 - `SmartMarkdownCanvas.svelte` — tokens whose value override is blank (`…/type=`) render as an inline `<input>` element. On blur, the canvas rewrites the token in the markdown source from `…/type=` → `…/type=<value>` and re-runs the resolver. Per protocol §7, no `{@html}` paths change here — values are rendered as text content of input elements; markdown rendering still goes through the existing marked + DOMPurify pipeline.
 - New picker option "Insert as fillable placeholder" surfaces in the field-step.
 - Source-pane editing of `=value` is supported as a fallback.
 
-### 9.2 Smart-markdown picker — stamp section (per ADR-B)
+### 9.2 Smart-markdown picker — stamp section (per ADR-211)
 
 - After entity selection, the picker shows a "Stamps" section above the "Fields" section.
 - Stamps are fetched via `GET /api/element-templates/stamps?element_id=...`.
@@ -408,7 +412,7 @@ Existing `iris element-template create`/`update` accept a new `--markdown-stamp`
 - Stamps with `template_data.element_type` matching the selected element appear; non-matching are hidden (per Q1 resolution).
 - A "Manage stamps" link in the picker footer navigates to the element-template editor for users with rights.
 
-### 9.3 Element-template editor — stamp editor (per ADR-B)
+### 9.3 Element-template editor — stamp editor (per ADR-211)
 
 - New "Stamp" tab in the element-template editor.
 - Editor uses the same smart_markdown component but with a `selfMode: true` prop:
@@ -416,7 +420,7 @@ Existing `iris element-template create`/`update` accept a new `--markdown-stamp`
   - Live preview renders the stamp against the template's `source_element_id`.
   - Preview prompts for test values for any blank slots so the user sees a realistic render.
 
-### 9.4 Aggregation-profile editor (per ADR-C)
+### 9.4 Aggregation-profile editor (per ADR-212)
 
 A new component `AggregationProfileEditor.svelte` reused in two contexts:
 
@@ -431,7 +435,7 @@ The editor renders the profile JSON as a form:
 - **Output** tab: group-by attribute-path picker; sort-groups + sort-items-within-group dropdowns (`alpha`, `package_display_order`, `none`); line-format + breakdown-format text inputs with placeholder autocomplete (`{name}`, `{sum_value}`, `{bucket}`, `{sources_joined}`).
 - **Preview** tab: source-diagram picker → live-rendered output of the engine against the current in-memory profile draft.
 
-### 9.5 Aggregation-list diagram (per ADR-D)
+### 9.5 Aggregation-list diagram (per ADR-213)
 
 - New create-diagram option "Aggregation list" in the diagram type dropdown.
 - Create dialog includes: source diagram picker (any diagram), profile dropdown (in-scope profiles).
@@ -489,7 +493,7 @@ backend/tests/
 - Component tests for the aggregation-list create dialog and read view.
 - Playwright e2e: author a recipe via stamp; build a meal plan; view the seeded shopping-list aggregation diagram; verify the markdown reflects the expected aggregation.
 
-### 10.3 Genericness invariant test (per ADR-E)
+### 10.3 Genericness invariant test (per ADR-214)
 
 A single pytest invokes `scripts/check_aggregation_genericness.py` and asserts exit code 0 across the entire current tree. Failures point at the offending file + line.
 
@@ -507,8 +511,8 @@ A single pytest invokes `scripts/check_aggregation_genericness.py` and asserts e
 - `docs/cli.md` — new `iris aggregation-profile` and `iris aggregate` subcommands.
 - `docs/mcp.md` — new MCP tools listed.
 - `docs/north-star.md` — refresh the "Iris as a prototyping tool" framing with shopping list as the worked example.
-- **`docs/aggregation-profiles-reference.md`** *(new)* — canonical reference for the five seeded global profiles (§4.5): the JSON of each, the template it pairs with (§4.4), the worked example for each use case, and a "How to clone and customise" section. Ships with v6.15.0.
-- **`docs/element-template-stamps-reference.md`** *(new)* — canonical reference for the five seeded global templates (§4.4): the stamp body of each, the pre-filled attribute blueprint, and worked examples of authoring with each. Ships with v6.14.0.
+- **`docs/aggregation-profiles-reference.md`** *(new)* — canonical reference for the five seeded global profiles (§4.5): the JSON of each, the template it pairs with (§4.4), the worked example for each use case, and a "How to clone and customise" section. Ships with v6.20.0.
+- **`docs/element-template-stamps-reference.md`** *(new)* — canonical reference for the five seeded global templates (§4.4): the stamp body of each, the pre-filled attribute blueprint, and worked examples of authoring with each. Ships with v6.19.0.
 
 ---
 
@@ -520,12 +524,12 @@ Recommended cadence — one minor version per primitive shipped end-to-end:
 
 | Version | Ship |
 |---|---|
-| `v6.13.0` | ADR-A: smart-markdown `=value` overrides + blank-attribute inline edit |
-| `v6.14.0` | ADR-B: element template stamps (schema + picker + stamp editor) + seed 5 global templates (§4.4) |
-| `v6.15.0` | ADR-C: aggregation profiles + engine + REST/MCP/CLI surfaces; seed 5 global aggregation profiles paired 1-for-1 with the v6.14 templates (§4.5) |
-| `v6.16.0` | ADR-D: `aggregation_list` diagram type; admin + set-editor UI for profiles |
-| `v6.16.1` | ADR-E: genericness invariant CI check (cleanup PR after the above) |
-| `v6.17.0` | Operator-run data migrations (Quantity attribute, recipe rewrites, servings backfill) + end-to-end demo verification |
+| `v6.18.0` | ADR-210: smart-markdown `=value` overrides + blank-attribute inline edit |
+| `v6.19.0` | ADR-211: element template stamps (schema + picker + stamp editor) + seed 5 global templates (§4.4) |
+| `v6.20.0` | ADR-212: aggregation profiles + engine + REST/MCP/CLI surfaces; seed 5 global aggregation profiles paired 1-for-1 with the v6.19 templates (§4.5) |
+| `v6.21.0` | ADR-213: `aggregation_list` diagram type; admin + set-editor UI for profiles |
+| `v6.21.1` | ADR-214: genericness invariant CI check (cleanup PR after the above) |
+| `v6.22.0` | Operator-run data migrations (Quantity attribute, recipe rewrites, servings backfill) + end-to-end demo verification |
 
 Each release: tag, GitHub Release per memory (`feedback_release_workflow`), CHANGELOG roll, four-place version bump per memory (`feedback_iris_version_bump_discipline`) — frontend/package.json + backend/mcp/iris-client pyproject.toml.
 
@@ -537,12 +541,12 @@ Per memory `feedback_render_supabase_ordering`: for the versions with Supabase m
 
 One logical change per branch. Suggested order:
 
-1. **`feature/smart-markdown-value-overrides`** — ADR-A + SPEC-A-a + grammar/resolver + canvas inline edit + tests + CHANGELOG → v6.13.0.
-2. **`feature/element-template-stamps`** — ADR-B + SPEC-B-a + schema migration + service + picker + stamp editor + **5 global template seeds (§4.4)** + tests + CHANGELOG → v6.14.0.
-3. **`feature/aggregation-profiles-and-engine`** — ADR-C + 3 specs + migrations + module + routes + MCP + CLI + **5 global aggregation-profile seeds (§4.5)** + `docs/aggregation-profiles-reference.md` + tests + CHANGELOG → v6.15.0.
-4. **`feature/aggregation-list-diagram-type`** — ADR-D + SPEC-D-a + migration + diagram wrapper + frontend create dialog + read/edit canvas + tests + CHANGELOG → v6.16.0.
-5. **`feature/aggregation-genericness-invariant`** — ADR-E + SPEC-E-a + CI script + tests + CHANGELOG → v6.16.1.
-6. **`feature/shopping-list-demo-migration`** — operator-run scripts (backfill Quantity, rewrite recipes, backfill servings) + tests + release notes + CHANGELOG → v6.17.0.
+1. **`feature/smart-markdown-value-overrides`** — ADR-210 + SPEC-210-a + grammar/resolver + canvas inline edit + tests + CHANGELOG → v6.18.0.
+2. **`feature/element-template-stamps`** — ADR-211 + SPEC-211-a + schema migration + service + picker + stamp editor + **5 global template seeds (§4.4)** + tests + CHANGELOG → v6.19.0.
+3. **`feature/aggregation-profiles-and-engine`** — ADR-212 + 3 specs + migrations + module + routes + MCP + CLI + **5 global aggregation-profile seeds (§4.5)** + `docs/aggregation-profiles-reference.md` + tests + CHANGELOG → v6.20.0.
+4. **`feature/aggregation-list-diagram-type`** — ADR-213 + SPEC-213-a + migration + diagram wrapper + frontend create dialog + read/edit canvas + tests + CHANGELOG → v6.21.0.
+5. **`feature/aggregation-genericness-invariant`** — ADR-214 + SPEC-214-a + CI script + tests + CHANGELOG → v6.21.1.
+6. **`feature/shopping-list-demo-migration`** — operator-run scripts (backfill Quantity, rewrite recipes, backfill servings) + tests + release notes + CHANGELOG → v6.22.0.
 
 Each PR closes one ADR's worth of work, has tests, has a CHANGELOG entry, and gets a GitHub Release.
 
@@ -564,7 +568,7 @@ These were flagged in the research doc and clarifying-questions exchange but not
 | O6 | Genericness invariant — banned-string list final cut: `ingredient`, `recipe`, `meal`, `diners`, `servings`, `aisle`, `shopping`. Anything to add/remove? | List as proposed; add `groceries` and `pantry`? Borderline since "Pantry" is a package name in user data, not in code. Probably leave both off. | Confirm |
 | O7 | Genericness invariant — should the check also extend to the **frontend** (`frontend/src/`)? | Yes — same rules, same allow-list (i18n strings, test fixtures, seed data only). | Confirm |
 | O8 | Naming: profile referred to as "aggregation profile" throughout. Any preference for "rollup profile", "aggregator profile", or other? | Keep "aggregation profile" — matches the `aggregation_list` diagram type, the `/api/aggregation/` route prefix, and the `aggregate` MCP tool. | Confirm |
-| O9 | _Resolved._ Seeds ship globally with their respective engine release: element templates in v6.14.0 (with ADR-B), aggregation profiles in v6.15.0 (with ADR-C). Both are five-strong libraries (Quantified item / Sized story / Logged work / Line item / Read entry templates; Shopping list / Sprint points rollup / Time tracker rollup / Expense report / Reading log rollup profiles). All `is_global = TRUE`, `set_id = NULL`. See §4.4 and §4.5. | — | Resolved 2026-05-22 |
+| O9 | _Resolved._ Seeds ship globally with their respective engine release: element templates in v6.19.0 (with ADR-211), aggregation profiles in v6.20.0 (with ADR-212). Both are five-strong libraries (Quantified item / Sized story / Logged work / Line item / Read entry templates; Shopping list / Sprint points rollup / Time tracker rollup / Expense report / Reading log rollup profiles). All `is_global = TRUE`, `set_id = NULL`. See §4.4 and §4.5. | — | Resolved 2026-05-22 |
 
 ---
 
@@ -612,8 +616,8 @@ Profile JSON is validated against the JSONSchema in `aggregation/schema.py` befo
 | Risk | Mitigation |
 |---|---|
 | Profile JSON gets gnarly for users editing it; the form UX in §9.4 is on the path | Build the form-style editor first (not a raw-JSON editor). Add a "View raw JSON" toggle for advanced users. Validate aggressively on submit; surface errors inline. |
-| The genericness invariant (ADR-E) blocks legitimate doc/seed/comment uses | The allow-list is path-based + comment-aware; if false positives surface, broaden the allow-list rather than the banned list. |
-| Existing recipes (the 34) get out of sync between rewrite migration and the v6.15 release | Operator-run scripts ship in v6.17.0 *after* the engine and diagram type are stable; before that, recipes still render fine — they just aren't on any aggregation. Migration is reversible. |
+| The genericness invariant (ADR-214) blocks legitimate doc/seed/comment uses | The allow-list is path-based + comment-aware; if false positives surface, broaden the allow-list rather than the banned list. |
+| Existing recipes (the 34) get out of sync between rewrite migration and the v6.15 release | Operator-run scripts ship in v6.22.0 *after* the engine and diagram type are stable; before that, recipes still render fine — they just aren't on any aggregation. Migration is reversible. |
 | Servings is missing on most existing recipes | Scaling default = 1 when servings missing or 0 (i.e., no scaling, pass through). A warning marker can render in the aggregated output. Operator backfills in v6.17 with user-supplied values. |
 | Performance: aggregating 30+ recipes on every GET | Profile data is small; recipe markdown is small; engine is O(tokens) and runs synchronously. If problematic at scale, add a per-diagram cache invalidated on source-diagram version bump (standard pattern). Not a v1 concern. |
 | Surface parity script fails on the new endpoints | Run locally before pushing each PR (`python scripts/check_surface_parity.py`). |
@@ -623,7 +627,7 @@ Profile JSON is validated against the JSONSchema in `aggregation/schema.py` befo
 
 ## 20. Demo verification (issue #211 end-to-end)
 
-When v6.17.0 ships, the issue-211 acceptance test is:
+When v6.22.0 ships, the issue-211 acceptance test is:
 
 1. User takes a photo of the kitchen jotter pad.
 2. Claude (Desktop) is asked to "build this week's meal plan and shopping list from this photo."
@@ -643,7 +647,7 @@ If steps 3 and 4 work end-to-end without any custom code beyond what this plan d
 
 - The merge-conflicted `frontend/src/lib/components/KnowledgeGraph.svelte` and the staged `frontend/vite.config.ts` modification on the local `main` branch — separate work, separate PR, not this initiative.
 - The other in-flight untracked plans/prompts in `docs/plans/` and `docs/prompts/` (e.g., `fizzing-tardle-whomp.md`, `doview-book-prompt-a.md`) — unrelated.
-- The Issue #185 follow-ups for smart_markdown (worktree at `.claude/worktrees/smart-markdown-and-tab-defaults/`) — this plan extends smart_markdown but assumes ADR-205 / ADR-206 / ADR-209 are merged before v6.13.0 begins. If they aren't, the plan's PR sequence merges them first.
+- The Issue #185 follow-ups for smart_markdown (worktree at `.claude/worktrees/smart-markdown-and-tab-defaults/`) — this plan extends smart_markdown but assumes ADR-205 / ADR-206 / ADR-209 are merged before v6.18.0 begins. If they aren't, the plan's PR sequence merges them first.
 
 ---
 
