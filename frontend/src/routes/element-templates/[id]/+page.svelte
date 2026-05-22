@@ -23,6 +23,7 @@
 		source_element_name: string | null;
 		included_fields: string[];
 		template_data: Record<string, unknown>;
+		markdown_stamp: string | null;
 		created_at: string;
 		updated_at: string;
 		created_by_username: string;
@@ -36,6 +37,49 @@
 	let submitting = $state(false);
 	let deleting = $state(false);
 	let showConfirmDelete = $state(false);
+
+	// SPEC-211-c (v6.24.0): inline stamp editor state.
+	let stampEditOpen = $state(false);
+	let stampDraft = $state('');
+	let stampSaving = $state(false);
+	let stampError = $state<string | null>(null);
+
+	function startStampEdit() {
+		if (!tpl) return;
+		stampDraft = tpl.markdown_stamp ?? '';
+		stampError = null;
+		stampEditOpen = true;
+	}
+
+	function cancelStampEdit() {
+		stampEditOpen = false;
+		stampError = null;
+	}
+
+	async function saveStamp() {
+		if (!tpl || stampSaving) return;
+		stampSaving = true;
+		stampError = null;
+		try {
+			// PUT carries only the fields we want to change. The
+			// backend (ADR-211) accepts markdown_stamp as a partial
+			// update; setting it to '' clears the stamp.
+			const updated = await apiFetch<ElementTemplate>(
+				`/api/element-templates/${tpl.id}`,
+				{
+					method: 'PUT',
+					body: JSON.stringify({
+						markdown_stamp: stampDraft,
+					}),
+				},
+			);
+			tpl = updated;
+			stampEditOpen = false;
+		} catch (e) {
+			stampError = e instanceof ApiError ? e.message : 'Failed to save stamp';
+		}
+		stampSaving = false;
+	}
 
 	$effect(() => {
 		const id = page.params.id;
@@ -200,6 +244,49 @@
 			<dt class="text-sm font-medium" style="color: var(--color-muted)">Updated</dt>
 			<dd class="text-sm" style="color: var(--color-fg)">{tpl.updated_at}</dd>
 		</dl>
+	</section>
+
+	<section class="mt-8">
+		<div class="flex items-center justify-between">
+			<h2 class="text-base font-semibold" style="color: var(--color-fg)">Markdown stamp</h2>
+			{#if !stampEditOpen}
+				<button onclick={startStampEdit} class="rounded px-3 py-1 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">
+					{tpl.markdown_stamp ? 'Edit stamp' : 'Add stamp'}
+				</button>
+			{/if}
+		</div>
+		<p class="mt-1 text-xs" style="color: var(--color-muted)">
+			Smart-markdown fragment surfaced in the picker when this template is in scope for the selected element (ADR-211).
+			Use <code>{'{{self:name}}'}</code>, <code>{'{{self:attr:&lt;path&gt;}}'}</code>, etc. — at insert time <code>self</code> is replaced with the element's id.
+			Trailing <code>=</code> on an attribute path marks a fillable slot (e.g.&nbsp;<code>{'{{self:attr:attributes/Quantity/type=}}'}</code>).
+		</p>
+		{#if stampEditOpen}
+			<div class="mt-3">
+				<textarea
+					bind:value={stampDraft}
+					rows="4"
+					class="w-full rounded border px-3 py-2 font-mono text-xs"
+					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					placeholder="{`{{self:attr:attributes/Quantity/type=}} {{self:attr:attributes/Unit/type}} {{self:name}}`}"
+					aria-label="Markdown stamp body"
+				></textarea>
+				{#if stampError}
+					<p class="mt-2 text-sm" style="color: var(--color-danger)">{stampError}</p>
+				{/if}
+				<div class="mt-2 flex justify-end gap-2">
+					<button onclick={cancelStampEdit} disabled={stampSaving} class="rounded px-4 py-2 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">
+						Cancel
+					</button>
+					<button onclick={saveStamp} disabled={stampSaving} class="rounded px-4 py-2 text-sm text-white disabled:opacity-50" style="background-color: var(--color-primary)">
+						{stampSaving ? 'Saving…' : 'Save stamp'}
+					</button>
+				</div>
+			</div>
+		{:else if tpl.markdown_stamp}
+			<pre class="mt-3 overflow-x-auto rounded border p-3 font-mono text-xs" style="border-color: var(--color-border); background: var(--color-surface); color: var(--color-fg)">{tpl.markdown_stamp}</pre>
+		{:else}
+			<p class="mt-3 text-sm" style="color: var(--color-muted)">No stamp set.</p>
+		{/if}
 	</section>
 
 	<section class="mt-8">
