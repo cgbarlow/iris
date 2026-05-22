@@ -697,6 +697,7 @@
 											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Type</th>
 											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Lower</th>
 											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Upper</th>
+											<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Notes</th>
 											<th class="py-1 text-left font-medium" style="color: var(--color-muted)"></th>
 										</tr>
 									</thead>
@@ -715,6 +716,7 @@
 												<td class="py-1 pr-2"><input type="text" bind:value={attr.type} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="type" /></td>
 												<td class="py-1 pr-2" style="width:3rem"><input type="text" bind:value={attr.lower_bound} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="0" /></td>
 												<td class="py-1 pr-2" style="width:3rem"><input type="text" bind:value={attr.upper_bound} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="*" /></td>
+												<td class="py-1 pr-2"><input type="text" bind:value={attr.notes} class="w-full rounded border px-1 py-0.5 text-sm" style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)" placeholder="notes" /></td>
 												<td class="py-1">
 													<button onclick={() => { editAttributes = editAttributes.filter((_, idx) => idx !== i); }} class="text-xs px-1 rounded" style="color: var(--color-danger)" title="Remove attribute">✕</button>
 												</td>
