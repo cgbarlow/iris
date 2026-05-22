@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.25.0] - 2026-05-22
+
+### Added
+
+- **Aggregation profile editor** UI
+  ([SPEC-212-d](docs/adrs/specs/SPEC-212-d-Aggregation-Profile-Editor.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211),
+  follow-up to v6.20.0). New reusable component
+  `AggregationProfileEditor.svelte` for listing, creating, editing,
+  and soft-deleting aggregation profiles. Edit-form has Name +
+  Description + JSON textarea for `profile_data`, with parse-validate
+  on Save. Seeded profiles are good clone templates.
+- **`/admin/aggregation-profiles`** — new admin route for global
+  profiles, with a card linking from the admin home page.
+- **Set edit page** gains a new section listing and managing
+  set-scoped profiles (above the Danger zone).
+
+### Migration
+
+- None. Pure frontend addition; reuses v6.20.0 REST endpoints.
+
+### Out of scope (deferred)
+
+- Tabbed form-based editor (General / Traversal / Multiplier /
+  Output). The JSON textarea covers v1; the seeded profiles cover
+  the common cases.
+- Attribute-path autocomplete.
+- Inline preview of the engine against a draft.
+
 ## [6.24.0] - 2026-05-22
 
 ### Added

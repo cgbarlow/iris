@@ -30,4 +30,12 @@
 		<div class="text-lg font-semibold" style="color: var(--color-primary)">Settings</div>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure session timeout, themes, AI providers, and extensions.</p>
 	</a>
+	<a
+		href="/admin/aggregation-profiles"
+		class="rounded border p-6 text-center"
+		style="border-color: var(--color-border); color: var(--color-fg)"
+	>
+		<div class="text-lg font-semibold" style="color: var(--color-primary)">Aggregation profiles</div>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Manage global aggregation profiles (ADR-212) — rulesets that drive cross-document rollups (sum / count by attribute, optionally scaled by a multiplier).</p>
+	</a>
 </div>
