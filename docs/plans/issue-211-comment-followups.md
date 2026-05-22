@@ -26,6 +26,7 @@ The user surfaced six observations after exercising the v6.18.0–v6.26.1 releas
 | **C3** | Rename seeded **"Quantified item"** → **"Ingredient"** | **Seed rename** | PR 13 |
 | **C4** | "Add Clone-from-existing for element templates too (parallel UX)" | **Missing UX affordance** | PR 13 |
 | **C5** | "In smart_markdown edit view, show a tip (grey text, uneditable, right of the token codes) so I can see what each resolves to — e.g. `500 g Pork Mince`" | **Missing UX affordance** — token codes are opaque without resolved preview | PR 14 |
+| **C6** | "If I paste an Ingredient stamp for broccoli, there should be a placeholder for quantity I can update easily — all I see is the code" | **Deferred functionality from SPEC-210-a §5.1** (v6.18.0 shipped the backend grammar but never built the inline editable spans the spec promised) | PR 14 |
 
 ---
 
@@ -212,56 +213,97 @@ The banned-string list (`scripts/check_aggregation_genericness.py`) **already** 
 
 ---
 
-## 6. PR 14 — Smart-markdown edit-view resolved-preview tips (v6.30.0)
+## 6. PR 14 — Smart-markdown edit-view companion panel (v6.30.0)
 
 **Type:** UX enhancement — spec extension on ADR-205. No new ADR.
 
-### 6.1 Problem (C5)
+### 6.1 Problem (C5 + C6)
 
-`SmartMarkdownCanvas.svelte` edit mode shows raw markdown source — tokens are opaque blobs like `{{element:a8db…:attr:attributes/Quantity/type=500}}`. The user has to mentally translate them to know what the line will render as. There's already a clean rendered form available (`data.content`, synthesised by the resolver) — the edit view just doesn't show it.
+`SmartMarkdownCanvas.svelte` edit mode shows raw markdown source — tokens are opaque blobs like `{{element:a8db…-…:attr:attributes/Quantity/type=}}`. Two related complaints:
+
+- **C5**: user can't tell what each line resolves to.
+- **C6**: fillable slots (the trailing-`=` form) require manual cursor work inside a long token blob to type in a quantity — fiddly and non-obvious.
+
+The deferral admission: **SPEC-210-a §5.1 specified inline editable spans for fillable slots** when shipping ADR-210 (v6.18.0). The backend grammar shipped; the canvas editor UX did not. This PR is delivering that deferred piece, combined with the C5 tip ask.
 
 ### 6.2 Decision
 
-Add a **right-hand resolved-preview pane** to `SmartMarkdownCanvas.svelte` in edit mode. The textarea stays on the left; on the right is a read-only, grey-styled, line-aligned render of what each token resolves to.
+Add a **right-hand companion panel** to `SmartMarkdownCanvas.svelte` in edit mode. The textarea stays on the left; the right is split into two stacked sections:
+
+#### 6.2.1 Top: "Fill in the blanks" — editable fillable-slot list
+
+For every `{{...:attr:<path>=}}` empty-override token in `markdown_source`, render a labeled input row:
 
 ```
-┌─ source (editable) ──────────────┬─ preview (grey, read-only) ───────┐
-│ - {{element:abc:name}}           │   - Pork mince                    │
-│ - {{element:abc:attr:Q/type=500}} │   - 500                           │
-│   {{element:abc:attr:U/type}}    │     g                             │
-│   {{element:abc:name}}           │     Pork mince                    │
+┌─ source (editable) ──────────────┬─ Fill in the blanks ──────────────┐
+│ - {{element:abc:...Quantity/...=}}│  Broccoli — Quantity              │
+│   {{element:abc:...Unit/type}}    │  [    2    ]                      │
+│   {{element:abc:name}}            │  ↳ "2 head Broccoli"              │
+│ - {{element:def:...Quantity/...=}}│                                   │
+│   {{element:def:...Unit/type}}    │  Pork mince — Quantity            │
+│   {{element:def:name}}            │  [   500   ]                      │
+│                                   │  ↳ "500 g Pork mince"             │
+│                                   ├─ Tokens preview (read-only) ──────┤
+│                                   │  - Broccoli                       │
+│                                   │  - 2 head Broccoli                │
+│                                   │  - 500 g Pork mince               │
 └──────────────────────────────────┴───────────────────────────────────┘
 ```
 
-The preview reflects the **last saved** resolved content (`data.content`) on first render, then refreshes after Save. We don't try to live-resolve as the user types — that would either hit the backend on every keystroke (heavy) or require re-implementing the resolver in TypeScript (DRY violation §13 of protocols).
+Each row carries:
 
-This matches the user's request semantically — "tip text, right of the codes, showing what each refers to" — without committing to per-token inline annotations, which would require replacing the textarea with a custom contenteditable editor (out of scope for v1).
+- **Element name** (resolved by client-side fetch of the token's element_id via existing `/api/elements/{id}` endpoint, cached per session).
+- **Attribute path label** (humanised — e.g. `attributes/Quantity/type` → `Quantity`).
+- **Editable text input** for the value.
+- **Resolved-line preview** (`↳ "500 g Pork mince"`) showing what the line containing this token will render to once filled. Updated immediately as the input changes — the substitution is purely string-level, no resolver call needed.
 
-### 6.3 Spec (SPEC-205-b)
+On `<input>` blur (or change), the panel rewrites that specific token in `data.markdown_source` from `=` to `=<value>`. The textarea text updates atomically; existing on-source-change wiring fires; on Save, the diagram persists.
 
-- New `<RightSidePreview>` sub-component (or inline pane) inside `SmartMarkdownCanvas.svelte`.
-- Edit mode layout: 50/50 split (or 60/40 source-favoured), source textarea on left, `<MarkdownView source={content} />` on right with a `.preview-muted` class that overrides colour to a muted grey.
-- Preview shows `data.content` (the last-saved resolved markdown). After Save, the resolved content updates and the preview re-renders.
-- A small "↻ Saved" / "* unsaved" indicator above the preview pane signals whether the preview reflects the current draft. No live-render churn.
-- Read view (non-editing) unchanged — already renders `data.content` full-width.
+#### 6.2.2 Bottom: "Tokens preview" — read-only resolved view
 
-### 6.4 Stretch (out of scope for v6.30.0)
+The same right-side area, below the fill-in form, shows the **last-saved** resolved markdown (`data.content`) in a muted grey style. This is the "tip showing what each token will display" that C5 asked for, scoped to "what was resolved last time the diagram was saved" rather than live keystrokes.
 
-- Per-token hover tooltips ("hover this token to see what it resolves to") — would need cursor-position tracking against the textarea and a token-boundary scanner. Pragmatic v2 if users ask for it.
-- Live (debounced) re-render against the resolver — would need either a backend-roundtrip-per-keystroke or a JS port of the resolver. Defer.
+A small "↻ Saved" / "* unsaved" indicator distinguishes whether the preview reflects current draft vs. last save.
+
+### 6.3 Why this design
+
+- **Solves both C5 + C6 in one panel.** The fill-in form gives users a discoverable, non-fiddly way to set fillable-slot values. The tokens preview answers "what will this line render to."
+- **No client-side resolver port.** Fillable-slot editing only needs string rewriting on the source — we already have the element name + attribute path from the token itself + a cheap GET on the element. We don't try to live-resolve every other token type.
+- **No replacement of the textarea.** Source stays editable as raw markdown; the panel is an additional surface, not a replacement. Power users can ignore it.
+- **Honours SPEC-210-a §5.1's intent** (make the empty-override `=` form editable) without committing to a full contenteditable rebuild of the canvas (the more aggressive interpretation of the original spec).
+
+### 6.4 Spec (SPEC-205-b — supersedes SPEC-210-a §5.1)
+
+- New component `frontend/src/lib/canvas/text/SmartMarkdownCompanionPanel.svelte`.
+- Mounted inside `SmartMarkdownCanvas.svelte` when `editing=true`. Layout: source 60% / panel 40% on wide screens; tabbed (Source / Panel) on narrow screens (< 900px).
+- Panel state derives from `data.markdown_source` (the `=`-empty-token regex from SPEC-210-a) and `data.content` (the resolved preview).
+- Element-name fetch: lazy GET `/api/elements/{id}?fields=name,data` per unique element-id seen in fillable tokens. Cache in a `Map<elementId, {name, attributes}>`.
+- Source rewrite: when an input's value changes, find the exact `{{...path=}}` substring in `data.markdown_source` (by token position from the regex match), splice in `=<escaped-value>`. Bubble up via `onsourcechange` (existing wiring from PR 1's canvas).
+- Tokens-preview pane: just a `<MarkdownView source={content}>` with a `.preview-muted` style modifier (sets `opacity: 0.75` and a grey overlay tone). Read-only.
 
 ### 6.5 Tests
 
-- `frontend/tests/unit/smartMarkdownPreview.test.ts` covers the saved/unsaved state flag logic.
-- Visual verification post-deploy: open Spaghetti recipe in edit mode → preview pane on the right shows the rendered ingredients with resolved names/values.
+- `frontend/tests/unit/smartMarkdownCompanion.test.ts`:
+  - Regex extraction: source with two fillable tokens → two panel rows.
+  - Source rewrite: setting an input value to "500" replaces `=` with `=500` in the right token, leaves others alone.
+  - Escape handling: setting a value containing `}` or `\` is rejected or escaped (decided in spec, currently: strip `}` and `\` before splice).
+  - Element-name resolution cache: same element-id used twice → one GET.
+- Visual verification post-deploy: paste Ingredient stamp for broccoli in a recipe → see "Broccoli — Quantity [ ]" appear in the panel → type "2" → source updates → preview shows "2 head Broccoli".
 
-### 6.6 Genericness (ADR-214)
+### 6.6 Stretch (out of scope, future v6.30.x)
 
-Pure UI layout change in a generic component. Clean.
+- **Per-token hover tooltips on the textarea itself** ("hover this token to see what it resolves to"). Pragmatic v2 if the panel + preview combo isn't enough.
+- **Live (debounced) full re-render against the resolver.** Would need either backend-roundtrip-per-keystroke (chatty) or a JS port of the resolver (DRY violation §13). The fillable-slot rewrite is purely local; the tokens preview stays "saved-state" until you click Save.
+- **Editing for non-fillable tokens** (e.g. clicking a `name` token to change which element it points at). Deferred — the panel only handles `=`-fillable slots in v1.
 
-### 6.7 Risk
+### 6.7 Genericness (ADR-214)
 
-- Low. The pane is additive to the existing edit view; saving still works the same; the canvas remains usable for narrow viewports by collapsing the preview pane into a tab toggle if width < ~900px.
+Pure UI logic in a generic component. No domain terminology. Clean.
+
+### 6.8 Risk
+
+- The element-name fetch adds N requests on first render of a recipe with N distinct elements. Mitigated by request coalescing and the existing API's <100ms response on UAT. Could batch via `/api/elements/batch?ids=...` if it becomes a hotspot (out of scope for v1).
+- Substring-based source rewrite is sensitive to token-string uniqueness. If two fillable tokens happen to be identical substrings (same element, same attribute path), the rewrite would target both. The regex matcher already returns byte positions, so we rewrite by index, not by string replace — disambiguates correctly.
 
 ---
 
@@ -319,6 +361,9 @@ After all four PRs ship and the user's live DB has m084 applied:
 - "Aggregation profiles for this set" section has a Clone-from-existing button alongside + New, with friendly help copy.
 - Elements list "Templates" dialog has a Clone-template button alongside Use.
 - The seeded "Quantified item" stamp is now named "Ingredient" everywhere — pickers, listings, MCP responses, CLI output.
-- Smart-markdown diagrams in edit mode show a grey resolved-preview pane on the right of the source textarea so users can see what each token line renders to (e.g. `500 g Pork mince`) without leaving edit mode.
+- Smart-markdown diagrams in edit mode show a companion panel on the right:
+  - **Fill in the blanks**: every fillable slot (`{{...path=}}`) appears as a labeled input — element name, attribute path, easy text field. Editing rewrites the source token in place.
+  - **Tokens preview**: the last-saved resolved markdown rendered in muted grey, so users can see what each token line renders to (e.g. `500 g Pork mince`) without leaving edit mode.
+- The deferred fillable-slot editor UX from SPEC-210-a §5.1 (v6.18.0) is finally delivered.
 - Genericness invariant still clean; no new `{@html}` paths; SQLite ↔ Supabase parity preserved.
 - All issue #211 observations and clarifications from the 2026-05-22 comment + follow-on exchange are closed.
