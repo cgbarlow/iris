@@ -1805,10 +1805,53 @@ async def _clear_old_seed_data(db: DatabasePort) -> None:
         for (orphan_rid,) in await cursor.fetchall():
             await db.execute("DELETE FROM relationship_versions WHERE relationship_id = ?", (orphan_rid,))
             await db.execute("DELETE FROM relationships WHERE id = ?", (orphan_rid,))
+        # Sever indirect FK references that aren't iterated above:
+        # element_templates point at an element via source_element_id;
+        # bookmarks may target an element. NULL/delete them rather than
+        # blocking the element delete. Tables may not exist on minimal
+        # test setups — tolerate "no such table" since their absence
+        # means no rows could be blocking anyway.
+        for stmt, params in (
+            ("UPDATE element_templates SET source_element_id = NULL "
+             "WHERE source_element_id = ?", (eid,)),
+            ("DELETE FROM bookmarks WHERE element_id = ?", (eid,)),
+        ):
+            try:
+                await db.execute(stmt, params)
+            except Exception:  # noqa: BLE001
+                pass
         await db.execute("DELETE FROM element_tags WHERE element_id = ?", (eid,))
         await db.execute("DELETE FROM element_versions WHERE element_id = ?", (eid,))
         await db.execute("DELETE FROM elements_fts WHERE element_id = ?", (eid,))
         await db.execute("DELETE FROM elements WHERE id = ?", (eid,))
+
+    # Sever non-seed references to seed packages before deleting them.
+    # The seed only iterates known seed IDs; if a user has placed any
+    # non-seed diagram or element under a seed package, FK constraints
+    # will block the package delete (issue surfaced when a DoView seed
+    # package picked up a hand-created diagram). NULL'ing the FK first
+    # lets the orphan stay (now reparented to "no package") while the
+    # seed package goes away cleanly. Also clear bookmarks that target
+    # the package directly.
+    for pid in package_ids:
+        # diagrams.parent_package_id always exists.
+        await db.execute(
+            "UPDATE diagrams SET parent_package_id = NULL "
+            "WHERE parent_package_id = ?",
+            (pid,),
+        )
+        # elements.package_id and bookmarks.package_id may be missing
+        # on minimal test setups — tolerate their absence (no rows to
+        # block the package delete in that case).
+        for stmt, params in (
+            ("UPDATE elements SET package_id = NULL "
+             "WHERE package_id = ?", (pid,)),
+            ("DELETE FROM bookmarks WHERE package_id = ?", (pid,)),
+        ):
+            try:
+                await db.execute(stmt, params)
+            except Exception:  # noqa: BLE001
+                pass
 
     # Delete packages (children first — all children have parent = pkg-0)
     for pid in reversed(package_ids):
