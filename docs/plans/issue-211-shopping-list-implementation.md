@@ -25,6 +25,7 @@ Given a *meal plan* — a smart_markdown diagram listing the week's recipe diagr
 - **AC6.** The aggregation engine is callable directly over REST / MCP / CLI without any persisted aggregation-list diagram (Claude Desktop can call it directly during a session).
 - **AC7.** Admin users can create, edit, and delete *global* aggregation profiles in admin settings. Set editors can do the same for *set-scoped* profiles inside the set editor.
 - **AC8.** Nothing in the Iris core code base (excluding seed data and tests) contains the strings `"ingredient"`, `"recipe"`, `"meal"`, `"diners"`, `"servings"`, `"aisle"`, or `"shopping"` outside of comments, docs, and seed/migration files. The genericness invariant is testable.
+- **AC9.** A fresh Iris install (no user data) ships with five global element templates (Quantified item, Sized story, Logged work, Line item, Read entry) and five matching global aggregation profiles (Shopping list, Sprint points rollup, Time tracker rollup, Expense report, Reading log rollup). All five profiles validate against the engine and run without errors against a minimal source diagram built from their paired template.
 
 ### 1.3 Out of scope for v1 (explicit, per Q3)
 
@@ -167,13 +168,53 @@ VALUES (?, 'aggregation_list', 'Aggregation list', 'markdown', ?, TRUE)
 ON CONFLICT (id) DO NOTHING;
 ```
 
-### 4.4 Seed global "Shopping list" aggregation profile
+### 4.4 Seed global element templates (with stamps)
 
-**SQLite + Supabase** (`m{N+3}_seed_shopping_list_profile.{py|sql}`):
+All seeded with `is_global = 1/TRUE`, `set_id = NULL`. Ships in the same release as ADR-B (v6.14.0) — once the `markdown_stamp` column exists. Each template's `template_data` pre-fills `element_type` and a `data.attributes` blueprint so creating an element from the template yields the attribute slots its stamp expects.
 
-Inserts one row into `aggregation_profiles` with `is_global = 1/TRUE`, `name = 'Shopping list'`, and the `profile_data` JSON from §5.3 of the research doc. Idempotent on re-run (skip if a row with the same `id` exists).
+**SQLite** (`m{N+3a}_seed_global_element_templates.py`) **+ Supabase** mirror.
 
-### 4.5 Optional: backfill `Quantity` attribute on existing grocery elements
+Templates seeded:
+
+| Template name | Purpose | `markdown_stamp` | Pre-filled `data.attributes` (blank values) |
+|---|---|---|---|
+| **Quantified item** | Any element with a numeric quantity + unit (groceries, stock items, ingredients, parts, …) | `{{self:attr:attributes/Quantity/type=}} {{self:attr:attributes/Unit/type}} {{self:name}}` | `Quantity`, `Unit` |
+| **Sized story** | Work items with story points | `{{self:attr:attributes/Points/type=}} pts — {{self:name}}` | `Points` |
+| **Logged work** | Work-log entries with hours | `{{self:attr:attributes/Hours/type=}}h — {{self:name}}` | `Hours` |
+| **Line item** | Expense or billing line items | `{{self:attr:attributes/Currency/type}}{{self:attr:attributes/Amount/type=}} — {{self:name}}` | `Amount`, `Currency` |
+| **Read entry** | Reading-log entries | `{{self:attr:attributes/Pages/type=}} pages — "{{self:name}}" by {{self:attr:attributes/Author/type}}` | `Pages`, `Author` |
+
+Each row's `included_fields` whitelist is `["element_type", "notation", "data"]` so the template fills those on element creation without dragging arbitrary metadata. `source_element_id` is NULL (the column is already nullable in the existing schema).
+
+Idempotency: each seed row has a deterministic id (e.g., UUIDv5 over the template name + `is_global=true`); re-running the migration is a no-op via `INSERT OR IGNORE` / `ON CONFLICT (id) DO NOTHING`.
+
+Schema/seed tests in `backend/tests/test_migrations/test_global_element_templates_seed_schema.py` assert: all five templates present after migration; markdown_stamp is non-empty; template_data parses; data.attributes contains the expected slots; idempotency on re-run.
+
+### 4.5 Seed global aggregation profiles
+
+All seeded with `is_global = 1/TRUE`, `set_id = NULL`. Ships in the same release as ADR-C (v6.15.0) — once the `aggregation_profiles` table exists.
+
+**SQLite** (`m{N+3b}_seed_global_aggregation_profiles.py`) **+ Supabase** mirror.
+
+Profiles seeded (one per use case, matching the templates from §4.4 1-for-1 so newly created elements from a template can be aggregated by the matching profile out of the box):
+
+| Profile name | Pairs with template | Outer traversal | Inner: value | Inner: bucket | Output: group_by |
+|---|---|---|---|---|---|
+| **Shopping list** | Quantified item | diagram tokens; multiplier = `Diners/type` override ÷ `data.servings` divisor; default = 1 | `attributes/Quantity/type` | `attributes/Unit/type` | `element.package_name` |
+| **Sprint points rollup** | Sized story | diagram tokens; no multiplier (default 1) | `attributes/Points/type` | _(none)_ | `element.package_name` |
+| **Time tracker rollup** | Logged work | diagram tokens; no multiplier | `attributes/Hours/type` | _(none)_ | `element.package_name` |
+| **Expense report** | Line item | diagram tokens; no multiplier | `attributes/Amount/type` | `attributes/Currency/type` | `element.package_name` |
+| **Reading log rollup** | Read entry | diagram tokens; no multiplier | `attributes/Pages/type` | _(none)_ | `element.attributes.Author/type` |
+
+Each profile's full `profile_data` JSON lives inline in the migration file (canonical reference) and is also surfaced in the docs (`docs/aggregation-profiles-reference.md`, created in this PR) so users browsing globally have one place to copy from.
+
+`line_format` defaults to `"- [{element.name}](iris://element/{element.id}) — {sum_value}{bucket_spaced}"` for all. `breakdown_format` defaults to `" ({sources_joined})"`. `sort_groups` and `sort_items_within_group` default to `alpha`.
+
+Idempotency: deterministic ids per profile name. Tests in `backend/tests/test_migrations/test_global_aggregation_profiles_seed_schema.py` mirror the patterns in §4.4 (existence, profile_data validates against the JSONSchema, idempotency).
+
+End-to-end smoke test under `backend/tests/test_aggregation/test_seeded_profiles_smoke.py` — for each seeded profile, builds a minimal test fixture (one element from the paired template + one source diagram referencing it) and verifies the engine runs against the profile without errors. Doesn't assert specific output (those are profile-specific), just that the seeded JSON is valid and the engine accepts it.
+
+### 4.6 Optional: backfill `Quantity` attribute on existing grocery elements
 
 Per Q5: yes, add `Quantity` attribute to grocery elements with blank value (treated as zero by the engine when blank). This is a **data migration**, not a schema migration — performed by a one-shot script `scripts/backfill_quantity_attribute.py` run by the operator against the target DB. The script:
 
@@ -184,7 +225,7 @@ Per Q5: yes, add `Quantity` attribute to grocery elements with blank value (trea
 
 This is **not** in the migration runner — it's an operator action because it's destination-specific (which set, which environment).
 
-### 4.6 Migration of the 34 existing recipe diagrams
+### 4.7 Migration of the 34 existing recipe diagrams
 
 Script `scripts/migrate_recipes_to_quantity_tokens.py`:
 
@@ -196,7 +237,7 @@ Script `scripts/migrate_recipes_to_quantity_tokens.py`:
 
 Also operator-run, not migration-runner.
 
-### 4.7 Seed "Servings" attribute on recipe diagrams
+### 4.8 Seed "Servings" attribute on recipe diagrams
 
 For servings-scaling (AC4), each recipe diagram needs `data.servings: <int>`. Script `scripts/backfill_servings_on_recipes.py`:
 
@@ -430,7 +471,10 @@ backend/tests/
     test_element_template_stamps_schema.py
     test_aggregation_profiles_schema.py
     test_aggregation_list_diagram_type_schema.py
-    test_seed_shopping_list_profile_schema.py
+    test_global_element_templates_seed_schema.py     # §4.4
+    test_global_aggregation_profiles_seed_schema.py  # §4.5
+  test_aggregation/
+    test_seeded_profiles_smoke.py                    # §4.5 — engine accepts every seeded profile
   test_scripts/
     test_backfill_quantity_attribute.py
     test_migrate_recipes_to_quantity_tokens.py
@@ -463,6 +507,8 @@ A single pytest invokes `scripts/check_aggregation_genericness.py` and asserts e
 - `docs/cli.md` — new `iris aggregation-profile` and `iris aggregate` subcommands.
 - `docs/mcp.md` — new MCP tools listed.
 - `docs/north-star.md` — refresh the "Iris as a prototyping tool" framing with shopping list as the worked example.
+- **`docs/aggregation-profiles-reference.md`** *(new)* — canonical reference for the five seeded global profiles (§4.5): the JSON of each, the template it pairs with (§4.4), the worked example for each use case, and a "How to clone and customise" section. Ships with v6.15.0.
+- **`docs/element-template-stamps-reference.md`** *(new)* — canonical reference for the five seeded global templates (§4.4): the stamp body of each, the pre-filled attribute blueprint, and worked examples of authoring with each. Ships with v6.14.0.
 
 ---
 
@@ -475,8 +521,8 @@ Recommended cadence — one minor version per primitive shipped end-to-end:
 | Version | Ship |
 |---|---|
 | `v6.13.0` | ADR-A: smart-markdown `=value` overrides + blank-attribute inline edit |
-| `v6.14.0` | ADR-B: element template stamps (schema + picker + stamp editor) |
-| `v6.15.0` | ADR-C: aggregation profiles + engine + REST/MCP/CLI surfaces; seed shopping-list profile |
+| `v6.14.0` | ADR-B: element template stamps (schema + picker + stamp editor) + seed 5 global templates (§4.4) |
+| `v6.15.0` | ADR-C: aggregation profiles + engine + REST/MCP/CLI surfaces; seed 5 global aggregation profiles paired 1-for-1 with the v6.14 templates (§4.5) |
 | `v6.16.0` | ADR-D: `aggregation_list` diagram type; admin + set-editor UI for profiles |
 | `v6.16.1` | ADR-E: genericness invariant CI check (cleanup PR after the above) |
 | `v6.17.0` | Operator-run data migrations (Quantity attribute, recipe rewrites, servings backfill) + end-to-end demo verification |
@@ -492,8 +538,8 @@ Per memory `feedback_render_supabase_ordering`: for the versions with Supabase m
 One logical change per branch. Suggested order:
 
 1. **`feature/smart-markdown-value-overrides`** — ADR-A + SPEC-A-a + grammar/resolver + canvas inline edit + tests + CHANGELOG → v6.13.0.
-2. **`feature/element-template-stamps`** — ADR-B + SPEC-B-a + schema migration + service + picker + stamp editor + tests + CHANGELOG → v6.14.0.
-3. **`feature/aggregation-profiles-and-engine`** — ADR-C + 3 specs + migrations + module + routes + MCP + CLI + tests + CHANGELOG → v6.15.0.
+2. **`feature/element-template-stamps`** — ADR-B + SPEC-B-a + schema migration + service + picker + stamp editor + **5 global template seeds (§4.4)** + tests + CHANGELOG → v6.14.0.
+3. **`feature/aggregation-profiles-and-engine`** — ADR-C + 3 specs + migrations + module + routes + MCP + CLI + **5 global aggregation-profile seeds (§4.5)** + `docs/aggregation-profiles-reference.md` + tests + CHANGELOG → v6.15.0.
 4. **`feature/aggregation-list-diagram-type`** — ADR-D + SPEC-D-a + migration + diagram wrapper + frontend create dialog + read/edit canvas + tests + CHANGELOG → v6.16.0.
 5. **`feature/aggregation-genericness-invariant`** — ADR-E + SPEC-E-a + CI script + tests + CHANGELOG → v6.16.1.
 6. **`feature/shopping-list-demo-migration`** — operator-run scripts (backfill Quantity, rewrite recipes, backfill servings) + tests + release notes + CHANGELOG → v6.17.0.
@@ -518,7 +564,7 @@ These were flagged in the research doc and clarifying-questions exchange but not
 | O6 | Genericness invariant — banned-string list final cut: `ingredient`, `recipe`, `meal`, `diners`, `servings`, `aisle`, `shopping`. Anything to add/remove? | List as proposed; add `groceries` and `pantry`? Borderline since "Pantry" is a package name in user data, not in code. Probably leave both off. | Confirm |
 | O7 | Genericness invariant — should the check also extend to the **frontend** (`frontend/src/`)? | Yes — same rules, same allow-list (i18n strings, test fixtures, seed data only). | Confirm |
 | O8 | Naming: profile referred to as "aggregation profile" throughout. Any preference for "rollup profile", "aggregator profile", or other? | Keep "aggregation profile" — matches the `aggregation_list` diagram type, the `/api/aggregation/` route prefix, and the `aggregate` MCP tool. | Confirm |
-| O9 | Should the seeded "Shopping list" profile ship in v6.15.0 (with the engine) or in v6.16.0 (with the aggregation_list UI)? | v6.15.0 — useful from MCP/CLI even before the diagram-type UI lands. | Confirm |
+| O9 | _Resolved._ Seeds ship globally with their respective engine release: element templates in v6.14.0 (with ADR-B), aggregation profiles in v6.15.0 (with ADR-C). Both are five-strong libraries (Quantified item / Sized story / Logged work / Line item / Read entry templates; Shopping list / Sprint points rollup / Time tracker rollup / Expense report / Reading log rollup profiles). All `is_global = TRUE`, `set_id = NULL`. See §4.4 and §4.5. | — | Resolved 2026-05-22 |
 
 ---
 
