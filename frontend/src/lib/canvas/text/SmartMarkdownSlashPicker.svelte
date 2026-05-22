@@ -520,25 +520,29 @@
 		}
 	}
 
-	function emitToken(terminalSeg?: string) {
+	function emitToken(terminalSeg?: string, opts?: { fillable?: boolean }) {
 		if (!chosenEntity) return;
+		// ADR-210 (v6.18.0): `fillable` appends `=` to the token so it
+		// renders as a fillable-slot strikethrough until the author types
+		// a value into the source.
+		const suffix = opts?.fillable ? '=' : '';
 		// terminalSeg = the literal `name`/`description` shortcut or
 		// an explicit primitive picked at the current path level.
 		if (terminalSeg === 'name' || terminalSeg === 'description') {
-			oninsert(`{{${chosenEntity.entity_type}:${chosenEntity.id}:${terminalSeg}}}`);
+			oninsert(`{{${chosenEntity.entity_type}:${chosenEntity.id}:${terminalSeg}${suffix}}}`);
 			return;
 		}
 		if (chosenEntity.entity_type !== 'element' && terminalSeg) {
-			oninsert(`{{${chosenEntity.entity_type}:${chosenEntity.id}:${terminalSeg}}}`);
+			oninsert(`{{${chosenEntity.entity_type}:${chosenEntity.id}:${terminalSeg}${suffix}}}`);
 			return;
 		}
 		// Element path:
 		const path = [...drillPath, ...(terminalSeg ? [terminalSeg] : [])];
 		if (path.length === 0) return;
-		oninsert(`{{element:${chosenEntity.id}:attr:${path.join('/')}}}`);
+		oninsert(`{{element:${chosenEntity.id}:attr:${path.join('/')}${suffix}}}`);
 	}
 
-	async function chooseDrillItem(item: DrillItem) {
+	async function chooseDrillItem(item: DrillItem, opts?: { fillable?: boolean }) {
 		// ADR-209: image item → open sizing chooser (does not emit yet).
 		if (item.kind === 'image') {
 			openImageSizer(item.image);
@@ -547,12 +551,12 @@
 		if (item.kind === 'primitive') {
 			// Top-level name/description shortcuts
 			if (drillPath.length === 0 && NON_ELEMENT_FIELDS.includes(item.label)) {
-				emitToken(item.label);
+				emitToken(item.label, opts);
 				return;
 			}
 			// Terminal primitive at this path level (current path resolved
 			// to a primitive value).
-			emitToken();
+			emitToken(undefined, opts);
 			return;
 		}
 		// Element data drill: container item → push the segment.
@@ -653,7 +657,11 @@
 		if (e.key === 'Enter') {
 			if (menu.length > 0) {
 				e.preventDefault();
-				chooseDrillItem(menu[Math.min(drillIdx, menu.length - 1)]);
+				// ADR-210: Shift+Enter inserts the token as a fillable-slot
+				// placeholder (trailing `=`) so the author fills the value in
+				// the source. Plain Enter inserts the normal token form.
+				chooseDrillItem(menu[Math.min(drillIdx, menu.length - 1)],
+					{ fillable: e.shiftKey });
 			}
 			return;
 		}
@@ -877,7 +885,7 @@
 				bind:this={drillInputEl}
 				type="text"
 				class="slash-picker__input slash-picker__input--drill"
-				placeholder="Type . or Tab to drill, Enter to insert"
+				placeholder="Type . or Tab to drill, Enter to insert (Shift+Enter for fillable slot)"
 				bind:value={drillFilter}
 				onkeydown={handleDrillKey}
 			/>

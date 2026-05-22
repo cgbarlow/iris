@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.18.0] - 2026-05-22
+
+### Added
+
+- **Smart-markdown tokens accept inline `=value` overrides on the
+  field-spec** ([ADR-210](docs/adrs/ADR-210-Smart-Markdown-Value-Overrides.md),
+  [SPEC-210-a](docs/adrs/specs/SPEC-210-a-Smart-Markdown-Value-Overrides.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211)). A token
+  of the form `{{element:UUID:attr:Quantity/type=500}}` resolves to
+  "500" regardless of the stored attribute value — per-use values
+  without a side table. The resolver splits on the first `=` so
+  override values may themselves contain `=`. A token with an empty
+  override (`{{...:attr:path=}}`) is a "fillable slot" marker:
+  renders as strikethrough so an unfilled placeholder is visible.
+  Dangling references (deleted entities) still strike through even
+  when an override is present. Existing tokens without `=` resolve
+  identically to before — pure additive grammar extension.
+- **Smart-markdown picker — Shift+Enter inserts as fillable slot**.
+  Pressing Enter on a primitive in the picker emits the normal token;
+  Shift+Enter emits the same token with `=` appended so the author
+  can fill the value in the source pane (or hand the diagram to a
+  collaborator). Hint text in the picker updated.
+
+### Migration
+
+- None. Pure grammar additive change; no schema or data migration.
+- Existing recipes with plain-text quantities (e.g.
+  `500 {{element:UUID:attr:Unit/type}} {{element:UUID:name}}`) render
+  identically. Migration to the new override form is optional and
+  arrives later via issue #211 PR 6.
+
 ## [6.17.9] - 2026-05-21
 
 ### Changed

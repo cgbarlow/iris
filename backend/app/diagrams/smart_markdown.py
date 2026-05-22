@@ -10,6 +10,14 @@ where ``entity-type`` is one of ``element``, ``package``, ``diagram``,
 is ``name``, ``description``, or (for elements only) ``attr:<key>``
 where ``<key>`` is a key in the element's ``data`` JSON.
 
+ADR-210 (v6.18.0): ``<field-spec>`` may carry an inline ``=<value>``
+override — ``{{element:UUID:attr:Quantity=500}}`` resolves to "500"
+regardless of the stored value. An empty override (``...path=``) is the
+"fillable slot" marker — render as strikethrough so the unfilled slot
+is visible. Splits on the first ``=`` only, so override values may
+contain ``=``. Dangling entity references still strike through even
+when an override is present.
+
 Unresolvable tokens (entity not found, deleted, wrong field for the
 entity type, missing attribute) render as ``~~{{...}}~~`` so the user
 sees them — silent drops would hide data loss.
@@ -313,36 +321,58 @@ async def _resolve_one(
     """Return the resolved value, or None if unresolvable.
 
     None signals: entity missing / deleted, field invalid for the type,
-    or attribute key missing. Callers turn None into strikethrough.
+    attribute key missing, or empty-override fillable-slot marker.
+    Callers turn None into strikethrough.
 
     ADR-209 (v6.17.0): entity-reference values are wrapped in a markdown
     link `[value](iris://<type>/<id> "<entity name>")` so MarkdownView
     routes the click and shows the name as a hover tooltip. Images
     (`{{image:...}}`) are returned as raw `<img>` HTML and are NOT
     wrapped.
+
+    ADR-210 (v6.18.0): if ``field_spec`` contains ``=``, split on the
+    first one — the suffix is an inline override value used in place
+    of the stored field. Empty override (``...path=``) → return None so
+    the token renders as strikethrough (the "fillable slot" marker).
+    Dangling entity references still strike through regardless of
+    override.
     """
     if entity_type == "image":
         return await _resolve_image(db, entity_id, field_spec)
     # Non-image entity types require a field_spec.
     if field_spec is None or field_spec == "":
         return None
-    raw_value: str | None = None
-    if entity_type == "element":
-        raw_value = await _fetch_element_field(db, entity_id, field_spec)
+
+    # ADR-210: parse inline =value override.
+    field_spec_path: str = field_spec
+    override_value: str | None = None
+    if "=" in field_spec:
+        field_spec_path, override_value = field_spec.split("=", 1)
+        if override_value == "":
+            # Fillable-slot marker — author declared "fill this in,"
+            # leave unfilled → strikethrough (don't fall through to
+            # stored value).
+            return None
+
+    raw_value: str | None
+    if override_value is not None:
+        raw_value = override_value
+    elif entity_type == "element":
+        raw_value = await _fetch_element_field(db, entity_id, field_spec_path)
     elif entity_type == "package":
         raw_value = await _fetch_named_field(
             db, table="packages", versions_table="package_versions",
-            fk="package_id", entity_id=entity_id, field_spec=field_spec,
+            fk="package_id", entity_id=entity_id, field_spec=field_spec_path,
         )
     elif entity_type == "diagram":
         raw_value = await _fetch_named_field(
             db, table="diagrams", versions_table="diagram_versions",
-            fk="diagram_id", entity_id=entity_id, field_spec=field_spec,
+            fk="diagram_id", entity_id=entity_id, field_spec=field_spec_path,
         )
     elif entity_type == "set":
-        raw_value = await _fetch_set_field(db, entity_id, field_spec)
+        raw_value = await _fetch_set_field(db, entity_id, field_spec_path)
     elif entity_type == "collection":
-        raw_value = await _fetch_collection_field(db, entity_id, field_spec)
+        raw_value = await _fetch_collection_field(db, entity_id, field_spec_path)
     else:
         return None
 
@@ -351,8 +381,12 @@ async def _resolve_one(
 
     # Wrap in an iris:// markdown link so the rendered output is a
     # clickable, tooltip-bearing reference to the source entity.
+    # ADR-210: even with an override, look up the entity to confirm it
+    # exists — a dangling reference should strike through regardless.
     name = await _fetch_entity_display_name(db, entity_type, entity_id)
-    title = _markdown_escape_title(name or entity_id)
+    if name is None:
+        return None
+    title = _markdown_escape_title(name)
     text = _markdown_escape_link_text(str(raw_value))
     return f'[{text}](iris://{entity_type}/{entity_id} "{title}")'
 
