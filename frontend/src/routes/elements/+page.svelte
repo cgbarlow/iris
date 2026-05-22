@@ -27,6 +27,65 @@
 	let sortField = $state<'name' | 'element_type' | 'updated_at'>('name');
 	let showCreateDialog = $state(false);
 	let showTemplatesDialog = $state(false);
+
+	// SPEC-211-e (v6.29.0): Clone an existing element template into a
+	// new one. Triggered from TemplatesListDialog's per-row Clone
+	// button. The source carries the markdown_stamp + template_data;
+	// we just need a new name from the user.
+	interface CloneSource {
+		id: string;
+		name: string;
+		description: string | null;
+		is_global: boolean;
+		markdown_stamp?: string | null;
+		template_data: Record<string, unknown>;
+	}
+	let cloneSource = $state<CloneSource | null>(null);
+	let cloneNewName = $state('');
+	let cloneSubmitting = $state(false);
+	let cloneError = $state<string | null>(null);
+
+	function startCloneTemplate(source: CloneSource) {
+		cloneSource = source;
+		cloneNewName = `${source.name} (copy)`;
+		cloneError = null;
+		showTemplatesDialog = false;
+	}
+
+	function cancelCloneTemplate() {
+		cloneSource = null;
+		cloneNewName = '';
+		cloneError = null;
+	}
+
+	async function confirmCloneTemplate(event: SubmitEvent) {
+		event.preventDefault();
+		if (!cloneSource || !cloneNewName.trim() || cloneSubmitting) return;
+		cloneSubmitting = true;
+		cloneError = null;
+		try {
+			const body: Record<string, unknown> = {
+				name: cloneNewName.trim(),
+				description: cloneSource.description,
+				template_data: cloneSource.template_data,
+				is_global: cloneSource.is_global,
+				set_id: cloneSource.is_global ? null : currentSetId,
+			};
+			if (cloneSource.markdown_stamp) {
+				body.markdown_stamp = cloneSource.markdown_stamp;
+			}
+			const created = await apiFetch<{ id: string }>(
+				'/api/element-templates',
+				{ method: 'POST', body: JSON.stringify(body) },
+			);
+			cloneSource = null;
+			cloneNewName = '';
+			goto(`/element-templates/${created.id}`);
+		} catch (e) {
+			cloneError = e instanceof ApiError ? e.message : 'Failed to clone template';
+		}
+		cloneSubmitting = false;
+	}
 	let groupMode = $state<'none' | 'type' | 'tag'>(
 		(typeof window !== 'undefined' &&
 			(localStorage.getItem('iris-elements-group') as 'none' | 'type' | 'tag')) ||
@@ -610,7 +669,49 @@
 		showTemplatesDialog = false;
 		goto(`/elements/${newId}`);
 	}}
+	onclone={(source) => startCloneTemplate(source)}
 />
+
+{#if cloneSource}
+	<!-- SPEC-211-e (v6.29.0): inline mini-dialog for naming the cloned template -->
+	<div
+		style="position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4)"
+		onclick={(e) => { if (e.target === e.currentTarget) cancelCloneTemplate(); }}
+		onkeydown={(e) => { if (e.key === 'Escape') cancelCloneTemplate(); }}
+		role="presentation"
+	>
+		<form
+			onsubmit={confirmCloneTemplate}
+			class="rounded-lg p-6 shadow-lg"
+			style="background: var(--color-bg); border: 1px solid var(--color-border); width: 460px; max-width: 90vw"
+		>
+			<h3 class="text-lg font-semibold" style="color: var(--color-fg)">Clone template</h3>
+			<p class="mt-1 text-sm" style="color: var(--color-muted)">
+				Create a new template by cloning <strong style="color: var(--color-fg)">{cloneSource.name}</strong>. The new template carries the same stamp body and content; you can edit either after creation.
+			</p>
+			<label for="clone-tpl-name" class="mt-4 block text-sm font-medium" style="color: var(--color-fg)">New template name</label>
+			<input
+				id="clone-tpl-name"
+				bind:value={cloneNewName}
+				required
+				autocomplete="off"
+				class="mt-1 w-full rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+			/>
+			{#if cloneError}
+				<p class="mt-2 text-sm" style="color: var(--color-danger)">{cloneError}</p>
+			{/if}
+			<div class="mt-4 flex justify-end gap-2">
+				<button type="button" onclick={cancelCloneTemplate} class="rounded px-4 py-2 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">
+					Cancel
+				</button>
+				<button type="submit" disabled={cloneSubmitting || !cloneNewName.trim()} class="rounded px-4 py-2 text-sm text-white disabled:opacity-50" style="background-color: var(--color-primary)">
+					{cloneSubmitting ? 'Cloning…' : 'Create clone'}
+				</button>
+			</div>
+		</form>
+	</div>
+{/if}
 
 <BatchSetDialog
 	open={showBatchSetDialog}

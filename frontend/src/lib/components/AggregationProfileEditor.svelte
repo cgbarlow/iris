@@ -53,7 +53,7 @@
 	let listError = $state<string | null>(null);
 
 	// Editor state — when editingId is non-null we're editing a row;
-	// when creating is true we're creating a new one.
+	// when creating is true we're creating a new one (blank or cloned).
 	let editingId = $state<string | null>(null);
 	let creating = $state(false);
 	let draftName = $state('');
@@ -62,6 +62,10 @@
 	let draftIsDefault = $state(false);
 	let draftError = $state<string | null>(null);
 	let saving = $state(false);
+
+	// SPEC-212-e (v6.29.0): Clone-from-existing picker state.
+	let cloning = $state(false);
+	let cloneCandidates = $state<AggregationProfile[]>([]);
 
 	const DEFAULT_PROFILE_JSON = JSON.stringify({
 		traversal: {
@@ -117,10 +121,55 @@
 	function startCreate() {
 		creating = true;
 		editingId = null;
+		cloning = false;
 		draftName = '';
 		draftDescription = '';
 		draftJson = DEFAULT_PROFILE_JSON;
 		draftIsDefault = false;
+		draftError = null;
+	}
+
+	// SPEC-212-e: open the clone-source picker. Candidates are the
+	// in-scope profiles already loaded in `profiles`, plus globals when
+	// we're in set-mode (so the user can clone from a seeded global
+	// into a set-scoped copy).
+	async function startClone() {
+		cloning = true;
+		creating = false;
+		editingId = null;
+		// In set mode, also fetch globals so the user can clone from
+		// a seeded global into a new set-scoped profile.
+		if (setId) {
+			try {
+				const params = new URLSearchParams();
+				params.set('set_id', setId);
+				params.set('include_global', 'true');
+				const data = await apiFetch<ListResponse>(
+					`/api/aggregation/profiles?${params}`,
+				);
+				cloneCandidates = data.items ?? [];
+			} catch {
+				cloneCandidates = profiles;
+			}
+		} else {
+			cloneCandidates = profiles;
+		}
+	}
+
+	function cancelClone() {
+		cloning = false;
+		cloneCandidates = [];
+	}
+
+	function commitClone(source: AggregationProfile) {
+		creating = true;
+		editingId = null;
+		cloning = false;
+		cloneCandidates = [];
+		draftName = `${source.name} (copy)`;
+		draftDescription = source.description ?? '';
+		draftJson = JSON.stringify(source.profile_data, null, 2);
+		draftIsDefault = false;  // copies don't inherit default-for-set
 		draftError = null;
 	}
 
@@ -212,18 +261,56 @@
 		<h2 class="text-base font-semibold" style="color: var(--color-fg)">
 			{globalsMode ? 'Global aggregation profiles' : 'Aggregation profiles for this set'}
 		</h2>
-		{#if !creating && !editingId}
-			<button onclick={startCreate} class="rounded px-3 py-1 text-sm text-white" style="background: var(--color-primary)">
-				+ New profile
-			</button>
+		{#if !creating && !editingId && !cloning}
+			<div class="flex gap-2">
+				<button onclick={startClone} class="rounded px-3 py-1 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">
+					+ Clone from existing
+				</button>
+				<button onclick={startCreate} class="rounded px-3 py-1 text-sm text-white" style="background: var(--color-primary)">
+					+ New profile
+				</button>
+			</div>
 		{/if}
 	</div>
 	<p class="mt-1 text-xs" style="color: var(--color-muted)">
-		Profiles drive the aggregation engine (ADR-212). Edit as JSON;
-		schema is documented in SPEC-212-a. Seeded global profiles are
-		good clone templates — duplicate one and edit the fields you
-		need.
+		Aggregation profiles describe how to roll up data across a group
+		of documents — deduplicated lists with summed quantities, points
+		totals, time-tracking rollups, and so on. Pick a seeded profile
+		as a starting point with <strong>Clone from existing</strong> and
+		duplicate-and-edit it for your use case, or start blank with
+		<strong>New profile</strong>.
 	</p>
+
+	{#if cloning}
+		<div class="mt-3 rounded border p-3" style="border-color: var(--color-border); background: var(--color-surface)">
+			<p class="text-sm" style="color: var(--color-fg)">Clone from which profile?</p>
+			<div class="mt-2 flex flex-col gap-1">
+				{#each cloneCandidates as p (p.id)}
+					<button
+						onclick={() => commitClone(p)}
+						class="rounded px-3 py-2 text-left text-sm"
+						style="border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+					>
+						<span style="color: var(--color-fg)">{p.name}</span>
+						{#if p.is_global}
+							<span class="ml-2 rounded px-1 text-xs" style="background: var(--color-surface); color: var(--color-muted)">global</span>
+						{/if}
+						{#if p.description}
+							<div class="mt-0.5 text-xs" style="color: var(--color-muted)">{p.description}</div>
+						{/if}
+					</button>
+				{/each}
+				{#if cloneCandidates.length === 0}
+					<p class="text-xs" style="color: var(--color-muted)">No profiles available to clone.</p>
+				{/if}
+			</div>
+			<div class="mt-3 flex justify-end">
+				<button onclick={cancelClone} class="rounded px-3 py-1 text-sm" style="border: 1px solid var(--color-border); color: var(--color-fg)">
+					Cancel
+				</button>
+			</div>
+		</div>
+	{/if}
 
 	{#if listError}
 		<p class="mt-3 text-sm" style="color: var(--color-danger)">{listError}</p>

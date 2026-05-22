@@ -82,6 +82,7 @@ from app.migrations.m075_seed_global_element_template_stamps import up as m075_u
 from app.migrations.m076_aggregation_profiles import up as m076_up
 from app.migrations.m077_seed_global_aggregation_profiles import up as m077_up
 from app.migrations.m078_aggregation_list_diagram_type import up as m078_up
+from app.migrations.m079_rename_quantified_item_to_ingredient import up as m079_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -191,6 +192,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m076_up(main)  # issue #211, v6.20.0: aggregation_profiles table (ADR-212)
     await m077_up(main)  # issue #211, v6.20.0: seed 5 global aggregation profiles (ADR-212)
     await m078_up(main)  # issue #211, v6.21.0: register aggregation_list diagram type (ADR-213)
+    await m079_up(main)  # issue #211, v6.29.0: rename seeded "Quantified item" → "Ingredient"
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

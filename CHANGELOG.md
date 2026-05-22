@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.29.0] - 2026-05-22
+
+### Added
+
+- **Clone-from-existing for aggregation profiles**
+  ([SPEC-212-e](docs/adrs/specs/SPEC-212-e-Aggregation-Profile-Editor-Polish.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211) comment
+  observation O7). A new **+ Clone from existing** button sits next
+  to **+ New profile** in `AggregationProfileEditor.svelte`. Selecting
+  a profile prefills the editor with `name + " (copy)"`, description,
+  and `profile_data`. The clone is always created in the parent's
+  scope (set-scoped when invoked from the set page; global when from
+  admin) — so you can clone a seeded global into a customised
+  set-scoped profile in one move. `is_default_for_set` resets to
+  false on every clone.
+- **Clone-from-existing for element templates**
+  ([SPEC-211-e](docs/adrs/specs/SPEC-211-e-Element-Template-Clone.md),
+  observation C4). `TemplatesListDialog` (elements list → Templates
+  button) gains a **Clone** action per row, parallel to **Use**. The
+  parent page hosts a small mini-dialog asking only for the new name;
+  the body is reused from the source (description, template_data,
+  markdown_stamp, scope). After creation the page navigates to the
+  new template's detail page.
+
+### Changed
+
+- **Friendlier aggregation-profile editor help text** (O6). Replaced
+  the ADR/SPEC-mentioning paragraph in `AggregationProfileEditor.svelte`
+  and the admin home card description with copy that talks in product
+  terms (rollups across documents, totals, etc.).
+- **Seeded "Quantified item" element template renamed to "Ingredient"**
+  (C3). Same id, same stamp body, same scope; updated name +
+  description only. New paired migrations **SQLite m079 / Supabase
+  m084** (idempotent: WHERE clause guards on the original name so
+  re-running doesn't double-rename).
+
+### Migration
+
+- **SQLite m079** + **Supabase m084**: rename the seeded global
+  template row `ea8829e5-…` from "Quantified item" to "Ingredient".
+- Supabase migration applied to the live DB before this merge per
+  `feedback_render_supabase_ordering`.
+
 ## [6.28.0] - 2026-05-22
 
 ### Changed

@@ -36,6 +36,6 @@
 		style="border-color: var(--color-border); color: var(--color-fg)"
 	>
 		<div class="text-lg font-semibold" style="color: var(--color-primary)">Aggregation profiles</div>
-		<p class="mt-1 text-sm" style="color: var(--color-muted)">Manage global aggregation profiles (ADR-212) — rulesets that drive cross-document rollups (sum / count by attribute, optionally scaled by a multiplier).</p>
+		<p class="mt-1 text-sm" style="color: var(--color-muted)">Manage global aggregation profiles — rulesets that roll up data across many documents (summed quantities, points totals, time-tracking, expenses, and so on).</p>
 	</a>
 </div>
