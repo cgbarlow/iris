@@ -27,6 +27,14 @@ if TYPE_CHECKING:
 # ADR-211: `{{self:<field-spec>}}` placeholder used in markdown_stamp.
 _SELF_TOKEN_RE = re.compile(r"\{\{self:([^}]+)\}\}")
 
+# ADR-215 (v6.27.0): regex that extracts attribute NAMEs from
+# self:attr:attributes/<NAME>/<rest> tokens in a stamp body. The
+# stamp's required-attribute set drives whether it applies to a
+# given element via SPEC-211-d's body-parsing filter.
+_BODY_ATTR_TOKEN_RE = re.compile(
+    r"\{\{self:attr:attributes/([^/}]+)/[^}]+\}\}",
+)
+
 
 def substitute_self(stamp_body: str, element_id: str) -> str:
     """Rewrite ``{{self:<field-spec>}}`` → ``{{element:<element_id>:<field-spec>}}``.
@@ -38,6 +46,31 @@ def substitute_self(stamp_body: str, element_id: str) -> str:
         lambda m: f"{{{{element:{element_id}:{m.group(1)}}}}}",
         stamp_body,
     )
+
+
+def _required_attr_names(stamp_body: str | None) -> set[str]:
+    """ADR-215: return the set of attribute NAMEs referenced by
+    ``{{self:attr:attributes/<NAME>/<rest>}}`` tokens in the stamp body.
+
+    Empty result means the body uses no attribute references — the
+    body filter is trivially satisfied for any element."""
+    if not stamp_body:
+        return set()
+    return set(_BODY_ATTR_TOKEN_RE.findall(stamp_body))
+
+
+def _element_attr_names(element_data: dict[str, Any]) -> set[str]:
+    """Return the set of attribute names on element.data.attributes."""
+    attrs = element_data.get("attributes")
+    if not isinstance(attrs, list):
+        return set()
+    out: set[str] = set()
+    for a in attrs:
+        if isinstance(a, dict):
+            name = a.get("name")
+            if isinstance(name, str):
+                out.add(name)
+    return out
 
 
 class ElementTemplateScopeError(ValueError):
@@ -459,23 +492,30 @@ def apply_template_to_create_body(
 async def list_stamps_for_element(
     db: DatabasePort, element_id: str,
 ) -> list[dict[str, Any]]:
-    """Return in-scope stamps for an element (ADR-211 scope rules).
+    """Return in-scope stamps for an element.
 
-    A stamp is in-scope when:
-      - The template has a non-empty ``markdown_stamp``.
-      - The template is global (``is_global = 1``) OR set-scoped to
-        the element's set.
-      - The template's captured ``element_type`` matches the element's
-        ``element_type`` (or the template doesn't capture an
-        element_type — then it's offered for any).
+    Filter rules:
+
+    1. Scope (ADR-211): the template is global (``is_global = 1``) OR
+       set-scoped to the element's set.
+    2. Element type (ADR-211): the template's captured ``element_type``
+       matches the element's ``element_type`` (or the template doesn't
+       capture an element_type — then it's offered for any).
+    3. Body attributes (ADR-215): every attribute name referenced by
+       the stamp body via ``{{self:attr:attributes/<NAME>/<rest>}}``
+       must be present on the element's ``data.attributes``. Stamps
+       whose body uses no ``attr:`` references pass trivially.
 
     Each returned ``markdown_stamp`` has ``{{self:…}}`` already
     substituted with the element's ID so the picker can paste it
     directly.
     """
-    # Resolve element's set_id + element_type.
+    # Resolve element's set_id + element_type + data.
     cursor = await db.execute(
-        "SELECT e.set_id, e.element_type FROM elements e "
+        "SELECT e.set_id, e.element_type, ev.data "
+        "FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id "
+        "  AND e.current_version = ev.version "
         "WHERE e.id = ? AND e.is_deleted = 0",
         (element_id,),
     )
@@ -483,6 +523,16 @@ async def list_stamps_for_element(
     if row is None:
         return []
     set_id, element_type = row[0], row[1]
+    raw_data = row[2]
+    try:
+        element_data: dict[str, Any] = (
+            json.loads(raw_data) if isinstance(raw_data, str) else (raw_data or {})
+        )
+    except (json.JSONDecodeError, TypeError):
+        element_data = {}
+    if not isinstance(element_data, dict):
+        element_data = {}
+    elem_attr_names = _element_attr_names(element_data)
 
     cursor = await db.execute(
         "SELECT id, name, description, set_id, is_global, "
@@ -503,6 +553,11 @@ async def list_stamps_for_element(
         if td_etype and td_etype != element_type:
             continue
         stamp_body = r[6] or ""
+        # ADR-215 body-parsing filter: every attribute name referenced
+        # by the stamp body must exist on the element.
+        required = _required_attr_names(stamp_body)
+        if required and not required.issubset(elem_attr_names):
+            continue
         resolved = substitute_self(stamp_body, element_id)
         out.append({
             "id": r[0],

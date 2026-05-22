@@ -76,17 +76,40 @@ async def _create_set(c: httpx.AsyncClient, h: dict, name: str = "S") -> str:
 async def _create_element(
     c: httpx.AsyncClient, h: dict, *, set_id: str,
     name: str = "E", element_type: str = "class",
+    data: dict | None = None,
 ) -> str:
+    body: dict = {
+        "name": name, "element_type": element_type, "set_id": set_id,
+    }
+    if data is not None:
+        body["data"] = data
     r = await c.post(
-        "/api/elements",
-        json={
-            "name": name, "element_type": element_type,
-            "set_id": set_id,
-        },
-        headers=h,
+        "/api/elements", json=body, headers=h,
     )
     assert r.status_code == 201, r.text
     return r.json()["id"]
+
+
+def _attrs(*names: str) -> dict:
+    """Build an element.data shape with the named attributes (all blank type)."""
+    return {
+        "attributes": [
+            {"name": n, "type": "", "scope": "Public",
+             "notes": "", "lower_bound": "", "upper_bound": ""}
+            for n in names
+        ],
+    }
+
+
+# All five seeded global stamps reference these attributes in their
+# bodies. Used by tests that need ALL seeded stamps to apply at once.
+_ALL_SEEDED_ATTRS = _attrs(
+    "Quantity", "Unit",          # Quantified item / Ingredient
+    "Points",                    # Sized story
+    "Hours",                     # Logged work
+    "Amount", "Currency",        # Line item
+    "Pages", "Author",           # Read entry
+)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -228,10 +251,13 @@ async def test_update_markdown_stamp(
 async def test_stamps_endpoint_returns_seeded_globals_for_class_element(
     client: httpx.AsyncClient,
 ) -> None:
+    """ADR-215: an element with *all* the attributes the seeded stamps
+    reference in their bodies sees all five seeded stamps."""
     h = await _auth(client)
     set_id = await _create_set(client, h)
     eid = await _create_element(
         client, h, set_id=set_id, element_type="class",
+        data=_ALL_SEEDED_ATTRS,
     )
     r = await client.get(
         f"/api/element-templates/stamps?element_id={eid}", headers=h,
@@ -253,6 +279,7 @@ async def test_stamps_self_substituted_to_element_id(
     set_id = await _create_set(client, h)
     eid = await _create_element(
         client, h, set_id=set_id, name="Pork mince", element_type="class",
+        data=_attrs("Quantity", "Unit"),
     )
     r = await client.get(
         f"/api/element-templates/stamps?element_id={eid}", headers=h,
@@ -335,3 +362,170 @@ async def test_stamps_missing_element_returns_empty_list(
     )
     assert r.status_code == 200
     assert r.json()["items"] == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# ADR-215 / SPEC-211-d: body-parsing attribute filter
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_body_filter_hides_stamp_when_required_attribute_missing(
+    client: httpx.AsyncClient,
+) -> None:
+    """ADR-215: stamp body requires Points; element has only Quantity+Unit
+    → stamp hidden."""
+    h = await _auth(client)
+    set_id = await _create_set(client, h)
+    eid = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+        data=_attrs("Quantity", "Unit"),
+    )
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid}", headers=h,
+    )
+    names = sorted(s["name"] for s in r.json()["items"])
+    # Sized story (Points), Logged work (Hours), Line item (Amount/Currency),
+    # Read entry (Pages/Author) — all hidden. Only Quantified item shows.
+    assert names == ["Quantified item"]
+
+
+@pytest.mark.asyncio
+async def test_body_filter_shows_stamp_when_all_required_attrs_present(
+    client: httpx.AsyncClient,
+) -> None:
+    """Quantified item body needs Quantity + Unit; element has both → shown."""
+    h = await _auth(client)
+    set_id = await _create_set(client, h)
+    eid = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+        data=_attrs("Quantity", "Unit", "Products"),  # extras don't matter
+    )
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid}", headers=h,
+    )
+    names = sorted(s["name"] for s in r.json()["items"])
+    assert "Quantified item" in names
+
+
+@pytest.mark.asyncio
+async def test_body_filter_hides_stamp_when_required_attr_partial(
+    client: httpx.AsyncClient,
+) -> None:
+    """Line item body requires Amount AND Currency; element has only Amount."""
+    h = await _auth(client)
+    set_id = await _create_set(client, h)
+    eid = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+        data=_attrs("Amount"),  # missing Currency
+    )
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid}", headers=h,
+    )
+    names = [s["name"] for s in r.json()["items"]]
+    assert "Line item" not in names
+
+
+@pytest.mark.asyncio
+async def test_body_trivial_stamp_applies_without_attrs(
+    client: httpx.AsyncClient,
+) -> None:
+    """A stamp body that uses no `self:attr:` tokens (e.g. just `name`)
+    passes the body filter trivially — applies to any matching-type
+    element regardless of attribute set."""
+    h = await _auth(client)
+    set_id = await _create_set(client, h)
+    eid = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+    )  # no attributes
+    # Create a body-trivial stamp.
+    r = await client.post(
+        "/api/element-templates",
+        json={
+            "name": "Just the name",
+            "markdown_stamp": "{{self:name}}",
+            "is_global": True,
+        },
+        headers=h,
+    )
+    assert r.status_code == 201
+
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid}", headers=h,
+    )
+    names = [s["name"] for s in r.json()["items"]]
+    assert "Just the name" in names
+    # The seeded stamps reference attributes → hidden from this element.
+    assert "Quantified item" not in names
+
+
+@pytest.mark.asyncio
+async def test_body_filter_user_stamp_referencing_custom_attribute(
+    client: httpx.AsyncClient,
+) -> None:
+    """A user-authored stamp body referencing a custom attribute applies
+    only to elements that have that attribute."""
+    h = await _auth(client)
+    set_id = await _create_set(client, h)
+    # Element WITH the custom attribute.
+    eid_with = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+        data=_attrs("Difficulty"),
+    )
+    # Element WITHOUT the custom attribute.
+    eid_without = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+        data=_attrs("OtherAttr"),
+    )
+    # Create the user stamp.
+    r = await client.post(
+        "/api/element-templates",
+        json={
+            "name": "Difficulty-rated",
+            "markdown_stamp":
+                "{{self:attr:attributes/Difficulty/type=}} - {{self:name}}",
+            "is_global": True,
+        },
+        headers=h,
+    )
+    assert r.status_code == 201
+
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid_with}", headers=h,
+    )
+    assert "Difficulty-rated" in [s["name"] for s in r.json()["items"]]
+
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid_without}", headers=h,
+    )
+    assert "Difficulty-rated" not in [s["name"] for s in r.json()["items"]]
+
+
+@pytest.mark.asyncio
+async def test_body_filter_dedupes_same_attribute_referenced_twice(
+    client: httpx.AsyncClient,
+) -> None:
+    """A stamp body referencing the same attribute twice — required set is
+    deduplicated, behaviour identical to a single reference."""
+    h = await _auth(client)
+    set_id = await _create_set(client, h)
+    eid = await _create_element(
+        client, h, set_id=set_id, element_type="class",
+        data=_attrs("Quantity"),
+    )
+    r = await client.post(
+        "/api/element-templates",
+        json={
+            "name": "Double-quantity",
+            "markdown_stamp":
+                "{{self:attr:attributes/Quantity/type=}} "
+                "{{self:attr:attributes/Quantity/notes}}",
+            "is_global": True,
+        },
+        headers=h,
+    )
+    assert r.status_code == 201
+    r = await client.get(
+        f"/api/element-templates/stamps?element_id={eid}", headers=h,
+    )
+    assert "Double-quantity" in [s["name"] for s in r.json()["items"]]

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.27.0] - 2026-05-22
+
+### Changed
+
+- **Smart-markdown picker stamp filter narrowed by body-referenced
+  attributes** ([ADR-215](docs/adrs/ADR-215-Stamp-Filter-By-Body-Attributes.md),
+  [SPEC-211-d](docs/adrs/specs/SPEC-211-d-Stamp-Filter-By-Body-Attributes.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211) comment
+  observation O2/O3). The `/api/element-templates/stamps?element_id=…`
+  endpoint now additionally filters out stamps whose body references
+  attributes the target element doesn't have. Resolves the user-
+  reported case where every grocery element saw all five seeded
+  stamps including ones for sprint points and reading logs.
+  - Attribute requirements are extracted from `{{self:attr:attributes/<NAME>/<rest>}}`
+    tokens in the stamp body via regex. The set must be a subset of
+    the element's `data.attributes` names for the stamp to appear.
+  - Stamps whose body uses no `self:attr:` tokens (e.g. just
+    `{{self:name}}`) pass the body filter trivially.
+  - The five seeded stamps now narrow naturally:
+    - **Quantified item** (Quantity + Unit) → groceries with both
+    - **Sized story** (Points) → story-shaped elements
+    - **Logged work** (Hours) → log-shaped elements
+    - **Line item** (Amount + Currency) → expense-shaped elements
+    - **Read entry** (Pages + Author) → reading-log-shaped elements
+
+### Migration
+
+- None. Pure filter logic change in
+  `backend/app/element_templates/service.py::list_stamps_for_element`.
+
 ## [6.26.1] - 2026-05-22
 
 ### Fixed
