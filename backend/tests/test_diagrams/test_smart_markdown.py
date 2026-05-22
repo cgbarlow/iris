@@ -596,3 +596,222 @@ async def test_primitive_then_more_segments_renders_strikethrough(
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
     assert rendered == f"~~{{{{element:{eid}:attr:unit/extra}}}}~~"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# ADR-210: token =value overrides (per-use values + fillable slots)
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_override_value_replaces_stored_attr(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: `attr:path=500` resolves to "500" regardless of stored value."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="Pork mince", data={"Quantity": "5"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:Quantity=500}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "500"
+
+
+@pytest.mark.asyncio
+async def test_override_value_with_blank_stored_attr(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: override works even when stored attribute is absent."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X")  # no Quantity attr
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:Quantity=500}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "500"
+
+
+@pytest.mark.asyncio
+async def test_empty_override_renders_strikethrough_fillable_slot(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: `attr:path=` (empty override) is the fillable-slot marker."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X")
+    token = f"{{{{element:{eid}:attr:Quantity=}}}}"
+    diag_id = await _create_smart_markdown_diagram(c, h, set_id, token)
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == f"~~{token}~~"
+
+
+@pytest.mark.asyncio
+async def test_empty_override_strikethrough_even_with_stored_value(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: empty override does NOT fall through to stored value.
+    The author explicitly chose "this is a slot to fill" — respect that."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X", data={"Q": "preset"})
+    token = f"{{{{element:{eid}:attr:Q=}}}}"
+    diag_id = await _create_smart_markdown_diagram(c, h, set_id, token)
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == f"~~{token}~~"
+
+
+@pytest.mark.asyncio
+async def test_override_on_name_field(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: override works on `name` field too, not just attr."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="Pork mince")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:name=Custom Label}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "Custom Label"
+
+
+@pytest.mark.asyncio
+async def test_override_on_package_name(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: override works on any non-element entity's name/description."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    r = await c.post(
+        "/api/packages",
+        json={"name": "Pantry", "set_id": set_id},
+        headers=h,
+    )
+    assert r.status_code == 201
+    pid = r.json()["id"]
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{package:{pid}:name=Aisle 7}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "Aisle 7"
+
+
+@pytest.mark.asyncio
+async def test_override_value_containing_equals_signs(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: split on FIRST `=` — values can contain `=`."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:foo=k=v=w}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "k=v=w"
+
+
+@pytest.mark.asyncio
+async def test_override_value_with_markdown_brackets_is_escaped(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: override values pass through the same markdown-link-text
+    escape as stored values (so `[`/`]` don't break the iris:// wrapper)."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:x=hello [world]}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # Wrapped: [hello \[world\]](iris://element/<id> "X")
+    assert "[hello \\[world\\]]" in rendered
+    assert f"iris://element/{eid}" in rendered
+
+
+@pytest.mark.asyncio
+async def test_override_on_deleted_entity_strikes_through(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: dangling reference takes precedence over override —
+    a deleted element renders as strikethrough even with an override."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X")
+    # Soft-delete the element (optimistic locking requires If-Match)
+    r = await c.delete(
+        f"/api/elements/{eid}",
+        headers={**h, "If-Match": "1"},
+    )
+    assert r.status_code in (200, 204), r.text
+    token = f"{{{{element:{eid}:attr:Quantity=500}}}}"
+    diag_id = await _create_smart_markdown_diagram(c, h, set_id, token)
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered == f"~~{token}~~"
+
+
+@pytest.mark.asyncio
+async def test_no_override_existing_behaviour_preserved(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: tokens without `=` resolve to stored value as before."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X", data={"Unit": "g"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:Unit}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "g"
+
+
+@pytest.mark.asyncio
+async def test_override_alongside_unoverridden_in_one_diagram(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: real-world recipe line composes override + stored + stored."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="Pork mince", data={"Unit": "g"},
+    )
+    src = (
+        f"- {{{{element:{eid}:attr:Quantity=500}}}}"
+        f" {{{{element:{eid}:attr:Unit}}}}"
+        f" {{{{element:{eid}:name}}}}"
+    )
+    diag_id = await _create_smart_markdown_diagram(c, h, set_id, src)
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "- 500 g Pork mince"
+
+
+@pytest.mark.asyncio
+async def test_override_on_attr_path_with_nested_segments(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """ADR-210: works on multi-segment attribute paths too (ADR-206 grammar)."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X",
+        data={"attributes": [{"name": "Quantity", "type": ""}]},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{element:{eid}:attr:attributes/Quantity/type=2.5}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "2.5"
