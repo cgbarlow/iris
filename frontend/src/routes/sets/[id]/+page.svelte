@@ -18,6 +18,7 @@
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import CollectionSelector from '$lib/components/CollectionSelector.svelte';
 	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
+	import AggregationProfileEditor from '$lib/components/AggregationProfileEditor.svelte';
 	import DOMPurify from 'dompurify';
 
 	let set = $state<IrisSet | null>(null);
@@ -460,6 +461,11 @@
 			style="border-color: var(--color-border); color: var(--color-primary)">
 			Iris AI — ask about this Set →
 		</a>
+	</div>
+
+	<!-- SPEC-212-d (v6.25.0): set-scoped aggregation profiles. -->
+	<div class="mt-8" style="max-width: 1024px">
+		<AggregationProfileEditor setId={setId} globalsMode={false} />
 	</div>
 
 	<!-- Danger zone -->
