@@ -24,6 +24,9 @@
 		source_element_name: string | null;
 		included_fields: string[];
 		template_data: Record<string, unknown>;
+		/** ADR-211 (v6.19.0): stamp body using {{self:…}} placeholders.
+		 *  Surfaced here for the clone flow (SPEC-211-e, v6.29.0). */
+		markdown_stamp?: string | null;
 		created_at: string;
 		updated_at: string;
 		created_by_username: string;
@@ -41,9 +44,15 @@
 		setId: string;
 		oncancel: () => void;
 		onuse: (createdElementId: string) => void;
+		/** SPEC-211-e (v6.29.0): when the user picks Clone from a row,
+		 * the parent navigates to the create-template flow with the
+		 * source's name + markdown_stamp prefilled. The parent is
+		 * `/elements/+page.svelte`, which composes the existing
+		 * `CreateTemplateDialog`. */
+		onclone?: (source: ElementTemplate) => void;
 	}
 
-	let { open, setId, oncancel, onuse }: Props = $props();
+	let { open, setId, oncancel, onuse, onclone }: Props = $props();
 
 	let dialogEl: HTMLDialogElement | undefined = $state();
 	let templates = $state<ElementTemplate[]>([]);
@@ -240,6 +249,17 @@
 								>
 									Use
 								</button>
+								{#if onclone}
+									<button
+										type="button"
+										onclick={() => onclone(t)}
+										class="ml-2 rounded px-3 py-1 text-xs"
+										style="border: 1px solid var(--color-border); color: var(--color-fg)"
+										title="Clone — open the create-template form prefilled with this template's content"
+									>
+										Clone
+									</button>
+								{/if}
 							</td>
 						</tr>
 					{/each}

@@ -144,3 +144,66 @@ describe('JSON parse-validate', () => {
 		expect(parsed.output.aggregation_fn).toBe('sum');
 	});
 });
+
+
+// ─────────────────────────────────────────────────────────────────────
+// SPEC-212-e (v6.29.0): Clone-from-existing
+// ─────────────────────────────────────────────────────────────────────
+
+
+interface AggregationProfileLite {
+	id: string;
+	name: string;
+	description: string | null;
+	is_default_for_set: boolean;
+	profile_data: Record<string, unknown>;
+}
+
+function buildCloneDraft(
+	source: AggregationProfileLite,
+): { name: string; description: string; json: string; isDefault: boolean } {
+	return {
+		name: `${source.name} (copy)`,
+		description: source.description ?? '',
+		json: JSON.stringify(source.profile_data, null, 2),
+		isDefault: false, // copies don't inherit default-for-set
+	};
+}
+
+describe('clone-from-existing draft construction', () => {
+	it('name carries " (copy)" suffix', () => {
+		const d = buildCloneDraft({
+			id: 's', name: 'Shopping list', description: null,
+			is_default_for_set: true,
+			profile_data: { traversal: { inner: { collect_token_type: 'element' } }, output: {} },
+		});
+		expect(d.name).toBe('Shopping list (copy)');
+	});
+
+	it('description is copied verbatim', () => {
+		const d = buildCloneDraft({
+			id: 's', name: 'X', description: 'A specific blurb',
+			is_default_for_set: false,
+			profile_data: { traversal: { inner: { collect_token_type: 'element' } }, output: {} },
+		});
+		expect(d.description).toBe('A specific blurb');
+	});
+
+	it('is_default_for_set always resets to false on clone', () => {
+		const d = buildCloneDraft({
+			id: 's', name: 'X', description: null,
+			is_default_for_set: true,
+			profile_data: { traversal: { inner: { collect_token_type: 'element' } }, output: {} },
+		});
+		expect(d.isDefault).toBe(false);
+	});
+
+	it('profile_data round-trips via JSON.stringify', () => {
+		const pd = { traversal: { inner: { collect_token_type: 'element', value_attribute_path: 'attributes/Quantity/type' } }, output: { line_format: '- {element.name}' } };
+		const d = buildCloneDraft({
+			id: 's', name: 'X', description: null,
+			is_default_for_set: false, profile_data: pd,
+		});
+		expect(JSON.parse(d.json)).toEqual(pd);
+	});
+});

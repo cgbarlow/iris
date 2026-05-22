@@ -266,7 +266,7 @@ async def test_stamps_endpoint_returns_seeded_globals_for_class_element(
     names = sorted(s["name"] for s in r.json()["items"])
     # Five seeded global stamps all target element_type=class.
     assert names == [
-        "Line item", "Logged work", "Quantified item",
+        "Ingredient", "Line item", "Logged work",
         "Read entry", "Sized story",
     ]
 
@@ -286,7 +286,7 @@ async def test_stamps_self_substituted_to_element_id(
     )
     assert r.status_code == 200
     quantified = next(
-        s for s in r.json()["items"] if s["name"] == "Quantified item"
+        s for s in r.json()["items"] if s["name"] == "Ingredient"
     )
     # `self` is rewritten to `element:<eid>` in the returned stamp body.
     assert f"element:{eid}:attr:attributes/Quantity/type=" in (
@@ -387,7 +387,7 @@ async def test_body_filter_hides_stamp_when_required_attribute_missing(
     names = sorted(s["name"] for s in r.json()["items"])
     # Sized story (Points), Logged work (Hours), Line item (Amount/Currency),
     # Read entry (Pages/Author) — all hidden. Only Quantified item shows.
-    assert names == ["Quantified item"]
+    assert names == ["Ingredient"]
 
 
 @pytest.mark.asyncio
@@ -405,7 +405,7 @@ async def test_body_filter_shows_stamp_when_all_required_attrs_present(
         f"/api/element-templates/stamps?element_id={eid}", headers=h,
     )
     names = sorted(s["name"] for s in r.json()["items"])
-    assert "Quantified item" in names
+    assert "Ingredient" in names
 
 
 @pytest.mark.asyncio
@@ -456,7 +456,7 @@ async def test_body_trivial_stamp_applies_without_attrs(
     names = [s["name"] for s in r.json()["items"]]
     assert "Just the name" in names
     # The seeded stamps reference attributes → hidden from this element.
-    assert "Quantified item" not in names
+    assert "Ingredient" not in names
 
 
 @pytest.mark.asyncio
