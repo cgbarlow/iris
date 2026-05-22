@@ -79,6 +79,8 @@ from app.migrations.m072_sets_element_tab_default import up as m072_up
 from app.migrations.m073_entity_images import up as m073_up
 from app.migrations.m074_element_template_markdown_stamp import up as m074_up
 from app.migrations.m075_seed_global_element_template_stamps import up as m075_up
+from app.migrations.m076_aggregation_profiles import up as m076_up
+from app.migrations.m077_seed_global_aggregation_profiles import up as m077_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -185,6 +187,8 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m073_up(main)  # issue #194, v6.17.0: entity_images junction table (ADR-209)
     await m074_up(main)  # issue #211, v6.19.0: element_templates.markdown_stamp (ADR-211)
     await m075_up(main)  # issue #211, v6.19.0: seed 5 global element-template stamps (ADR-211)
+    await m076_up(main)  # issue #211, v6.20.0: aggregation_profiles table (ADR-212)
+    await m077_up(main)  # issue #211, v6.20.0: seed 5 global aggregation profiles (ADR-212)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
