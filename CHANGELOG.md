@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.26.1] - 2026-05-22
+
+### Fixed
+
+- **Admin → Settings → Seed Example Diagrams** no longer 500s with a
+  `ForeignKeyViolationError` when the user has placed any non-seed
+  diagram or element under a seed package. The seed's
+  `_clear_old_seed_data` flow now NULLs out non-seed FK references to
+  seed packages (diagrams.parent_package_id, elements.package_id) and
+  to seed elements (element_templates.source_element_id, bookmarks)
+  before deleting them, so orphaned user content survives the
+  clear-and-re-seed cycle (reparented to "no package") while the seed
+  packages go away cleanly.
+- The browser-side symptom — "No access control origin header" CORS
+  error — was a downstream effect of Render returning a 500 without
+  CORS headers when the backend exception fired. The fix is on the
+  backend; CORS is unchanged.
+
+### Migration
+
+- None. Pure logic fix in `backend/app/seed/example_models.py`.
+
+### Test plan
+
+- Regression tests added in
+  `backend/tests/test_seed/test_example_models.py` cover both the
+  "non-seed diagram parented to a seed package" and "user template
+  referencing a seed element" cases.
+
 ## [6.26.0] - 2026-05-22
 
 ### Added

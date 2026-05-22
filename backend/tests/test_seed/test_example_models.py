@@ -566,3 +566,137 @@ async def test_v2_seed_upgraded_to_v3(main_db: aiosqlite.Connection) -> None:
         (_DEFAULT_SET_ID,),
     )
     assert (await cursor.fetchone())[0] == 39
+
+
+@pytest.mark.asyncio
+async def test_seed_re_runs_when_user_diagram_under_seed_package(
+    main_db: aiosqlite.Connection,
+) -> None:
+    """Regression for the 2026-05-22 seed-clear FK violation.
+
+    If a user has created a non-seed diagram with `parent_package_id`
+    pointing at a seed package (here the DoView Notation package),
+    the seed's clear-and-re-seed flow must not FK-fail on the package
+    delete. `_clear_old_seed_data` now NULLs out non-seed references
+    before deleting seed packages.
+    """
+    await _run_migrations(main_db)
+    await _create_active_user(main_db)
+
+    # First seed populates everything.
+    await seed_example_models(main_db)
+
+    # Simulate the user-created scenario: a non-seed diagram pointing
+    # at one of the seed packages. DoView Notation is pkg-5.
+    doview_pkg_id = _gen_id("pkg", 5)
+    user_diag_id = "11111111-1111-1111-1111-111111111111"
+    now = "2026-05-22T00:00:00+00:00"
+    await main_db.execute(
+        "INSERT INTO diagrams (id, diagram_type, set_id, current_version, "
+        "created_at, created_by, updated_at, parent_package_id, notation, "
+        "sequence_order) "
+        "VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)",
+        (user_diag_id, "outcomes_map", _DEFAULT_SET_ID, now,
+         _SYSTEM_USER_ID, now, doview_pkg_id, "doview", 999),
+    )
+    await main_db.execute(
+        "INSERT INTO diagram_versions (diagram_id, version, name, "
+        "description, data, metadata, change_type, created_at, created_by) "
+        "VALUES (?, 1, ?, ?, ?, ?, 'create', ?, ?)",
+        (user_diag_id, "User-created DoView", "User content",
+         "{}", None, now, _SYSTEM_USER_ID),
+    )
+    await main_db.commit()
+
+    # Wipe the v8 marker so the next seed call runs the clear-and-re-seed
+    # path (mirroring what happens when an older seed version had been
+    # left behind in prod).
+    await main_db.execute(
+        "UPDATE diagram_versions SET metadata = NULL WHERE diagram_id = ?",
+        (_gen_id("diagram", 33),),
+    )
+    await main_db.commit()
+
+    # Should NOT raise — the fix reparents the user diagram before
+    # deleting the seed package.
+    await seed_example_models(main_db)
+    await main_db.commit()
+
+    # User diagram still exists, but its parent_package_id is now NULL.
+    cursor = await main_db.execute(
+        "SELECT parent_package_id FROM diagrams WHERE id = ?",
+        (user_diag_id,),
+    )
+    row = await cursor.fetchone()
+    assert row is not None, "User diagram should survive the seed re-run"
+    assert row[0] is None, (
+        "User diagram's parent_package_id should be NULL after the seed "
+        "package was deleted (the cleanup nulls non-seed references)."
+    )
+
+    # And the seed is back to a complete state.
+    cursor = await main_db.execute(
+        "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
+        (_DEFAULT_SET_ID,),
+    )
+    assert (await cursor.fetchone())[0] == 6
+
+
+@pytest.mark.asyncio
+async def test_seed_re_runs_when_user_element_template_references_seed_element(
+    main_db: aiosqlite.Connection,
+) -> None:
+    """Regression: element_template.source_element_id pointing at a
+    seed element previously FK-blocked the element delete during the
+    seed clear-and-re-seed flow.
+    """
+    await _run_migrations(main_db)
+    await _create_active_user(main_db)
+
+    # The seed-test fixture's migration list doesn't include m067 (element
+    # templates). Create a minimal table inline for this regression test.
+    await main_db.execute(
+        "CREATE TABLE IF NOT EXISTS element_templates ("
+        "id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, "
+        "set_id TEXT, is_global INTEGER NOT NULL DEFAULT 0, "
+        "source_element_id TEXT, included_fields TEXT NOT NULL, "
+        "template_data TEXT NOT NULL, created_by TEXT, "
+        "created_at TEXT NOT NULL, updated_at TEXT NOT NULL, "
+        "is_deleted INTEGER NOT NULL DEFAULT 0)",
+    )
+    await main_db.commit()
+
+    await seed_example_models(main_db)
+
+    # Pick a seed element and create a template referencing it.
+    seed_eid = _gen_id("element", 0)
+    template_id = "22222222-2222-2222-2222-222222222222"
+    now = "2026-05-22T00:00:00+00:00"
+    await main_db.execute(
+        "INSERT INTO element_templates ("
+        "id, name, description, set_id, is_global, source_element_id, "
+        "included_fields, template_data, created_by, created_at, updated_at"
+        ") VALUES (?, ?, ?, NULL, 1, ?, '[\"name\"]', '{}', ?, ?, ?)",
+        (template_id, "Stamps-on-seed", "Test",
+         seed_eid, _SYSTEM_USER_ID, now, now),
+    )
+    await main_db.commit()
+
+    # Wipe v8 marker → trigger the clear flow.
+    await main_db.execute(
+        "UPDATE diagram_versions SET metadata = NULL WHERE diagram_id = ?",
+        (_gen_id("diagram", 33),),
+    )
+    await main_db.commit()
+
+    await seed_example_models(main_db)
+    await main_db.commit()
+
+    # Template survives but its source_element_id is now NULL.
+    cursor = await main_db.execute(
+        "SELECT source_element_id FROM element_templates WHERE id = ?",
+        (template_id,),
+    )
+    row = await cursor.fetchone()
+    assert row is not None
+    assert row[0] is None
