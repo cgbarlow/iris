@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.21.0] - 2026-05-22
+
+### Added
+
+- **`aggregation_list` diagram type**
+  ([ADR-213](docs/adrs/ADR-213-Aggregation-List-Diagram-Type.md),
+  [SPEC-213-a](docs/adrs/specs/SPEC-213-a-Aggregation-List-Diagram-Type.md),
+  issue [#211](https://github.com/cgbarlow/issues/211)). Synth-on-
+  read diagram type under the `markdown` notation. Storage is
+  minimal config (`data.source_diagram_id` + `data.profile_id`); the
+  v6.20.0 aggregation engine fills `data.content` at GET time. Thin
+  wrapper — the engine does the real work. Failures (missing
+  source/profile/etc.) render informative placeholders in
+  `data.content` instead of crashing the GET, so the diagram stays
+  editable.
+- The aggregation_list canvas reads `data.content` and renders it
+  via the existing `MarkdownView` component — same look and feel as
+  smart_markdown and dynamic_list.
+
+### Migration
+
+- **SQLite m078 / Supabase m083** — register `aggregation_list`
+  diagram type under the `markdown` notation. Two-row insert
+  (`diagram_types` + `diagram_type_notations`), idempotent via
+  `INSERT OR IGNORE` / `ON CONFLICT DO NOTHING`.
+- Supabase migration applied to the live DB prior to merge.
+
 ## [6.20.0] - 2026-05-22
 
 ### Added
