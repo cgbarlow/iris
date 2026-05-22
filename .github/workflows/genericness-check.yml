@@ -1,0 +1,32 @@
+name: genericness-check
+
+# ADR-214: enforce the genericness invariant — no domain terminology
+# (ingredient / recipe / meal / diners / servings / aisle / grocery /
+# pantry / shopping) in Iris core code paths.
+#
+# Hard-fails the PR if any banned term appears in non-allow-listed
+# files. Comments and docstrings are exempt — the principle is "no
+# domain logic," not "no domain mentions."
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/**'
+      - 'frontend/src/**'
+      - 'scripts/check_aggregation_genericness.py'
+      - '.github/workflows/genericness-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genericness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run genericness check
+        run: python3 scripts/check_aggregation_genericness.py

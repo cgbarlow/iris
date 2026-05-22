@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.21.1] - 2026-05-22
+
+### Added
+
+- **Genericness invariant CI check**
+  ([ADR-214](docs/adrs/ADR-214-Genericness-Invariant-Shopping-List.md),
+  [SPEC-214-a](docs/adrs/specs/SPEC-214-a-Genericness-Invariant.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211)).
+  `scripts/check_aggregation_genericness.py` fails CI if any of the
+  banned domain terms — `ingredient`, `recipe`, `meal`, `diners`,
+  `servings`, `aisle`, `grocery`, `pantry`, `shopping` — appears in
+  Iris core code paths. Mirrors ADR-182's surface-parity discipline:
+  the shopping-list workflow was deliberately built without domain
+  terminology in code; this script keeps that honest under future
+  contributions.
+- Comments and docstrings are exempt — the principle is "no domain
+  logic," not "no domain mentions." Allow-listed paths: migrations,
+  seed, import_sparx, tests, i18n, all `*.md` files.
+- New GitHub Actions workflow `genericness-check.yml` runs the
+  script on PRs touching `backend/app/**`, `frontend/src/**`, the
+  script itself, or the workflow file.
+- pytest harness in `backend/tests/test_aggregation/test_genericness_invariant.py`
+  so local runs catch violations too.
+
+### Migration
+
+- None.
+
 ## [6.21.0] - 2026-05-22
 
 ### Added
