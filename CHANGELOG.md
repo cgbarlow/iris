@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.26.0] - 2026-05-22
+
+### Added
+
+- **`aggregation_list` canvas with source + profile pickers**
+  ([SPEC-213-b](docs/adrs/specs/SPEC-213-b-Aggregation-List-Pickers.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211),
+  follow-up to v6.21.0). New `AggregationListCanvas.svelte`:
+  - **View mode**: renders the synthesised `data.content` via
+    `MarkdownView` (same as smart_markdown / dynamic_list).
+  - **Edit mode**: native `<select>` pickers for source diagram
+    (`smart_markdown` only, scoped to the same set) and aggregation
+    profile (in-scope: set-scoped + globals). Collapsible preview
+    of the currently rendered output.
+- **`DiagramDialog` create flow** offers `Aggregation list` under the
+  `markdown` notation. Picker labels are alpha-sorted (preserved from
+  ADR-206), so the new entry appears at the top of the markdown
+  type list.
+- **`views/[id]` canvas dispatcher** gains an `aggregation_list`
+  branch in both edit-mode and browse-mode paths.
+
+### Migration
+
+- None. Pure frontend addition; reuses v6.20.0 + v6.21.0 endpoints.
+
+### Out of scope
+
+- Typeahead autocomplete on the source / profile pickers (native
+  `<select>` is sufficient for now).
+- Cross-set source picking (current: same-set only).
+- Live engine re-render on every config change (current: triggers on
+  Save like other canvases).
+
 ## [6.25.0] - 2026-05-22
 
 ### Added
