@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from app.audit.service import verify_audit_chain
@@ -343,10 +344,39 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
 
     # v6.17.8 (issue #208): regenerate PNG thumbnails so changes to
     # ``generate_svg_from_diagram_data`` propagate to pre-existing
-    # diagrams (the markdown-notation preview branch added in v6.17.6
-    # was otherwise dormant on Supabase deployments).
+    # diagrams.
+    #
+    # v6.30.2: dispatched as a background task instead of awaited in
+    # the lifespan. With 1000+ diagrams the synchronous regen can
+    # take 5–6 minutes per deploy and exceed Render's port-detection
+    # deadline (deploys getting cancelled mid-startup despite the
+    # process being healthy). Moving it off the critical path lets
+    # the API bind its port in seconds; thumbnails update silently
+    # in the background. Any new/changed diagram still renders fresh
+    # on first GET regardless of whether the background sweep has
+    # finished.
+    asyncio.create_task(_regenerate_thumbnails_background(port))
+    print(
+        "[STARTUP] thumbnail regeneration scheduled in background",
+        flush=True,
+    )
+
+
+async def _regenerate_thumbnails_background(port: object) -> None:
+    """Fire-and-forget thumbnail regen.
+
+    Errors are logged + swallowed. If the lifespan tears down mid-regen
+    (e.g. SIGTERM during a deploy) the partial work is discarded and
+    the next deploy starts fresh.
+    """
     try:
-        count = await regenerate_all_thumbnails(port)
-        print(f"[STARTUP] regenerated {count} diagram thumbnails", flush=True)
+        count = await regenerate_all_thumbnails(port)  # type: ignore[arg-type]
+        print(
+            f"[STARTUP] regenerated {count} diagram thumbnails (background)",
+            flush=True,
+        )
     except Exception as exc:  # noqa: BLE001
-        print(f"[STARTUP] thumbnail regeneration skipped: {exc}", flush=True)
+        print(
+            f"[STARTUP] thumbnail regeneration skipped: {exc}",
+            flush=True,
+        )

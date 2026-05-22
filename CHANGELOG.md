@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.30.2] - 2026-05-22
+
+### Fixed
+
+- **Render deploys no longer get marked `canceled` by the
+  port-detection timeout.** `_initialize_supabase` was awaiting
+  `regenerate_all_thumbnails` synchronously inside the FastAPI
+  lifespan; with 1100+ diagrams on UAT the regen took ~5–6 minutes
+  per deploy, well past Render's port-binding deadline. Render
+  printed `==> No open ports detected, continuing to scan…` three
+  times and cancelled the deploy, despite the process being healthy
+  and reaching `Application startup complete` shortly afterwards.
+
+  v6.30.2 dispatches the regen as a fire-and-forget background task
+  via `asyncio.create_task(...)`. The lifespan returns immediately
+  after scheduling — the port binds in seconds. Thumbnails update
+  silently over the next few minutes; any new or changed diagram
+  still renders fresh on first GET regardless of whether the
+  background sweep has finished. Errors inside the background task
+  are logged + swallowed (no unhandled-exception warnings on
+  SIGTERM mid-regen).
+
+- The SQLite startup path is unchanged — small dev/self-hosted
+  databases don't hit the timeout and the seed example diagrams
+  benefit from being rendered synchronously on first run.
+
+### Migration
+
+- None. Pure backend startup-flow change.
+
 ## [6.30.1] - 2026-05-22
 
 ### Fixed
