@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.24.0] - 2026-05-22
+
+### Added
+
+- **Element-template stamp editor** in the template detail page
+  ([SPEC-211-c](docs/adrs/specs/SPEC-211-c-Stamp-Editor.md),
+  issue [#211](https://github.com/cgbarlow/iris/issues/211),
+  follow-up to v6.19.0). A new **Markdown stamp** section shows the
+  template's `markdown_stamp` body with an inline edit textarea.
+  Save → `PUT /api/element-templates/{id}` with the new body;
+  empty string clears the stamp. Help text documents
+  `{{self:name}}` / `{{self:attr:<path>}}` / trailing-`=` fillable-
+  slot syntax. The seeded stamps are good clone templates for
+  authoring new ones.
+
+### Migration
+
+- None. Pure frontend addition.
+
+### Out of scope (deferred)
+
+- Picker self-mode (smart-markdown picker emitting `{{self:…}}`
+  tokens instead of full `{{element:UUID:…}}` tokens). The current
+  v1 editor is a plain textarea; authors write tokens by hand.
+- Live preview of the stamp rendered against the template's source
+  element.
+
 ## [6.23.0] - 2026-05-22
 
 ### Added
