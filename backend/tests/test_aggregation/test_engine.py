@@ -463,6 +463,163 @@ async def test_run_missing_source_raises(
         )
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Provenance comments (ADR-217)
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_include_provenance_off_omits_comments(
+    env: tuple[httpx.AsyncClient, DatabaseManager, dict],
+) -> None:
+    """Default behaviour: no `<!-- iris:element=...` substring anywhere."""
+    c, dm, h = env
+    set_id = await _create_set(c, h)
+    aisle_meat = await _create_package(c, h, set_id, "Meat & Poultry")
+    aisle_produce = await _create_package(c, h, set_id, "Produce")
+    pork_id = await _create_element(
+        c, h, set_id=set_id, name="Pork mince",
+        package_id=aisle_meat, data=_ATTR_BLUEPRINT,
+    )
+    carrot_id = await _create_element(
+        c, h, set_id=set_id, name="Carrot",
+        package_id=aisle_produce, data=_ATTR_BLUEPRINT,
+    )
+    source = (
+        f"- {{{{element:{pork_id}:attr:attributes/Quantity/type=500}}}}\n"
+        f"- {{{{element:{carrot_id}:attr:attributes/Quantity/type=3}}}}"
+    )
+    diag_id = await _create_smart_md(c, h, set_id, source)
+    profile = await create_aggregation_profile(
+        dm.main_db,
+        name="Default no provenance", description=None,
+        set_id=None, is_global=True,
+        profile_data={
+            "traversal": {
+                "inner": {
+                    "collect_token_type": "element",
+                    "value_attribute_path": "attributes/Quantity/type",
+                    "bucket_attribute_path": None,
+                    "skip_blank_values": True,
+                },
+            },
+            "output": {
+                "group_by": "element.package_name",
+                "aggregation_fn": "sum",
+                "line_format": "- {element.name}: {sum_value}",
+            },
+        },
+        is_default_for_set=False, created_by=None,
+    )
+    result = await _engine.run(
+        dm.main_db, profile_id=profile["id"], source_diagram_id=diag_id,
+    )
+    assert "<!-- iris:element=" not in result.markdown
+
+
+@pytest.mark.asyncio
+async def test_include_provenance_on_appends_comment_per_line(
+    env: tuple[httpx.AsyncClient, DatabaseManager, dict],
+) -> None:
+    """With include_provenance=True, every rendered shopping-list line
+    ends with a `<!-- iris:element=<uuid> -->` comment carrying the row's
+    element_id. Headings and section dividers MUST NOT get the comment.
+    Per-source breakdown text (when enabled) appears UNAFFECTED, before
+    the trailing comment."""
+    c, dm, h = env
+    set_id = await _create_set(c, h)
+    aisle_meat = await _create_package(c, h, set_id, "Meat & Poultry")
+    aisle_produce = await _create_package(c, h, set_id, "Produce")
+    pork_id = await _create_element(
+        c, h, set_id=set_id, name="Pork mince",
+        package_id=aisle_meat, data=_ATTR_BLUEPRINT,
+    )
+    carrot_id = await _create_element(
+        c, h, set_id=set_id, name="Carrot",
+        package_id=aisle_produce, data=_ATTR_BLUEPRINT,
+    )
+    # Two recipes so per-source breakdown has substance.
+    rec_a = await _create_smart_md(
+        c, h, set_id,
+        f"- {{{{element:{pork_id}:attr:attributes/Quantity/type=500}}}}\n"
+        f"- {{{{element:{carrot_id}:attr:attributes/Quantity/type=2}}}}",
+        name="Recipe A",
+    )
+    rec_b = await _create_smart_md(
+        c, h, set_id,
+        f"- {{{{element:{carrot_id}:attr:attributes/Quantity/type=1}}}}",
+        name="Recipe B",
+    )
+    plan_id = await _create_smart_md(
+        c, h, set_id,
+        f"- {{{{diagram:{rec_a}}}}}\n- {{{{diagram:{rec_b}}}}}",
+        name="Plan",
+    )
+    profile = await create_aggregation_profile(
+        dm.main_db,
+        name="Provenance on", description=None,
+        set_id=None, is_global=True,
+        profile_data={
+            "traversal": {
+                "outer": {
+                    "collect_token_type": "diagram",
+                },
+                "inner": {
+                    "collect_token_type": "element",
+                    "value_attribute_path": "attributes/Quantity/type",
+                    "bucket_attribute_path": None,
+                    "skip_blank_values": True,
+                },
+            },
+            "output": {
+                "group_by": "element.package_name",
+                "aggregation_fn": "sum",
+                "line_format": "- {element.name}: {sum_value}",
+                "show_per_source_breakdown": True,
+                "breakdown_format": " ({sources_joined})",
+                "include_provenance": True,
+            },
+        },
+        is_default_for_set=False, created_by=None,
+    )
+    result = await _engine.run(
+        dm.main_db, profile_id=profile["id"], source_diagram_id=plan_id,
+    )
+    md = result.markdown
+    # Heading lines must NOT carry the comment.
+    for line in md.splitlines():
+        if line.startswith("## "):
+            assert "<!-- iris:element=" not in line, (
+                f"Heading carried provenance comment: {line!r}"
+            )
+        if line.strip() == "":
+            assert "<!-- iris:element=" not in line
+    # Every list line (starts with "- ") ends with the comment, and the
+    # element_id matches the correct row.
+    list_lines = [ln for ln in md.splitlines() if ln.startswith("- ")]
+    assert list_lines, "no shopping-list lines rendered"
+    for line in list_lines:
+        assert line.endswith(" -->"), f"missing trailing comment: {line!r}"
+        assert "<!-- iris:element=" in line
+    # Verify the right element_id is on each row by matching name.
+    pork_lines = [ln for ln in list_lines if "Pork mince" in ln]
+    carrot_lines = [ln for ln in list_lines if "Carrot" in ln]
+    assert pork_lines and carrot_lines
+    for ln in pork_lines:
+        assert f"<!-- iris:element={pork_id} -->" in ln, ln
+    for ln in carrot_lines:
+        assert f"<!-- iris:element={carrot_id} -->" in ln, ln
+    # Per-source breakdown text MUST appear before the comment, not
+    # after it (comment is the very last thing on the line).
+    for ln in list_lines:
+        comment_start = ln.index("<!-- iris:element=")
+        breakdown_idx = ln.find("(Recipe ")
+        if breakdown_idx != -1:
+            assert breakdown_idx < comment_start, (
+                f"breakdown text appeared after the comment: {ln!r}"
+            )
+
+
 @pytest.mark.asyncio
 async def test_blank_value_skipped(
     env: tuple[httpx.AsyncClient, DatabaseManager, dict],

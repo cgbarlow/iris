@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.31.0] - 2026-05-24
+
+### Added
+
+- Aggregate output provenance flag (ADR-217) — opt-in per-line
+  element_id surfacing for downstream consumers.
+
 ## [6.30.2] - 2026-05-22
 
 ### Fixed

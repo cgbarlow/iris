@@ -92,9 +92,26 @@ Config resolution order (first match wins):
 | `iris export diagram\|element\|package\|set\|collection <id> --format json\|markdown [-o PATH]` | Headless export |
 | `iris ask "<question>"` | AI question (`--set S` repeatable, `--mode discuss\|creation`, `--stream/--no-stream`) |
 | `iris conversations list --set <id>` | History |
+| `iris aggregate --profile <id> --source <diagram-id>` | Run a generic aggregation profile (ADR-212) |
+| `iris aggregation-profile list` / `get <id>` | Browse aggregation profiles |
+| `iris create aggregation-profile` / `iris update aggregation-profile` / `iris delete aggregation-profile` | Manage aggregation profiles |
 
 Add `--json` to any command for machine-parsable output. `-o -` on
 `iris export` writes to stdout.
+
+### Aggregate output provenance (ADR-217)
+
+An aggregation profile can opt in to per-line provenance by setting
+`output.include_provenance: true` in its `profile_data` (e.g. via
+`iris update aggregation-profile <id> --profile-data-file path.json`).
+When enabled, `iris aggregate` returns markdown where every rendered
+list line ends with `<!-- iris:element=<element-uuid> -->`. Headings
+and blank lines stay clean, and any per-source breakdown text is
+preserved in front of the comment. Bash orchestrators can extract the
+element id from each line to fetch related data (for example, cached
+SKU values stored on the element's attribute notes) without an LLM
+round-trip. The flag is off by default; existing consumers see no
+change.
 
 ## Exit codes
 
