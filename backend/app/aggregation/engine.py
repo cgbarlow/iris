@@ -523,6 +523,11 @@ async def _format_output(
             )
             if output.show_per_source_breakdown:
                 line += _render_breakdown(output.breakdown_format, r.sources)
+            if output.include_provenance:
+                # ADR-217: trailing HTML comment carrying the row's
+                # element_id. Appended LAST so it never interrupts the
+                # visible text or any per-source breakdown.
+                line += f" <!-- iris:element={r.token_id} -->"
             out_lines.append(line)
             row_count += 1
         out_lines.append("")

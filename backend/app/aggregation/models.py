@@ -62,6 +62,11 @@ class OutputConfig(BaseModel):
     line_format: str = "- {element.name}: {sum_value}{bucket_spaced}"
     show_per_source_breakdown: bool = False
     breakdown_format: str = " ({sources_joined})"
+    # ADR-217: opt-in per-line provenance — appends
+    # ` <!-- iris:element=<uuid> -->` to each rendered shopping-list
+    # line so downstream consumers can look the row's element up
+    # (e.g. for cached SKU notes) without an LLM round-trip.
+    include_provenance: bool = False
 
 
 class ProfileData(BaseModel):

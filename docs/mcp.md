@@ -53,9 +53,23 @@ Or use `iris login` from `iris-cli` (mints + saves a PAT in one step).
 | `ask` | Multi-set AI question with optional file contexts |
 | `apply_diagram_creation` | Apply an AI-generated diagram bundle (`mode="creation"` output of `ask`) |
 | `list_conversations` | AI conversation history for a set |
+| `aggregate` / `create_aggregation_profile` / `list_aggregation_profiles` / `get_aggregation_profile` / `update_aggregation_profile` / `delete_aggregation_profile` | Run and manage generic aggregation profiles (ADR-212) |
 
 Each tool ships with an LLM-facing description with "when to use"
 guidance so an agent picks the right tool without manual prompting.
+
+### Aggregate output provenance (ADR-217)
+
+An aggregation profile can opt in to per-line provenance by setting
+`output.include_provenance: true` in its `profile_data`. When enabled,
+the `aggregate` tool's returned markdown appends
+`<!-- iris:element=<element-uuid> -->` to every rendered list line —
+headings and blank lines are untouched, and any per-source breakdown
+text stays in front of the comment. Downstream consumers can grep the
+comments to look up each row's element (for example, to fetch cached
+SKU values stored on the element's attribute notes) without parsing
+the visible text. The flag is off by default; existing consumers see
+no change.
 
 ## Resources
 
