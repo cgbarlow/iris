@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.31.2] - 2026-05-25
+
+### Fixed
+
+- Aggregation Profiles added to the admin sidebar so it is directly reachable without going through the `/admin` dashboard card.
+
 ## [6.31.1] - 2026-05-25
 
 ### Added
