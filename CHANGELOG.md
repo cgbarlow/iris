@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.31.1] - 2026-05-25
+
+### Added
+
+- Aggregation profile editor surfaces the `output.include_provenance`
+  flag (ADR-217) as a discrete checkbox above the JSON textarea.
+  Lets a non-technical user flip the flag without editing the raw
+  profile_data — patches the parsed JSON on save. SPEC-217-a's UI
+  exposure gap from v6.31.0 closed.
+
 ## [6.31.0] - 2026-05-24
 
 ### Added
