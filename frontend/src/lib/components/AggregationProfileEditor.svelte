@@ -60,8 +60,18 @@
 	let draftDescription = $state('');
 	let draftJson = $state('');
 	let draftIsDefault = $state(false);
+	// SPEC-217-a (v6.31.0) — surface the `output.include_provenance` flag as
+	// a discrete checkbox so a non-technical user can flip it without editing
+	// the JSON. The rest of the profile_data still lives in the textarea below;
+	// this checkbox patches the parsed JSON on save.
+	let draftIncludeProvenance = $state(false);
 	let draftError = $state<string | null>(null);
 	let saving = $state(false);
+
+	function readIncludeProvenance(profileData: Record<string, unknown>): boolean {
+		const output = profileData?.output as Record<string, unknown> | undefined;
+		return output?.include_provenance === true;
+	}
 
 	// SPEC-212-e (v6.29.0): Clone-from-existing picker state.
 	let cloning = $state(false);
@@ -84,6 +94,7 @@
 			line_format: '- {element.name}: {sum_value}{bucket_spaced}',
 			show_per_source_breakdown: false,
 			breakdown_format: ' ({sources_joined})',
+			include_provenance: false,
 		},
 	}, null, 2);
 
@@ -126,6 +137,7 @@
 		draftDescription = '';
 		draftJson = DEFAULT_PROFILE_JSON;
 		draftIsDefault = false;
+		draftIncludeProvenance = false;
 		draftError = null;
 	}
 
@@ -170,6 +182,7 @@
 		draftDescription = source.description ?? '';
 		draftJson = JSON.stringify(source.profile_data, null, 2);
 		draftIsDefault = false;  // copies don't inherit default-for-set
+		draftIncludeProvenance = readIncludeProvenance(source.profile_data);
 		draftError = null;
 	}
 
@@ -180,6 +193,7 @@
 		draftDescription = p.description ?? '';
 		draftJson = JSON.stringify(p.profile_data, null, 2);
 		draftIsDefault = p.is_default_for_set;
+		draftIncludeProvenance = readIncludeProvenance(p.profile_data);
 		draftError = null;
 	}
 
@@ -203,6 +217,12 @@
 			draftError = 'Name is required';
 			return;
 		}
+		// SPEC-217-a: merge the include-provenance checkbox into output.include_provenance.
+		// We ensure the output object exists so a malformed profile_data doesn't
+		// silently drop the flag on save.
+		const outputObj = (parsed.output as Record<string, unknown> | undefined) ?? {};
+		outputObj.include_provenance = draftIncludeProvenance;
+		parsed.output = outputObj;
 		saving = true;
 		try {
 			if (creating) {
@@ -336,6 +356,18 @@
 					class="mt-1 w-full rounded border px-3 py-2 text-sm"
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 				/>
+			</label>
+			<label class="mt-3 flex items-start gap-2 text-sm" style="color: var(--color-fg)">
+				<input type="checkbox" bind:checked={draftIncludeProvenance} class="mt-1" />
+				<span>
+					<span class="font-medium">Include provenance comments</span>
+					<span class="block text-xs" style="color: var(--color-muted)">
+						When on, each aggregated line is rendered with a trailing HTML
+						comment carrying the source element id, e.g. <code>&lt;!-- iris:element=… --&gt;</code>.
+						Required by downstream orchestrators that need to map output
+						lines back to elements (e.g. the woolies-shopper skill). ADR-217.
+					</span>
+				</span>
 			</label>
 			<label class="mt-3 block text-sm font-medium" style="color: var(--color-fg)">
 				profile_data (JSON)
