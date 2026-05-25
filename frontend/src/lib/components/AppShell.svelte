@@ -105,7 +105,6 @@
 		{ href: '/admin/users', label: 'Users', shortcut: 'U', icon: 'users' },
 		{ href: '/admin/audit', label: 'Audit Log', shortcut: 'A', icon: 'audit' },
 		{ href: '/admin/locks', label: 'Locks', shortcut: 'L', icon: 'lock' },
-		{ href: '/admin/aggregation-profiles', label: 'Aggregation', shortcut: 'G', icon: 'aggregate' },
 		{ href: '/admin/settings', label: 'Settings', shortcut: 'S', icon: 'admin-settings' },
 	];
 

@@ -8,6 +8,7 @@
 		{ href: '/admin/settings/themes', label: 'Themes' },
 		{ href: '/admin/settings/ai', label: 'AI' },
 		{ href: '/admin/settings/extensions', label: 'Extensions' },
+		{ href: '/admin/settings/aggregation-profiles', label: 'Aggregation' },
 	];
 
 	const activeTab = $derived(

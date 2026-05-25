@@ -31,7 +31,7 @@
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Configure session timeout, themes, AI providers, and extensions.</p>
 	</a>
 	<a
-		href="/admin/aggregation-profiles"
+		href="/admin/settings/aggregation-profiles"
 		class="rounded border p-6 text-center"
 		style="border-color: var(--color-border); color: var(--color-fg)"
 	>
