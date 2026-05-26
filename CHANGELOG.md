@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.31.4] - 2026-05-26
+
+### Fixed
+
+- **Row Level Security enabled on three Supabase tables that slipped past
+  the m030 sweep** (issue [#236](https://github.com/cgbarlow/iris/issues/236),
+  ADR-095). `artefacts` (m064, v6.2.0), `element_templates` (m071, v6.11.0),
+  and `aggregation_profiles` (m081, v6.28.0) were created without
+  `ENABLE ROW LEVEL SECURITY`, so the public Supabase `anon` key could
+  reach those rows directly via PostgREST, bypassing the FastAPI RBAC
+  layer. Migration m085 enables the standard deny-all policy on all
+  three; the backend still bypasses RLS as table owner, so no
+  application code changes are needed.
+
+- The `test_rls_policies.py` structural test now scans the full Supabase
+  migration set instead of just m001–m029, so any future table that
+  ships without RLS is caught in CI.
+
+### Migration
+
+- **Supabase only.** Run `scripts/supabase-migrate.sh` against UAT/prod
+  after deploy to apply m085. SQLite installations are unaffected (no
+  RLS in SQLite).
+
 ## [6.31.3] - 2026-05-25
 
 ### Fixed
