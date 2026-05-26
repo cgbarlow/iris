@@ -79,7 +79,18 @@ bundle and can be used to bypass all Iris security.
 ## Verification
 
 1. Structural test (`tests/test_migrations/test_rls_policies.py`) verifies every table from
-   m001–m029 has a corresponding `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` in m030
+   m001–m029 has a corresponding `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` in m030, AND
+   that every table created across the full Supabase migration set has RLS enabled
+   somewhere (the broader check was added in v6.31.4 after issue #236 surfaced three
+   post-m030 tables that had drifted without it)
 2. Manual verification: after applying m030, query any table with the `anon` key via REST —
    should return empty result with no error (PostgREST returns `[]` when RLS denies access)
 3. Backend CRUD operations continue to work (backend connects as `postgres`, bypasses RLS)
+
+## History
+
+- **2026-03-21 (v5.4.x):** m030 enabled RLS on the 34 tables that existed at that point.
+- **2026-05-26 (v6.31.4):** m085 backfilled three tables that were created after m030
+  without their own `ENABLE ROW LEVEL SECURITY`: `artefacts` (m064), `element_templates`
+  (m071), `aggregation_profiles` (m081). The structural test was broadened at the same
+  time so subsequent migrations can't recreate the gap (issue #236).

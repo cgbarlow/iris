@@ -1,17 +1,23 @@
-"""Tests for m030_rls_policies.sql — ensure every Supabase table has RLS enabled.
+"""Structural validation for Supabase RLS coverage (ADR-095).
 
-This is a structural validation test (the SQLite test environment cannot test
-actual PostgreSQL RLS enforcement). It parses the migration SQL and verifies
-that every table created by m001–m029 has a corresponding
-ALTER TABLE ... ENABLE ROW LEVEL SECURITY statement in m030.
+The SQLite test environment cannot exercise PostgreSQL RLS enforcement,
+so these tests parse the migration SQL instead. They verify that every
+table created by any Supabase migration has a corresponding
+``ALTER TABLE ... ENABLE ROW LEVEL SECURITY`` statement somewhere in the
+migration set.
+
+History: the original sweep landed in m030 covering m001–m029. Later
+migrations enable RLS in the same file that creates the table. Issue
+#236 surfaced three tables (artefacts, element_templates,
+aggregation_profiles) that slipped through; m085 backfills them and
+this test now scans the full migration tree so future drift is caught
+in CI.
 """
 
 from __future__ import annotations
 
 import os
 import re
-
-import pytest
 
 _MIGRATIONS_DIR = os.path.join(
     os.path.dirname(__file__),
@@ -25,24 +31,34 @@ _MIGRATIONS_DIR = os.path.join(
 _RLS_FILE = os.path.join(_MIGRATIONS_DIR, "m030_rls_policies.sql")
 
 
-def _get_created_tables() -> set[str]:
-    """Parse all m001–m029 .sql files and extract table names from CREATE TABLE."""
+def _migration_files() -> list[str]:
+    return sorted(
+        os.path.join(_MIGRATIONS_DIR, fn)
+        for fn in os.listdir(_MIGRATIONS_DIR)
+        if fn.endswith(".sql")
+    )
+
+
+def _get_created_tables(max_migration: int | None = None) -> set[str]:
+    """Extract table names from CREATE TABLE statements across migrations.
+
+    ``max_migration`` (exclusive) limits the scan — used by the legacy
+    m001–m029 check. Strips an optional ``public.`` schema prefix so
+    tables created with and without it compare equal.
+    """
     tables: set[str] = set()
-    for filename in sorted(os.listdir(_MIGRATIONS_DIR)):
-        if not filename.endswith(".sql"):
-            continue
-        # Only include m001 through m029 (exclude m030+ which is the RLS file itself)
+    for filepath in _migration_files():
+        filename = os.path.basename(filepath)
         match = re.match(r"m(\d+)", filename)
         if not match:
             continue
         num = int(match.group(1))
-        if num >= 30:
+        if max_migration is not None and num >= max_migration:
             continue
-        filepath = os.path.join(_MIGRATIONS_DIR, filename)
         with open(filepath) as f:
             content = f.read()
         for m in re.finditer(
-            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)",
+            r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(\w+)",
             content,
             re.IGNORECASE,
         ):
@@ -50,17 +66,23 @@ def _get_created_tables() -> set[str]:
     return tables
 
 
-def _get_rls_tables() -> set[str]:
-    """Parse m030_rls_policies.sql and extract table names from ALTER TABLE ... ENABLE ROW LEVEL SECURITY."""
-    with open(_RLS_FILE) as f:
-        content = f.read()
+def _get_rls_tables(file: str | None = None) -> set[str]:
+    """Extract table names from ENABLE ROW LEVEL SECURITY statements.
+
+    If ``file`` is given, scan only that file (legacy m030 check).
+    Otherwise scan every Supabase migration.
+    """
+    files = [file] if file else _migration_files()
     tables: set[str] = set()
-    for m in re.finditer(
-        r"ALTER\s+TABLE\s+(\w+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY",
-        content,
-        re.IGNORECASE,
-    ):
-        tables.add(m.group(1))
+    for filepath in files:
+        with open(filepath) as f:
+            content = f.read()
+        for m in re.finditer(
+            r"ALTER\s+TABLE\s+(?:public\.)?(\w+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY",
+            content,
+            re.IGNORECASE,
+        ):
+            tables.add(m.group(1))
     return tables
 
 
@@ -69,10 +91,10 @@ def test_rls_migration_file_exists() -> None:
     assert os.path.isfile(_RLS_FILE), f"Missing: {_RLS_FILE}"
 
 
-def test_every_table_has_rls() -> None:
+def test_every_m001_m029_table_has_rls_in_m030() -> None:
     """Every table created by m001–m029 must have RLS enabled in m030."""
-    created = _get_created_tables()
-    rls = _get_rls_tables()
+    created = _get_created_tables(max_migration=30)
+    rls = _get_rls_tables(file=_RLS_FILE)
 
     missing = created - rls
     assert not missing, (
@@ -80,12 +102,16 @@ def test_every_table_has_rls() -> None:
     )
 
 
-def test_no_extra_rls_tables() -> None:
-    """m030 should not enable RLS on tables that don't exist in m001–m029."""
+def test_every_supabase_table_has_rls_enabled() -> None:
+    """Every table created by any Supabase migration must have RLS enabled
+    somewhere in the migration set (ADR-095)."""
     created = _get_created_tables()
     rls = _get_rls_tables()
 
-    extra = rls - created
-    assert not extra, (
-        f"RLS enabled on tables not created by m001–m029: {sorted(extra)}"
+    missing = created - rls
+    assert not missing, (
+        "Supabase tables missing ENABLE ROW LEVEL SECURITY anywhere in "
+        f"the migration set: {sorted(missing)}. Add the ALTER TABLE in "
+        "the same migration that creates the table, or in a follow-up "
+        "RLS-fix migration like m085."
     )
