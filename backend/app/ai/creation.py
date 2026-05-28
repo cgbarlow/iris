@@ -12,6 +12,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from app.diagrams.canvas_normalize import flat_edge_to_canvas, flat_node_to_canvas
 from app.elements.materialise import materialise_element, materialise_relationship
 
 if TYPE_CHECKING:
@@ -383,65 +384,36 @@ def _nodes_edges_to_sequence(canvas_data: dict) -> dict:
 
 
 def _build_canvas_nodes(ai_nodes: list[dict]) -> list[dict]:
-    """Convert AI node format to Iris canvas node format."""
+    """Convert AI node format to Iris canvas node format.
+
+    Delegates the flat → canvas transform to the shared
+    ``flat_node_to_canvas`` (protocols §13 DRY); the doview default
+    entity type and the phase-2 ``_linkedDiagramIndex`` stash are the
+    apply-path specifics layered on top.
+    """
     canvas_nodes = []
     for ai_node in ai_nodes:
-        node_id = ai_node.get("id", str(uuid.uuid4()))
-        entity_type = ai_node.get("type", "outcome_box")
-        label = ai_node.get("label", "")
-        position = ai_node.get("position", {"x": 0, "y": 0})
-        size = ai_node.get("size", {"width": 200, "height": 86})
-        visual = ai_node.get("visual", {})
-
-        node_data: dict = {
-            "label": label,
-            "entityType": entity_type,
-        }
-        description = ai_node.get("description", "")
-        if description:
-            node_data["description"] = description
-        if visual:
-            node_data["visual"] = visual
-
-        # Stash linkedDiagramIndex for phase-2 resolution
-        linked_idx = ai_node.get("linkedDiagramIndex")
+        node = dict(ai_node)
+        node.setdefault("id", str(uuid.uuid4()))
+        linked_idx = node.pop("linkedDiagramIndex", None)
+        canvas = flat_node_to_canvas(node, default_entity_type="outcome_box")
         if linked_idx is not None:
-            node_data["_linkedDiagramIndex"] = linked_idx
-
-        canvas_nodes.append({
-            "id": node_id,
-            "type": entity_type,
-            "position": position,
-            "data": node_data,
-            "width": size.get("width", 200),
-            "height": size.get("height", 86),
-        })
+            canvas["data"]["_linkedDiagramIndex"] = linked_idx
+        canvas_nodes.append(canvas)
     return canvas_nodes
 
 
 def _build_canvas_edges(ai_edges: list[dict]) -> list[dict]:
-    """Convert AI edge format to Iris canvas edge format."""
+    """Convert AI edge format to Iris canvas edge format.
+
+    Delegates to the shared ``flat_edge_to_canvas`` (protocols §13 DRY);
+    the doview default relationship type is the apply-path specific.
+    """
     canvas_edges = []
     for ai_edge in ai_edges:
-        edge_id = ai_edge.get("id", str(uuid.uuid4()))
-        edge_type = ai_edge.get("type", "causal_link")
-        source = ai_edge.get("source", "")
-        target = ai_edge.get("target", "")
-        visual = ai_edge.get("visual", {})
-
-        edge_data: dict = {
-            "relationshipType": edge_type,
-        }
-        if visual:
-            edge_data["visual"] = visual
-
-        canvas_edges.append({
-            "id": edge_id,
-            "type": edge_type,
-            "source": source,
-            "target": target,
-            "sourceHandle": "center",
-            "targetHandle": "center",
-            "data": edge_data,
-        })
+        edge = dict(ai_edge)
+        edge.setdefault("id", str(uuid.uuid4()))
+        canvas_edges.append(
+            flat_edge_to_canvas(edge, default_relationship_type="causal_link")
+        )
     return canvas_edges

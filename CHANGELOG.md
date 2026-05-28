@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.31.5] - 2026-05-28
+
+### Fixed
+
+- **Diagrams generated via the MCP `create_diagram` tool failed to
+  load** (issue [#238](https://github.com/cgbarlow/iris/issues/238),
+  ADR-218). The shared creation prompt teaches models the *flat* AI node
+  shape (`{id, type, label, position, size, visual}`) that
+  `apply_diagram_creation` converts to canvas shape — but
+  `create_diagram` persisted its `data` verbatim, so flat nodes reached
+  storage with no per-node `data` object and the canvas crashed with
+  `Cannot read properties of undefined (reading 'entityType')`.
+  `create_diagram` / `update_diagram` now normalise the flat shape to
+  canvas shape on write, and `get_diagram` auto-heals legacy flat
+  diagrams on read (non-destructive). A new shared
+  `normalize_canvas_data` is the single source of truth; the
+  `apply_diagram_creation` builder now delegates to it (DRY).
+
+- `UnifiedCanvas` `fitViewOptions` now optional-chains `n.data` so a
+  dataless node can never hard-crash the canvas on mount
+  (defense-in-depth behind the backend fix).
+
+### Repair (UAT/prod)
+
+- The three already-broken diagrams named in issue #238 are repaired in
+  place — and only those — by
+  `scripts/repair_flat_diagram_shape.py --diagram-id <id> …`, which
+  reuses `normalize_canvas_data` and regenerates the affected diagrams'
+  thumbnails. The script refuses to run without explicit ids and never
+  scans all diagrams. No database schema migration is required.
+
 ## [6.31.4] - 2026-05-26
 
 ### Fixed

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.migrations.m012_sets import DEFAULT_SET_ID
+from app.diagrams.canvas_normalize import normalize_canvas_data
 from app.diagrams.thumbnail import VALID_THEMES, generate_and_store_thumbnail
 from app.package_relationships.service import create_package_relationship
 from app.relationships.service import create_relationship
@@ -38,6 +39,11 @@ async def create_diagram(
     """Create a new diagram with initial version."""
     diagram_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
+    # ADR-218 (issue #238): models following the shared creation prompt
+    # emit the flat AI node shape; create_diagram persists `data`
+    # verbatim. Normalise flat → canvas shape so the stored payload is
+    # always renderable. Idempotent: canvas-shaped data passes through.
+    data = normalize_canvas_data(data)
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
     effective_set_id = set_id or DEFAULT_SET_ID
@@ -192,6 +198,11 @@ async def get_diagram(
         "detected_notations": detected,
         "metadata": json.loads(row[14]) if row[14] else None,
     }
+    # ADR-218 (issue #238): auto-heal legacy diagrams persisted with the
+    # flat AI node shape (no per-node `data` object) so they render
+    # instead of crashing the canvas. Non-destructive — storage is
+    # untouched; idempotent for already-canvas data.
+    result["data"] = normalize_canvas_data(result["data"])
     # ADR-187 — compute-on-read overlay for dynamic_list (and future
     # opt-in computed diagram types).
     await _maybe_synthesise_content(db, result)
@@ -445,6 +456,10 @@ async def update_diagram(
 
     new_version = row[0] + 1
     now = datetime.now(tz=UTC).isoformat()
+    # ADR-218 (issue #238): normalise flat → canvas shape on write so an
+    # update carrying the flat AI node shape can't persist unrenderable
+    # data. Idempotent for already-canvas payloads.
+    data = normalize_canvas_data(data)
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
 

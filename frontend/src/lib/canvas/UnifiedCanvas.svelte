@@ -109,9 +109,13 @@
 			: nodes
 	);
 
-	/** fitView options: exclude diagram_frame nodes from bounding box calculation. */
+	/** fitView options: exclude diagram_frame nodes from bounding box calculation.
+	 *  ADR-218 (issue #238): optional-chain `n.data` so a node that somehow
+	 *  arrives without a data object (legacy flat AI/MCP payloads) can't
+	 *  hard-crash the canvas on mount. Backend normalization is the real
+	 *  fix; this is defense-in-depth. */
 	const fitViewOptions = $derived({
-		nodes: nodes.filter((n) => n.data.entityType !== 'diagram_frame'),
+		nodes: nodes.filter((n) => n.data?.entityType !== 'diagram_frame'),
 		padding: 0.15,
 	});
 
