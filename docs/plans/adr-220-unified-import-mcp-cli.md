@@ -2,7 +2,7 @@
 
 **Status:** Backlogged to the release after v6.32.0. Deferred from the native
 Sparx XMI work (ADR-219, shipped in v6.32.0, website-only).
-**Tracking issue:** _(this plan is linked from its GitHub issue)_
+**Tracking issue:** [#240](https://github.com/cgbarlow/iris/issues/240)
 
 ---
 
