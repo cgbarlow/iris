@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** Import page — upload .qea/.eap (SparxEA), .pptx (DoView), or .xml/.archimate/.oex (ArchiMate Open Exchange) files. */
+	/** Import page — upload .qea/.eap/.xml (SparxEA: database or native XMI), .pptx (DoView), or .xml/.archimate/.oex (ArchiMate Open Exchange) files. .xml is content-sniffed to route Sparx native XMI vs ArchiMate OEX. */
 	import { goto } from '$app/navigation';
 	import { getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
@@ -105,7 +105,7 @@
 				ARCHIMATE_EXT.test(f.name),
 		);
 		if (valid.length === 0) {
-			error = 'Supported formats: .qea, .eap (SparxEA); .pptx (DoView); .xml, .archimate, .oex (ArchiMate Open Exchange).';
+			error = 'Supported formats: .qea, .eap, .xml/XMI (SparxEA); .pptx (DoView); .xml, .archimate, .oex (ArchiMate Open Exchange).';
 			return;
 		}
 		// Multi-file only for .pptx
@@ -117,6 +117,19 @@
 		summary = null;
 		batchSummary = null;
 		selectedFiles = valid;
+	}
+
+	/**
+	 * `.xml` is shared by ArchiMate Open Exchange and Sparx EA native XMI, so
+	 * disambiguate by sniffing the file head. `.archimate`/`.oex` are always OEX.
+	 */
+	async function resolveXmlEndpoint(file: File): Promise<string> {
+		if (!file.name.toLowerCase().endsWith('.xml')) return '/api/import/archimate';
+		const head = await file.slice(0, 4096).text();
+		if (head.includes('sparxsystems.com') || head.includes('Enterprise Architect')) {
+			return '/api/import/sparx-xml';
+		}
+		return '/api/import/archimate';
 	}
 
 	async function uploadFile() {
@@ -171,7 +184,7 @@
 				const endpoint = isPptx
 					? '/api/import/pptx'
 					: isArchimate
-						? '/api/import/archimate'
+						? await resolveXmlEndpoint(file)
 						: '/api/import/sparx';
 				const response = await fetch(`${API_BASE_URL}${endpoint}`, {
 					method: 'POST',
@@ -235,7 +248,7 @@
 <div>
 	<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Import</h1>
 	<p class="mt-1 text-sm" style="color: var(--color-muted)">
-		Import diagrams from SparxEA (.qea, .eap), DoView (.pptx), or ArchiMate Open Exchange (.xml, .archimate, .oex) files. Select multiple .pptx files for batch import.
+		Import diagrams from SparxEA (.qea, .eap, or native XML/XMI .xml), DoView (.pptx), or ArchiMate Open Exchange (.xml, .archimate, .oex) files. Select multiple .pptx files for batch import.
 	</p>
 </div>
 
@@ -346,6 +359,18 @@
 					<p class="text-sm" style="color: var(--color-muted)">Packages Skipped</p>
 				</div>
 			{/if}
+			{#if summary.elements_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.elements_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Elements Skipped</p>
+				</div>
+			{/if}
+			{#if summary.diagrams_skipped != null}
+				<div class="rounded border p-3 text-center" style="border-color: var(--color-border)">
+					<p class="text-2xl font-bold" style="color: var(--color-muted)">{summary.diagrams_skipped}</p>
+					<p class="text-sm" style="color: var(--color-muted)">Diagrams Skipped</p>
+				</div>
+			{/if}
 		</div>
 
 		{#if summary.warnings.length > 0}
@@ -412,7 +437,7 @@
 			{/if}
 		</p>
 		<p class="mt-1 text-xs" style="color: var(--color-muted)">
-			SparxEA (.qea, .eap), DoView (.pptx), or ArchiMate Open Exchange (.xml, .archimate, .oex) — select multiple .pptx for batch import
+			SparxEA (.qea, .eap, native XML/XMI), DoView (.pptx), or ArchiMate Open Exchange (.xml, .archimate, .oex) — select multiple .pptx for batch import
 		</p>
 	</div>
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.32.0] - 2026-05-28
+
+### Added
+
+- **Native Sparx EA XMI 2.1 (`.xml`) import** (ADR-219, SPEC-219-A). Iris
+  can now import Sparx Enterprise Architect's native XML export ("Export
+  Package to XMI 2.1 / Native XML"), in addition to the existing
+  `.qea`/`.eap` database import. The new `POST /api/import/sparx-xml`
+  endpoint parses the UML 2.1 XMI + EA `<xmi:Extension>` block (packages,
+  elements, connectors, tagged values, and diagram geometry) and reuses
+  the entire `.qea` import pipeline — type/stereotype mapping, geometry
+  conversion, and `ea_guid` idempotency are shared via a new
+  surface-agnostic `import_sparx_model` orchestrator (DRY). The import UI
+  content-sniffs `.xml` uploads to route Sparx native XMI vs ArchiMate
+  Open Exchange automatically. Import-only, website-only this release; an
+  MCP tool and CLI command are planned for a follow-up.
+
 ## [6.31.5] - 2026-05-28
 
 ### Fixed
