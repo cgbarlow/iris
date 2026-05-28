@@ -36,6 +36,7 @@ from app.graph.router import router as graph_router
 from app.import_archimate.router import router as import_archimate_router
 from app.import_pptx.router import router as import_pptx_router
 from app.import_sparx.router import router as import_router
+from app.import_sparx_xml.router import router as import_sparx_xml_router
 from app.locks.router import admin_router as admin_locks_router
 from app.locks.router import router as locks_router
 from app.middleware.audit import AuditMiddleware
@@ -199,6 +200,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     app.include_router(version_router)
     app.include_router(import_pptx_router)
     app.include_router(import_archimate_router)
+    app.include_router(import_sparx_xml_router)
     app.include_router(package_relationships_router)
     app.include_router(sets_router)
     app.include_router(collections_router)

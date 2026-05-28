@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1" xmlns:ArchiMate3="http://www.sparxsystems.com/profiles/ArchiMate3/1.0">
+	<xmi:Documentation exporter="Enterprise Architect" exporterVersion="6.5" exporterID="1627"/>
+	<uml:Model xmi:type="uml:Model" name="EA_Model" visibility="public">
+		<packagedElement xmi:type="uml:Package" xmi:id="EAPK_PKG1" name="Sample Package" visibility="public">
+			<packagedElement xmi:type="uml:Class" xmi:id="EAID_A" name="Capability A" visibility="public"/>
+			<packagedElement xmi:type="uml:Class" xmi:id="EAID_B" name="Class B" visibility="public"/>
+			<packagedElement xmi:type="uml:Class" xmi:id="EAID_C" name="Abstract C" visibility="public" isAbstract="true"/>
+			<packagedElement xmi:type="uml:Association" xmi:id="EAID_CONN1" visibility="public"/>
+		</packagedElement>
+	</uml:Model>
+	<xmi:Extension extender="Enterprise Architect" extenderID="6.5">
+		<elements>
+			<element xmi:idref="EAPK_PKG1" xmi:type="uml:Package" name="Sample Package" scope="public">
+				<model package="EAPK_ROOT" tpos="0" ea_localid="1" ea_eleType="package"/>
+				<properties isSpecification="false" sType="Package" nType="0" scope="public" documentation="Top level sample package."/>
+				<project author="Tester" version="1.0" phase="1.0" created="2026-01-01 10:00:00" modified="2026-01-02 10:00:00" complexity="1" status="Proposed"/>
+			</element>
+			<element xmi:idref="EAID_A" xmi:type="uml:Class" name="Capability A" scope="public">
+				<model package="EAPK_PKG1" tpos="0" ea_localid="10" ea_eleType="element"/>
+				<properties documentation="A business capability." isSpecification="false" sType="Class" nType="0" alias="CAP.A" scope="public" stereotype="ArchiMate_Capability" isAbstract="false"/>
+				<project author="Tester" version="1.0" phase="1.0" created="2026-01-01 10:00:00" modified="2026-01-02 10:00:00" complexity="1" status="Proposed"/>
+				<code gentype="Java"/>
+				<style appearance="BackColor=16708300;BorderColor=14772545;BorderWidth=3;FontColor=-1;"/>
+				<tags>
+					<tag xmi:id="EAID_TAG1" name="Current Maturity Level" value="3" modelElement="EAID_A"/>
+				</tags>
+			</element>
+			<element xmi:idref="EAID_B" xmi:type="uml:Class" name="Class B" scope="public">
+				<model package="EAPK_PKG1" tpos="1" ea_localid="11" ea_eleType="element"/>
+				<properties documentation="A plain class." isSpecification="false" sType="Class" nType="0" scope="public"/>
+				<project author="Tester" version="1.0" phase="1.0" created="2026-01-01 10:00:00" modified="2026-01-02 10:00:00" complexity="1" status="Proposed"/>
+				<style appearance="BackColor=-1;BorderColor=-1;BorderWidth=1;FontColor=-1;"/>
+			</element>
+			<element xmi:idref="EAID_C" xmi:type="uml:Class" name="Abstract C" scope="public">
+				<model package="EAPK_PKG1" tpos="2" ea_localid="12" ea_eleType="element"/>
+				<properties documentation="An abstract class." isSpecification="false" sType="Class" nType="0" scope="public" isAbstract="true"/>
+				<project author="Tester" version="1.0" phase="1.0" created="2026-01-01 10:00:00" modified="2026-01-02 10:00:00" complexity="1" status="Proposed"/>
+				<style appearance="BackColor=-1;BorderColor=-1;BorderWidth=1;FontColor=-1;"/>
+			</element>
+		</elements>
+		<connectors>
+			<connector xmi:idref="EAID_CONN1">
+				<source xmi:idref="EAID_A">
+					<model ea_localid="10" type="Class" name="Capability A"/>
+					<type aggregation="none" containment="Unspecified"/>
+				</source>
+				<target xmi:idref="EAID_B">
+					<model ea_localid="11" type="Class" name="Class B"/>
+					<type aggregation="none" containment="Unspecified"/>
+				</target>
+				<model ea_localid="100"/>
+				<properties ea_type="Association" stereotype="ArchiMate_Association" direction="Unspecified"/>
+				<appearance linemode="3" linecolor="-1" linewidth="0" seqno="0" headStyle="0" lineStyle="0"/>
+				<documentation/>
+			</connector>
+		</connectors>
+		<diagrams>
+			<diagram xmi:id="EAID_DIAG1">
+				<model package="EAPK_PKG1" localID="200" owner="EAPK_PKG1"/>
+				<properties name="Sample Diagram" type="Logical" documentation="A sample logical diagram."/>
+				<project author="Tester" version="1.0" created="2026-01-01 10:00:00" modified="2026-01-02 10:00:00"/>
+				<style1 value="ShowPrivate=1;DocSize.cx=1138;DocSize.cy=795;Zoom=100;"/>
+				<elements>
+					<element geometry="Left=10;Top=20;Right=130;Bottom=80;" subject="EAID_A" seqno="1" style="DUID=AAAA;BCol=16708300;LCol=14772545;LWth=3;font=Calibri;fontsz=120;"/>
+					<element geometry="Left=200;Top=20;Right=320;Bottom=80;" subject="EAID_B" seqno="2" style="DUID=BBBB;font=Calibri;fontsz=120;"/>
+					<element geometry="SX=0;SY=0;EX=0;EY=0;EDGE=3;$LLB=;LLT=;Path=;" subject="EAID_CONN1" style="Mode=3;EOID=BBBB;SOID=AAAA;Color=-1;LWidth=2;Hidden=0;"/>
+				</elements>
+			</diagram>
+		</diagrams>
+	</xmi:Extension>
+</xmi:XMI>

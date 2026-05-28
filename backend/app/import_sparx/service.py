@@ -16,8 +16,14 @@ from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_
 from app.import_sparx.icon_matcher import SemanticIconMatcher
 from app.import_sparx.mapper import map_archimate_stereotype, map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
+    QeaAttribute,
+    QeaConnector,
+    QeaDiagram,
+    QeaDiagramLink,
+    QeaDiagramObject,
     QeaElement,
     QeaPackage,
+    QeaTaggedValue,
     read_attributes,
     read_connectors,
     read_diagram_links,
@@ -217,9 +223,11 @@ async def import_sparx_file(
     imported_by: str,
     set_id: str | None = None,
 ) -> ImportSummary:
-    """Import a SparxEA .qea file into Iris."""
-    summary = ImportSummary()
+    """Import a SparxEA .qea file into Iris.
 
+    Reads the .qea SQLite tables into the intermediate dataclasses, then
+    delegates to the surface-agnostic orchestrator ``import_sparx_model``.
+    """
     # 1. Read all data from .qea file
     packages = await read_packages(qea_path)
     elements = await read_elements(qea_path)
@@ -229,6 +237,49 @@ async def import_sparx_file(
     diagram_links = await read_diagram_links(qea_path)
     attributes = await read_attributes(qea_path)
     tagged_values = await read_tagged_values(qea_path)
+
+    return await import_sparx_model(
+        db,
+        packages=packages,
+        elements=elements,
+        connectors=connectors,
+        diagrams=diagrams,
+        diagram_objects=diagram_objects,
+        diagram_links=diagram_links,
+        attributes=attributes,
+        tagged_values=tagged_values,
+        imported_by=imported_by,
+        set_id=set_id,
+        source_label="SparxEA",
+    )
+
+
+async def import_sparx_model(
+    db: DatabasePort,
+    *,
+    packages: list[QeaPackage],
+    elements: list[QeaElement],
+    connectors: list[QeaConnector],
+    diagrams: list[QeaDiagram],
+    diagram_objects: list[QeaDiagramObject],
+    diagram_links: list[QeaDiagramLink],
+    attributes: list[QeaAttribute],
+    tagged_values: list[QeaTaggedValue],
+    imported_by: str,
+    set_id: str | None = None,
+    source_label: str = "SparxEA",
+) -> ImportSummary:
+    """Orchestrate already-read SparxEA model data into Iris entities.
+
+    Reading the source (a ``.qea`` SQLite file, or a native XMI ``.xml``
+    export) is the caller's responsibility; this function only writes.
+    Shared by ``import_sparx_file`` and
+    ``import_sparx_xml.service.import_sparx_xml_file`` so the mapping,
+    geometry conversion, and ``ea_guid`` idempotency logic lives in one
+    place (protocol §13). ``source_label`` is woven into version
+    ``change_summary`` strings to record provenance.
+    """
+    summary = ImportSummary()
 
     # Build element index for fast lookups
     element_index = _build_element_index(elements)
@@ -298,7 +349,7 @@ async def import_sparx_file(
             parent_package_id=parent_iris_id,
             set_id=set_id,
             metadata=pkg_metadata,
-            change_summary=f"Imported from SparxEA ({pkg.Name})",
+            change_summary=f"Imported from {source_label} ({pkg.Name})",
         )
         package_map[pkg.Package_ID] = package["id"]  # type: ignore[assignment]
         summary.packages_created += 1
@@ -413,7 +464,7 @@ async def import_sparx_file(
             created_by=imported_by,
             set_id=set_id,
             metadata=element_metadata,
-            change_summary=f"Imported from SparxEA ({elem.Object_Type})",
+            change_summary=f"Imported from {source_label} ({elem.Object_Type})",
         )
         element_map[elem.Object_ID] = element["id"]  # type: ignore[assignment]
         summary.elements_created += 1
@@ -876,7 +927,7 @@ async def import_sparx_file(
                         diag.Notes,
                         data_json,
                         metadata_json,
-                        f"Re-imported from SparxEA diagram ({diag.Diagram_Type})",
+                        f"Re-imported from {source_label} diagram ({diag.Diagram_Type})",
                         now,
                         imported_by,
                     ),
@@ -899,7 +950,7 @@ async def import_sparx_file(
                 set_id=set_id,
                 notation=diagram_notation,
                 metadata=diag_metadata,
-                change_summary=f"Imported from SparxEA diagram ({diag.Diagram_Type})",
+                change_summary=f"Imported from {source_label} diagram ({diag.Diagram_Type})",
             )
             ea_diagram_id_to_iris[diag.Diagram_ID] = result["id"]
             summary.diagrams_created += 1

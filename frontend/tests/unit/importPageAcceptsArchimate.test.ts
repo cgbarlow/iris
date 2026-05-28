@@ -30,6 +30,6 @@ describe('import page accepts ArchiMate OEX files', () => {
 	});
 
 	it('selectFiles error message lists ArchiMate as a supported format', () => {
-		expect(src).toMatch(/Supported formats:[^.]*ArchiMate/);
+		expect(src).toMatch(/Supported formats:[^']*ArchiMate/);
 	});
 });
