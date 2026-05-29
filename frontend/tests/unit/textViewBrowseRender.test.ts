@@ -30,9 +30,19 @@ describe('Text view browse-mode rendering (issue #32)', () => {
 		expect(textBranchesBefore).toBeGreaterThanOrEqual(2);
 	});
 
-	it('renders TextCanvas with editing=false in browse mode', () => {
-		// The browse-mode branch must mount TextCanvas with editing={false}.
-		expect(SRC).toMatch(/<TextCanvas\b[\s\S]*editing=\{false\}/);
+	it('renders the shared markdownArea snippet in browse mode (read-only via editing state)', () => {
+		// v6.32.1 (#243): the 4-way text-canvas switch is shared via the
+		// {#snippet markdownArea()} so browse + edit + their full-screen
+		// (FocusView) variants don't duplicate it. The snippet mounts
+		// TextCanvas driven by the component's `editing` state, which is
+		// false in browse mode — so the view stays read-only.
+		expect(SRC).toMatch(/\{#snippet markdownArea\(\)\}/);
+		expect(SRC).toMatch(/<TextCanvas\b[\s\S]*editing=\{editing\}/);
+		// The browse-mode Text branch (the last `canvasType === 'text'`
+		// branch) renders the shared snippet.
+		const idxBrowse = SRC.lastIndexOf("{:else if canvasType === 'text'}");
+		expect(idxBrowse).toBeGreaterThan(-1);
+		expect(SRC.slice(idxBrowse)).toMatch(/\{@render markdownArea\(\)\}/);
 	});
 
 	it('shows a "This text view is empty" prompt when content is blank (mirrors canvas Start Building)', () => {

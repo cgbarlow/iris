@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.32.1] - 2026-05-29
+
+### Fixed
+
+- **Full screen on markdown-notation diagrams** (#243). The "Full screen"
+  toolbar button did nothing on text / smart-markdown / dynamic-list /
+  aggregation-list views: the text render branches never mounted
+  `FocusView`, so toggling focus mode had no visible effect. The text
+  branches (browse and edit) now wrap their content in `FocusView` when
+  focus mode is active, and the editor's canvas focus branch is gated to
+  non-text views so a text view no longer flips to a blank canvas overlay.
+  The four-way text-canvas switch is now shared via a single
+  `{#snippet markdownArea()}` (DRY) instead of being duplicated across the
+  browse, edit, and full-screen variants.
+
 ## [6.32.0] - 2026-05-28
 
 ### Added
