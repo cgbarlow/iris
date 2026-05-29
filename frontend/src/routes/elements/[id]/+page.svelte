@@ -681,7 +681,7 @@
 								{/if}
 							</dd>
 
-							<dt class="text-sm font-medium" style="color: var(--color-muted)">Detail diagram</dt>
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Detail view</dt>
 							<dd>
 								{#if editingDetails}
 									{#if editDetailDiagramId}
@@ -698,7 +698,7 @@
 											<button
 												type="button"
 												onclick={() => { editDetailDiagramId = null; editDetailDiagramName = null; }}
-												title="Clear detail diagram"
+												title="Clear detail view"
 												class="shrink-0 px-1 text-sm leading-none"
 												style="color: var(--color-muted); background: none; border: none; cursor: pointer"
 											>&times;</button>
@@ -709,7 +709,7 @@
 											onclick={() => (showDetailDiagramPicker = true)}
 											class="rounded border px-2 py-1 text-xs"
 											style="border-color: var(--color-border); border-style: dashed; background: none; color: var(--color-primary); cursor: pointer"
-										>Set detail diagram</button>
+										>Set detail view</button>
 									{/if}
 								{:else if entity.detail_diagram_id}
 									<a
@@ -1089,7 +1089,7 @@
 	<!-- ADR-221: pick the element's detail diagram (cross-set allowed). -->
 	<DiagramPicker
 		open={showDetailDiagramPicker}
-		title="Set detail diagram"
+		title="Set detail view"
 		onselect={(d: Diagram) => {
 			editDetailDiagramId = d.id;
 			editDetailDiagramName = d.name;
