@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.34.0] - 2026-05-29
+
+### Added
+
+- **Smart-markdown `{{diagram:<id>:element_count}}` token** (ADR-222,
+  SPEC-222-A). Renders a live count of the element nodes on a referenced
+  view (excluding `diagram_frame` / `note` decoration), wrapped in a link
+  that drills into that view. Computed on read, so the figure follows the
+  view's contents instead of being hand-maintained. Lets a smart-markdown
+  source show a real "N elements in this view" count.
+
 ## [6.33.1] - 2026-05-29
 
 ### Changed

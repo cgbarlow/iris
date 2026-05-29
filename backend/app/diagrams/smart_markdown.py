@@ -343,6 +343,54 @@ async def _resolve_element_detail_diagram(
     return f'[{text}](iris://diagram/{detail_id} "{title}")'
 
 
+# Canvas node types that are structural decoration, not model elements
+# (ADR-222). Excluded from the element-count.
+_STRUCTURAL_NODE_TYPES = {"diagram_frame", "note"}
+
+
+async def _fetch_diagram_element_count(
+    db: DatabasePort, diagram_id: str,
+) -> str | None:
+    """Count the element nodes on a diagram's canvas (ADR-222).
+
+    Counts nodes that represent real model elements — i.e. nodes whose
+    ``data.entityType`` is set and is not a structural type
+    (``diagram_frame`` / ``note``). Returns the count as a string, or
+    ``None`` when the diagram is missing/deleted (→ strikethrough).
+    """
+    cursor = await db.execute(
+        "SELECT dv.data FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+        "  AND d.current_version = dv.version "
+        "WHERE d.id = ? AND d.is_deleted = 0",
+        (diagram_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    raw = row[0]
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return "0"
+    nodes = data.get("nodes")
+    if not isinstance(nodes, list):
+        return "0"
+    count = 0
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        node_data = n.get("data")
+        if not isinstance(node_data, dict):
+            continue
+        etype = node_data.get("entityType")
+        if etype and etype not in _STRUCTURAL_NODE_TYPES:
+            count += 1
+    return str(count)
+
+
 async def _resolve_one(
     db: DatabasePort, entity_type: str, entity_id: str, field_spec: str | None,
 ) -> str | None:
@@ -399,10 +447,14 @@ async def _resolve_one(
             fk="package_id", entity_id=entity_id, field_spec=field_spec_path,
         )
     elif entity_type == "diagram":
-        raw_value = await _fetch_named_field(
-            db, table="diagrams", versions_table="diagram_versions",
-            fk="diagram_id", entity_id=entity_id, field_spec=field_spec_path,
-        )
+        if field_spec_path == "element_count":
+            # ADR-222: live count of element nodes in the referenced view.
+            raw_value = await _fetch_diagram_element_count(db, entity_id)
+        else:
+            raw_value = await _fetch_named_field(
+                db, table="diagrams", versions_table="diagram_versions",
+                fk="diagram_id", entity_id=entity_id, field_spec=field_spec_path,
+            )
     elif entity_type == "set":
         raw_value = await _fetch_set_field(db, entity_id, field_spec_path)
     elif entity_type == "collection":
