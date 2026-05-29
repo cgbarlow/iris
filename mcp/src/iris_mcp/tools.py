@@ -425,7 +425,7 @@ async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
         body["name"] = args["name"]
     for key in (
         "description", "data", "set_id", "metadata", "notation",
-        "package_id", "template_id",
+        "package_id", "detail_diagram_id", "template_id",
     ):
         if args.get(key) is not None:
             body[key] = args[key]
@@ -923,14 +923,16 @@ async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-178 (v6.3.0): update an Element's metadata or data.
 
     ADR-184 (v6.7.0): also accepts ``package_id`` (set / clear via JSON
-    null). Because the standard ``_put_merge_partial`` helper drops
-    ``None`` overrides, ``package_id`` is wired through a small special
-    case so the caller can explicitly clear membership.
+    null). ADR-221 (v6.33.0): also accepts ``detail_diagram_id`` (set /
+    clear via JSON null). Because the standard ``_put_merge_partial``
+    helper drops ``None`` overrides, both tri-state fields are wired
+    through a small special case so the caller can explicitly clear them.
     """
     try:
-        # Special-case ``package_id``: only forward to the body if the
-        # caller actually supplied the key (including JSON null).
-        if "package_id" in args:
+        # Special-case the tri-state fields: only forward to the body the
+        # ones the caller actually supplied (including JSON null).
+        tristate = [k for k in ("package_id", "detail_diagram_id") if k in args]
+        if tristate:
             current_resp = await c._request(
                 "GET", f"/api/elements/{args['element_id']}",
             )
@@ -941,7 +943,8 @@ async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
                     body[field] = args[field]
                 elif field in current:
                     body[field] = current[field]
-            body["package_id"] = args["package_id"]
+            for key in tristate:
+                body[key] = args[key]
             headers = {"If-Match": str(current.get("current_version", 1))}
             resp = await c._request(
                 "PUT", f"/api/elements/{args['element_id']}",
@@ -1699,6 +1702,15 @@ TOOLS: list[Tool] = [
                 "`update_element` call.",
                 required=False,
             ),
+            "detail_diagram_id": _str_arg(
+                "detail_diagram_id",
+                "Optional diagram this element drills into — the Sparx "
+                "EA 'composite element' link (v6.33.0, ADR-221 / issue "
+                "#242). The element page shows it as a drill-in and the "
+                "diagram lists the element under 'Referenced by'. May "
+                "point at a diagram in another set.",
+                required=False,
+            ),
             "notation": _str_arg(
                 "notation",
                 "Notation id (default 'simple'). Should match the "
@@ -2385,9 +2397,10 @@ TOOLS: list[Tool] = [
     Tool(
         name="update_element",
         description=(
-            "Update an Element's metadata, data, and/or package "
-            "membership (ADR-184). Note: elements cannot be moved "
-            "between diagrams — see ADR-178."
+            "Update an Element's metadata, data, package membership "
+            "(ADR-184), and/or detail-diagram drill link (ADR-221). "
+            "Note: elements cannot be moved between diagrams — see "
+            "ADR-178."
         ),
         input_schema=_schema({
             "element_id": _str_arg("element_id", "Element id"),
@@ -2404,6 +2417,18 @@ TOOLS: list[Tool] = [
                         "Set or clear the element's package membership "
                         "(ADR-184). Pass a UUID to set, JSON null to "
                         "clear, or omit to leave unchanged."
+                    ),
+                },
+                False,
+            ),
+            "detail_diagram_id": (
+                {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Set or clear the element's detail-diagram drill "
+                        "link (v6.33.0, ADR-221 / issue #242). Pass a "
+                        "diagram UUID to set (may be in another set), "
+                        "JSON null to clear, or omit to leave unchanged."
                     ),
                 },
                 False,

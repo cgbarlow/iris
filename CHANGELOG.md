@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.33.0] - 2026-05-29
+
+### Added
+
+- **Element → detail diagram drill link** (ADR-221, SPEC-221-A, issue
+  #242). An element can now declare a navigable "detail diagram" — the
+  Sparx EA "composite element" concept — so you can drill from an element
+  into the diagram that elaborates it, and back out. Surfaced as a new
+  nullable `elements.detail_diagram_id` column (migration m080 / Supabase
+  m086), tri-state on update like `package_id`:
+  - **API/MCP/CLI** (§14 surface parity): `create_element` /
+    `update_element` accept `detail_diagram_id` (MCP) /
+    `--detail-diagram-id` (CLI), set/clear via JSON `null`. Cross-set
+    links are allowed; the target diagram is validated to exist.
+  - **Element page** shows a "Detail diagram" drill-in (and a picker to
+    set/clear it); the **diagram page** lists referencing elements under
+    "Referenced by" (`get_diagram` gains `referenced_by_elements`).
+  - **Smart-markdown**: a new `{{element:<id>:detail_diagram}}` token
+    renders a link straight to the element's detail diagram.
+  - **Sparx EA import**: composite elements (`t_diagram.ParentID` in
+    `.qea`; the diagram `owner` in native XMI) now populate
+    `detail_diagram_id` automatically, so imported models light up the
+    drill.
+
 ## [6.32.1] - 2026-05-29
 
 ### Fixed

@@ -98,6 +98,10 @@ class QeaDiagram:
     Notes: str | None = None
     cx: int | None = None
     cy: int | None = None
+    # ADR-221: t_diagram.ParentID points at the owning element's
+    # Object_ID when the diagram is a "composite" child of an element.
+    # Used to populate that element's detail_diagram_id on import.
+    ParentID: int | None = None
 
 
 @dataclass
@@ -245,12 +249,21 @@ async def read_connectors(db_path: str) -> list[QeaConnector]:
 
 
 async def read_diagrams(db_path: str) -> list[QeaDiagram]:
-    """Read all diagrams from a .qea file."""
+    """Read all diagrams from a .qea file.
+
+    ``ParentID`` (ADR-221: the owning element of a composite diagram) is a
+    standard EA column but may be absent in older/minimal databases, so it
+    is selected only when present.
+    """
     async with aiosqlite.connect(db_path) as db:
-        cursor = await db.execute(
-            "SELECT Diagram_ID, Name, Diagram_Type, Package_ID, ea_guid, Notes, cx, cy "
-            "FROM t_diagram"
+        info = await db.execute("PRAGMA table_info(t_diagram)")
+        cols = {row[1] for row in await info.fetchall()}
+        has_parent = "ParentID" in cols
+        select = (
+            "SELECT Diagram_ID, Name, Diagram_Type, Package_ID, ea_guid, "
+            "Notes, cx, cy" + (", ParentID" if has_parent else "") + " FROM t_diagram"
         )
+        cursor = await db.execute(select)
         rows = await cursor.fetchall()
         return [
             QeaDiagram(
@@ -262,6 +275,7 @@ async def read_diagrams(db_path: str) -> list[QeaDiagram]:
                 Notes=row[5],
                 cx=row[6],
                 cy=row[7],
+                ParentID=(row[8] or None) if has_parent else None,
             )
             for row in rows
         ]

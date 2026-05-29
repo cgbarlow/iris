@@ -25,6 +25,37 @@ class ElementPackageInvariantError(ValueError):
     """
 
 
+class ElementDetailDiagramError(ValueError):
+    """Raised when an element's detail_diagram_id points at a diagram
+    that does not exist or is soft-deleted (ADR-221).
+
+    The router translates this into HTTP 422 with the message intact.
+    Cross-set targets are allowed — only existence is checked.
+    """
+
+
+async def _validate_detail_diagram_exists(
+    db: DatabasePort,
+    detail_diagram_id: str | None,
+) -> None:
+    """Ensure ``detail_diagram_id`` references a live diagram (ADR-221).
+
+    ``None`` (clear / unset) is always valid. A non-null id must resolve
+    to a non-deleted ``diagrams`` row, else
+    :class:`ElementDetailDiagramError`. No set constraint — cross-set
+    drill links are intentionally allowed.
+    """
+    if detail_diagram_id is None:
+        return
+    cursor = await db.execute(
+        "SELECT 1 FROM diagrams WHERE id = ? AND is_deleted = 0",
+        (detail_diagram_id,),
+    )
+    if await cursor.fetchone() is None:
+        msg = f"Detail diagram {detail_diagram_id} not found"
+        raise ElementDetailDiagramError(msg)
+
+
 async def _validate_element_package_set_consistency(
     db: DatabasePort,
     *,
@@ -71,6 +102,7 @@ async def create_element(
     created_by: str,
     set_id: str | None = None,
     package_id: str | None = None,
+    detail_diagram_id: str | None = None,
     metadata: dict[str, object] | None = None,
     change_summary: str | None = None,
     notation: str = "simple",
@@ -85,13 +117,15 @@ async def create_element(
     await _validate_element_package_set_consistency(
         db, set_id=effective_set_id, package_id=package_id,
     )
+    await _validate_detail_diagram_exists(db, detail_diagram_id)
 
     await db.execute(
         "INSERT INTO elements (id, element_type, current_version, "
-        "created_at, created_by, updated_at, set_id, package_id, notation) "
-        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)",
+        "created_at, created_by, updated_at, set_id, package_id, "
+        "detail_diagram_id, notation) "
+        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)",
         (element_id, element_type, now, created_by, now,
-         effective_set_id, package_id, notation),
+         effective_set_id, package_id, detail_diagram_id, notation),
     )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, "
@@ -119,6 +153,7 @@ async def create_element(
         "is_deleted": False,
         "set_id": effective_set_id,
         "package_id": package_id,
+        "detail_diagram_id": detail_diagram_id,
         "metadata": metadata,
         "notation": notation,
     }
@@ -134,7 +169,7 @@ async def get_element(
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
         "u.username, e.set_id, s.name, ev.metadata, e.notation, "
-        "e.package_id, "
+        "e.package_id, e.detail_diagram_id, "
         "(SELECT pv.name FROM packages p "
         "  JOIN package_versions pv ON p.id = pv.package_id "
         "    AND p.current_version = pv.version "
@@ -168,7 +203,8 @@ async def get_element(
         "metadata": json.loads(row[13]) if row[13] else None,
         "notation": row[14] or "simple",
         "package_id": row[15],
-        "package_name": row[16],
+        "detail_diagram_id": row[16],
+        "package_name": row[17],
     }
 
     # Enrich with tags
@@ -270,7 +306,7 @@ async def list_elements(
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
         "e.set_id, s.name, ev.metadata, e.notation, "
-        "e.package_id, "
+        "e.package_id, e.detail_diagram_id, "
         "(SELECT pv.name FROM packages p "
         "  JOIN package_versions pv ON p.id = pv.package_id "
         "    AND p.current_version = pv.version "
@@ -302,7 +338,8 @@ async def list_elements(
             "metadata": json.loads(r[12]) if r[12] else None,
             "notation": r[13] or "simple",
             "package_id": r[14],
-            "package_name": r[15],
+            "detail_diagram_id": r[15],
+            "package_name": r[16],
         }
         for r in rows
     ]
@@ -342,6 +379,7 @@ async def list_elements(
 
 
 _UNSET_PACKAGE_ID: Any = object()
+_UNSET_DETAIL_DIAGRAM_ID: Any = object()
 
 
 async def update_element(
@@ -356,13 +394,15 @@ async def update_element(
     expected_version: int,
     metadata: dict[str, object] | None = None,
     package_id: Any = _UNSET_PACKAGE_ID,
+    detail_diagram_id: Any = _UNSET_DETAIL_DIAGRAM_ID,
 ) -> dict[str, object] | None:
     """Update an element with optimistic concurrency. Returns None on conflict.
 
-    ``package_id`` is tri-state. The sentinel ``_UNSET_PACKAGE_ID`` means
-    "do not touch the column"; an explicit ``None`` clears the column;
-    a string sets it. The invariant against ``set_id`` runs whenever
-    ``package_id`` is being touched.
+    ``package_id`` and ``detail_diagram_id`` are tri-state. The sentinel
+    means "do not touch the column"; an explicit ``None`` clears the
+    column; a string sets it. The package/set invariant runs whenever
+    ``package_id`` is being touched; ``detail_diagram_id`` is validated to
+    reference a live diagram whenever it is being touched (ADR-221).
     """
     # Check current version (OCC)
     cursor = await db.execute(
@@ -382,23 +422,30 @@ async def update_element(
         await _validate_element_package_set_consistency(
             db, set_id=current_set_id, package_id=package_id,
         )
+    if detail_diagram_id is not _UNSET_DETAIL_DIAGRAM_ID:
+        await _validate_detail_diagram_exists(db, detail_diagram_id)
 
     new_version = current_version + 1
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
 
-    if package_id is _UNSET_PACKAGE_ID:
-        await db.execute(
-            "UPDATE elements SET current_version = ?, updated_at = ? WHERE id = ?",
-            (new_version, now, element_id),
-        )
-    else:
-        await db.execute(
-            "UPDATE elements SET current_version = ?, updated_at = ?, "
-            "package_id = ? WHERE id = ?",
-            (new_version, now, package_id, element_id),
-        )
+    # Build the SET clause dynamically so package_id and detail_diagram_id
+    # can each be touched (or left untouched) independently. All clause
+    # fragments are literal column assignments — no user text in the SQL.
+    set_clauses = ["current_version = ?", "updated_at = ?"]
+    set_params: list[object] = [new_version, now]
+    if package_id is not _UNSET_PACKAGE_ID:
+        set_clauses.append("package_id = ?")
+        set_params.append(package_id)
+    if detail_diagram_id is not _UNSET_DETAIL_DIAGRAM_ID:
+        set_clauses.append("detail_diagram_id = ?")
+        set_params.append(detail_diagram_id)
+    set_params.append(element_id)
+    await db.execute(
+        f"UPDATE elements SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608
+        set_params,
+    )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, "
         "data, change_type, change_summary, created_at, created_by, metadata) "

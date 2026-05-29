@@ -2304,6 +2304,20 @@
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Notation</dt>
 							<dd style="color: var(--color-fg)">{diagram.notation ?? 'simple'}</dd>
 
+							{#if diagram.referenced_by_elements && diagram.referenced_by_elements.length > 0}
+								<!-- ADR-221: elements that drill into this diagram. -->
+								<dt class="text-sm font-medium" style="color: var(--color-muted)">Referenced by</dt>
+								<dd>
+									<ul class="flex flex-col gap-1">
+										{#each diagram.referenced_by_elements as ref}
+											<li>
+												<a href={`/elements/${ref.id}`} class="text-sm underline" style="color: var(--color-fg)" title="Element that drills into this diagram">{ref.name}</a>
+											</li>
+										{/each}
+									</ul>
+								</dd>
+							{/if}
+
 							{#if diagram.detected_notations && diagram.detected_notations.length > 0}
 								<dt class="text-sm font-medium" style="color: var(--color-muted)">Detected Notations</dt>
 								<dd>

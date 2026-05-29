@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">
+	<xmi:Documentation exporter="Enterprise Architect" exporterVersion="6.5" exporterID="1627"/>
+	<uml:Model xmi:type="uml:Model" name="EA_Model" visibility="public">
+		<packagedElement xmi:type="uml:Package" xmi:id="EAPK_PKG1" name="Sample Package" visibility="public">
+			<packagedElement xmi:type="uml:Class" xmi:id="EAID_A" name="Capability A" visibility="public"/>
+		</packagedElement>
+	</uml:Model>
+	<xmi:Extension extender="Enterprise Architect" extenderID="6.5">
+		<elements>
+			<element xmi:idref="EAPK_PKG1" xmi:type="uml:Package" name="Sample Package" scope="public">
+				<model package="EAPK_ROOT" tpos="0" ea_localid="1" ea_eleType="package"/>
+				<properties isSpecification="false" sType="Package" nType="0" scope="public" documentation="Top level."/>
+			</element>
+			<element xmi:idref="EAID_A" xmi:type="uml:Class" name="Capability A" scope="public">
+				<model package="EAPK_PKG1" tpos="0" ea_localid="10" ea_eleType="element"/>
+				<properties documentation="A composite capability." isSpecification="false" sType="Class" nType="0" scope="public"/>
+			</element>
+		</elements>
+		<connectors/>
+		<diagrams>
+			<diagram xmi:id="EAID_DIAG2">
+				<model package="EAPK_PKG1" localID="201" owner="EAID_A"/>
+				<properties name="Capability A Detail" type="Logical" documentation="Composite detail diagram owned by Capability A."/>
+				<project author="Tester" version="1.0" created="2026-01-01 10:00:00" modified="2026-01-02 10:00:00"/>
+				<style1 value="DocSize.cx=800;DocSize.cy=600;Zoom=100;"/>
+				<elements/>
+			</diagram>
+		</diagrams>
+	</xmi:Extension>
+</xmi:XMI>

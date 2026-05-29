@@ -994,4 +994,23 @@ async def import_sparx_model(
                 )
         await db.commit()
 
+    # 7. Post-process: populate elements.detail_diagram_id from composite
+    # diagrams (ADR-221). t_diagram.ParentID points at the owning element's
+    # Object_ID; now that both elements and diagrams have Iris UUIDs, link
+    # the owning element to its child (detail) diagram. Idempotent.
+    linked_detail = False
+    for diag in diagrams:
+        if not diag.ParentID:
+            continue
+        owner_iris_id = element_map.get(diag.ParentID)
+        diagram_iris_id = ea_diagram_id_to_iris.get(diag.Diagram_ID)
+        if owner_iris_id and diagram_iris_id:
+            await db.execute(
+                "UPDATE elements SET detail_diagram_id = ? WHERE id = ?",
+                (diagram_iris_id, owner_iris_id),
+            )
+            linked_detail = True
+    if linked_detail:
+        await db.commit()
+
     return summary
