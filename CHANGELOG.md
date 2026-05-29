@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.33.1] - 2026-05-29
+
+### Changed
+
+- Renamed the element-page label "Detail diagram" to **"Detail view"**
+  (ADR-221 follow-up). UI label only — the `detail_diagram_id` field /
+  API / MCP / CLI surface is unchanged.
+
 ## [6.33.0] - 2026-05-29
 
 ### Added
