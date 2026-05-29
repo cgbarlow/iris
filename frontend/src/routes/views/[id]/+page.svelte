@@ -2919,7 +2919,7 @@
 
 				<!-- Canvas area -->
 				{#if editing}
-					{#if focusMode}
+					{#if focusMode && canvasType !== 'text'}
 						<FocusView onexit={() => (focusMode = false)}>
 							<div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
 								<!-- Toolbar inside FocusView so edit controls are visible -->
@@ -3034,82 +3034,19 @@
 						 in the canvas-toolbar above (lines 2687-2862) for all non-
 						 sequence canvases. The duplicates that lived here in v5.4.0
 						 have been removed. -->
-					<div class="flex gap-4">
-						<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto">
-							{#if diagram?.diagram_type === 'dynamic_list'}
-								<!-- ADR-186 (issue #147): auto-generated content; the
-									 canvas is read-only and the Source panel appears in
-									 edit mode. -->
-								<DynamicListCanvas
-									content={markdownContent}
-									editing={editing}
-									setId={diagram?.set_id ?? null}
-									source={dynamicSource}
-									onsourcechange={(next: DynamicSource) => {
-										pendingDynamicSource = next;
-										canvasDirty = true;
-									}}
-									onheadings={(h) => (textHeadings = h)}
-								/>
-							{:else if diagram?.diagram_type === 'smart_markdown'}
-								<!-- ADR-205 (issue #185): user authors markdown_source
-									 with tokens; the server resolves tokens at read
-									 time into data.content for view + export pipelines. -->
-								<SmartMarkdownCanvas
-									content={markdownContent}
-									source={(diagram.data?.markdown_source as string | undefined) ?? ''}
-									editing={editing}
-									contextSetId={diagram?.set_id ?? null}
-									onsourcechange={(s: string) => {
-										if (diagram) {
-											diagram.data = { ...(diagram.data ?? {}), markdown_source: s };
-											canvasDirty = true;
-										}
-									}}
-									onheadings={(h) => (textHeadings = h)}
-								/>
-							{:else if diagram?.diagram_type === 'aggregation_list'}
-								<!-- ADR-213 (v6.21.0): pickers in edit mode for source +
-									 profile; engine fills data.content at GET time. -->
-								<AggregationListCanvas
-									content={markdownContent}
-									editing={editing}
-									setId={diagram?.set_id ?? null}
-									source={{
-										source_diagram_id: (diagram.data?.source_diagram_id as string | null | undefined) ?? null,
-										profile_id: (diagram.data?.profile_id as string | null | undefined) ?? null,
-									}}
-									onsourcechange={(next) => {
-										if (diagram) {
-											diagram.data = {
-												...(diagram.data ?? {}),
-												source_diagram_id: next.source_diagram_id ?? null,
-												profile_id: next.profile_id ?? null,
-											};
-											canvasDirty = true;
-										}
-									}}
-									onheadings={(h) => (textHeadings = h)}
-								/>
-							{:else}
-								<TextCanvas
-									bind:textareaEl={textTextareaEl}
-									content={markdownContent}
-									editing={editing}
-									oncontentchange={(c) => {
-										if (diagram) {
-											diagram.data = { ...(diagram.data ?? {}), content: c };
-											canvasDirty = true;
-										}
-									}}
-									onheadings={(h) => (textHeadings = h)}
-								/>
-							{/if}
+					{#if focusMode}
+						<FocusView onexit={() => (focusMode = false)}>
+							<div style="width: 100%; height: 100%; overflow: auto">
+								{@render markdownArea()}
+							</div>
+						</FocusView>
+					{:else}
+						<div class="flex gap-4">
+							<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto">
+								{@render markdownArea()}
+							</div>
 						</div>
-						{#if !editing && showTocDrawer}
-							<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
-						{/if}
-					</div>
+					{/if}
 					{:else if notation === 'bpmn'}
 					<!-- v5.2.0 (issue #37): BPMN authoring shell — palette / canvas /
 						 property panel + bottom problems dock + canConnect toast.
@@ -3173,47 +3110,22 @@
 						 through to `canvasNodes.length === 0` and show "Start Building"
 						 because Text views legitimately have zero canvas nodes. -->
 					{#if markdownContent}
-						<div class="flex gap-4">
-							<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto">
-								{#if diagram?.diagram_type === 'dynamic_list'}
-									<!-- ADR-186 (issue #147): browse-mode dynamic_list view. -->
-									<DynamicListCanvas
-										content={markdownContent}
-										editing={false}
-										setId={diagram?.set_id ?? null}
-										source={dynamicSource}
-										onheadings={(h) => (textHeadings = h)}
-									/>
-								{:else if diagram?.diagram_type === 'smart_markdown'}
-									<!-- ADR-205 (issue #185): browse-mode Smart Markdown. -->
-									<SmartMarkdownCanvas
-										content={markdownContent}
-										source={(diagram.data?.markdown_source as string | undefined) ?? ''}
-										editing={false}
-										contextSetId={diagram?.set_id ?? null}
-										onheadings={(h) => (textHeadings = h)}
-									/>
-								{:else if diagram?.diagram_type === 'aggregation_list'}
-									<!-- ADR-213: browse-mode shows the synthesised content only. -->
-									<AggregationListCanvas
-										content={markdownContent}
-										editing={false}
-										setId={diagram?.set_id ?? null}
-										onheadings={(h) => (textHeadings = h)}
-									/>
-								{:else}
-									<TextCanvas
-										content={markdownContent}
-										editing={false}
-										oncontentchange={() => {}}
-										onheadings={(h) => (textHeadings = h)}
-									/>
+						{#if focusMode}
+							<FocusView onexit={() => (focusMode = false)}>
+								<div style="width: 100%; height: 100%; overflow: auto">
+									{@render markdownArea()}
+								</div>
+							</FocusView>
+						{:else}
+							<div class="flex gap-4">
+								<div class="flex-1" style="height: calc(100vh - 317px); border: 1px solid var(--color-border); border-radius: 0.375rem; overflow: auto">
+									{@render markdownArea()}
+								</div>
+								{#if showTocDrawer}
+									<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
 								{/if}
 							</div>
-							{#if showTocDrawer}
-								<MarkdownToc headings={textHeadings} onclose={() => (showTocDrawer = false)} />
-							{/if}
-						</div>
+						{/if}
 					{:else}
 						<div class="flex flex-col items-center justify-center gap-3 rounded border p-8" style="border-color: var(--color-border); min-height: 300px">
 							<p style="color: var(--color-muted)">This text view is empty.</p>
@@ -3764,3 +3676,71 @@
 	{/if}
 
 {/if}
+
+<!-- Issue #243: shared markdown render area, used by both browse + edit and
+	 their full-screen (FocusView) variants so the 4-way diagram-type switch
+	 isn't duplicated. `editing` drives read-only vs editable; in browse mode
+	 it's always false so onsourcechange/oncontentchange never fire. -->
+{#snippet markdownArea()}
+	{#if diagram?.diagram_type === 'dynamic_list'}
+		<DynamicListCanvas
+			content={markdownContent}
+			editing={editing}
+			setId={diagram?.set_id ?? null}
+			source={dynamicSource}
+			onsourcechange={(next: DynamicSource) => {
+				pendingDynamicSource = next;
+				canvasDirty = true;
+			}}
+			onheadings={(h) => (textHeadings = h)}
+		/>
+	{:else if diagram?.diagram_type === 'smart_markdown'}
+		<SmartMarkdownCanvas
+			content={markdownContent}
+			source={(diagram.data?.markdown_source as string | undefined) ?? ''}
+			editing={editing}
+			contextSetId={diagram?.set_id ?? null}
+			onsourcechange={(s: string) => {
+				if (diagram) {
+					diagram.data = { ...(diagram.data ?? {}), markdown_source: s };
+					canvasDirty = true;
+				}
+			}}
+			onheadings={(h) => (textHeadings = h)}
+		/>
+	{:else if diagram?.diagram_type === 'aggregation_list'}
+		<AggregationListCanvas
+			content={markdownContent}
+			editing={editing}
+			setId={diagram?.set_id ?? null}
+			source={{
+				source_diagram_id: (diagram.data?.source_diagram_id as string | null | undefined) ?? null,
+				profile_id: (diagram.data?.profile_id as string | null | undefined) ?? null,
+			}}
+			onsourcechange={(next) => {
+				if (diagram) {
+					diagram.data = {
+						...(diagram.data ?? {}),
+						source_diagram_id: next.source_diagram_id ?? null,
+						profile_id: next.profile_id ?? null,
+					};
+					canvasDirty = true;
+				}
+			}}
+			onheadings={(h) => (textHeadings = h)}
+		/>
+	{:else}
+		<TextCanvas
+			bind:textareaEl={textTextareaEl}
+			content={markdownContent}
+			editing={editing}
+			oncontentchange={(c) => {
+				if (diagram) {
+					diagram.data = { ...(diagram.data ?? {}), content: c };
+					canvasDirty = true;
+				}
+			}}
+			onheadings={(h) => (textHeadings = h)}
+		/>
+	{/if}
+{/snippet}
