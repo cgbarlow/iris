@@ -23,6 +23,7 @@ from app.element_templates.service import (
     get_element_template,
 )
 from app.elements.service import (
+    ElementDetailDiagramError,
     ElementPackageInvariantError,
     cascade_delete_element,
     create_element,
@@ -88,10 +89,11 @@ async def create(
             created_by=current_user["id"],
             set_id=fields.get("set_id"),
             package_id=fields.get("package_id"),
+            detail_diagram_id=fields.get("detail_diagram_id"),
             metadata=fields.get("metadata"),
             notation=fields.get("notation") or "simple",
         )
-    except ElementPackageInvariantError as exc:
+    except (ElementPackageInvariantError, ElementDetailDiagramError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
 
     # Apply template-supplied tags (if any) to the element_tags table.
@@ -394,9 +396,11 @@ async def update(
     }
     if body.package_id is not _ELEMENT_UPDATE_UNSET:
         update_kwargs["package_id"] = body.package_id
+    if body.detail_diagram_id is not _ELEMENT_UPDATE_UNSET:
+        update_kwargs["detail_diagram_id"] = body.detail_diagram_id
     try:
         result = await update_element(db, element_id, **update_kwargs)
-    except ElementPackageInvariantError as exc:
+    except (ElementPackageInvariantError, ElementDetailDiagramError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
     if result is None:
         raise HTTPException(status_code=409, detail="Version conflict")

@@ -55,6 +55,9 @@ class DiagramResponse(BaseModel):
     notation: str = "simple"
     detected_notations: list[str] = Field(default_factory=list)
     metadata: dict[str, object] | None = None
+    # ADR-221: elements that point at this diagram as their detail diagram
+    # (the inbound "Referenced by" side of the element → diagram drill).
+    referenced_by_elements: list[dict[str, str]] = Field(default_factory=list)
 
 
 class DiagramHierarchyNode(BaseModel):

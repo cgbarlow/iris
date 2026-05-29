@@ -32,6 +32,8 @@ export interface Element {
 	set_name?: string;
 	metadata?: Record<string, unknown> | null;
 	notation?: string;
+	// ADR-221: the diagram this element drills into (Sparx composite element).
+	detail_diagram_id?: string | null;
 }
 
 export interface Diagram {
@@ -53,6 +55,8 @@ export interface Diagram {
 	notation?: string;
 	detected_notations?: string[];
 	metadata?: Record<string, unknown> | null;
+	// ADR-221: elements that point at this diagram as their detail diagram.
+	referenced_by_elements?: { id: string; name: string }[];
 }
 
 export interface Package {

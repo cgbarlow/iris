@@ -27,6 +27,7 @@ class ElementCreate(BaseModel):
     data: dict[str, object] = Field(default_factory=dict)
     set_id: str | None = None
     package_id: str | None = None
+    detail_diagram_id: str | None = None
     metadata: dict[str, object] | None = None
     notation: str = "simple"
     template_id: str | None = None
@@ -35,10 +36,10 @@ class ElementCreate(BaseModel):
 class ElementUpdate(BaseModel):
     """Request body for updating an element.
 
-    ``package_id`` is tri-state: omit the key to leave the column
-    untouched, pass ``null`` (JSON) to clear, or pass a string to set.
-    The router translates these three states into a kwarg passed to the
-    service layer.
+    ``package_id`` and ``detail_diagram_id`` are tri-state: omit the key
+    to leave the column untouched, pass ``null`` (JSON) to clear, or pass
+    a string to set. The router translates these three states into a
+    kwarg passed to the service layer.
     """
 
     name: str = Field(min_length=1, max_length=255)
@@ -47,6 +48,7 @@ class ElementUpdate(BaseModel):
     change_summary: str | None = None
     metadata: dict[str, object] | None = None
     package_id: Any = _UNSET
+    detail_diagram_id: Any = _UNSET
 
 
 class ElementRollback(BaseModel):
@@ -76,6 +78,7 @@ class ElementResponse(BaseModel):
     set_name: str | None = None
     package_id: str | None = None
     package_name: str | None = None
+    detail_diagram_id: str | None = None
     metadata: dict[str, object] | None = None
     notation: str = "simple"
 

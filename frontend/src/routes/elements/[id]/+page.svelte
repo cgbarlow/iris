@@ -20,6 +20,8 @@
 	import CommentsPanel from '$lib/components/CommentsPanel.svelte';
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import CreateTemplateDialog from '$lib/components/CreateTemplateDialog.svelte';
+	import DiagramPicker from '$lib/components/DiagramPicker.svelte';
+	import type { Diagram } from '$lib/types/api';
 	import { Accordion } from 'bits-ui';
 	import DOMPurify from 'dompurify';
 	import {
@@ -69,6 +71,13 @@
 	interface PackageOption { id: string; name: string }
 	let setPackages = $state<PackageOption[]>([]);
 	let editElementType = $state('');
+	// ADR-221 — element → detail diagram drill link. ``detailDiagramName``
+	// is the resolved name shown in read mode; the edit-mode picker
+	// updates ``editDetailDiagramId`` / ``editDetailDiagramName``.
+	let detailDiagramName = $state<string | null>(null);
+	let editDetailDiagramId = $state<string | null>(null);
+	let editDetailDiagramName = $state<string | null>(null);
+	let showDetailDiagramPicker = $state(false);
 
 	/** Entity type options for the current element's notation. */
 	const entityTypeOptions = $derived.by(() => {
@@ -111,7 +120,8 @@
 		);
 		const typeChanged = editElementType !== entity.element_type;
 		const pkgChanged = (editPackageId ?? null) !== ((entity as any).package_id ?? null);
-		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged;
+		const detailDiagramChanged = (editDetailDiagramId ?? null) !== (entity.detail_diagram_id ?? null);
+		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged || detailDiagramChanged;
 	});
 
 	async function loadEntity(id: string) {
@@ -126,6 +136,7 @@
 				loadRelationships(id),
 				loadDiagrams(id),
 				loadPackageMemberships(id),
+				loadDetailDiagramName(),
 				loadAllTags(),
 				loadBookmarkStatus(id),
 			]);
@@ -160,6 +171,22 @@
 			packageMemberships = await apiFetch<{id: string; name: string}[]>(`/api/elements/${id}/package-memberships`);
 		} catch {
 			packageMemberships = [];
+		}
+	}
+
+	// ADR-221: resolve the detail diagram's name for the read-mode drill
+	// link. Element responses carry only the id.
+	async function loadDetailDiagramName() {
+		const detailId = entity?.detail_diagram_id ?? null;
+		if (!detailId) {
+			detailDiagramName = null;
+			return;
+		}
+		try {
+			const d = await apiFetch<Diagram>(`/api/diagrams/${detailId}`);
+			detailDiagramName = d.name;
+		} catch {
+			detailDiagramName = null;
 		}
 	}
 
@@ -265,6 +292,8 @@
 			? srcAttrs.map((a: any) => ({ name: a.name ?? '', type: a.type ?? '', scope: a.scope ?? 'Public', notes: a.notes ?? '', lower_bound: a.lower_bound ?? '', upper_bound: a.upper_bound ?? '' }))
 			: [];
 		editPackageId = (entity as any).package_id ?? null;
+		editDetailDiagramId = entity.detail_diagram_id ?? null;
+		editDetailDiagramName = detailDiagramName;
 		// Load packages scoped to the element's set so the picker stays
 		// constrained to a consistent group (ADR-184).
 		try {
@@ -314,6 +343,9 @@
 			// untouched" but we initialise it to either the current
 			// value or null on entry, so always include it here.
 			putBody.package_id = editPackageId ?? null;
+			// ADR-221 tri-state — same convention as package_id: always
+			// include the key (set / null) since we seed it on edit entry.
+			putBody.detail_diagram_id = editDetailDiagramId ?? null;
 			await apiFetch(`/api/elements/${entity.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(entity.current_version) },
@@ -643,6 +675,50 @@
 										style="background: var(--color-surface); color: var(--color-fg)"
 									>
 										{(entity as any).package_name ?? (entity as any).package_id}
+									</a>
+								{:else}
+									<span style="color: var(--color-muted)">None</span>
+								{/if}
+							</dd>
+
+							<dt class="text-sm font-medium" style="color: var(--color-muted)">Detail diagram</dt>
+							<dd>
+								{#if editingDetails}
+									{#if editDetailDiagramId}
+										<div class="flex items-center gap-1.5">
+											<span class="truncate text-sm" style="color: var(--color-fg)" title={editDetailDiagramName ?? editDetailDiagramId}>
+												{editDetailDiagramName ?? editDetailDiagramId}
+											</span>
+											<button
+												type="button"
+												onclick={() => (showDetailDiagramPicker = true)}
+												class="shrink-0 rounded border px-2 py-0.5 text-xs"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+											>Change</button>
+											<button
+												type="button"
+												onclick={() => { editDetailDiagramId = null; editDetailDiagramName = null; }}
+												title="Clear detail diagram"
+												class="shrink-0 px-1 text-sm leading-none"
+												style="color: var(--color-muted); background: none; border: none; cursor: pointer"
+											>&times;</button>
+										</div>
+									{:else}
+										<button
+											type="button"
+											onclick={() => (showDetailDiagramPicker = true)}
+											class="rounded border px-2 py-1 text-xs"
+											style="border-color: var(--color-border); border-style: dashed; background: none; color: var(--color-primary); cursor: pointer"
+										>Set detail diagram</button>
+									{/if}
+								{:else if entity.detail_diagram_id}
+									<a
+										href={`/views/${entity.detail_diagram_id}`}
+										class="rounded px-2 py-0.5 text-sm underline"
+										style="background: var(--color-surface); color: var(--color-fg)"
+										title="Drill into the diagram that elaborates this element"
+									>
+										{detailDiagramName ?? entity.detail_diagram_id}
 									</a>
 								{:else}
 									<span style="color: var(--color-muted)">None</span>
@@ -1008,5 +1084,17 @@
 			showSaveTemplateDialog = false;
 			goto(`/element-templates/${templateId}`);
 		}}
+	/>
+
+	<!-- ADR-221: pick the element's detail diagram (cross-set allowed). -->
+	<DiagramPicker
+		open={showDetailDiagramPicker}
+		title="Set detail diagram"
+		onselect={(d: Diagram) => {
+			editDetailDiagramId = d.id;
+			editDetailDiagramName = d.name;
+			showDetailDiagramPicker = false;
+		}}
+		oncancel={() => (showDetailDiagramPicker = false)}
 	/>
 {/if}

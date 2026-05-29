@@ -314,6 +314,19 @@ def parse_sparx_xmi(path: str) -> SparxXmiModel:
         m = _child(dg, "model")
         props = _child(dg, "properties")
         pkg_guid = m.get("package") if m is not None else None
+        # ADR-221: a composite (element-owned) diagram carries an `owner`
+        # GUID that differs from its containing package. Map it to the
+        # owning element's int id so the orchestrator can set that
+        # element's detail_diagram_id. A package-owned diagram (owner ==
+        # package) is not composite → leave ParentID unset. The
+        # orchestrator further filters to element ids, so a stray
+        # non-element owner is harmless.
+        owner_guid = m.get("owner") if m is not None else None
+        parent_id = (
+            guid_to_int.get(owner_guid)
+            if owner_guid and owner_guid != pkg_guid
+            else None
+        )
 
         cx = cy = None
         style1 = _child(dg, "style1")
@@ -334,6 +347,7 @@ def parse_sparx_xmi(path: str) -> SparxXmiModel:
                 Notes=props.get("documentation") if props is not None else None,
                 cx=cx,
                 cy=cy,
+                ParentID=parent_id,
             )
         )
 

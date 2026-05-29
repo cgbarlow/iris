@@ -315,6 +315,34 @@ def _markdown_escape_title(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+async def _resolve_element_detail_diagram(
+    db: DatabasePort, element_id: str,
+) -> str | None:
+    """Resolve ``{{element:<id>:detail_diagram}}`` (ADR-221).
+
+    Unlike other element tokens — which link back to the element — this
+    resolves to a link to the element's *detail diagram* so the rendered
+    markdown drills into the diagram that elaborates the element. Returns
+    ``None`` (→ strikethrough) when the element has no detail diagram, or
+    the target diagram is missing/soft-deleted.
+    """
+    cursor = await db.execute(
+        "SELECT detail_diagram_id FROM elements "
+        "WHERE id = ? AND is_deleted = 0",
+        (element_id,),
+    )
+    row = await cursor.fetchone()
+    if not row or not row[0]:
+        return None
+    detail_id = row[0]
+    name = await _fetch_entity_display_name(db, "diagram", detail_id)
+    if name is None:
+        return None
+    title = _markdown_escape_title(name)
+    text = _markdown_escape_link_text(name)
+    return f'[{text}](iris://diagram/{detail_id} "{title}")'
+
+
 async def _resolve_one(
     db: DatabasePort, entity_type: str, entity_id: str, field_spec: str | None,
 ) -> str | None:
@@ -342,6 +370,12 @@ async def _resolve_one(
     # Non-image entity types require a field_spec.
     if field_spec is None or field_spec == "":
         return None
+
+    # ADR-221: an element's detail-diagram drill. Resolves to a link to
+    # the *target diagram*, not the element — so it's handled before the
+    # generic element-field path (which would wrap in an element link).
+    if entity_type == "element" and field_spec == "detail_diagram":
+        return await _resolve_element_detail_diagram(db, entity_id)
 
     # ADR-210: parse inline =value override.
     field_spec_path: str = field_spec

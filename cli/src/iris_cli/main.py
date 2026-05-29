@@ -813,6 +813,14 @@ def create_element_cmd(
         None, "--package-id",
         help="Optional package membership for the new element (ADR-184).",
     ),
+    detail_diagram_id: str | None = typer.Option(
+        None, "--detail-diagram-id",
+        help=(
+            "Optional diagram this element drills into — the Sparx EA "
+            "'composite element' link (v6.33.0, ADR-221). May point at a "
+            "diagram in another set."
+        ),
+    ),
     notation: str | None = typer.Option(None, "--notation"),
     description: str | None = typer.Option(None, "--description"),
     data_json: str | None = typer.Option(None, "--data-json"),
@@ -843,6 +851,8 @@ def create_element_cmd(
         body["set_id"] = set_id
     if package_id is not None:
         body["package_id"] = package_id
+    if detail_diagram_id is not None:
+        body["detail_diagram_id"] = detail_diagram_id
     if notation is not None:
         body["notation"] = notation
     if description is not None:
@@ -1059,6 +1069,15 @@ def update_element_cmd(
             "(ADR-178 invariant)."
         ),
     ),
+    detail_diagram_id: str | None = typer.Option(
+        None, "--detail-diagram-id",
+        help=(
+            "Set or clear the element's detail-diagram drill link "
+            "(v6.33.0, ADR-221). Pass a diagram UUID to set (may be in "
+            "another set), the literal 'null' to clear, or omit to leave "
+            "unchanged."
+        ),
+    ),
 ) -> None:
     """Update an Element. Note: elements cannot be moved between
     diagrams — they travel with their parent diagram (ADR-178 invariant)."""
@@ -1066,16 +1085,19 @@ def update_element_cmd(
         "name": name, "description": description,
         "data": _parse_json_opt(data_json, "--data-json"),
     }
-    # package_id is tri-state at the PUT body level: include the key to
-    # set (string) or clear (null), omit to leave untouched. The
-    # _put_merge_partial helper strips None so we wire package_id by
-    # hand.
+    # package_id / detail_diagram_id are tri-state at the PUT body level:
+    # include the key to set (string) or clear (null), omit to leave
+    # untouched. The _put_merge_partial helper strips None so we wire them
+    # by hand.
     raw_package_id = _resolve_null(package_id) if package_id is not None else _UNSET
+    raw_detail_diagram_id = (
+        _resolve_null(detail_diagram_id) if detail_diagram_id is not None else _UNSET
+    )
 
     async def _do() -> Any:
         async with _client() as c:
-            # Build the body from the GET-then-merge path, then graft
-            # package_id on if the user passed --package-id.
+            # Build the body from the GET-then-merge path, then graft the
+            # tri-state fields on if the user passed them.
             current_resp = await c._request("GET", f"/api/elements/{element_id}")
             current = current_resp.json()
             body: dict[str, Any] = {}
@@ -1086,6 +1108,8 @@ def update_element_cmd(
                     body[field] = current[field]
             if raw_package_id is not _UNSET:
                 body["package_id"] = raw_package_id
+            if raw_detail_diagram_id is not _UNSET:
+                body["detail_diagram_id"] = raw_detail_diagram_id
             headers = {"If-Match": str(current.get("current_version", 1))}
             resp = await c._request(
                 "PUT", f"/api/elements/{element_id}", json=body, headers=headers,

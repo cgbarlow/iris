@@ -171,6 +171,19 @@ async def get_diagram(
     tag_rows = await tag_cursor.fetchall()
     tags = [t[0] for t in tag_rows]
 
+    # ADR-221: elements that declare this diagram as their detail diagram
+    # ("Referenced by" — the inbound side of the element → diagram drill).
+    ref_cursor = await db.execute(
+        "SELECT e.id, ev.name FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id "
+        "  AND e.current_version = ev.version "
+        "WHERE e.detail_diagram_id = ? AND e.is_deleted = 0 "
+        "ORDER BY ev.name",
+        (diagram_id,),
+    )
+    ref_rows = await ref_cursor.fetchall()
+    referenced_by_elements = [{"id": r[0], "name": r[1]} for r in ref_rows]
+
     # Parse detected_notations JSON
     detected_raw = row[16]
     try:
@@ -197,6 +210,7 @@ async def get_diagram(
         "notation": row[15] or "simple",
         "detected_notations": detected,
         "metadata": json.loads(row[14]) if row[14] else None,
+        "referenced_by_elements": referenced_by_elements,
     }
     # ADR-218 (issue #238): auto-heal legacy diagrams persisted with the
     # flat AI node shape (no per-node `data` object) so they render
