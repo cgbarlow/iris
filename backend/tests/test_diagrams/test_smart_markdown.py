@@ -85,12 +85,15 @@ async def _create_set(c: httpx.AsyncClient, h: dict[str, str], name: str = "S") 
 async def _create_element(
     c: httpx.AsyncClient, h: dict[str, str], set_id: str, *,
     name: str, description: str | None = None, data: dict | None = None,
+    metadata: dict | None = None,
 ) -> str:
     body: dict = {"name": name, "element_type": "application", "set_id": set_id}
     if description is not None:
         body["description"] = description
     if data is not None:
         body["data"] = data
+    if metadata is not None:
+        body["metadata"] = metadata
     r = await c.post("/api/elements", json=body, headers=h)
     assert r.status_code == 201
     return r.json()["id"]
@@ -896,3 +899,122 @@ async def test_override_on_attr_path_with_nested_segments(
     )
     rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
     assert _unwrap_iris_links(rendered) == "2.5"
+
+
+# ── ADR-223: element metadata, EA tagged values, and computed counts ──
+
+
+@pytest.mark.asyncio
+async def test_meta_returns_metadata_value(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X", metadata={"status": "Approved"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"Status: {{{{element:{eid}:meta:status}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "Status: Approved"
+
+
+@pytest.mark.asyncio
+async def test_meta_missing_key_strikes_through(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X", metadata={"status": "Approved"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"X {{{{element:{eid}:meta:bogus}}}} Y",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert "~~" in rendered
+
+
+@pytest.mark.asyncio
+async def test_tag_strips_notes_suffix(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X",
+        metadata={"tagged_values": [
+            {"property": "Maturity", "value": "3#NOTES#Values: 0..5"},
+        ]},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"M: {{{{element:{eid}:tag:Maturity}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "M: 3"
+
+
+@pytest.mark.asyncio
+async def test_tag_dash_placeholder_strikes_through(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X",
+        metadata={"tagged_values": [
+            {"property": "Maturity", "value": "-#NOTES#unset"},
+        ]},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"M {{{{element:{eid}:tag:Maturity}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert "~~" in rendered
+
+
+@pytest.mark.asyncio
+async def test_relationship_count_returns_count(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    a = await _create_element(c, h, set_id, name="A")
+    b = await _create_element(c, h, set_id, name="B")
+    r = await c.post(
+        "/api/relationships",
+        json={
+            "source_element_id": a, "target_element_id": b,
+            "relationship_type": "association",
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"A has {{{{element:{a}:relationship_count}}}} rels",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered) == "A has 1 rels"
+
+
+@pytest.mark.asyncio
+async def test_diagram_usage_count_returns_count(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="A")
+    # Draw the element on a canvas diagram → diagram_usage_count >= 1.
+    await _create_canvas_diagram(
+        c, h, set_id, nodes=[_node("n", "class", entity_id=eid)],
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"On {{{{element:{eid}:diagram_usage_count}}}} diagrams",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # The diagram_usage_count uses `data LIKE '%<id>%'`, so the canvas
+    # diagram counts, and so does this smart_markdown diagram (its
+    # markdown_source contains the element id verbatim in the token) =>
+    # the count is 2.
+    assert _unwrap_iris_links(rendered) == "On 2 diagrams"

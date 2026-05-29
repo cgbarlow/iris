@@ -77,7 +77,9 @@ async def _create_package(c, h, set_id, name) -> str:
     return r.json()["id"]
 
 
-async def _create_element(c, h, *, set_id, name, package_id=None, data=None) -> str:
+async def _create_element(
+    c, h, *, set_id, name, package_id=None, data=None, metadata=None,
+) -> str:
     body = {
         "name": name, "element_type": "class", "set_id": set_id,
     }
@@ -85,6 +87,8 @@ async def _create_element(c, h, *, set_id, name, package_id=None, data=None) -> 
         body["data"] = data
     if package_id is not None:
         body["package_id"] = package_id
+    if metadata is not None:
+        body["metadata"] = metadata
     r = await c.post("/api/elements", json=body, headers=h)
     assert r.status_code == 201, r.text
     return r.json()["id"]
@@ -654,3 +658,126 @@ async def test_blank_value_skipped(
         dm.main_db, profile_id=profile["id"], source_diagram_id=diag_id,
     )
     assert result.row_count == 0
+
+
+# ── ADR-223: aggregation over metadata, tagged values, counts ────────
+
+
+@pytest.mark.asyncio
+async def test_adr223_sum_relationship_count_grouped_by_meta_status(
+    env: tuple[httpx.AsyncClient, DatabaseManager, dict],
+) -> None:
+    """Sum relationship_count grouped by element.meta.status — exercises
+    both the new value path (`relationship_count`) and the new group_by
+    path (`element.meta.<key>`)."""
+    c, dm, h = env
+    set_id = await _create_set(c, h)
+    a = await _create_element(
+        c, h, set_id=set_id, name="A", metadata={"status": "Approved"},
+    )
+    b = await _create_element(
+        c, h, set_id=set_id, name="B", metadata={"status": "Proposed"},
+    )
+    # One relationship A ↔ B → each has relationship_count == 1.
+    r = await c.post(
+        "/api/relationships",
+        json={
+            "source_element_id": a, "target_element_id": b,
+            "relationship_type": "association",
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    diag_id = await _create_smart_md(
+        c, h, set_id,
+        f"- {{{{element:{a}:name}}}}\n- {{{{element:{b}:name}}}}",
+    )
+    profile = await create_aggregation_profile(
+        dm.main_db,
+        name="rels by status", description=None,
+        set_id=None, is_global=True,
+        profile_data={
+            "traversal": {"inner": {
+                "collect_token_type": "element",
+                "value_attribute_path": "relationship_count",
+                "bucket_attribute_path": None,
+                "skip_blank_values": True,
+            }},
+            "output": {
+                "group_by": "element.meta.status",
+                "sort_groups": "alpha",
+                "sort_items_within_group": "alpha",
+                "aggregation_fn": "sum",
+                "line_format": "- {element.name}: {sum_value}",
+                "show_per_source_breakdown": False,
+                "breakdown_format": "",
+            },
+        },
+        is_default_for_set=False, created_by=None,
+    )
+    result = await _engine.run(
+        dm.main_db, profile_id=profile["id"], source_diagram_id=diag_id,
+    )
+    md = result.markdown
+    assert "## Approved" in md
+    assert "## Proposed" in md
+    assert "A: 1" in md
+    assert "B: 1" in md
+
+
+@pytest.mark.asyncio
+async def test_adr223_sum_tag_value_with_notes_suffix(
+    env: tuple[httpx.AsyncClient, DatabaseManager, dict],
+) -> None:
+    """A `tag:<property>` value path resolves EA tagged values and strips
+    the `#NOTES#` template suffix so they're summable. An EA "-"
+    placeholder is treated as unset and skipped under skip_blank_values."""
+    c, dm, h = env
+    set_id = await _create_set(c, h)
+    a = await _create_element(
+        c, h, set_id=set_id, name="A",
+        metadata={"tagged_values": [
+            {"property": "Maturity", "value": "3#NOTES#Values: 0..5"},
+        ]},
+    )
+    b = await _create_element(
+        c, h, set_id=set_id, name="B",
+        metadata={"tagged_values": [
+            {"property": "Maturity", "value": "-#NOTES#unset"},
+        ]},
+    )
+    diag_id = await _create_smart_md(
+        c, h, set_id,
+        f"- {{{{element:{a}:name}}}}\n- {{{{element:{b}:name}}}}",
+    )
+    profile = await create_aggregation_profile(
+        dm.main_db,
+        name="maturity by name", description=None,
+        set_id=None, is_global=True,
+        profile_data={
+            "traversal": {"inner": {
+                "collect_token_type": "element",
+                "value_attribute_path": "tag/Maturity",
+                "bucket_attribute_path": None,
+                "skip_blank_values": True,
+            }},
+            "output": {
+                "group_by": "element.name",
+                "sort_groups": "alpha",
+                "sort_items_within_group": "alpha",
+                "aggregation_fn": "sum",
+                "line_format": "- {element.name}: {sum_value}",
+                "show_per_source_breakdown": False,
+                "breakdown_format": "",
+            },
+        },
+        is_default_for_set=False, created_by=None,
+    )
+    result = await _engine.run(
+        dm.main_db, profile_id=profile["id"], source_diagram_id=diag_id,
+    )
+    md = result.markdown
+    # A's "3#NOTES#..." → resolves to 3 and contributes a row.
+    assert "A: 3" in md
+    # B's "-#NOTES#..." → treated as unset → no row (skip_blank_values).
+    assert "B:" not in md

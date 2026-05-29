@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.35.0] - 2026-05-29
+
+### Added
+
+- **Element metadata, EA tagged-value, and computed-count tokens**
+  (ADR-223, SPEC-223-A). Smart-markdown gains `{{element:<id>:meta:<key>}}`,
+  `{{element:<id>:tag:<property>}}` (strips Sparx EA's `#NOTES#` template
+  suffix; `""` / `"-"` → strikethrough), `{{element:<id>:relationship_count}}`,
+  and `{{element:<id>:diagram_usage_count}}`. The aggregation engine
+  accepts the same as `value_attribute_path` / `bucket_attribute_path`
+  (e.g. `meta/status`, `tag/Maturity`, `relationship_count`,
+  `diagram_usage_count`) and as `output.group_by` (e.g.
+  `element.meta.status`, `element.tag.Maturity`). Unlocks live rollups of
+  Status (Approved/Proposed), hubs by relationship count, orphan / unused
+  capability lists, and Maturity rollups straight off the element row —
+  no engine algorithm change, no migration, no surface-parity impact.
+
 ## [6.34.0] - 2026-05-29
 
 ### Added

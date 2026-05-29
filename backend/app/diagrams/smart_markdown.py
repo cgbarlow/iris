@@ -121,11 +121,90 @@ def _resolve_attr_path(node: Any, segments: list[str]) -> Any | None:
     return node
 
 
+def _parse_metadata(raw: object) -> dict[str, Any]:
+    """Coerce a (possibly JSON-string) metadata blob to a dict."""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _extract_tagged_value(
+    metadata: dict[str, Any], prop: str,
+) -> str | None:
+    """Resolve ``metadata.tagged_values[*].value`` for a given property
+    name (ADR-223).
+
+    Sparx EA tagged values are imported as
+    ``{"property": "...", "value": "<raw>"}`` and EA encodes its template
+    defaults / option lists with a ``#NOTES#<description>`` suffix on the
+    value (e.g. ``"3#NOTES#Values: 0,1,2,3,4,5..."``). Split on
+    ``#NOTES#`` and return the prefix. EA's ``"-"`` placeholder and the
+    empty string both mean "unset" — those return ``None`` so callers see
+    a strikethrough in render and a skipped row in aggregation.
+    """
+    tvs = metadata.get("tagged_values") if isinstance(metadata, dict) else None
+    if not isinstance(tvs, list):
+        return None
+    for t in tvs:
+        if not isinstance(t, dict) or t.get("property") != prop:
+            continue
+        v = t.get("value")
+        if v is None:
+            return None
+        s = str(v)
+        if "#NOTES#" in s:
+            s = s.split("#NOTES#", 1)[0]
+        s = s.strip()
+        if not s or s == "-":
+            return None
+        return s
+    return None
+
+
+async def _fetch_element_relationship_count(
+    db: DatabasePort, element_id: str,
+) -> int:
+    """ADR-223 — count of element ↔ element relationships involving this
+    element (mirrors elements/service.get_element)."""
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM relationships "
+        "WHERE (source_element_id = ? OR target_element_id = ?) "
+        "AND is_deleted = 0",
+        (element_id, element_id),
+    )
+    row = await cursor.fetchone()
+    return int(row[0]) if row else 0
+
+
+async def _fetch_element_diagram_usage_count(
+    db: DatabasePort, element_id: str,
+) -> int:
+    """ADR-223 — count of distinct diagrams whose current-version data
+    references this element (mirrors elements/service.get_element)."""
+    cursor = await db.execute(
+        "SELECT COUNT(DISTINCT d.id) FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+        "  AND d.current_version = dv.version "
+        "WHERE d.is_deleted = 0 AND dv.data LIKE ?",
+        (f"%{element_id}%",),
+    )
+    row = await cursor.fetchone()
+    return int(row[0]) if row else 0
+
+
 async def _fetch_element_field(
     db: DatabasePort, entity_id: str, field_spec: str,
 ) -> str | None:
     cursor = await db.execute(
-        "SELECT ev.name, ev.description, ev.data FROM elements e "
+        "SELECT ev.name, ev.description, ev.data, ev.metadata FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "  AND e.current_version = ev.version "
         "WHERE e.id = ? AND e.is_deleted = 0",
@@ -138,6 +217,28 @@ async def _fetch_element_field(
         return row[0]
     if field_spec == "description":
         return row[1]
+    # ADR-223: element-level token surface for metadata, EA tagged values,
+    # and computed counts.
+    if field_spec == "relationship_count":
+        return str(await _fetch_element_relationship_count(db, entity_id))
+    if field_spec == "diagram_usage_count":
+        return str(await _fetch_element_diagram_usage_count(db, entity_id))
+    if field_spec.startswith("meta:"):
+        key = field_spec[len("meta:"):].strip()
+        if not key:
+            return None
+        meta = _parse_metadata(row[3])
+        v = meta.get(key)
+        if v is None:
+            return None
+        s = str(v) if not isinstance(v, str) else v
+        s = s.strip()
+        return s or None
+    if field_spec.startswith("tag:"):
+        prop = field_spec[len("tag:"):].strip()
+        if not prop:
+            return None
+        return _extract_tagged_value(_parse_metadata(row[3]), prop)
     if field_spec.startswith("attr:"):
         raw_path = field_spec[len("attr:"):]
         segments = [s for s in raw_path.split("/") if s]

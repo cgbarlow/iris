@@ -33,7 +33,13 @@ from app.aggregation.models import (
     TraversalConfig,
 )
 from app.aggregation.profiles_service import get_aggregation_profile
-from app.diagrams.smart_markdown import _TOKEN_RE  # DRY §13
+from app.diagrams.smart_markdown import (  # DRY §13
+    _TOKEN_RE,
+    _extract_tagged_value,
+    _fetch_element_diagram_usage_count,
+    _fetch_element_relationship_count,
+    _parse_metadata,
+)
 
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
@@ -268,9 +274,45 @@ async def _resolve_token_value(
     # paths; for other entity types the path doesn't resolve and we
     # return None.
     if token.entity_type == "element":
-        _, _, data = await _read_element_data(db, token.entity_id)
+        eid = token.entity_id
+        # ADR-223: computed counts + metadata + EA tagged values, exposed
+        # to aggregation profiles via well-known paths.
+        if attribute_path == "relationship_count":
+            return await _fetch_element_relationship_count(db, eid)
+        if attribute_path == "diagram_usage_count":
+            return await _fetch_element_diagram_usage_count(db, eid)
+        if attribute_path.startswith("meta/"):
+            key = attribute_path[len("meta/"):]
+            meta = await _fetch_element_metadata_dict(db, eid)
+            v = meta.get(key)
+            if v is None:
+                return None
+            s = str(v).strip()
+            return s or None
+        if attribute_path.startswith("tag/"):
+            prop = attribute_path[len("tag/"):]
+            meta = await _fetch_element_metadata_dict(db, eid)
+            return _extract_tagged_value(meta, prop)
+        _, _, data = await _read_element_data(db, eid)
         return _walk_attr_path(data, attribute_path)
     return None
+
+
+async def _fetch_element_metadata_dict(
+    db: DatabasePort, element_id: str,
+) -> dict[str, Any]:
+    """Read the current-version metadata of an element (ADR-223)."""
+    cursor = await db.execute(
+        "SELECT ev.metadata FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id "
+        "  AND e.current_version = ev.version "
+        "WHERE e.id = ? AND e.is_deleted = 0",
+        (element_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        return {}
+    return _parse_metadata(row[0])
 
 
 async def _resolve_multiplier(
@@ -412,6 +454,21 @@ async def _resolve_group_value(
         if value is None:
             return ""
         return str(value)
+    # ADR-223: group by metadata, tagged values, or computed counts.
+    if rest == "relationship_count":
+        return str(await _fetch_element_relationship_count(db, token_id))
+    if rest == "diagram_usage_count":
+        return str(await _fetch_element_diagram_usage_count(db, token_id))
+    if rest.startswith("meta."):
+        key = rest[len("meta."):]
+        meta = await _fetch_element_metadata_dict(db, token_id)
+        v = meta.get(key)
+        return "" if v is None else str(v).strip()
+    if rest.startswith("tag."):
+        prop = rest[len("tag."):]
+        meta = await _fetch_element_metadata_dict(db, token_id)
+        v = _extract_tagged_value(meta, prop)
+        return v or ""
     return ""
 
 
