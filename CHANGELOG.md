@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.36.1] - 2026-05-29
+
+### Fixed
+
+- **MCP `update_element` and CLI `iris update element` now forward `metadata`**.
+  The backend `ElementUpdate` model already accepted `metadata`; the MCP
+  surface (`_ELEMENT_UPDATE_FIELDS`) and the CLI command (`--metadata-json`)
+  were missing it. Lets agents and scripts edit Sparx EA tagged values,
+  status, and other element metadata via the standard surfaces. No new
+  write op, no schema impact beyond exposing the existing backend field.
+
 ## [6.36.0] - 2026-05-29
 
 ### Added

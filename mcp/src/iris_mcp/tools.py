@@ -863,7 +863,7 @@ _SET_UPDATE_FIELDS = (
 _SET_METADATA_FIELDS = tuple(f for f in _SET_UPDATE_FIELDS if f != "collection_id")
 _PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
 _DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
-_ELEMENT_UPDATE_FIELDS = ("name", "description", "data")
+_ELEMENT_UPDATE_FIELDS = ("name", "description", "data", "metadata")
 _ELEMENT_UPDATE_FIELDS_WITH_PACKAGE = (
     "name", "description", "data", "package_id",
 )
@@ -2408,6 +2408,19 @@ TOOLS: list[Tool] = [
             "description": _str_arg("description", "New description", required=False),
             "data": (
                 {"type": "object", "additionalProperties": True},
+                False,
+            ),
+            "metadata": (
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "Replacement metadata for the element (e.g. "
+                        "Sparx EA fields like status, stereotype, "
+                        "tagged_values). Pass the full object — it "
+                        "replaces the stored value. Omit to leave unchanged."
+                    ),
+                },
                 False,
             ),
             "package_id": (
