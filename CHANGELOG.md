@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.36.0] - 2026-05-29
+
+### Added
+
+- **Smart-markdown `:raw` modifier** (ADR-224, SPEC-224-A). A trailing
+  `:raw` on any token's field-spec returns the resolved value **without**
+  the `iris://` markdown-link wrap (ADR-209), so tokens can be embedded
+  inside fenced code blocks (Mermaid `pie` / `xychart-beta` / `flowchart`)
+  where the link syntax would otherwise break the parser. Composes with
+  every existing token form — `meta:`, `tag:`, `attr:`, the ADR-210
+  `=value` override, the ADR-221 `detail_diagram` short-circuit, the
+  ADR-222 `element_count`, and so on. Lets dashboard charts drive their
+  values live from the model.
+
 ## [6.35.0] - 2026-05-29
 
 ### Added

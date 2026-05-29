@@ -1018,3 +1018,110 @@ async def test_diagram_usage_count_returns_count(
     # markdown_source contains the element id verbatim in the token) =>
     # the count is 2.
     assert _unwrap_iris_links(rendered) == "On 2 diagrams"
+
+
+# ── ADR-224: :raw modifier (unwrapped values for Mermaid etc.) ───────
+
+
+@pytest.mark.asyncio
+async def test_raw_modifier_returns_unwrapped_name(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """A plain `:raw` suffix returns the value without the iris:// link
+    wrap — usable inside Mermaid fenced code blocks."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="Pork mince")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"Buy some {{{{element:{eid}:name:raw}}}} today.",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # No iris:// link wrapping.
+    assert rendered.strip() == "Buy some Pork mince today."
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_raw_modifier_with_meta_status(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X", metadata={"status": "Approved"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"S: {{{{element:{eid}:meta:status:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "S: Approved"
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_raw_modifier_with_diagram_element_count(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    zone_id = await _create_canvas_diagram(
+        c, h, set_id, nodes=[
+            _node("c1", "capability", entity_id="e1"),
+            _node("c2", "capability", entity_id="e2"),
+        ],
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"N={{{{diagram:{zone_id}:element_count:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "N=2"
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_raw_modifier_with_detail_diagram(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """`detail_diagram:raw` returns the *diagram* name (the target), not
+    the element's name — without link wrapping."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    target = await _create_canvas_diagram(c, h, set_id, nodes=[])
+    # Rename the diagram so we can distinguish.
+    r = await c.put(
+        f"/api/diagrams/{target}",
+        json={"name": "Detail Zone", "data": {"nodes": [], "edges": []}},
+        headers={**h, "If-Match": "1"},
+    )
+    assert r.status_code == 200, r.text
+    eid = await _create_element(c, h, set_id, name="X")
+    # Wire the detail diagram via PUT.
+    r = await c.put(
+        f"/api/elements/{eid}",
+        json={"name": "X", "data": {}, "detail_diagram_id": target},
+        headers={**h, "If-Match": "1"},
+    )
+    assert r.status_code == 200, r.text
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"D: {{{{element:{eid}:detail_diagram:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "D: Detail Zone"
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_without_raw_modifier_still_wraps(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """Regression: omitting `:raw` keeps the existing link-wrap behaviour."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="Pork mince")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"Buy some {{{{element:{eid}:name}}}} today.",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # Link is present.
+    assert f"iris://element/{eid}" in rendered
+    assert _unwrap_iris_links(rendered).strip() == "Buy some Pork mince today."

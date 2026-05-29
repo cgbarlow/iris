@@ -417,7 +417,7 @@ def _markdown_escape_title(value: str) -> str:
 
 
 async def _resolve_element_detail_diagram(
-    db: DatabasePort, element_id: str,
+    db: DatabasePort, element_id: str, *, raw_mode: bool = False,
 ) -> str | None:
     """Resolve ``{{element:<id>:detail_diagram}}`` (ADR-221).
 
@@ -426,6 +426,10 @@ async def _resolve_element_detail_diagram(
     markdown drills into the diagram that elaborates the element. Returns
     ``None`` (→ strikethrough) when the element has no detail diagram, or
     the target diagram is missing/soft-deleted.
+
+    ADR-224 (v6.36.0): with ``raw_mode=True`` (set by a trailing ``:raw``
+    on the token's field-spec), the diagram name is returned unwrapped so
+    the value can be embedded inside Mermaid fenced code blocks etc.
     """
     cursor = await db.execute(
         "SELECT detail_diagram_id FROM elements "
@@ -439,6 +443,8 @@ async def _resolve_element_detail_diagram(
     name = await _fetch_entity_display_name(db, "diagram", detail_id)
     if name is None:
         return None
+    if raw_mode:
+        return name
     title = _markdown_escape_title(name)
     text = _markdown_escape_link_text(name)
     return f'[{text}](iris://diagram/{detail_id} "{title}")'
@@ -520,11 +526,24 @@ async def _resolve_one(
     if field_spec is None or field_spec == "":
         return None
 
+    # ADR-224 (v6.36.0): a trailing ``:raw`` modifier returns the resolved
+    # value without the iris:// markdown-link wrap. Useful for embedding
+    # a token's value inside a fenced code block (e.g. Mermaid) where the
+    # ``[N](iris://…)`` link syntax would break the renderer.
+    raw_mode = False
+    if field_spec.endswith(":raw"):
+        raw_mode = True
+        field_spec = field_spec[:-len(":raw")]
+        if field_spec == "":
+            return None
+
     # ADR-221: an element's detail-diagram drill. Resolves to a link to
     # the *target diagram*, not the element — so it's handled before the
     # generic element-field path (which would wrap in an element link).
     if entity_type == "element" and field_spec == "detail_diagram":
-        return await _resolve_element_detail_diagram(db, entity_id)
+        return await _resolve_element_detail_diagram(
+            db, entity_id, raw_mode=raw_mode,
+        )
 
     # ADR-210: parse inline =value override.
     field_spec_path: str = field_spec
@@ -566,13 +585,18 @@ async def _resolve_one(
     if raw_value is None:
         return None
 
-    # Wrap in an iris:// markdown link so the rendered output is a
-    # clickable, tooltip-bearing reference to the source entity.
     # ADR-210: even with an override, look up the entity to confirm it
     # exists — a dangling reference should strike through regardless.
     name = await _fetch_entity_display_name(db, entity_type, entity_id)
     if name is None:
         return None
+
+    # ADR-224: raw mode returns the plain value (no markdown-link wrap).
+    if raw_mode:
+        return str(raw_value)
+
+    # Wrap in an iris:// markdown link so the rendered output is a
+    # clickable, tooltip-bearing reference to the source entity.
     title = _markdown_escape_title(name)
     text = _markdown_escape_link_text(str(raw_value))
     return f'[{text}](iris://{entity_type}/{entity_id} "{title}")'
