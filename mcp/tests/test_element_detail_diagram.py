@@ -131,3 +131,45 @@ class TestUpdateForwarding:
         body = json.loads(put.calls[0].request.content)
         assert "detail_diagram_id" in body
         assert body["detail_diagram_id"] is None
+
+
+# ── v6.36.1: update_element forwards metadata (surface parity fix) ───
+
+
+class TestMetadataForwarding:
+    def test_update_schema_includes_metadata(self) -> None:
+        defs = {t.name: t for t in tools.tool_definitions()}
+        props = defs["update_element"].inputSchema["properties"]
+        assert "metadata" in props
+        assert "metadata" not in defs["update_element"].inputSchema.get(
+            "required", [],
+        )
+
+    @pytest.mark.anyio
+    async def test_forwards_metadata_in_put_body(
+        self, respx_mock: respx.Router,
+    ) -> None:
+        """The handler merges via `_put_merge_partial` (no tristate keys)
+        and now includes ``metadata`` in `_ELEMENT_UPDATE_FIELDS`."""
+        respx_mock.get(f"{BASE}/api/elements/el1").mock(
+            return_value=httpx.Response(
+                200, json=_element_response(current_version=1),
+            ),
+        )
+        put = respx_mock.put(f"{BASE}/api/elements/el1").mock(
+            return_value=httpx.Response(
+                200, json=_element_response(current_version=2),
+            ),
+        )
+        new_meta = {
+            "status": "Approved",
+            "tagged_values": [
+                {"property": "Current Maturity Level", "value": "3"},
+            ],
+        }
+        async with IrisClient(BASE) as c:
+            await tools._update_element(
+                c, {"element_id": "el1", "metadata": new_meta},
+            )
+        body = json.loads(put.calls[0].request.content)
+        assert body["metadata"] == new_meta

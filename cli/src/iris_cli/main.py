@@ -1060,6 +1060,15 @@ def update_element_cmd(
     name: str | None = typer.Option(None, "--name"),
     description: str | None = typer.Option(None, "--description"),
     data_json: str | None = typer.Option(None, "--data-json"),
+    metadata_json: str | None = typer.Option(
+        None, "--metadata-json",
+        help=(
+            "Replacement metadata for the element as a JSON object "
+            "(e.g. Sparx EA fields like status, stereotype, "
+            "tagged_values). Replaces the stored value; omit to leave "
+            "unchanged."
+        ),
+    ),
     package_id: str | None = typer.Option(
         None, "--package-id",
         help=(
@@ -1084,6 +1093,7 @@ def update_element_cmd(
     partial: dict[str, Any] = {
         "name": name, "description": description,
         "data": _parse_json_opt(data_json, "--data-json"),
+        "metadata": _parse_json_opt(metadata_json, "--metadata-json"),
     }
     # package_id / detail_diagram_id are tri-state at the PUT body level:
     # include the key to set (string) or clear (null), omit to leave
@@ -1101,7 +1111,7 @@ def update_element_cmd(
             current_resp = await c._request("GET", f"/api/elements/{element_id}")
             current = current_resp.json()
             body: dict[str, Any] = {}
-            for field in ("name", "description", "data"):
+            for field in ("name", "description", "data", "metadata"):
                 if field in partial and partial[field] is not None:
                     body[field] = partial[field]
                 elif field in current:
