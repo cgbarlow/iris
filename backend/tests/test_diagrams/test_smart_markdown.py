@@ -142,6 +142,87 @@ async def test_resolves_element_description(
     assert _unwrap_iris_links(rendered) == "Note: lean cut"
 
 
+# ── ADR-222: diagram element_count token ─────────────────────────────
+
+
+async def _create_canvas_diagram(
+    c: httpx.AsyncClient, h: dict[str, str], set_id: str, *, nodes: list,
+) -> str:
+    r = await c.post(
+        "/api/diagrams",
+        json={
+            "name": "Zone", "set_id": set_id,
+            "diagram_type": "class", "notation": "uml",
+            "data": {"nodes": nodes, "edges": []},
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def _node(nid: str, entity_type: str, *, entity_id: str | None = None) -> dict:
+    data: dict = {"entityType": entity_type, "label": nid}
+    if entity_id is not None:
+        data["entityId"] = entity_id
+    return {"id": nid, "type": entity_type, "position": {"x": 0, "y": 0}, "data": data}
+
+
+@pytest.mark.asyncio
+async def test_diagram_element_count_excludes_notes_and_frame(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    nodes = [
+        _node("frame", "diagram_frame"),
+        _node("c1", "capability", entity_id="e1"),
+        _node("c2", "capability", entity_id="e2"),
+        _node("note1", "note", entity_id="x"),
+        _node("cls", "class", entity_id="e3"),
+    ]
+    zone_id = await _create_canvas_diagram(c, h, set_id, nodes=nodes)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"This zone has {{{{diagram:{zone_id}:element_count}}}} capabilities.",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # 3 element nodes (2 capability + 1 class); frame + note excluded.
+    assert _unwrap_iris_links(rendered) == "This zone has 3 capabilities."
+
+
+@pytest.mark.asyncio
+async def test_diagram_element_count_links_to_the_diagram(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    zone_id = await _create_canvas_diagram(
+        c, h, set_id, nodes=[_node("c1", "capability", entity_id="e1")],
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"{{{{diagram:{zone_id}:element_count}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # The count is wrapped in a link back to the source diagram (ADR-209/222).
+    assert f"iris://diagram/{zone_id}" in rendered
+    assert _unwrap_iris_links(rendered) == "1"
+
+
+@pytest.mark.asyncio
+async def test_diagram_element_count_missing_diagram_strikes_through(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    missing = "00000000-0000-0000-0000-000000000000"
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id, f"X {{{{diagram:{missing}:element_count}}}} Y",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert "~~" in rendered
+    assert "iris://diagram/" not in rendered
+
+
 @pytest.mark.asyncio
 async def test_resolves_element_attr(
     context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
