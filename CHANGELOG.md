@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.37.0] - 2026-05-30
+
+### Added
+
+- **Smart-markdown `aggregation` token — group counts from
+  aggregation_list views** (ADR-225, SPEC-225-A). New token shape
+  `{{aggregation:<aggregation_list_view_id>:group_count:<group>[:raw]}}`
+  resolves to the row count of the named group within the bound
+  profile's output. Composes with the ADR-224 `:raw` modifier so live
+  group counts can be embedded inside Mermaid pie / xychart / flowchart
+  blocks (e.g. the GEANZ Dashboard's Status pie now reads `"Approved"
+  : {{aggregation:…:group_count:Approved:raw}}` instead of hand-typed
+  values). Default form wraps the count in a markdown link back to the
+  source aggregation_list view. Unknown group → `"0"`; missing /
+  non-aggregation_list view → strikethrough.
+- `AggregationResult.group_counts: dict[str, int]` — the new
+  `{group_value: row_count}` map populated by the engine, surfaced
+  for the smart-markdown token but also available to any other caller
+  via the existing `/api/aggregate` and MCP `aggregate` surfaces.
+
 ## [6.36.2] - 2026-05-30
 
 ### Fixed

@@ -136,3 +136,7 @@ class AggregationResult(BaseModel):
     source_versions: dict[str, int] = Field(default_factory=dict)
     row_count: int = 0
     warnings: list[str] = Field(default_factory=list)
+    # ADR-225: number of rows per group_by bucket — feeds the
+    # `aggregation:<view>:group_count:<group>` smart-markdown token.
+    # Empty when `output.group_by` is unset.
+    group_counts: dict[str, int] = Field(default_factory=dict)

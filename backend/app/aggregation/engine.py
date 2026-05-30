@@ -530,9 +530,10 @@ async def _format_output(
     db: DatabasePort,
     grouped: list[_GroupedRow],
     output: OutputConfig,
-) -> tuple[str, int]:
+) -> tuple[str, int, dict[str, int]]:
     """Group output by output.group_by, sort, format. Returns
-    (markdown, row_count)."""
+    (markdown, row_count, group_counts) — the last is a {group_value:
+    row_count} dict consumed by the ADR-225 aggregation token."""
     element_cache: dict[str, tuple[str | None, str | None, dict[str, Any]]] = {}
 
     # Resolve display data for every token.
@@ -588,7 +589,8 @@ async def _format_output(
             out_lines.append(line)
             row_count += 1
         out_lines.append("")
-    return "\n".join(out_lines).rstrip() + "\n", row_count
+    group_counts = {gv: len(items) for gv, items in groups.items()}
+    return "\n".join(out_lines).rstrip() + "\n", row_count, group_counts
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -647,7 +649,9 @@ async def run(
         )
 
     grouped = _group_and_aggregate(accumulator, p.output.aggregation_fn)
-    markdown, row_count = await _format_output(db, grouped, p.output)
+    markdown, row_count, group_counts = await _format_output(
+        db, grouped, p.output,
+    )
 
     return AggregationResult(
         markdown=markdown,
@@ -655,4 +659,5 @@ async def run(
         source_versions=source_versions,
         row_count=row_count,
         warnings=warnings,
+        group_counts=group_counts,
     )
