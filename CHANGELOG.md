@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.36.2] - 2026-05-30
+
+### Fixed
+
+- **Aggregation-list edit-mode picker no longer spams the API**
+  (`AggregationListCanvas.svelte`). Two bugs combined into a runaway
+  request loop on the picker:
+  - The source-diagram fetch sent `page_size=200`, but the backend
+    `/api/diagrams` endpoint caps `page_size` at 100 and returned 422
+    Unprocessable Content on every call.
+  - The `$effect` that triggers the load re-fired whenever
+    `diagrams.length === 0`, which the failed fetch could never
+    populate — producing an infinite retry loop until the user
+    closed the page.
+  Capped the request at `page_size=100` and added one-shot
+  `triedDiagrams` / `triedProfiles` guards so the picker attempts at
+  most one fetch per editing-toggle, regardless of outcome.
+
 ## [6.36.1] - 2026-05-29
 
 ### Fixed
