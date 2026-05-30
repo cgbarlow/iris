@@ -186,14 +186,18 @@
 	// (see backend/app/diagrams/service.py:get_diagram_ancestors).
 	let ancestors = $state<BreadcrumbAncestor[]>([]);
 
-	// Focus view state
-	let focusMode = $state(false);
+	// Focus view state — initialised from the URL during script init so
+	// the *first* render already wears the focused chrome when the
+	// page is opened via a `?focus=1` link. Initialising later (in an
+	// $effect) used to flash the unfocused layout while the diagram
+	// fetch was in flight (v6.37.3 fix).
+	let focusMode = $state(page.url.searchParams.get('focus') === '1');
 
 	// v6.37.2: focus mode <-> URL sync. When focus is active the URL
 	// carries `?focus=1` so the page can be linked to in fullscreen.
 	// Uses replaceState (no history pollution) and a directional guard
 	// to prevent the two effects below from re-firing each other.
-	let focusModeFromURL = false;
+	let focusModeFromURL = focusMode;
 	$effect(() => {
 		// URL → focusMode (mount + back/forward).
 		const urlHas = page.url.searchParams.get('focus') === '1';
@@ -2004,25 +2008,46 @@
 </svelte:head>
 
 {#if loading}
-	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-		<ol class="flex flex-wrap items-baseline gap-1">
-			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
-			<li aria-hidden="true">/</li>
-			<li aria-current="page">{page.params.id}</li>
-		</ol>
-	</nav>
-	<p style="color: var(--color-muted)">Loading diagram...</p>
+	{#if focusMode}
+		<!-- v6.37.3: keep the loading state inside the focused chrome so a
+			 `?focus=1` URL doesn't flash unfocused while the diagram fetch
+			 is in flight. -->
+		<FocusView onexit={() => (focusMode = false)}>
+			<div class="flex h-full w-full items-center justify-center">
+				<p style="color: var(--color-muted)">Loading diagram...</p>
+			</div>
+		</FocusView>
+	{:else}
+		<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
+			<ol class="flex flex-wrap items-baseline gap-1">
+				<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
+				<li aria-hidden="true">/</li>
+				<li aria-current="page">{page.params.id}</li>
+			</ol>
+		</nav>
+		<p style="color: var(--color-muted)">Loading diagram...</p>
+	{/if}
 {:else if error}
-	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-		<ol class="flex flex-wrap items-baseline gap-1">
-			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
-			<li aria-hidden="true">/</li>
-			<li aria-current="page">{page.params.id}</li>
-		</ol>
-	</nav>
-	<div role="alert" class="rounded border p-4" style="border-color: var(--color-danger); color: var(--color-danger)">
-		{error}
-	</div>
+	{#if focusMode}
+		<FocusView onexit={() => (focusMode = false)}>
+			<div class="flex h-full w-full items-center justify-center p-8">
+				<div role="alert" class="rounded border p-4" style="border-color: var(--color-danger); color: var(--color-danger)">
+					{error}
+				</div>
+			</div>
+		</FocusView>
+	{:else}
+		<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
+			<ol class="flex flex-wrap items-baseline gap-1">
+				<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
+				<li aria-hidden="true">/</li>
+				<li aria-current="page">{page.params.id}</li>
+			</ol>
+		</nav>
+		<div role="alert" class="rounded border p-4" style="border-color: var(--color-danger); color: var(--color-danger)">
+			{error}
+		</div>
+	{/if}
 {:else if diagram}
 	<!-- Windowed browse sidebar: fixed right panel + margin on page content -->
 	{#if windowedBrowseSidebar && selectedBrowseNode}

@@ -66,6 +66,13 @@
 		else if (kind === 'package') path = `/packages/${id}`;
 		else if (kind === 'collection') path = `/collections/${id}`;
 		else path = `/elements/${id}`;
+		// v6.37.3: preserve `?focus=1` when jumping from one focused view
+		// to another. Only forward to diagram links — other entity routes
+		// don't have a focus concept.
+		if (kind === 'diagram' && typeof window !== 'undefined') {
+			const sp = new URLSearchParams(window.location.search);
+			if (sp.get('focus') === '1') path += '?focus=1';
+		}
 		goto(path);
 	}
 

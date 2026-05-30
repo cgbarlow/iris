@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.37.3] - 2026-05-30
+
+### Fixed
+
+- **Fullscreen view persists across iris:// link navigation.** Clicking
+  a `iris://diagram/<id>` link inside a focused view used to drop the
+  user out of fullscreen because the destination URL didn't carry the
+  `?focus=1` flag. `MarkdownView`'s click handler now forwards the
+  flag to view-class destinations so a focused → focused navigation
+  stays focused.
+- **No more unfocused flash before the diagram loads.** Opening a
+  view URL with `?focus=1` used to render the normal layout briefly
+  while the diagram fetch was in flight, then enter focus mode after
+  the data arrived. The `focusMode` state is now initialised from the
+  URL during script init (not in a post-render `$effect`), and the
+  `loading` / `error` branches render inside `FocusView` when the
+  URL says focus, so the focused chrome is on screen from the first
+  paint.
+
 ## [6.37.2] - 2026-05-30
 
 ### Added
