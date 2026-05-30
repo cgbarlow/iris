@@ -49,7 +49,7 @@ _PLACEHOLDER = "_No content yet._"
 # safe because non-image entity types validate field-spec separately in
 # `_resolve_one` (missing/invalid → strikethrough).
 _TOKEN_RE = re.compile(
-    r"\{\{(element|package|diagram|set|collection|image):"
+    r"\{\{(element|package|diagram|set|collection|image|aggregation):"
     r"([^:}]+)"
     r"(?::([^}]*))?"
     r"\}\}"
@@ -450,6 +450,74 @@ async def _resolve_element_detail_diagram(
     return f'[{text}](iris://diagram/{detail_id} "{title}")'
 
 
+# ─────────────────────────────────────────────────────────────────────
+# ADR-225: aggregation `group_count` token
+# ─────────────────────────────────────────────────────────────────────
+
+
+async def _resolve_aggregation_group_count(
+    db: DatabasePort, view_id: str, group_value: str, *, raw_mode: bool,
+) -> str | None:
+    """Resolve `{{aggregation:<view_id>:group_count:<group_value>}}` —
+    the count of aggregation rows whose group equals ``group_value``
+    in the aggregation_list view named by ``view_id``.
+
+    Returns ``None`` (→ strikethrough) when the view is missing/deleted,
+    is not an aggregation_list diagram, or has no source/profile bound.
+    Returns ``"0"`` when the group simply has no matching rows — the
+    binding is valid, the bucket is just empty.
+    """
+    # Confirm the view exists and is an aggregation_list.
+    cursor = await db.execute(
+        "SELECT dv.name, d.diagram_type, dv.data FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+        "  AND d.current_version = dv.version "
+        "WHERE d.id = ? AND d.is_deleted = 0",
+        (view_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+    name, diagram_type, raw_data = row
+    if diagram_type != "aggregation_list":
+        return None
+    try:
+        data = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    src = data.get("source_diagram_id")
+    profile_id = data.get("profile_id")
+    if not src or not profile_id:
+        return None
+
+    # Lazy import — mirrors the diagrams/service.py pattern for the
+    # aggregation_list GET hook (avoids an import cycle in cold-import
+    # smart_markdown callers).
+    from app.aggregation import engine as agg_engine
+    from app.aggregation.exceptions import (
+        AggregationProfileNotFound,
+        AggregationSourceNotFound,
+    )
+    try:
+        result = await agg_engine.run(
+            db, profile_id=str(profile_id), source_diagram_id=str(src),
+        )
+    except (AggregationProfileNotFound, AggregationSourceNotFound):
+        return None
+    # group_counts is empty when output.group_by is unset, so an unknown
+    # key correctly defaults to 0 (empty bucket), matching the "valid
+    # binding, empty group" semantic in SPEC-225-A.
+    count = result.group_counts.get(group_value, 0)
+    count_str = str(count)
+    if raw_mode:
+        return count_str
+    title = _markdown_escape_title(name)
+    text = _markdown_escape_link_text(count_str)
+    return f'[{text}](iris://diagram/{view_id} "{title}")'
+
+
 # Canvas node types that are structural decoration, not model elements
 # (ADR-222). Excluded from the element-count.
 _STRUCTURAL_NODE_TYPES = {"diagram_frame", "note"}
@@ -544,6 +612,19 @@ async def _resolve_one(
         return await _resolve_element_detail_diagram(
             db, entity_id, raw_mode=raw_mode,
         )
+
+    # ADR-225: aggregation `group_count` token. Resolves to one group's
+    # row count from an aggregation_list view, link-wrapped back to the
+    # view (or plain in raw_mode).
+    if entity_type == "aggregation" and field_spec is not None \
+            and field_spec.startswith("group_count:"):
+        group_value = field_spec[len("group_count:"):]
+        return await _resolve_aggregation_group_count(
+            db, entity_id, group_value, raw_mode=raw_mode,
+        )
+    if entity_type == "aggregation":
+        # Any other field-spec on `aggregation` is unsupported.
+        return None
 
     # ADR-210: parse inline =value override.
     field_spec_path: str = field_spec

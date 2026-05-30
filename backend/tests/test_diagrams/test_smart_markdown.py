@@ -1125,3 +1125,181 @@ async def test_without_raw_modifier_still_wraps(
     # Link is present.
     assert f"iris://element/{eid}" in rendered
     assert _unwrap_iris_links(rendered).strip() == "Buy some Pork mince today."
+
+
+# ── ADR-225: aggregation `group_count` token ─────────────────────────
+
+
+async def _create_aggregation_profile(
+    c: httpx.AsyncClient, h: dict[str, str], set_id: str, *,
+    name: str = "Status by group",
+    group_by: str = "element.meta.status",
+    value_attribute_path: str | None = "meta/status",
+) -> str:
+    """Profile that counts each element token, grouped by element meta.status."""
+    inner: dict = {"collect_token_type": "element", "skip_blank_values": False}
+    if value_attribute_path is not None:
+        inner["value_attribute_path"] = value_attribute_path
+    pd = {
+        "traversal": {"inner": inner},
+        "output": {
+            "group_by": group_by,
+            "aggregation_fn": "count",
+            "line_format": "- [{element.name}](iris://element/{element.id})",
+        },
+    }
+    r = await c.post(
+        "/api/aggregation/profiles",
+        json={"name": name, "set_id": set_id, "is_global": False,
+              "profile_data": pd},
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+async def _create_aggregation_list_view(
+    c: httpx.AsyncClient, h: dict[str, str], set_id: str, *,
+    source_diagram_id: str, profile_id: str,
+    name: str = "Rollup",
+) -> str:
+    r = await c.post(
+        "/api/diagrams",
+        json={
+            "name": name, "set_id": set_id,
+            "diagram_type": "aggregation_list", "notation": "markdown",
+            "data": {"source_diagram_id": source_diagram_id,
+                     "profile_id": profile_id},
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+async def _setup_status_rollup(
+    c: httpx.AsyncClient, h: dict[str, str], set_id: str,
+) -> str:
+    """Helper: 3 elements (2 Approved, 1 Proposed), a source listing them,
+    a status-count profile, and an aggregation_list view binding them.
+    Returns the aggregation_list view id."""
+    e1 = await _create_element(
+        c, h, set_id, name="A1", metadata={"status": "Approved"},
+    )
+    e2 = await _create_element(
+        c, h, set_id, name="A2", metadata={"status": "Approved"},
+    )
+    e3 = await _create_element(
+        c, h, set_id, name="P1", metadata={"status": "Proposed"},
+    )
+    source_md = (
+        f"- {{{{element:{e1}:name}}}}\n"
+        f"- {{{{element:{e2}:name}}}}\n"
+        f"- {{{{element:{e3}:name}}}}\n"
+    )
+    source_id = await _create_smart_markdown_diagram(c, h, set_id, source_md)
+    profile_id = await _create_aggregation_profile(c, h, set_id)
+    return await _create_aggregation_list_view(
+        c, h, set_id,
+        source_diagram_id=source_id, profile_id=profile_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_aggregation_group_count_returns_named_group_count(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    view_id = await _setup_status_rollup(c, h, set_id)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"approved={{{{aggregation:{view_id}:group_count:Approved}}}}, "
+        f"proposed={{{{aggregation:{view_id}:group_count:Proposed}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # Two elements Approved, one Proposed.
+    assert _unwrap_iris_links(rendered).strip() == "approved=2, proposed=1"
+
+
+@pytest.mark.asyncio
+async def test_aggregation_group_count_unknown_group_returns_zero(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    view_id = await _setup_status_rollup(c, h, set_id)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"pending={{{{aggregation:{view_id}:group_count:Pending:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "pending=0"
+
+
+@pytest.mark.asyncio
+async def test_aggregation_group_count_missing_view_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    bogus = "00000000-0000-0000-0000-000000000000"
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"n={{{{aggregation:{bogus}:group_count:Approved}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # Strikethrough placeholder for dangling reference (matches existing UX).
+    assert "~~" in rendered
+
+
+@pytest.mark.asyncio
+async def test_aggregation_group_count_non_aggregation_list_diagram_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """Pointing the aggregation token at a non-aggregation_list diagram
+    (a plain smart_markdown one) resolves to strikethrough."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    not_an_agg_view = await _create_smart_markdown_diagram(
+        c, h, set_id, "just markdown",
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"n={{{{aggregation:{not_an_agg_view}:group_count:Approved}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert "~~" in rendered
+
+
+@pytest.mark.asyncio
+async def test_aggregation_group_count_raw_returns_unwrapped(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    view_id = await _setup_status_rollup(c, h, set_id)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"n={{{{aggregation:{view_id}:group_count:Approved:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "n=2"
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_aggregation_group_count_default_wraps_link_to_view(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    view_id = await _setup_status_rollup(c, h, set_id)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"{{{{aggregation:{view_id}:group_count:Approved}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # Wrapped in a link back to the aggregation_list view.
+    assert f"iris://diagram/{view_id}" in rendered
+    assert _unwrap_iris_links(rendered).strip() == "2"
