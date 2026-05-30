@@ -455,19 +455,13 @@ async def _resolve_element_detail_diagram(
 # ─────────────────────────────────────────────────────────────────────
 
 
-async def _resolve_aggregation_group_count(
-    db: DatabasePort, view_id: str, group_value: str, *, raw_mode: bool,
-) -> str | None:
-    """Resolve `{{aggregation:<view_id>:group_count:<group_value>}}` —
-    the count of aggregation rows whose group equals ``group_value``
-    in the aggregation_list view named by ``view_id``.
-
-    Returns ``None`` (→ strikethrough) when the view is missing/deleted,
-    is not an aggregation_list diagram, or has no source/profile bound.
-    Returns ``"0"`` when the group simply has no matching rows — the
-    binding is valid, the bucket is just empty.
-    """
-    # Confirm the view exists and is an aggregation_list.
+async def _fetch_aggregation_list_binding(
+    db: DatabasePort, view_id: str,
+) -> tuple[str, str, str] | None:
+    """Validate that ``view_id`` points to a live aggregation_list view
+    with both ``source_diagram_id`` and ``profile_id`` set. Returns
+    (view_name, source_diagram_id, profile_id) or ``None`` so the caller
+    can render a single strikethrough placeholder."""
     cursor = await db.execute(
         "SELECT dv.name, d.diagram_type, dv.data FROM diagrams d "
         "JOIN diagram_versions dv ON d.id = dv.diagram_id "
@@ -491,6 +485,25 @@ async def _resolve_aggregation_group_count(
     profile_id = data.get("profile_id")
     if not src or not profile_id:
         return None
+    return (name, str(src), str(profile_id))
+
+
+async def _resolve_aggregation_group_count(
+    db: DatabasePort, view_id: str, group_value: str, *, raw_mode: bool,
+) -> str | None:
+    """Resolve `{{aggregation:<view_id>:group_count:<group_value>}}` —
+    the count of aggregation rows whose group equals ``group_value``
+    in the aggregation_list view named by ``view_id``.
+
+    Returns ``None`` (→ strikethrough) when the view is missing/deleted,
+    is not an aggregation_list diagram, or has no source/profile bound.
+    Returns ``"0"`` when the group simply has no matching rows — the
+    binding is valid, the bucket is just empty.
+    """
+    binding = await _fetch_aggregation_list_binding(db, view_id)
+    if binding is None:
+        return None
+    name, src, profile_id = binding
 
     # Lazy import — mirrors the diagrams/service.py pattern for the
     # aggregation_list GET hook (avoids an import cycle in cold-import
@@ -502,7 +515,7 @@ async def _resolve_aggregation_group_count(
     )
     try:
         result = await agg_engine.run(
-            db, profile_id=str(profile_id), source_diagram_id=str(src),
+            db, profile_id=profile_id, source_diagram_id=src,
         )
     except (AggregationProfileNotFound, AggregationSourceNotFound):
         return None
@@ -516,6 +529,70 @@ async def _resolve_aggregation_group_count(
     title = _markdown_escape_title(name)
     text = _markdown_escape_link_text(count_str)
     return f'[{text}](iris://diagram/{view_id} "{title}")'
+
+
+async def _resolve_aggregation_row_count(
+    db: DatabasePort, view_id: str, *, raw_mode: bool,
+) -> str | None:
+    """Resolve `{{aggregation:<view_id>:row_count[:raw]}}` (ADR-226) — the
+    total row count from the bound profile's output, across every
+    group. Same `AggregationResult.row_count` exposed via /api/aggregate
+    and MCP."""
+    binding = await _fetch_aggregation_list_binding(db, view_id)
+    if binding is None:
+        return None
+    name, src, profile_id = binding
+    from app.aggregation import engine as agg_engine
+    from app.aggregation.exceptions import (
+        AggregationProfileNotFound,
+        AggregationSourceNotFound,
+    )
+    try:
+        result = await agg_engine.run(
+            db, profile_id=profile_id, source_diagram_id=src,
+        )
+    except (AggregationProfileNotFound, AggregationSourceNotFound):
+        return None
+    count_str = str(result.row_count)
+    if raw_mode:
+        return count_str
+    title = _markdown_escape_title(name)
+    text = _markdown_escape_link_text(count_str)
+    return f'[{text}](iris://diagram/{view_id} "{title}")'
+
+
+async def _resolve_set_element_count(
+    db: DatabasePort, set_id: str, *, raw_mode: bool,
+) -> str | None:
+    """Resolve `{{set:<id>:element_count[:raw]}}` (ADR-226) — the live
+    count of non-deleted elements in the set.
+
+    Returns ``None`` when the set itself is missing/deleted; returns
+    ``"0"`` for a live but empty set (live binding, empty contents — same
+    pattern as ADR-225 `group_count` for an empty group).
+    """
+    # Validate the set first so a missing set strikes through rather
+    # than silently returning 0.
+    cursor = await db.execute(
+        "SELECT name FROM sets WHERE id = ? AND is_deleted = 0",
+        (set_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+    name = row[0]
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
+        (set_id,),
+    )
+    row = await cursor.fetchone()
+    count = int(row[0]) if row and row[0] is not None else 0
+    count_str = str(count)
+    if raw_mode:
+        return count_str
+    title = _markdown_escape_title(name)
+    text = _markdown_escape_link_text(count_str)
+    return f'[{text}](iris://set/{set_id} "{title}")'
 
 
 # Canvas node types that are structural decoration, not model elements
@@ -622,9 +699,20 @@ async def _resolve_one(
         return await _resolve_aggregation_group_count(
             db, entity_id, group_value, raw_mode=raw_mode,
         )
+    # ADR-226: aggregation `row_count` — total rows across every group.
+    if entity_type == "aggregation" and field_spec == "row_count":
+        return await _resolve_aggregation_row_count(
+            db, entity_id, raw_mode=raw_mode,
+        )
     if entity_type == "aggregation":
         # Any other field-spec on `aggregation` is unsupported.
         return None
+
+    # ADR-226: live count of elements in a set.
+    if entity_type == "set" and field_spec == "element_count":
+        return await _resolve_set_element_count(
+            db, entity_id, raw_mode=raw_mode,
+        )
 
     # ADR-210: parse inline =value override.
     field_spec_path: str = field_spec

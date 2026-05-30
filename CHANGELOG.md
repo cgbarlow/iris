@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.37.1] - 2026-05-30
+
+### Added
+
+- **Two new smart-markdown tokens for dashboard totals** (ADR-226,
+  SPEC-226-A):
+  - `{{aggregation:<view_id>:row_count[:raw]}}` — total rows across
+    every group from an aggregation_list view's profile output.
+    Mirrors `AggregationResult.row_count` already exposed via
+    `/api/aggregate` and MCP.
+  - `{{set:<set_id>:element_count[:raw]}}` — live count of
+    non-deleted elements in a set.
+  Both compose with the ADR-224 `:raw` modifier so they can be
+  dropped inside Mermaid blocks. Default form wraps in a markdown
+  link back to the view / set (with the entity name as tooltip).
+  Missing/deleted entity → strikethrough; live-but-empty set →
+  `"0"`.
+
+  These let the GEANZ Dashboard's Coverage snapshot table replace
+  the remaining hand-typed cells (Total elements, ArchiMate_Capability
+  stereotype, Maturity values populated, Orphan capabilities) with
+  live tokens.
+
 ## [6.37.0] - 2026-05-30
 
 ### Added
