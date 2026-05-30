@@ -56,6 +56,11 @@
 	let loadingDiagrams = $state(false);
 	let loadingProfiles = $state(false);
 	let loadError = $state<string | null>(null);
+	// One-shot guards: without these, a failed loadDiagrams/loadProfiles
+	// would re-fire the $effect (diagrams.length stays 0) and spam the
+	// API. The picker should attempt once per editing-toggle.
+	let triedDiagrams = $state(false);
+	let triedProfiles = $state(false);
 
 	onMount(() => {
 		if (editing) {
@@ -64,7 +69,7 @@
 	});
 
 	$effect(() => {
-		if (editing && diagrams.length === 0 && !loadingDiagrams) {
+		if (editing && !triedDiagrams && !loadingDiagrams) {
 			void loadOptions();
 		}
 	});
@@ -82,7 +87,9 @@
 			// expand to global picks.
 			const params = new URLSearchParams();
 			if (setId) params.set('set_id', setId);
-			params.set('page_size', '200');
+			// Backend caps page_size at 100. Anything larger 422s and,
+			// combined with the editing-effect, used to spam the API.
+			params.set('page_size', '100');
 			const data = await apiFetch<{ items: DiagramRow[] }>(
 				`/api/diagrams?${params.toString()}`,
 			);
@@ -92,6 +99,7 @@
 		} catch (e) {
 			loadError = `Failed to load source diagrams: ${(e as Error).message}`;
 		}
+		triedDiagrams = true;
 		loadingDiagrams = false;
 	}
 
@@ -112,6 +120,7 @@
 		} catch (e) {
 			loadError = `${loadError ?? ''}\nFailed to load profiles: ${(e as Error).message}`.trim();
 		}
+		triedProfiles = true;
 		loadingProfiles = false;
 	}
 
