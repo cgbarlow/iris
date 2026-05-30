@@ -189,6 +189,33 @@
 	// Focus view state
 	let focusMode = $state(false);
 
+	// v6.37.2: focus mode <-> URL sync. When focus is active the URL
+	// carries `?focus=1` so the page can be linked to in fullscreen.
+	// Uses replaceState (no history pollution) and a directional guard
+	// to prevent the two effects below from re-firing each other.
+	let focusModeFromURL = false;
+	$effect(() => {
+		// URL → focusMode (mount + back/forward).
+		const urlHas = page.url.searchParams.get('focus') === '1';
+		if (urlHas !== focusModeFromURL) {
+			focusMode = urlHas;
+			focusModeFromURL = urlHas;
+		}
+	});
+	$effect(() => {
+		// focusMode → URL (in-app toggle).
+		if (focusMode === focusModeFromURL) return;
+		const url = new URL(page.url);
+		if (focusMode) url.searchParams.set('focus', '1');
+		else url.searchParams.delete('focus');
+		focusModeFromURL = focusMode;
+		void goto(url.pathname + url.search + url.hash, {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true,
+		});
+	});
+
 	/** True when the windowed browse sidebar should be visible (shifts page content). */
 	const windowedBrowseSidebar = $derived(!editing && !focusMode && !!selectedBrowseNode);
 
