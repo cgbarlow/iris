@@ -1303,3 +1303,132 @@ async def test_aggregation_group_count_default_wraps_link_to_view(
     # Wrapped in a link back to the aggregation_list view.
     assert f"iris://diagram/{view_id}" in rendered
     assert _unwrap_iris_links(rendered).strip() == "2"
+
+
+# ── ADR-226: aggregation `row_count` + set `element_count` tokens ─────
+
+
+@pytest.mark.asyncio
+async def test_aggregation_row_count_returns_total(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """row_count is the total rows across every group — same as
+    AggregationResult.row_count exposed via /api/aggregate."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    view_id = await _setup_status_rollup(c, h, set_id)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"total={{{{aggregation:{view_id}:row_count}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # 2 Approved + 1 Proposed = 3 rows total.
+    assert _unwrap_iris_links(rendered).strip() == "total=3"
+    assert f"iris://diagram/{view_id}" in rendered
+
+
+@pytest.mark.asyncio
+async def test_aggregation_row_count_raw_returns_unwrapped(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    view_id = await _setup_status_rollup(c, h, set_id)
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"total={{{{aggregation:{view_id}:row_count:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "total=3"
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_aggregation_row_count_missing_view_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    bogus = "00000000-0000-0000-0000-000000000000"
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"n={{{{aggregation:{bogus}:row_count}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert "~~" in rendered
+
+
+@pytest.mark.asyncio
+async def test_set_element_count_returns_live_count(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h, "Coverage")
+    # Create 3 elements directly in the set.
+    for n in ("A", "B", "C"):
+        await _create_element(c, h, set_id, name=n)
+    # And a smart_markdown diagram (which is NOT counted as an element).
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"size={{{{set:{set_id}:element_count}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert _unwrap_iris_links(rendered).strip() == "size=3"
+    assert f"iris://set/{set_id}" in rendered
+
+
+@pytest.mark.asyncio
+async def test_set_element_count_raw_returns_unwrapped(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    await _create_element(c, h, set_id, name="One")
+    await _create_element(c, h, set_id, name="Two")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"size={{{{set:{set_id}:element_count:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert rendered.strip() == "size=2"
+    assert "iris://" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_set_element_count_missing_set_strikethrough(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    bogus = "00000000-0000-0000-0000-000000000000"
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"n={{{{set:{bogus}:element_count}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    assert "~~" in rendered
+
+
+@pytest.mark.asyncio
+async def test_set_element_count_excludes_deleted_elements(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    keep = await _create_element(c, h, set_id, name="Keep")
+    drop = await _create_element(c, h, set_id, name="Drop")
+    # Soft-delete one element. The API uses DELETE with If-Match.
+    r = await c.delete(
+        f"/api/elements/{drop}",
+        headers={**h, "If-Match": "1"},
+    )
+    assert r.status_code in (200, 204), r.text
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"size={{{{set:{set_id}:element_count:raw}}}}",
+    )
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    # Only the live element counts.
+    assert rendered.strip() == "size=1"
+    # And the live element is the one we kept.
+    assert keep != drop
