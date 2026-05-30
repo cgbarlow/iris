@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.37.2] - 2026-05-30
+
+### Added
+
+- **Shareable fullscreen URLs for views.** Focus mode on
+  `/views/[id]` now syncs with a `?focus=1` query param. Toggling
+  fullscreen updates the URL via `replaceState` (no history
+  pollution); opening any view URL with `?focus=1` lands the page
+  directly in fullscreen. Copy-paste-share a focused canvas without
+  asking the recipient to click the button. Back/forward navigation
+  to a URL without the flag drops out of focus correctly. Frontend
+  only — no backend / API change.
+
 ## [6.37.1] - 2026-05-30
 
 ### Added
