@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.6] - 2026-05-31
+
+### Fixed
+
+- **Text-view TOC heading text + jump (ADR-137 follow-up).** TOC entries
+  showed raw inline-markdown syntax for headings that contain links —
+  e.g. `Security (CSE) · [13](iris://diagram/…)` instead of `Security
+  (CSE) · 13`. Heading text is now flattened to plain text (links/images
+  keep their label/alt; emphasis, code and strikethrough markers are
+  dropped). Separately, rendered headings had no `id`, so clicking a TOC
+  entry did nothing; rendered headings now get slug ids that match the TOC
+  entries (shared slugger), so TOC jumps scroll to the heading.
+
 ## [6.41.5] - 2026-05-31
 
 ### Fixed
