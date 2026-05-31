@@ -250,6 +250,7 @@ async def _maybe_synthesise_content(
         # fills data.content at GET time. Any engine error renders an
         # informative placeholder rather than crashing the GET.
         from app.aggregation import engine as agg_engine
+        from app.aggregation import engine_cache  # ADR-227 per-request memo
         from app.aggregation.exceptions import (
             AggregationProfileNotFound,
             AggregationSourceNotFound,
@@ -261,11 +262,14 @@ async def _maybe_synthesise_content(
         profile_id = data.get("profile_id")
         if src and profile_id:
             try:
-                result = await agg_engine.run(
-                    db,
-                    profile_id=str(profile_id),
-                    source_diagram_id=str(src),
-                )
+                # ADR-227: per-request memo around the engine call —
+                # symmetric with the smart_markdown.compute_… wrapper.
+                with engine_cache.set_request_cache():
+                    result = await agg_engine.run(
+                        db,
+                        profile_id=str(profile_id),
+                        source_diagram_id=str(src),
+                    )
                 data["content"] = result.markdown
             except AggregationProfileNotFound:
                 data["content"] = "_Aggregation profile not found._"

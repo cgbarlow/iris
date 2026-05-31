@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from app.aggregation import engine_cache  # ADR-227 two-layer cache
 from app.aggregation.exceptions import (
     AggregationProfileNotFound,
     AggregationSourceNotFound,
@@ -604,11 +605,67 @@ async def run(
     profile_id: str,
     source_diagram_id: str,
 ) -> AggregationResult:
-    """Apply ``profile_id`` to ``source_diagram_id``. See SPEC-212-b."""
+    """Apply ``profile_id`` to ``source_diagram_id``. See SPEC-212-b.
+
+    ADR-227 (v6.38.0): two-layer cache wrapper. Layer 1 is per-request
+    memoisation via a ContextVar — within one HTTP request, repeated
+    `(profile_id, source_diagram_id)` calls (the common case for a
+    smart-markdown body with multiple `{{aggregation:<view>:…}}` tokens)
+    share a single result. Layer 2 is a process-wide LRU keyed by the
+    same pair, revalidated against profile `updated_at` plus the
+    `current_version` of every diagram in the cached
+    `AggregationResult.source_versions`.
+    """
+    # Layer 1 — per-request memo.
+    req_key = ("agg", profile_id, source_diagram_id)
+    hit = engine_cache.lookup_request(req_key)
+    if hit is not engine_cache.MISSING:
+        return hit  # type: ignore[no-any-return]
+
+    lru_key = (profile_id, source_diagram_id)
+
+    # Layer 2 — process-wide LRU. Validate against the live profile +
+    # the cached source_versions before trusting the entry.
+    cached = engine_cache.lru_get(lru_key)
+    if cached is not None:
+        profile_row = await get_aggregation_profile(db, profile_id)
+        if profile_row is None:
+            # Profile vanished — drop the cached entry, fall through to
+            # the cold path which will raise AggregationProfileNotFound.
+            engine_cache.lru_evict(lru_key)
+        else:
+            profile_updated_at = str(profile_row.get("updated_at") or "")
+            if await engine_cache.revalidate(
+                db, cached,
+                profile_id=profile_id,
+                profile_updated_at=profile_updated_at,
+            ):
+                engine_cache.store_request(req_key, cached)
+                return cached
+            engine_cache.lru_evict(lru_key)
+
+    # Cold path — run the engine end-to-end, cache the result.
+    result = await _run_uncached(
+        db, profile_id=profile_id, source_diagram_id=source_diagram_id,
+    )
+    engine_cache.lru_put(lru_key, result)
+    engine_cache.store_request(req_key, result)
+    return result
+
+
+async def _run_uncached(
+    db: DatabasePort,
+    *,
+    profile_id: str,
+    source_diagram_id: str,
+) -> AggregationResult:
+    """Engine cold path — the original `run` body. Always runs end-to-end;
+    callers are responsible for any caching."""
     profile_row = await get_aggregation_profile(db, profile_id)
     if profile_row is None:
         raise AggregationProfileNotFound(profile_id)
     p = ProfileData(**profile_row["profile_data"])
+    profile_updated_at = str(profile_row.get("updated_at") or "")
 
     # Sanity: source must exist.
     src_name, src_version = await _diagram_meta(db, source_diagram_id)
@@ -660,4 +717,5 @@ async def run(
         row_count=row_count,
         warnings=warnings,
         group_counts=group_counts,
+        profile_updated_at=profile_updated_at,
     )

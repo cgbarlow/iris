@@ -34,6 +34,8 @@ import json
 import re
 from typing import TYPE_CHECKING, Any
 
+from app.aggregation import engine_cache  # ADR-227 per-request memo
+
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
 
@@ -169,40 +171,21 @@ def _extract_tagged_value(
     return None
 
 
-async def _fetch_element_relationship_count(
-    db: DatabasePort, element_id: str,
-) -> int:
-    """ADR-223 — count of element ↔ element relationships involving this
-    element (mirrors elements/service.get_element)."""
-    cursor = await db.execute(
-        "SELECT COUNT(*) FROM relationships "
-        "WHERE (source_element_id = ? OR target_element_id = ?) "
-        "AND is_deleted = 0",
-        (element_id, element_id),
-    )
-    row = await cursor.fetchone()
-    return int(row[0]) if row else 0
+async def _fetch_element_row(
+    db: DatabasePort, entity_id: str,
+) -> tuple[str | None, str | None, Any, Any] | None:
+    """Fetch (name, description, data, metadata) for one element.
+    Returns None if the element is missing or deleted.
 
-
-async def _fetch_element_diagram_usage_count(
-    db: DatabasePort, element_id: str,
-) -> int:
-    """ADR-223 — count of distinct diagrams whose current-version data
-    references this element (mirrors elements/service.get_element)."""
-    cursor = await db.execute(
-        "SELECT COUNT(DISTINCT d.id) FROM diagrams d "
-        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
-        "  AND d.current_version = dv.version "
-        "WHERE d.is_deleted = 0 AND dv.data LIKE ?",
-        (f"%{element_id}%",),
-    )
-    row = await cursor.fetchone()
-    return int(row[0]) if row else 0
-
-
-async def _fetch_element_field(
-    db: DatabasePort, entity_id: str, field_spec: str,
-) -> str | None:
+    ADR-227 (v6.38.0): cached via the request_cache ContextVar so a
+    smart-markdown body that references the same element across many
+    tokens (e.g. the GEANZ Dashboard's 5 hub elements × 4 tokens each)
+    pays one SELECT per element per render instead of N.
+    """
+    key = ("element_row", entity_id)
+    hit = engine_cache.lookup_request(key)
+    if hit is not engine_cache.MISSING:
+        return hit  # type: ignore[no-any-return]
     cursor = await db.execute(
         "SELECT ev.name, ev.description, ev.data, ev.metadata FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
@@ -211,7 +194,63 @@ async def _fetch_element_field(
         (entity_id,),
     )
     row = await cursor.fetchone()
-    if not row:
+    result: tuple[str | None, str | None, Any, Any] | None
+    result = (row[0], row[1], row[2], row[3]) if row else None
+    engine_cache.store_request(key, result)
+    return result
+
+
+async def _fetch_element_relationship_count(
+    db: DatabasePort, element_id: str,
+) -> int:
+    """ADR-223 — count of element ↔ element relationships involving this
+    element (mirrors elements/service.get_element). Memoed per-request
+    (ADR-227) so a body with multiple `…:relationship_count` tokens on
+    the same element pays one COUNT(*) per render."""
+    key = ("rel_count", element_id)
+    hit = engine_cache.lookup_request(key)
+    if hit is not engine_cache.MISSING:
+        return hit  # type: ignore[no-any-return]
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM relationships "
+        "WHERE (source_element_id = ? OR target_element_id = ?) "
+        "AND is_deleted = 0",
+        (element_id, element_id),
+    )
+    row = await cursor.fetchone()
+    count = int(row[0]) if row else 0
+    engine_cache.store_request(key, count)
+    return count
+
+
+async def _fetch_element_diagram_usage_count(
+    db: DatabasePort, element_id: str,
+) -> int:
+    """ADR-223 — count of distinct diagrams whose current-version data
+    references this element (mirrors elements/service.get_element).
+    Memoed per-request (ADR-227)."""
+    key = ("usage_count", element_id)
+    hit = engine_cache.lookup_request(key)
+    if hit is not engine_cache.MISSING:
+        return hit  # type: ignore[no-any-return]
+    cursor = await db.execute(
+        "SELECT COUNT(DISTINCT d.id) FROM diagrams d "
+        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+        "  AND d.current_version = dv.version "
+        "WHERE d.is_deleted = 0 AND dv.data LIKE ?",
+        (f"%{element_id}%",),
+    )
+    row = await cursor.fetchone()
+    count = int(row[0]) if row else 0
+    engine_cache.store_request(key, count)
+    return count
+
+
+async def _fetch_element_field(
+    db: DatabasePort, entity_id: str, field_spec: str,
+) -> str | None:
+    row = await _fetch_element_row(db, entity_id)
+    if row is None:
         return None
     if field_spec == "name":
         return row[0]
@@ -364,16 +403,22 @@ async def _fetch_entity_display_name(
     Used to populate the tooltip on the markdown link that wraps a
     resolved entity-field value, so hovering shows the entity name
     even when the resolved value is e.g. an attribute string like "g".
+
+    ADR-227: per-request memo so the link-wrap step doesn't re-query
+    the same entity's name once per token.
     """
+    # Element display name is already cached as part of the row tuple;
+    # short-circuit through the row fetch so we share one SELECT for
+    # name + description + data + metadata.
     if entity_type == "element":
-        cursor = await db.execute(
-            "SELECT ev.name FROM elements e "
-            "JOIN element_versions ev ON e.id = ev.element_id "
-            "  AND e.current_version = ev.version "
-            "WHERE e.id = ? AND e.is_deleted = 0",
-            (entity_id,),
-        )
-    elif entity_type == "package":
+        row = await _fetch_element_row(db, entity_id)
+        return row[0] if row else None
+
+    key = ("display_name", entity_type, entity_id)
+    hit = engine_cache.lookup_request(key)
+    if hit is not engine_cache.MISSING:
+        return hit  # type: ignore[no-any-return]
+    if entity_type == "package":
         cursor = await db.execute(
             "SELECT pv.name FROM packages p "
             "JOIN package_versions pv ON p.id = pv.package_id "
@@ -399,9 +444,12 @@ async def _fetch_entity_display_name(
             "SELECT name FROM collections WHERE id = ?", (entity_id,),
         )
     else:
+        engine_cache.store_request(key, None)
         return None
     row = await cursor.fetchone()
-    return row[0] if row else None
+    name = row[0] if row else None
+    engine_cache.store_request(key, name)
+    return name
 
 
 def _markdown_escape_link_text(value: str) -> str:
@@ -774,7 +822,14 @@ async def _resolve_one(
 async def compute_smart_markdown_content(
     db: DatabasePort, diagram_id: str,
 ) -> str:
-    """Return the resolved markdown for a smart_markdown diagram (ADR-205)."""
+    """Return the resolved markdown for a smart_markdown diagram (ADR-205).
+
+    ADR-227 (v6.38.0): wraps the entire render in `set_request_cache()`
+    so repeated reads of the same entity / aggregation across many
+    tokens share work via the per-request memo. Outside this scope the
+    memo helpers are a no-op, so unit-test call sites that invoke
+    individual `_resolve_one` calls are unaffected.
+    """
     source = await _read_source(db, diagram_id)
     if not source.strip():
         return _PLACEHOLDER
@@ -783,16 +838,17 @@ async def compute_smart_markdown_content(
     if not matches:
         return source
 
-    out: list[str] = []
-    cursor = 0
-    for m in matches:
-        out.append(source[cursor:m.start()])
-        entity_type, entity_id, field_spec = m.group(1), m.group(2), m.group(3)
-        resolved = await _resolve_one(db, entity_type, entity_id, field_spec)
-        if resolved is None or resolved == "":
-            out.append(f"~~{m.group(0)}~~")
-        else:
-            out.append(resolved)
-        cursor = m.end()
-    out.append(source[cursor:])
-    return "".join(out)
+    with engine_cache.set_request_cache():
+        out: list[str] = []
+        cursor = 0
+        for m in matches:
+            out.append(source[cursor:m.start()])
+            entity_type, entity_id, field_spec = m.group(1), m.group(2), m.group(3)
+            resolved = await _resolve_one(db, entity_type, entity_id, field_spec)
+            if resolved is None or resolved == "":
+                out.append(f"~~{m.group(0)}~~")
+            else:
+                out.append(resolved)
+            cursor = m.end()
+        out.append(source[cursor:])
+        return "".join(out)
