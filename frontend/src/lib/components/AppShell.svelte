@@ -1,17 +1,45 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { isAuthenticated, isAnonymous, getCurrentUser, clearAuth } from '$lib/stores/auth.svelte.js';
 	import { getActiveSetId, getActiveSetName } from '$lib/stores/activeSet.svelte.js';
 	import { getActiveCollectionId, getActiveCollectionName } from '$lib/stores/activeCollection.svelte.js';
 	import { getAiContextCount } from '$lib/stores/aiContext.svelte.js';
 	import { startProviderPolling, stopProviderPolling } from '$lib/stores/aiProviders.svelte.js';
+	import { viewport } from '$lib/stores/viewport.svelte';
 	import { apiFetch } from '$lib/utils/api';
 	import SystemBanner from '$lib/components/SystemBanner.svelte';
+	import { Dialog } from 'bits-ui';
 
 	let { children } = $props();
 
+	// Desktop: the sidebar is a persistent, collapsible column (default open).
+	// Mobile/tablet (ADR-229): the same nav becomes an overlay drawer whose
+	// open state is `drawerOpen` (default closed). The hamburger toggles
+	// whichever applies to the current viewport.
 	let sidebarOpen = $state(true);
+	let drawerOpen = $state(false);
+
+	function toggleNav() {
+		if (viewport.isDesktop) {
+			sidebarOpen = !sidebarOpen;
+		} else {
+			drawerOpen = !drawerOpen;
+		}
+	}
+
+	// Close the mobile drawer after navigating to a new route.
+	afterNavigate(() => {
+		drawerOpen = false;
+	});
+
+	// If the viewport grows to desktop while the drawer is open, close it —
+	// the persistent sidebar takes over and a lingering modal would trap focus.
+	$effect(() => {
+		if (viewport.isDesktop && drawerOpen) {
+			drawerOpen = false;
+		}
+	});
 	let aiContextCount = $derived(getAiContextCount());
 	let recycleBinCount = $state(0);
 	let bookmarkCount = $state(0);
@@ -159,6 +187,88 @@
 	</svg>
 {/snippet}
 
+<!-- Nav body — rendered inline in the desktop sidebar and inside the mobile
+     drawer (ADR-229). Single source of truth for the menu markup. -->
+{#snippet navInner()}
+	<ul class="space-y-1">
+		{#each navItems as item}
+			{#if item.icon === 'bookmarks' && sceniaEnabled}
+				<li>
+					<a
+						href="/roadmap"
+						class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
+						style="color: var(--color-fg){page.url.pathname.startsWith('/roadmap') || page.url.pathname.startsWith('/scenia') ? '; background-color: var(--color-bg)' : ''}"
+						aria-current={page.url.pathname.startsWith('/roadmap') || page.url.pathname.startsWith('/scenia') ? 'page' : undefined}
+						title="Roadmap (G)"
+					>
+						{@render navIcon('roadmap')}
+						Roadmap
+					</a>
+				</li>
+				<li aria-hidden="true" class="my-3 border-t" style="border-color: var(--color-border)"></li>
+			{/if}
+			<li>
+				<a
+					href={item.href}
+					class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
+					style="color: var(--color-fg){(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? '; background-color: var(--color-bg)' : ''}"
+					aria-current={(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? 'page' : undefined}
+					title="{item.label} ({item.shortcut})"
+				>
+					{#if item.icon === 'ai'}
+						<span class="ai-icon-highlight">{@render navIcon(item.icon)}</span>
+					{:else}
+						{@render navIcon(item.icon)}
+					{/if}
+					{item.label}
+					{#if item.icon === 'ai' && aiContextCount > 0}
+						<span
+							class="ai-context-indicator"
+							aria-label="{aiContextCount} item{aiContextCount === 1 ? '' : 's'} in AI context"
+						></span>
+					{/if}
+					{#if item.icon === 'bookmarks' && bookmarkCount > 0}
+						<span
+							class="recycle-bin-indicator"
+							aria-label="{bookmarkCount} bookmark{bookmarkCount === 1 ? '' : 's'}"
+						></span>
+					{/if}
+					{#if item.icon === 'recycle-bin' && recycleBinCount > 0}
+						<span
+							class="recycle-bin-indicator"
+							aria-label="{recycleBinCount} item{recycleBinCount === 1 ? '' : 's'} in recycle bin"
+						></span>
+					{/if}
+				</a>
+			</li>
+		{/each}
+	</ul>
+
+	{#if getCurrentUser()?.role === 'admin'}
+		<div class="mt-4 border-t pt-4" style="border-color: var(--color-border)">
+			<h2 class="mb-2 px-3 text-xs font-semibold uppercase" style="color: var(--color-muted)">
+				Admin
+			</h2>
+			<ul class="space-y-1">
+				{#each adminItems as item}
+					<li>
+						<a
+							href={item.href}
+							class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
+							style="color: var(--color-fg){page.url.pathname.startsWith(item.href) ? '; background-color: var(--color-bg)' : ''}"
+							aria-current={page.url.pathname.startsWith(item.href) ? 'page' : undefined}
+							title="{item.label} ({item.shortcut})"
+						>
+							{@render navIcon(item.icon)}
+							{item.label}
+						</a>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+{/snippet}
+
 <div class="flex min-h-screen flex-col">
 	<!-- Skip link per WCAG 2.4.1 -->
 	<a href="#main-content" class="skip-link">Skip to main content</a>
@@ -174,8 +284,9 @@
 	>
 		<div class="flex items-center gap-3">
 			<button
-				onclick={() => (sidebarOpen = !sidebarOpen)}
-				aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+				onclick={toggleNav}
+				aria-label={(viewport.isDesktop ? sidebarOpen : drawerOpen) ? 'Close navigation' : 'Open navigation'}
+				aria-expanded={viewport.isDesktop ? sidebarOpen : drawerOpen}
 				class="rounded p-1"
 			>
 				<span aria-hidden="true" class="text-lg">&#9776;</span>
@@ -205,7 +316,7 @@
 					class="header-link rounded px-3 py-1 text-sm transition-colors"
 					style="color: var(--color-danger)"
 				>
-					Sign out ({getCurrentUser()?.username})
+					Sign out <span class="hidden sm:inline">({getCurrentUser()?.username})</span>
 				</button>
 			{:else}
 				<a
@@ -220,95 +331,39 @@
 	</header>
 
 	<div class="flex flex-1">
-		<!-- Sidebar / Navigation landmark -->
-		{#if sidebarOpen}
+		<!-- Desktop sidebar (≥1024px): persistent, collapsible column. -->
+		{#if viewport.isDesktop && sidebarOpen}
 			<nav
 				aria-label="Main navigation"
 				class="w-56 border-r p-4"
 				style="background-color: var(--color-surface); border-color: var(--color-border)"
 			>
-				<ul class="space-y-1">
-					{#each navItems as item}
-						{#if item.icon === 'bookmarks' && sceniaEnabled}
-							<li>
-								<a
-									href="/roadmap"
-									class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
-									style="color: var(--color-fg){page.url.pathname.startsWith('/roadmap') || page.url.pathname.startsWith('/scenia') ? '; background-color: var(--color-bg)' : ''}"
-									aria-current={page.url.pathname.startsWith('/roadmap') || page.url.pathname.startsWith('/scenia') ? 'page' : undefined}
-									title="Roadmap (G)"
-								>
-									{@render navIcon('roadmap')}
-									Roadmap
-								</a>
-							</li>
-							<li aria-hidden="true" class="my-3 border-t" style="border-color: var(--color-border)"></li>
-						{/if}
-						<li>
-							<a
-								href={item.href}
-								class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
-								style="color: var(--color-fg){(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? '; background-color: var(--color-bg)' : ''}"
-								aria-current={(item.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(item.href)) ? 'page' : undefined}
-								title="{item.label} ({item.shortcut})"
-							>
-								{#if item.icon === 'ai'}
-									<span class="ai-icon-highlight">{@render navIcon(item.icon)}</span>
-								{:else}
-									{@render navIcon(item.icon)}
-								{/if}
-								{item.label}
-								{#if item.icon === 'ai' && aiContextCount > 0}
-									<span
-										class="ai-context-indicator"
-										aria-label="{aiContextCount} item{aiContextCount === 1 ? '' : 's'} in AI context"
-									></span>
-								{/if}
-								{#if item.icon === 'bookmarks' && bookmarkCount > 0}
-									<span
-										class="recycle-bin-indicator"
-										aria-label="{bookmarkCount} bookmark{bookmarkCount === 1 ? '' : 's'}"
-									></span>
-								{/if}
-								{#if item.icon === 'recycle-bin' && recycleBinCount > 0}
-									<span
-										class="recycle-bin-indicator"
-										aria-label="{recycleBinCount} item{recycleBinCount === 1 ? '' : 's'} in recycle bin"
-									></span>
-								{/if}
-							</a>
-						</li>
-					{/each}
-				</ul>
-
-				{#if getCurrentUser()?.role === 'admin'}
-					<div class="mt-4 border-t pt-4" style="border-color: var(--color-border)">
-						<h2 class="mb-2 px-3 text-xs font-semibold uppercase" style="color: var(--color-muted)">
-							Admin
-						</h2>
-						<ul class="space-y-1">
-							{#each adminItems as item}
-								<li>
-									<a
-										href={item.href}
-										class="sidebar-link flex items-center gap-2.5 rounded px-3 py-2 text-sm transition-colors"
-										style="color: var(--color-fg){page.url.pathname.startsWith(item.href) ? '; background-color: var(--color-bg)' : ''}"
-										aria-current={page.url.pathname.startsWith(item.href) ? 'page' : undefined}
-										title="{item.label} ({item.shortcut})"
-									>
-										{@render navIcon(item.icon)}
-										{item.label}
-									</a>
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/if}
+				{@render navInner()}
 			</nav>
 		{/if}
 
+		<!-- Mobile/tablet drawer (<1024px): same nav as an overlay. bits-ui
+		     Dialog provides the focus trap, scroll-lock, Escape, aria-modal,
+		     and focus-restore-to-trigger (ADR-229). -->
+		{#if !viewport.isDesktop}
+			<Dialog.Root bind:open={drawerOpen}>
+				<Dialog.Portal>
+					<Dialog.Overlay class="drawer-backdrop" />
+					<Dialog.Content
+						class="mobile-nav-drawer"
+						style="background-color: var(--color-surface); border-color: var(--color-border)"
+					>
+						<Dialog.Title class="sr-only">Main navigation</Dialog.Title>
+						<nav aria-label="Main navigation" class="p-4">
+							{@render navInner()}
+						</nav>
+					</Dialog.Content>
+				</Dialog.Portal>
+			</Dialog.Root>
+		{/if}
+
 		<!-- Main content landmark -->
-		<main id="main-content" class="flex flex-1 flex-col p-6" tabindex="-1">
+		<main id="main-content" class="flex min-w-0 flex-1 flex-col p-4 md:p-6" tabindex="-1">
 			{@render children()}
 		</main>
 	</div>

@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.0] - 2026-05-31
+
+### Added
+
+- **Mobile-responsive UI (ADR-229 / SPEC-229-A).** Iris now detects a
+  mobile screen and adapts its surfaces — browse everything and make light
+  edits on a phone; heavy diagram-canvas authoring stays desktop-only.
+  Responsive adaptation in one codebase (no separate mobile route tree);
+  breakpoints mirror Tailwind v4 defaults (`< 768px` mobile, `768–1023px`
+  tablet, `≥ 1024px` desktop).
+  - **Foundations** — `frontend/src/lib/stores/viewport.svelte.ts` exposes
+    reactive `isMobile` / `isTablet` / `isDesktop` flags built on
+    `matchMedia`, generalising the one-off responsive check that lived
+    inline on the dashboard. SSR-safe: defaults to desktop during prerender
+    and reconciles eagerly in the browser. Wired once from the root layout.
+    New `app.css` tokens (`--page-pad`, `.drawer-backdrop`,
+    `body.scroll-locked`, `.mobile-nav-drawer`) reuse the existing WCAG
+    utilities. A Playwright `mobile` project (Pixel 5) runs `*.mobile.spec.ts`,
+    disjoint from the desktop `e2e` suite (`npm run test:mobile`).
+  - **App shell + navigation** — on mobile the persistent sidebar becomes a
+    hamburger-triggered overlay drawer (bits-ui `Dialog`: focus trap,
+    scroll-lock, Escape, focus-restore), auto-closing on navigation and when
+    the viewport grows to desktop. Desktop keeps the persistent collapsible
+    sidebar unchanged. The nav markup is shared via a single snippet.
+  - **Lists + detail pages** — responsive page gutters (`p-4 md:p-6`),
+    wrapping toolbars/headers, horizontally-scrollable section tab bars, and
+    the two-column `auto 1fr` definition grids on element/package detail pages
+    collapse to a single column on mobile (new `.detail-grid` helper). Wide
+    metadata/relationship tables scroll within their section instead of
+    forcing page-wide horizontal overflow.
+  - **Diagram viewer** — on mobile the canvas takes the full width (the
+    hierarchy sidebar is hidden) and stays pan/pinch-zoom viewable, but layout
+    authoring (node drag, edge draw) is disabled via a new `interactiveLayout`
+    prop on `UnifiedCanvas`, with a "view only — edit layout on a larger
+    screen" hint. The full-screen (FocusView) trigger is hidden and the
+    section tab bar scrolls. Light edits (rename, properties, comments) remain.
+  - **Iris AI chat** — uses `100dvh` so the mobile browser chrome/keyboard
+    can't clip the composer; the 3-column config row collapses to a single
+    column (`grid-cols-1 md:grid-cols-3`) and drops its fixed 800px cap on
+    mobile; the diagram-picker dropdown is constrained to the viewport width.
+
 ## [6.40.0] - 2026-05-31
 
 ### Added

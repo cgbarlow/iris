@@ -10,6 +10,7 @@
 	import type { Diagram, DiagramVersion, Bookmark } from '$lib/types/api';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
+	import { viewport } from '$lib/stores/viewport.svelte';
 	import UnifiedCanvas from '$lib/canvas/UnifiedCanvas.svelte';
 	import BpmnAuthoringShell from '$lib/canvas/bpmn/BpmnAuthoringShell.svelte';
 	import SequenceDiagram from '$lib/canvas/sequence/SequenceDiagram.svelte';
@@ -2074,7 +2075,7 @@
 			/>
 		</div>
 	{/if}
-	<div style={(windowedBrowseSidebar || windowedCommentsSidebar) ? 'margin-right: 316px; margin-bottom: -24px; transition: margin-right 0.15s ease;' : 'margin-bottom: -24px; transition: margin-right 0.15s ease;'}>
+	<div style={(windowedBrowseSidebar || windowedCommentsSidebar) && !viewport.isMobile ? 'margin-right: 316px; margin-bottom: -24px; transition: margin-right 0.15s ease;' : 'margin-bottom: -24px; transition: margin-right 0.15s ease;'}>
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
 		<ol class="flex flex-wrap items-baseline gap-1">
 			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
@@ -2155,8 +2156,9 @@
 	</div>
 
 	<div class="mt-6 flex gap-4">
-	<!-- Collapsible hierarchy sidebar -->
-	{#if sidebarOpen}
+	<!-- Collapsible hierarchy sidebar — hidden on mobile (ADR-229) so the canvas
+	     takes the full width; the diagram is pan/zoom view-first on a phone. -->
+	{#if sidebarOpen && !viewport.isMobile}
 		<aside
 			data-hierarchy-sidebar
 			style="width: 280px; max-height: calc(100vh - 216px); flex-shrink: 0; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; position: sticky; top: 16px; align-self: flex-start"
@@ -2226,7 +2228,7 @@
 				<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
 			</svg>
 		</button>
-		<div class="flex gap-1" role="tablist" aria-label="Diagram sections">
+		<div class="flex gap-1 overflow-x-auto" role="tablist" aria-label="Diagram sections">
 			<!-- v5.4.0 (#10): Canvas first — the working content tab leads.
 			     ADR-204 (v6.14.0): Details moved between Relationships and
 			     Version History. -->
@@ -2665,6 +2667,7 @@
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
+							class:hidden={viewport.isMobile}
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
 							aria-label="Full screen"
 							title="Full screen"
@@ -2969,6 +2972,7 @@
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
+							class:hidden={viewport.isMobile}
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
 							aria-label="Full screen"
 							title="Full screen"
@@ -3081,6 +3085,7 @@
 											onnodedragstart={handleNodeDragStart}
 											ontogglemode={handleToggleToBrowseMode}
 											panX={selectedEditNodeId && selectedNodeVisual ? -308 : 0}
+											interactiveLayout={!viewport.isMobile}
 										/>
 									</div>
 									{#if selectedEditNodeId && selectedNodeVisual}
@@ -3155,6 +3160,7 @@
 								onnodedragstart={handleNodeDragStart}
 								ontogglemode={handleToggleToBrowseMode}
 								panX={selectedEditNodeId && selectedNodeVisual ? -308 : 0}
+								interactiveLayout={!viewport.isMobile}
 							/>
 						</div>
 						{#if selectedEditNodeId && selectedNodeVisual}

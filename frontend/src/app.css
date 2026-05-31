@@ -107,6 +107,73 @@ a {
 	}
 }
 
+/* ── Responsive tokens (ADR-229 / SPEC-229-A) ──
+   Shared primitives for the mobile-responsive rollout. Breakpoints mirror
+   Tailwind v4 defaults (md = 768px). Pages opt into --page-pad; drawers
+   (bits-ui Dialog) reuse .drawer-backdrop and body.scroll-locked. */
+:root {
+	--page-pad: 1.5rem; /* desktop default (matches p-6) */
+}
+@media (max-width: 767px) {
+	:root {
+		--page-pad: 1rem; /* tighter gutters on mobile (matches p-4) */
+	}
+}
+
+/* Dimmed backdrop behind a mobile drawer / bottom sheet */
+.drawer-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.4);
+	z-index: 45;
+}
+
+/* Lock background scrolling while a drawer / bottom sheet is open */
+body.scroll-locked {
+	overflow: hidden;
+}
+
+/* Mobile nav drawer (ADR-229). bits-ui Dialog.Content renders in a body-level
+   portal, so this must be global (component-scoped styles wouldn't reach it). */
+.mobile-nav-drawer {
+	position: fixed;
+	left: 0;
+	top: 0;
+	height: 100%;
+	width: 18rem;
+	max-width: 85vw;
+	z-index: 46; /* above .drawer-backdrop (45) */
+	overflow-y: auto;
+	border-right: 1px solid var(--color-border);
+	box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.mobile-nav-drawer[data-state='open'] {
+	animation: drawer-slide-in 0.2s ease-out;
+}
+
+@keyframes drawer-slide-in {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: translateX(0);
+	}
+}
+
+/* Definition grids on detail pages (elements/packages) — term + value in two
+   columns on desktop, stacked single column on mobile (ADR-229). Replaces the
+   inline `grid-template-columns: auto 1fr` so a media query can override it
+   (inline styles can't be). Pair with Tailwind `grid gap-3`. */
+.detail-grid {
+	grid-template-columns: auto 1fr;
+}
+@media (max-width: 767px) {
+	.detail-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
 /* Screen-reader only utility */
 .sr-only {
 	position: absolute;

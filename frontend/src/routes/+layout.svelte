@@ -5,9 +5,14 @@
 	import AppShell from '$lib/components/AppShell.svelte';
 	import SessionTimeoutWarning from '$lib/components/SessionTimeoutWarning.svelte';
 	import { isAuthenticated } from '$lib/stores/auth.svelte.js';
+	import { initViewport } from '$lib/stores/viewport.svelte';
 	import { ModeWatcher } from 'mode-watcher';
 
 	let { children } = $props();
+
+	// Wire up the shared viewport breakpoint store once for the whole app
+	// (ADR-229). Runs browser-only; returns the matchMedia cleanup.
+	$effect(() => initViewport());
 
 	// /login renders without the AppShell (clean full-page login form).
 	// Every other route renders inside the AppShell — anonymous visitors
