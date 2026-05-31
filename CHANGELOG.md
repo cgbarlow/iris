@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.39.1] - 2026-05-31
+
+### Fixed
+
+- **Status datalist suggestions now visible** on the element edit
+  page. Chrome / Edge render an empty dropdown when a `<datalist>`
+  `<option>` carries only a `value` attribute and no text node — the
+  spec-valid `<option value="Approved"></option>` form looks like
+  nothing's there. Repeated the value as the option's text content
+  (`<option value="Approved">Approved</option>`) so the suggestions
+  show across browsers.
+
 ## [6.39.0] - 2026-05-31
 
 ### Added
