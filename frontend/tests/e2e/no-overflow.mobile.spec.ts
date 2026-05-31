@@ -29,6 +29,7 @@ test.describe('no horizontal overflow on mobile', () => {
 	// A populated element-detail page exercises the detail grids and the wide
 	// metadata/relationship tables, which are the real overflow risks.
 	test('populated element-detail page does not overflow', async ({ page }) => {
+		test.slow(); // seeds + logs in; absorb API rate-limit back-off under full-suite load
 		await seedAdmin();
 		const token = await getAuthToken();
 		const res = await fetch(`${API_BASE}/api/elements`, {

@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     collapse to a single column on mobile (new `.detail-grid` helper). Wide
     metadata/relationship tables scroll within their section instead of
     forcing page-wide horizontal overflow.
+  - **Diagram viewer** — on mobile the canvas takes the full width (the
+    hierarchy sidebar is hidden) and stays pan/pinch-zoom viewable, but layout
+    authoring (node drag, edge draw) is disabled via a new `interactiveLayout`
+    prop on `UnifiedCanvas`, with a "view only — edit layout on a larger
+    screen" hint. The full-screen (FocusView) trigger is hidden and the
+    section tab bar scrolls. Light edits (rename, properties, comments) remain.
 
 ## [6.40.0] - 2026-05-31
 

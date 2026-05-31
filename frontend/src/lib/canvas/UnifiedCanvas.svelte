@@ -52,6 +52,10 @@
 		/** v5.2.0 (issue #37): forwarded to BpmnRenderer via setContext so the
 		 *  ContextPad inside a selected BPMN node can call back to the page. */
 		oncontextpadaction?: (action: string, nodeId: string) => void;
+		/** v6.41.0 (ADR-229): when false, layout authoring (node drag + edge
+		 *  draw) is disabled while pan/zoom stay enabled — used on mobile, where
+		 *  the canvas is view-only. Pass `!viewport.isMobile`. Defaults true. */
+		interactiveLayout?: boolean;
 	}
 
 	let {
@@ -76,6 +80,7 @@
 		onbeforeconnect,
 		ondropentity,
 		oncontextpadaction,
+		interactiveLayout = true,
 	}: Props = $props();
 
 	// Set notation context for DynamicNode/DynamicEdge to read
@@ -355,8 +360,8 @@
 			onconnect={handleSvelteFlowConnect}
 			proOptions={{ hideAttribution: true }}
 			defaultEdgeOptions={{ type: defaultEdgeType }}
-			nodesDraggable={true}
-			nodesConnectable={!connectMode}
+			nodesDraggable={interactiveLayout}
+			nodesConnectable={interactiveLayout && !connectMode}
 			elementsSelectable={true}
 		>
 			<Controls showLock={false} {fitViewOptions} />
@@ -390,6 +395,14 @@
 	{#if connectMode}
 		<div class="canvas-connect-indicator" aria-live="assertive">
 			Connect mode — select target node or press Escape
+		</div>
+	{/if}
+
+	<!-- ADR-229: on mobile the canvas is pan/zoom view-only; layout authoring
+	     (drag + edge draw) is disabled. Surface why. -->
+	{#if !browseMode && !interactiveLayout}
+		<div class="canvas-mode-badge" data-testid="layout-locked-hint">
+			View only — edit layout on a larger screen
 		</div>
 	{/if}
 

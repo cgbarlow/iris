@@ -23,6 +23,7 @@ test.beforeAll(async () => {
 });
 
 test('detail definition grid collapses to a single column on mobile', async ({ page }) => {
+	test.slow(); // login + page load; absorb rate-limit back-off under full-suite load
 	await loginAsAdmin(page);
 	await page.goto(`/elements/${elementId}`);
 	await page.getByRole('tab', { name: 'Details' }).click();
@@ -37,6 +38,7 @@ test('detail definition grid collapses to a single column on mobile', async ({ p
 });
 
 test('section tab bar is horizontally scrollable, not clipped', async ({ page }) => {
+	test.slow(); // login + page load; absorb rate-limit back-off under full-suite load
 	await loginAsAdmin(page);
 	await page.goto(`/elements/${elementId}`);
 
