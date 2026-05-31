@@ -8,6 +8,7 @@
 	 * heading element by id (slugged from heading text).
 	 */
 	import type { TocHeading } from './MarkdownView.svelte';
+	import { viewport } from '$lib/stores/viewport.svelte';
 
 	interface Props {
 		headings: TocHeading[];
@@ -20,9 +21,17 @@
 	function jump(id: string) {
 		const el = document.getElementById(id);
 		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		// On mobile the TOC is a full-screen overlay drawer (ADR-229); close it
+		// after jumping so the reader lands on the content.
+		if (viewport.isMobile) onclose?.();
 	}
 </script>
 
+<!-- Mobile (ADR-229): the TOC becomes a fixed right overlay drawer; this
+     backdrop closes it on tap. On desktop it's an inline column (no backdrop). -->
+{#if viewport.isMobile && onclose}
+	<button type="button" class="md-toc-backdrop" aria-label="Close TOC" onclick={onclose}></button>
+{/if}
 <aside class="md-toc" aria-label="Table of contents">
 	<header class="md-toc__header">
 		<span class="md-toc__title">Contents</span>
@@ -59,6 +68,26 @@
 		padding: 12px;
 		font-size: 12px;
 		overflow-y: auto;
+	}
+
+	/* Mobile (ADR-229): a fixed right overlay drawer instead of a 300px column
+	   that would squeeze the markdown content to nothing on a phone. */
+	.md-toc-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.4);
+		z-index: 49;
+		border: 0;
+	}
+	@media (max-width: 767px) {
+		.md-toc {
+			position: fixed;
+			right: 0; top: 0; bottom: 0;
+			height: 100dvh;
+			width: 85vw; max-width: 320px;
+			border-radius: 0;
+			z-index: 50;
+		}
 	}
 	.md-toc__header {
 		display: flex; justify-content: space-between; align-items: center;
