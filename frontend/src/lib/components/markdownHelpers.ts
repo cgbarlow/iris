@@ -60,23 +60,47 @@ export function urlIsAllowed(href: string): boolean {
 	}
 }
 
+/** A fresh slugger with its own dedup counter. Shared by extractHeadings and
+ *  renderMarkdown — walked in the same (document) order — so the TOC entry ids
+ *  match the ids assigned to the rendered heading elements, and TOC jumps land. */
+export function makeSlugger(): (s: string) => string {
+	const counts = new Map<string, number>();
+	return (s: string) => {
+		const base = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'h';
+		const n = (counts.get(base) ?? 0) + 1;
+		counts.set(base, n);
+		return n === 1 ? base : `${base}-${n}`;
+	};
+}
+
+/** Flatten inline markdown to plain text for TOC display: links/images keep
+ *  their label/alt; emphasis, inline code, and strikethrough markers are
+ *  dropped. So a heading authored as `Security (CSE) · [13](iris://diagram/…)`
+ *  reads `Security (CSE) · 13` in the TOC instead of leaking the raw link
+ *  syntax (ADR-137 follow-up). */
+export function stripInlineMarkdown(s: string): string {
+	return s
+		.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1') // images → alt text
+		.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // links → label
+		.replace(/`([^`]+)`/g, '$1') // inline code
+		.replace(/(\*\*|__)(.*?)\1/g, '$2') // bold
+		.replace(/(\*|_)(.*?)\1/g, '$2') // italic
+		.replace(/~~(.*?)~~/g, '$2') // strikethrough
+		.trim();
+}
+
 export function extractHeadings(source: string): TocHeading[] {
 	const out: TocHeading[] = [];
 	const lines = source.split(/\r?\n/);
 	let inFence = false;
-	const slugCounts = new Map<string, number>();
-	const slug = (s: string) => {
-		const base = s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'h';
-		const n = (slugCounts.get(base) ?? 0) + 1;
-		slugCounts.set(base, n);
-		return n === 1 ? base : `${base}-${n}`;
-	};
+	const slug = makeSlugger();
 	for (const line of lines) {
 		if (/^```/.test(line.trim())) { inFence = !inFence; continue; }
 		if (inFence) continue;
 		const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
 		if (!m) continue;
-		out.push({ id: slug(m[2].trim()), level: m[1].length, text: m[2].trim() });
+		const text = stripInlineMarkdown(m[2].trim());
+		out.push({ id: slug(text), level: m[1].length, text });
 	}
 	return out;
 }
@@ -157,6 +181,14 @@ export function renderMarkdown(source: string, textDiagramIds?: Set<string>): Re
 		if (irisLink.kind === 'diagram' && textDiagramIds?.has(irisLink.id)) {
 			a.classList.add('md-iris-link--text');
 		}
+	}
+
+	// ADR-137 follow-up: give rendered headings slug ids so the TOC's
+	// getElementById jump targets exist. Same slugger as extractHeadings,
+	// walked in document order, so ids line up with the TOC entries.
+	const slugHeading = makeSlugger();
+	for (const h of tpl.content.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
+		if (!h.id) h.id = slugHeading(h.textContent ?? '');
 	}
 
 	return { html: tpl.innerHTML, links };

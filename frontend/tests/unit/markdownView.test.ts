@@ -125,6 +125,35 @@ describe('extractHeadings', () => {
 	it('returns an empty list when there are no headings', () => {
 		expect(extractHeadings('Just paragraphs.')).toEqual([]);
 	});
+
+	it('flattens inline markdown (links/emphasis/code) in heading text', () => {
+		const source = [
+			'## Security (CSE) · [13](iris://diagram/ef1eafcd-e608)',
+			'',
+			'### **Bold** and `code` and _em_',
+		].join('\n');
+		const headings = extractHeadings(source);
+		expect(headings[0].text).toBe('Security (CSE) · 13');
+		expect(headings[0].id).toBe('security-cse-13');
+		expect(headings[1].text).toBe('Bold and code and em');
+	});
+});
+
+describe('renderMarkdown — heading ids match the TOC (ADR-137 follow-up)', () => {
+	it('assigns slug ids to rendered headings that match extractHeadings', () => {
+		const source = [
+			'# Top',
+			'',
+			'## Security (CSE) · [13](iris://diagram/ef1eafcd-e608)',
+		].join('\n');
+		const { html } = renderMarkdown(source);
+		const tpl = document.createElement('template');
+		tpl.innerHTML = html;
+		const ids = Array.from(tpl.content.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((h) => h.id);
+		const tocIds = extractHeadings(source).map((h) => h.id);
+		expect(ids).toEqual(tocIds);
+		expect(ids).toContain('security-cse-13');
+	});
 });
 
 describe('parseIrisHref + urlIsAllowed', () => {
