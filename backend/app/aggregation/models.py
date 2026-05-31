@@ -126,7 +126,17 @@ class AggregationProfileListResponse(BaseModel):
 
 
 class AggregationRunRequest(BaseModel):
-    profile_id: str = Field(min_length=1)
+    """Run a profile against a source diagram.
+
+    Exactly one of ``profile_id`` (saved profile lookup) or
+    ``profile_data`` (inline draft, used by the form-editor live
+    preview per SPEC-212-f) must be set. The route handler enforces
+    the exclusivity — keeping the rule there lets the response shape
+    a 400 with a clear message instead of a generic 422.
+    """
+
+    profile_id: str | None = Field(default=None, min_length=1)
+    profile_data: ProfileData | None = None
     source_diagram_id: str = Field(min_length=1)
 
 

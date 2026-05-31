@@ -167,12 +167,28 @@ async def run_aggregation(
     _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> AggregationResult:
     """Apply a profile to a source smart-markdown diagram. Returns the
-    computed markdown and observed source versions."""
+    computed markdown and observed source versions.
+
+    Accepts either ``profile_id`` (saved profile) or ``profile_data``
+    (inline draft for the form-editor live preview — SPEC-212-f).
+    Exactly one must be provided.
+    """
+    if body.profile_id and body.profile_data is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of profile_id or profile_data",
+        )
+    if not body.profile_id and body.profile_data is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide one of profile_id or profile_data",
+        )
     db = request.app.state.db_manager.main_db
     try:
         return await _engine.run(
             db,
             profile_id=body.profile_id,
+            profile_data=body.profile_data,
             source_diagram_id=body.source_diagram_id,
         )
     except AggregationProfileNotFound:

@@ -1475,21 +1475,47 @@ def delete_aggregation_profile_cmd(profile_id: str = typer.Argument(...)) -> Non
 
 @app.command("aggregate")
 def aggregate_cmd(
-    profile: str = typer.Option(
-        ..., "--profile",
-        help="Profile id (UUID).",
-    ),
     source: str = typer.Option(
         ..., "--source",
         help="Source smart_markdown diagram id (UUID).",
+    ),
+    profile: str | None = typer.Option(
+        None, "--profile",
+        help="Saved profile id (UUID). Mutually exclusive with --profile-data.",
+    ),
+    profile_data: str | None = typer.Option(
+        None, "--profile-data",
+        help=(
+            "Inline profile draft as a JSON file path, or `-` to read "
+            "from stdin (SPEC-212-f). Mutually exclusive with --profile."
+        ),
     ),
 ) -> None:
     """Run an aggregation profile against a source diagram (ADR-212).
 
     Returns the computed markdown plus metadata. Equivalent to
-    `POST /api/aggregation/run`.
+    `POST /api/aggregation/run`. Pass either --profile (saved) or
+    --profile-data (inline draft, SPEC-212-f) but not both.
     """
-    body = {"profile_id": profile, "source_diagram_id": source}
+    if (profile is None) == (profile_data is None):
+        msg = (
+            "Provide exactly one of --profile or --profile-data."
+        )
+        raise typer.BadParameter(msg)
+
+    body: dict[str, Any] = {"source_diagram_id": source}
+    if profile is not None:
+        body["profile_id"] = profile
+    if profile_data is not None:
+        # Inline draft — accept a file path or `-` for stdin.
+        raw = sys.stdin.read() if profile_data == "-" else Path(
+            profile_data,
+        ).read_text(encoding="utf-8")
+        try:
+            body["profile_data"] = json_lib.loads(raw)
+        except json_lib.JSONDecodeError as exc:
+            msg = f"--profile-data is not valid JSON: {exc}"
+            raise typer.BadParameter(msg) from exc
 
     async def _do() -> Any:
         async with _client() as c:

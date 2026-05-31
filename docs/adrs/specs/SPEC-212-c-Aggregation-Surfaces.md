@@ -74,3 +74,23 @@ iris aggregate                    --profile <id-or-name> --source <diagram-id>
 `mcp/tests/test_aggregation.py` — every MCP tool name resolves and forwards correctly.
 
 `cli/tests/test_aggregation.py` — every CLI subcommand round-trips against a fixture API.
+
+## 6. Inline `profile_data` on `/run` (SPEC-212-f)
+
+`POST /api/aggregation/run` accepts an optional `profile_data: ProfileData` in the request body for the form-editor's live-preview pane:
+
+```json
+{
+  "profile_data": {"traversal": {...}, "output": {...}},
+  "source_diagram_id": "<uuid>"
+}
+```
+
+Exactly one of `profile_id` or `profile_data` must be supplied — providing both is `400`, providing neither is `400`. Malformed inline `profile_data` is `422` (Pydantic). The inline path bypasses the ADR-227 cache.
+
+Mirrored on the parity surfaces:
+
+- **MCP** `aggregate` tool: `profile_id` is now optional, new optional `profile_data: object` arg with the same exactly-one-of semantics.
+- **CLI** `iris aggregate`: `--profile-data <path|->` flag accepts a JSON file path or `-` for stdin. Mutually exclusive with `--profile`.
+
+`scripts/check_surface_parity.py` is unaffected — only the write set is checked, and `aggregate` was already a read-shaped POST on the existing exception list.
