@@ -15,6 +15,7 @@
 	import type { Bookmark, Diagram, DiagramHierarchyNode } from '$lib/types/api';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
+	import { viewport } from '$lib/stores/viewport.svelte';
 
 	interface Package {
 		id: string;
@@ -566,9 +567,20 @@
 	</div>
 
 	<div class="mt-6 flex gap-4">
-		<!-- Collapsible hierarchy sidebar -->
+		<!-- Collapsible hierarchy sidebar. Inline sticky column on desktop; on
+		     mobile (ADR-229) the [data-hierarchy-sidebar] CSS turns it into a
+		     full-height fixed left overlay drawer, closed via this backdrop. -->
+		{#if sidebarOpen && viewport.isMobile}
+			<button
+				type="button"
+				class="drawer-backdrop"
+				aria-label="Close hierarchy"
+				onclick={toggleSidebar}
+			></button>
+		{/if}
 		{#if sidebarOpen}
 			<aside
+				data-hierarchy-sidebar
 				style="width: 280px; max-height: calc(100vh - 80px); flex-shrink: 0"
 				class="overflow-y-auto rounded border"
 				style:border-color="var(--color-border)"

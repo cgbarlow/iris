@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.4] - 2026-05-31
+
+### Fixed
+
+- **Package page hierarchy drawer on mobile (ADR-229 follow-up).** The
+  package detail page's hierarchy sidebar now gets the same mobile
+  treatment as the view page: it opens as a full-height fixed left overlay
+  drawer (toggle to open, backdrop to close) instead of an inline 280px
+  column. Added the `data-hierarchy-sidebar` hook so the shared overlay CSS
+  applies.
+
 ## [6.41.3] - 2026-05-31
 
 ### Fixed
