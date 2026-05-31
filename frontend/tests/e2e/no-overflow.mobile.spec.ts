@@ -18,7 +18,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 test.describe('no horizontal overflow on mobile', () => {
 	// Anonymous-reachable browse surfaces (ADR-123) — no seeding needed.
-	for (const path of ['/', '/collections', '/sets', '/elements']) {
+	for (const path of ['/', '/collections', '/sets', '/elements', '/ask']) {
 		test(`browse page ${path} does not overflow`, async ({ page }) => {
 			await page.goto(path);
 			await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible();

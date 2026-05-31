@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     prop on `UnifiedCanvas`, with a "view only — edit layout on a larger
     screen" hint. The full-screen (FocusView) trigger is hidden and the
     section tab bar scrolls. Light edits (rename, properties, comments) remain.
+  - **Iris AI chat** — uses `100dvh` so the mobile browser chrome/keyboard
+    can't clip the composer; the 3-column config row collapses to a single
+    column (`grid-cols-1 md:grid-cols-3`) and drops its fixed 800px cap on
+    mobile; the diagram-picker dropdown is constrained to the viewport width.
 
 ## [6.40.0] - 2026-05-31
 

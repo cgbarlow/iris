@@ -226,7 +226,7 @@
 	<title>Iris AI</title>
 </svelte:head>
 
-<div class="flex flex-col" style="height: calc(100vh - 56px - 48px); overflow: hidden">
+<div class="flex flex-col" style="height: calc(100dvh - 56px - 48px); overflow: hidden">
 	<div class="flex-none">
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Iris AI</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">
@@ -261,7 +261,7 @@
 		{#if loading}
 			<p class="mt-4 text-sm" style="color: var(--color-muted)">Loading...</p>
 		{:else}
-			<div class="mt-4 grid items-end gap-4" style="max-width: 800px; grid-template-columns: 1fr 1fr 1fr">
+			<div class="mt-4 grid grid-cols-1 items-end gap-4 md:max-w-[800px] md:grid-cols-3">
 				<div style="min-width: 0">
 					{#if collections.length > 0}
 						<label for="ask-collection" class="mb-1 block text-sm font-medium" style="color: var(--color-fg)">Collection</label>
@@ -311,7 +311,7 @@
 						></div>
 						<div
 							class="rounded border shadow-lg"
-							style="position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; min-width: 320px; max-height: 400px; background: var(--color-surface); border-color: var(--color-border); overflow: hidden; display: flex; flex-direction: column"
+							style="position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px; min-width: min(320px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: 400px; background: var(--color-surface); border-color: var(--color-border); overflow: hidden; display: flex; flex-direction: column"
 						>
 							<div class="flex items-center gap-2 border-b px-3 py-2" style="border-color: var(--color-border)">
 								<button type="button" onclick={selectAllDiagrams} class="text-xs" style="color: var(--color-primary)">Select all</button>
