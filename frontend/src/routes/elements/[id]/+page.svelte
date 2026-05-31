@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { joinTaggedValue, splitTaggedValue } from '$lib/utils/taggedValues';
 	import { openScenia } from '$lib/scenia/config.js';
 	import { addAiContextItem, removeAiContextItem, getAiContextItems } from '$lib/stores/aiContext.svelte.js';
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
@@ -71,6 +72,22 @@
 	interface PackageOption { id: string; name: string }
 	let setPackages = $state<PackageOption[]>([]);
 	let editElementType = $state('');
+	// ADR-228 — `metadata` is now editable. Status + the eleven extended
+	// scalars get plain text inputs in edit mode; tagged_values become
+	// an editable grid with #NOTES# split per row.
+	let editStatus = $state('');
+	let editStereotype = $state('');
+	let editMetaVersion = $state('');
+	let editScope = $state('');
+	let editAbstract = $state('');
+	let editPersistence = $state('');
+	let editAuthor = $state('');
+	let editComplexity = $state('');
+	let editPhase = $state('');
+	let editCreatedDate = $state('');
+	let editModifiedDate = $state('');
+	let editGenType = $state('');
+	let editTaggedValues = $state<{ property: string; value: string; notes: string }[]>([]);
 	// ADR-221 — element → detail diagram drill link. ``detailDiagramName``
 	// is the resolved name shown in read mode; the edit-mode picker
 	// updates ``editDetailDiagramId`` / ``editDetailDiagramName``.
@@ -121,7 +138,38 @@
 		const typeChanged = editElementType !== entity.element_type;
 		const pkgChanged = (editPackageId ?? null) !== ((entity as any).package_id ?? null);
 		const detailDiagramChanged = (editDetailDiagramId ?? null) !== (entity.detail_diagram_id ?? null);
-		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged || detailDiagramChanged;
+		// ADR-228: any edit to status / the eleven extended scalars /
+		// the tagged-values rows flips the dirty flag. Compare the
+		// rebuilt metadata against the entity's current value — same
+		// JSON-equality approach used for attributes above.
+		const origMeta = (entity.metadata ?? {}) as Record<string, unknown>;
+		const editedMeta: Record<string, unknown> = { ...origMeta };
+		const apply = (k: string, v: string) => {
+			if (v.trim()) editedMeta[k] = v;
+			else delete editedMeta[k];
+		};
+		apply('status', editStatus);
+		apply('stereotype', editStereotype);
+		apply('version', editMetaVersion);
+		apply('scope', editScope);
+		apply('abstract', editAbstract);
+		apply('persistence', editPersistence);
+		apply('author', editAuthor);
+		apply('complexity', editComplexity);
+		apply('phase', editPhase);
+		apply('created_date', editCreatedDate);
+		apply('modified_date', editModifiedDate);
+		apply('gen_type', editGenType);
+		const rebuiltTV = editTaggedValues
+			.filter((r) => r.property.trim())
+			.map((r) => ({
+				property: r.property,
+				value: joinTaggedValue(r.value, r.notes) || null,
+			}));
+		if (rebuiltTV.length) editedMeta.tagged_values = rebuiltTV;
+		else delete editedMeta.tagged_values;
+		const metaChanged = JSON.stringify(editedMeta) !== JSON.stringify(origMeta);
+		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged || detailDiagramChanged || metaChanged;
 	});
 
 	async function loadEntity(id: string) {
@@ -294,6 +342,28 @@
 		editPackageId = (entity as any).package_id ?? null;
 		editDetailDiagramId = entity.detail_diagram_id ?? null;
 		editDetailDiagramName = detailDiagramName;
+		// ADR-228: seed metadata edit state from `entity.metadata`. Each
+		// blank string corresponds to "field unset" so the existing
+		// {#if meta?.field} display behaviour is preserved on save.
+		const md = (entity.metadata ?? {}) as Record<string, unknown>;
+		editStatus = (md.status as string | undefined) ?? '';
+		editStereotype = (md.stereotype as string | undefined) ?? '';
+		editMetaVersion = (md.version as string | undefined) ?? '';
+		editScope = (md.scope as string | undefined) ?? '';
+		editAbstract = (md.abstract as string | undefined) ?? '';
+		editPersistence = (md.persistence as string | undefined) ?? '';
+		editAuthor = (md.author as string | undefined) ?? '';
+		editComplexity = (md.complexity as string | undefined) ?? '';
+		editPhase = (md.phase as string | undefined) ?? '';
+		editCreatedDate = (md.created_date as string | undefined) ?? '';
+		editModifiedDate = (md.modified_date as string | undefined) ?? '';
+		editGenType = (md.gen_type as string | undefined) ?? '';
+		const tvs = Array.isArray(md.tagged_values) ? md.tagged_values : [];
+		editTaggedValues = (tvs as Array<{ property?: string; value?: string | null }>)
+			.map((tv) => ({
+				property: tv.property ?? '',
+				...splitTaggedValue(tv.value),
+			}));
 		// Load packages scoped to the element's set so the picker stays
 		// constrained to a consistent group (ADR-184).
 		try {
@@ -332,7 +402,9 @@
 			}
 			const putBody: Record<string, unknown> = {
 				name: sanitizedName,
-				element_type: editElementType || entity.element_type,
+				// v6.39.0 (ADR-228): `element_type` is intentionally omitted —
+				// `ElementUpdate` doesn't accept it (element type is immutable
+				// after creation per ADR-178). Previously included as dead bytes.
 				description: sanitizedDesc,
 				data: updatedData,
 				change_summary: 'Updated element details',
@@ -346,6 +418,38 @@
 			// ADR-221 tri-state — same convention as package_id: always
 			// include the key (set / null) since we seed it on edit entry.
 			putBody.detail_diagram_id = editDetailDiagramId ?? null;
+			// ADR-228: assemble the updated metadata from edit state and
+			// include it in the PUT body. Preserves any keys we didn't
+			// surface in the editor; deletes scalars the user blanked
+			// out; reassembles tagged-value `value` from the split
+			// editor form, dropping blank-property rows.
+			const baseMeta = (entity.metadata ?? {}) as Record<string, unknown>;
+			const updatedMeta: Record<string, unknown> = { ...baseMeta };
+			const setOrDelete = (k: string, v: string) => {
+				if (v.trim()) updatedMeta[k] = v;
+				else delete updatedMeta[k];
+			};
+			setOrDelete('status', editStatus);
+			setOrDelete('stereotype', editStereotype);
+			setOrDelete('version', editMetaVersion);
+			setOrDelete('scope', editScope);
+			setOrDelete('abstract', editAbstract);
+			setOrDelete('persistence', editPersistence);
+			setOrDelete('author', editAuthor);
+			setOrDelete('complexity', editComplexity);
+			setOrDelete('phase', editPhase);
+			setOrDelete('created_date', editCreatedDate);
+			setOrDelete('modified_date', editModifiedDate);
+			setOrDelete('gen_type', editGenType);
+			const rebuiltTV = editTaggedValues
+				.filter((r) => r.property.trim())
+				.map((r) => ({
+					property: r.property,
+					value: joinTaggedValue(r.value, r.notes) || null,
+				}));
+			if (rebuiltTV.length) updatedMeta.tagged_values = rebuiltTV;
+			else delete updatedMeta.tagged_values;
+			putBody.metadata = updatedMeta;
 			await apiFetch(`/api/elements/${entity.id}`, {
 				method: 'PUT',
 				headers: { 'If-Match': String(entity.current_version) },
@@ -863,9 +967,29 @@
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Modified By</dt>
 							<dd style="color: var(--color-fg)">{modifiedByUsername}</dd>
 
-							{#if (entity.metadata as Record<string, unknown> | null | undefined)?.status}
+							{#if editingDetails || (entity.metadata as Record<string, unknown> | null | undefined)?.status}
 								<dt class="text-sm font-medium" style="color: var(--color-muted)">Status</dt>
-								<dd style="color: var(--color-fg)">{(entity.metadata as Record<string, unknown>).status}</dd>
+								<dd style="color: var(--color-fg)">
+									{#if editingDetails}
+										<input
+											type="text"
+											list="status-suggestions"
+											bind:value={editStatus}
+											aria-label="Status"
+											class="w-full rounded border px-2 py-1 text-sm"
+											style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+										/>
+										<datalist id="status-suggestions">
+											<option value="Approved"></option>
+											<option value="Proposed"></option>
+											<option value="Implemented"></option>
+											<option value="Validated"></option>
+											<option value="Mandatory"></option>
+										</datalist>
+									{:else}
+										{(entity.metadata as Record<string, unknown>).status}
+									{/if}
+								</dd>
 							{/if}
 						</dl>
 					</Accordion.Content>
@@ -882,54 +1006,113 @@
 					<Accordion.Content class="pb-4">
 						{@const meta = entity.metadata as Record<string, unknown> | null | undefined}
 						{@const hasMeta = !!(meta && (meta.stereotype || meta.version || meta.scope || meta.abstract || meta.persistence || meta.author || meta.complexity || meta.phase || meta.created_date || meta.modified_date || meta.gen_type || (Array.isArray(meta.tagged_values) && (meta.tagged_values as unknown[]).length > 0)))}
-						{#if hasMeta}
+						{#if hasMeta || editingDetails}
+							<!-- ADR-228: each row shows in edit mode regardless of
+								 whether the underlying metadata key is set, so the
+								 user can add or clear it. Tailwind classes mirror
+								 the Attributes editor at lines 854-907. -->
+							{#snippet scalarRow(label: string, displayValue: string, ariaLabel: string, get: () => string, set: (v: string) => void)}
+								{#if editingDetails || displayValue}
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">{label}</dt>
+									<dd style="color: var(--color-fg)">
+										{#if editingDetails}
+											<input
+												type="text"
+												value={get()}
+												oninput={(e) => set((e.currentTarget as HTMLInputElement).value)}
+												aria-label={ariaLabel}
+												class="w-full rounded border px-2 py-1 text-sm"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+											/>
+										{:else}
+											{displayValue}
+										{/if}
+									</dd>
+								{/if}
+							{/snippet}
 							<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
-								{#if meta?.stereotype}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Stereotype</dt>
-									<dd style="color: var(--color-fg)">{meta.stereotype}</dd>
-								{/if}
-								{#if meta?.version}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Metadata Version</dt>
-									<dd style="color: var(--color-fg)">{meta.version}</dd>
-								{/if}
-								{#if meta?.scope}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Scope</dt>
-									<dd style="color: var(--color-fg)">{meta.scope}</dd>
-								{/if}
-								{#if meta?.abstract}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Abstract</dt>
-									<dd style="color: var(--color-fg)">Yes</dd>
-								{/if}
-								{#if meta?.persistence}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Persistence</dt>
-									<dd style="color: var(--color-fg)">{meta.persistence}</dd>
-								{/if}
-								{#if meta?.author}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Author</dt>
-									<dd style="color: var(--color-fg)">{meta.author}</dd>
-								{/if}
-								{#if meta?.complexity}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Complexity</dt>
-									<dd style="color: var(--color-fg)">{meta.complexity}</dd>
-								{/if}
-								{#if meta?.phase}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Phase</dt>
-									<dd style="color: var(--color-fg)">{meta.phase}</dd>
-								{/if}
-								{#if meta?.created_date}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">EA Created Date</dt>
-									<dd style="color: var(--color-fg)">{meta.created_date}</dd>
-								{/if}
-								{#if meta?.modified_date}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">EA Modified Date</dt>
-									<dd style="color: var(--color-fg)">{meta.modified_date}</dd>
-								{/if}
-								{#if meta?.gen_type}
-									<dt class="text-sm font-medium" style="color: var(--color-muted)">Gen Type</dt>
-									<dd style="color: var(--color-fg)">{meta.gen_type}</dd>
-								{/if}
+								{@render scalarRow('Stereotype', (meta?.stereotype as string) ?? '', 'Stereotype', () => editStereotype, (v) => (editStereotype = v))}
+								{@render scalarRow('Metadata Version', (meta?.version as string) ?? '', 'Metadata Version', () => editMetaVersion, (v) => (editMetaVersion = v))}
+								{@render scalarRow('Scope', (meta?.scope as string) ?? '', 'Scope', () => editScope, (v) => (editScope = v))}
+								{@render scalarRow('Abstract', meta?.abstract ? 'Yes' : '', 'Abstract', () => editAbstract, (v) => (editAbstract = v))}
+								{@render scalarRow('Persistence', (meta?.persistence as string) ?? '', 'Persistence', () => editPersistence, (v) => (editPersistence = v))}
+								{@render scalarRow('Author', (meta?.author as string) ?? '', 'Author', () => editAuthor, (v) => (editAuthor = v))}
+								{@render scalarRow('Complexity', (meta?.complexity as string) ?? '', 'Complexity', () => editComplexity, (v) => (editComplexity = v))}
+								{@render scalarRow('Phase', (meta?.phase as string) ?? '', 'Phase', () => editPhase, (v) => (editPhase = v))}
+								{@render scalarRow('EA Created Date', (meta?.created_date as string) ?? '', 'EA Created Date', () => editCreatedDate, (v) => (editCreatedDate = v))}
+								{@render scalarRow('EA Modified Date', (meta?.modified_date as string) ?? '', 'EA Modified Date', () => editModifiedDate, (v) => (editModifiedDate = v))}
+								{@render scalarRow('Gen Type', (meta?.gen_type as string) ?? '', 'Gen Type', () => editGenType, (v) => (editGenType = v))}
 
-								{#if Array.isArray(meta?.tagged_values) && (meta.tagged_values as unknown[]).length > 0}
+								{#if editingDetails}
+									<!-- Edit mode: the full grid of tagged values
+										 including a `+ Add Tagged Value` button so
+										 users can grow / shrink the list. -->
+									<dt class="text-sm font-medium" style="color: var(--color-muted)">Tagged Values</dt>
+									<dd>
+										<table class="w-full text-sm" style="color: var(--color-fg)">
+											<thead>
+												<tr style="border-bottom: 1px solid var(--color-border)">
+													<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Property</th>
+													<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Value</th>
+													<th class="py-1 pr-2 text-left font-medium" style="color: var(--color-muted)">Notes</th>
+													<th class="py-1 w-6"></th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each editTaggedValues as _row, i (i)}
+													<tr style="border-bottom: 1px solid var(--color-border)">
+														<td class="py-1 pr-2">
+															<input
+																type="text"
+																bind:value={editTaggedValues[i].property}
+																aria-label={`Tagged value ${i + 1} property`}
+																class="w-full rounded border px-1 py-0.5 text-sm"
+																style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+															/>
+														</td>
+														<td class="py-1 pr-2">
+															<input
+																type="text"
+																bind:value={editTaggedValues[i].value}
+																aria-label={`Tagged value ${i + 1} value`}
+																class="w-full rounded border px-1 py-0.5 text-sm"
+																style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+															/>
+														</td>
+														<td class="py-1 pr-2">
+															<textarea
+																bind:value={editTaggedValues[i].notes}
+																rows="1"
+																aria-label={`Tagged value ${i + 1} notes`}
+																class="w-full rounded border px-1 py-0.5 text-sm"
+																style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+															></textarea>
+														</td>
+														<td class="py-1">
+															<button
+																type="button"
+																aria-label={`Remove tagged value ${i + 1}`}
+																onclick={() => { editTaggedValues = editTaggedValues.filter((_, j) => j !== i); }}
+																class="rounded px-2 py-0.5 text-sm"
+																style="color: var(--color-muted)"
+															>✕</button>
+														</td>
+													</tr>
+												{/each}
+												<tr>
+													<td colspan="4" class="py-2">
+														<button
+															type="button"
+															onclick={() => { editTaggedValues = [...editTaggedValues, { property: '', value: '', notes: '' }]; }}
+															class="rounded px-2 py-1 text-sm"
+															style="border: 1px solid var(--color-border); color: var(--color-fg)"
+														>+ Add Tagged Value</button>
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</dd>
+								{:else if Array.isArray(meta?.tagged_values) && (meta.tagged_values as unknown[]).length > 0}
 									<dt class="text-sm font-medium" style="color: var(--color-muted)">Tagged Values</dt>
 									<dd>
 										<table class="w-full text-sm" style="color: var(--color-fg)">
