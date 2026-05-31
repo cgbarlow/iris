@@ -7,10 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.39.3] - 2026-05-31
+
+### Fixed
+
+- **Status dropdown re-released as v6.39.3.** The Status select-swap
+  fix was committed and pushed to the v6.39.2 PR branch but did not
+  land on `main` when the PR was merged (GitHub merge used the
+  earlier commit at PR-edit time). Re-shipped as v6.39.3 to actually
+  roll the fix out.
+
 ## [6.39.2] - 2026-05-31
 
 ### Fixed
 
+- **Status dropdown on the element edit page now actually shows the
+  suggestions.** The v6.39.0 / v6.39.1 `<input list>` + `<datalist>`
+  approach was being filtered by Chrome to entries matching the
+  current input text — with the cell already showing the existing
+  status, the only entry shown was the existing value, looking like
+  an empty dropdown. Replaced with a paired `<select>` (quick-pick
+  of common Sparx values) + a text input (custom values), both
+  bound to the same `editStatus` state. The select always lists all
+  five standard values plus any non-standard existing value, so
+  state is preserved without forcing the user to retype.
 - **Aggregation cache now invalidates on element edits** (ADR-227
   follow-up). The v6.38.0 two-layer cache only tracked DIAGRAM
   versions in `AggregationResult.source_versions`. Element edits —

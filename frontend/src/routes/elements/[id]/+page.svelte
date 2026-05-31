@@ -971,25 +971,45 @@
 								<dt class="text-sm font-medium" style="color: var(--color-muted)">Status</dt>
 								<dd style="color: var(--color-fg)">
 									{#if editingDetails}
-										<input
-											type="text"
-											list="status-suggestions"
-											bind:value={editStatus}
-											aria-label="Status"
-											class="w-full rounded border px-2 py-1 text-sm"
-											style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
-										/>
-										<datalist id="status-suggestions">
-											<!-- v6.39.1: Chrome/Edge show NOTHING in the datalist
-												 dropdown when an <option> has only a `value` attribute
-												 and no text node. Repeating the value as the label
-												 is the cross-browser pattern. -->
-											<option value="Approved">Approved</option>
-											<option value="Proposed">Proposed</option>
-											<option value="Implemented">Implemented</option>
-											<option value="Validated">Validated</option>
-											<option value="Mandatory">Mandatory</option>
-										</datalist>
+										<!-- v6.39.2: the v6.39.1 `<input list>` + `<datalist>`
+											 approach was filtering the dropdown to entries
+											 matching the current input text. With the cell
+											 already showing "Approved", Chrome only surfaced
+											 the matching entry — looking to the user like an
+											 empty dropdown carrying just the existing value.
+											 Pair a real <select> for quick-pick with a text
+											 input for custom values; both bind the same
+											 `editStatus` state, so changes in either
+											 propagate. -->
+										<div class="flex gap-2">
+											<select
+												bind:value={editStatus}
+												aria-label="Status quick-pick"
+												class="rounded border px-2 py-1 text-sm"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+											>
+												<option value="">—</option>
+												<option value="Approved">Approved</option>
+												<option value="Proposed">Proposed</option>
+												<option value="Implemented">Implemented</option>
+												<option value="Validated">Validated</option>
+												<option value="Mandatory">Mandatory</option>
+												{#if editStatus && !['', 'Approved', 'Proposed', 'Implemented', 'Validated', 'Mandatory'].includes(editStatus)}
+													<!-- Preserve any non-standard existing value so
+														 the select reflects state correctly without
+														 forcing the user to retype it. -->
+													<option value={editStatus}>{editStatus}</option>
+												{/if}
+											</select>
+											<input
+												type="text"
+												bind:value={editStatus}
+												aria-label="Status"
+												placeholder="or type a custom value"
+												class="flex-1 rounded border px-2 py-1 text-sm"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+											/>
+										</div>
 									{:else}
 										{(entity.metadata as Record<string, unknown>).status}
 									{/if}
