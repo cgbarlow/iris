@@ -710,6 +710,26 @@ async def _run_uncached(
         db, grouped, p.output,
     )
 
+    # ADR-227 fix v6.39.2: record the current_version of every distinct
+    # element touched during the walk so the cache revalidator can
+    # detect element-level edits (status flips, metadata changes,
+    # attribute edits) — the diagram-level `source_versions` doesn't
+    # change when only an element's row bumps. Only run for
+    # element-collecting profiles; other collect_token_types don't read
+    # element rows and don't need the extra query.
+    element_versions: dict[str, int] = {}
+    if p.traversal.inner.collect_token_type == "element":
+        token_ids = sorted({r.token_id for r in accumulator})
+        if token_ids:
+            placeholders = ",".join(["?"] * len(token_ids))
+            cursor = await db.execute(
+                "SELECT id, current_version FROM elements "
+                f"WHERE id IN ({placeholders}) AND is_deleted = 0",  # noqa: S608
+                tuple(token_ids),
+            )
+            rows = await cursor.fetchall()
+            element_versions = {r[0]: r[1] for r in rows}
+
     return AggregationResult(
         markdown=markdown,
         computed_at=datetime.now(tz=UTC).isoformat(),
@@ -718,4 +738,5 @@ async def _run_uncached(
         warnings=warnings,
         group_counts=group_counts,
         profile_updated_at=profile_updated_at,
+        element_versions=element_versions,
     )

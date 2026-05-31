@@ -182,14 +182,14 @@ async def revalidate(
     profile_updated_at: str,
 ) -> bool:
     """Return True iff the cached result is still consistent with the
-    live profile `updated_at` and the `current_version` of every
-    diagram in `cached.source_versions`.
+    live profile `updated_at`, the `current_version` of every diagram
+    in `cached.source_versions`, AND (ADR-227 v6.39.2 fix) the
+    `current_version` of every element in `cached.element_versions`.
 
-    Two SQL queries: one for the bound profile (caller already has it
-    in hand and passes `profile_updated_at`), one batched query for
-    all referenced diagrams. The caller is responsible for fetching
-    the profile fresh and supplying its `updated_at`; this function
-    only handles the version comparison.
+    Up to three SQL queries: the caller has already fetched the
+    profile and passes its `updated_at`; this function batches one
+    query for the referenced diagrams and (if the cached result
+    walked any elements) one query for the referenced elements.
     """
     cached_profile_updated_at = cached.profile_updated_at
     if cached_profile_updated_at is None:
@@ -200,21 +200,46 @@ async def revalidate(
     if not cached.source_versions:
         # Nothing to validate against — refuse to trust.
         return False
-    ids = list(cached.source_versions.keys())
-    # Build the IN-list placeholders portably (SQLite + Postgres both
-    # accept `?` via the iris asyncpg adapter).
-    placeholders = ",".join(["?"] * len(ids))
-    sql = (
+
+    # ── Diagram-level revalidation (covers source + outer-step refs) ──
+    diag_ids = list(cached.source_versions.keys())
+    placeholders = ",".join(["?"] * len(diag_ids))
+    cursor = await db.execute(
         "SELECT id, current_version FROM diagrams "
-        f"WHERE id IN ({placeholders}) AND is_deleted = 0"
+        f"WHERE id IN ({placeholders}) AND is_deleted = 0",  # noqa: S608
+        tuple(diag_ids),
     )
-    cursor = await db.execute(sql, tuple(ids))
     rows = await cursor.fetchall()
-    live = {r[0]: r[1] for r in rows}
-    if len(live) != len(ids):
+    live_diagrams = {r[0]: r[1] for r in rows}
+    if len(live_diagrams) != len(diag_ids):
         # Some referenced diagram was soft-deleted.
         return False
     for did, ver in cached.source_versions.items():
-        if live.get(did) != ver:
+        if live_diagrams.get(did) != ver:
             return False
+
+    # ── Element-level revalidation (ADR-227 v6.39.2 fix) ───────────────
+    # The diagram-level check above misses pure element edits — e.g. a
+    # status flip in `metadata.status`. The engine now records every
+    # touched element's current_version in `element_versions`; verify
+    # them all here. Older cached results have an empty dict and skip
+    # straight to "valid" (safe: they were computed before the engine
+    # tracked elements, but the diagram check still gates them).
+    if cached.element_versions:
+        elem_ids = list(cached.element_versions.keys())
+        placeholders = ",".join(["?"] * len(elem_ids))
+        cursor = await db.execute(
+            "SELECT id, current_version FROM elements "
+            f"WHERE id IN ({placeholders}) AND is_deleted = 0",  # noqa: S608
+            tuple(elem_ids),
+        )
+        rows = await cursor.fetchall()
+        live_elements = {r[0]: r[1] for r in rows}
+        if len(live_elements) != len(elem_ids):
+            # Some referenced element was soft-deleted.
+            return False
+        for eid, ver in cached.element_versions.items():
+            if live_elements.get(eid) != ver:
+                return False
+
     return True

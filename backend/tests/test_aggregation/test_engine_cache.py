@@ -288,6 +288,71 @@ async def test_lru_miss_when_source_version_bumps(
 
 
 @pytest.mark.asyncio
+async def test_lru_miss_when_element_metadata_changes(
+    env: tuple[httpx.AsyncClient, DatabaseManager, dict],
+) -> None:
+    """v6.39.2 fix: flipping a referenced element's `metadata.status`
+    (the user-facing case that exposed the bug — element edit on
+    *C&A (alternative name)* didn't update the Dashboard pie) must
+    invalidate the cache. The diagram-level source_versions doesn't
+    change for an element-only edit, so this used to serve stale."""
+    c, dm, h = env
+    profile_id, source_id = await _setup_status_rollup(c, h, dm)
+
+    with patch.object(
+        _engine, "_run_uncached", wraps=_engine._run_uncached,
+    ) as spy:
+        first = await _engine.run(
+            dm.main_db,
+            profile_id=profile_id, source_diagram_id=source_id,
+        )
+        # The status rollup of 2 Approved + 1 Proposed → group_counts
+        # has those two keys.
+        assert first.group_counts.get("Approved") == 2
+        assert first.group_counts.get("Proposed") == 1
+
+        # Flip the Proposed element's status → Approved via the API.
+        # The element's current_version bumps; the source diagram's
+        # version does NOT.
+        # Find the Proposed element id (the source markdown enumerates
+        # them but doesn't tell us which is which; query via the API).
+        listing = await c.get(
+            "/api/elements",
+            headers=h,
+            params={"page_size": 50},
+        )
+        items = listing.json().get("items") or []
+        prop_el = next(
+            (e for e in items if (e.get("metadata") or {}).get("status") == "Proposed"),
+            None,
+        )
+        assert prop_el is not None, "expected at least one Proposed element"
+        flip_response = await c.put(
+            f"/api/elements/{prop_el['id']}",
+            json={
+                "name": prop_el["name"],
+                "data": prop_el.get("data") or {},
+                "metadata": {**(prop_el.get("metadata") or {}), "status": "Approved"},
+            },
+            headers={**h, "If-Match": str(prop_el["current_version"])},
+        )
+        assert flip_response.status_code == 200, flip_response.text
+
+        # Re-run — Layer 2 lookup should detect the element version
+        # bump and miss the cache.
+        second = await _engine.run(
+            dm.main_db,
+            profile_id=profile_id, source_diagram_id=source_id,
+        )
+
+    # _run_uncached fired twice (initial + post-flip recompute).
+    assert spy.call_count == 2
+    # And the recomputed totals reflect the flip: 3 Approved, 0 Proposed.
+    assert second.group_counts.get("Approved") == 3
+    assert second.group_counts.get("Proposed", 0) == 0
+
+
+@pytest.mark.asyncio
 async def test_lru_miss_when_profile_updates(
     env: tuple[httpx.AsyncClient, DatabaseManager, dict],
 ) -> None:

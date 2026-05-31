@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.39.2] - 2026-05-31
+
+### Fixed
+
+- **Aggregation cache now invalidates on element edits** (ADR-227
+  follow-up). The v6.38.0 two-layer cache only tracked DIAGRAM
+  versions in `AggregationResult.source_versions`. Element edits —
+  the user-facing case (flipping *C&A (alternative name)* from
+  `Proposed` to `Approved` and finding the GEANZ Dashboard's Status
+  pie unchanged) — don't bump the rollup-source diagram's version,
+  so the revalidator passed and we served stale aggregated output.
+  - The engine now records every distinct element it touched during
+    the walk in `AggregationResult.element_versions: dict[str, int]`
+    via one batched `SELECT id, current_version FROM elements WHERE
+    id IN (…)` after the walk completes. Only runs for
+    element-collecting profiles; other `collect_token_type` profiles
+    skip the extra query.
+  - `engine_cache.revalidate` now also batch-checks element versions
+    against the cached set. Any element edit (status flip, attribute
+    change, name rename) bumps the element's `current_version` and
+    misses the cache on next lookup.
+  - Older cached results have an empty `element_versions` dict and
+    still revalidate via the diagram check; new computes populate
+    the new field, so cache warmth recovers within one cold-path
+    request after the deploy.
+
 ## [6.39.1] - 2026-05-31
 
 ### Fixed
