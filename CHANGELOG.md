@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.5] - 2026-05-31
+
+### Fixed
+
+- **Text-view Table of Contents on mobile (ADR-229 follow-up).** The TOC
+  on Text (markdown) views was a fixed 300px right column that squeezed the
+  document to a sliver on a phone. On mobile it now opens as a full-height
+  fixed right overlay drawer (`100dvh`) with a tap-to-close backdrop, and
+  jumping to a heading closes it so the reader lands on the content. Desktop
+  keeps the inline column.
+
 ## [6.41.4] - 2026-05-31
 
 ### Fixed
