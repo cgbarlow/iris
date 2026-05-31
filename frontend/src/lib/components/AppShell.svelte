@@ -282,7 +282,7 @@
 		class="flex h-14 items-center justify-between border-b px-4"
 		style="background-color: var(--color-surface); border-color: var(--color-border)"
 	>
-		<div class="flex items-center gap-3">
+		<div class="flex min-w-0 items-center gap-2 sm:gap-3">
 			<button
 				onclick={toggleNav}
 				aria-label={(viewport.isDesktop ? sidebarOpen : drawerOpen) ? 'Close navigation' : 'Open navigation'}
@@ -292,17 +292,19 @@
 				<span aria-hidden="true" class="text-lg">&#9776;</span>
 			</button>
 			<a href="/" class="text-lg font-bold" style="color: var(--color-fg)">Iris</a>
-			{#if activeCollectionId}
+			<!-- Scope breadcrumb hidden on mobile (ADR-229) to keep the header
+			     one line; the right-hand actions must stay inside the header. -->
+			{#if activeCollectionId && !viewport.isMobile}
 				<span style="color: var(--color-fg)">/</span>
-				<a href="/collections" class="text-lg" style="color: var(--color-fg)">{activeCollectionName}</a>
+				<a href="/collections" class="truncate text-lg" style="color: var(--color-fg)">{activeCollectionName}</a>
 			{/if}
-			{#if activeSetId}
+			{#if activeSetId && !viewport.isMobile}
 				<span style="color: var(--color-fg)">/</span>
-				<a href="/sets" class="text-lg" style="color: var(--color-fg)">{activeSetName}</a>
+				<a href="/sets" class="truncate text-lg" style="color: var(--color-fg)">{activeSetName}</a>
 			{/if}
 		</div>
 
-		<div class="flex items-center gap-4">
+		<div class="flex shrink-0 items-center gap-2 sm:gap-4">
 			<a
 				href="/guide"
 				class="header-link rounded px-3 py-1 text-sm transition-colors"

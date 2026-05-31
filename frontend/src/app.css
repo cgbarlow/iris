@@ -161,6 +161,27 @@ body.scroll-locked {
 	}
 }
 
+/* Diagram-viewer hierarchy sidebar on mobile (ADR-229). On a phone the inline
+   sticky column becomes a fixed left overlay drawer (the toggle button opens
+   it, a backdrop closes it) so the canvas keeps the full width. In fullscreen
+   (FocusView) the diagram is pure canvas — hide the aside and its toggle. */
+@media (max-width: 767px) {
+	[data-hierarchy-sidebar] {
+		position: fixed !important;
+		left: 0 !important;
+		top: 0 !important;
+		bottom: 0 !important;
+		width: 85vw !important;
+		max-width: 320px !important;
+		max-height: 100dvh !important;
+		z-index: 50 !important;
+	}
+	.focus-view [data-hierarchy-sidebar],
+	.focus-view [aria-label='Toggle hierarchy sidebar'] {
+		display: none !important;
+	}
+}
+
 /* Definition grids on detail pages (elements/packages) — term + value in two
    columns on desktop, stacked single column on mobile (ADR-229). Replaces the
    inline `grid-template-columns: auto 1fr` so a media query can override it

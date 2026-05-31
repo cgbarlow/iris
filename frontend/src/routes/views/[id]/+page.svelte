@@ -2020,7 +2020,7 @@
 		</FocusView>
 	{:else}
 		<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-			<ol class="flex flex-wrap items-baseline gap-1">
+			<ol class="flex flex-nowrap items-baseline gap-1 overflow-x-auto whitespace-nowrap">
 				<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
 				<li aria-hidden="true">/</li>
 				<li aria-current="page">{page.params.id}</li>
@@ -2039,7 +2039,7 @@
 		</FocusView>
 	{:else}
 		<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-			<ol class="flex flex-wrap items-baseline gap-1">
+			<ol class="flex flex-nowrap items-baseline gap-1 overflow-x-auto whitespace-nowrap">
 				<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
 				<li aria-hidden="true">/</li>
 				<li aria-current="page">{page.params.id}</li>
@@ -2077,7 +2077,7 @@
 	{/if}
 	<div style={(windowedBrowseSidebar || windowedCommentsSidebar) && !viewport.isMobile ? 'margin-right: 316px; margin-bottom: -24px; transition: margin-right 0.15s ease;' : 'margin-bottom: -24px; transition: margin-right 0.15s ease;'}>
 	<nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-		<ol class="flex flex-wrap items-baseline gap-1">
+		<ol class="flex flex-nowrap items-baseline gap-1 overflow-x-auto whitespace-nowrap">
 			<li><a href="/views" style="color: var(--color-primary)">Views</a></li>
 			{#each ancestors as ancestor}
 				<li class="flex items-baseline gap-1">
@@ -2091,7 +2091,7 @@
 			</li>
 		</ol>
 	</nav>
-	<div class="flex items-center justify-between">
+	<div class="flex flex-wrap items-center justify-between gap-2">
 		<div>
 			<div class="flex flex-wrap items-center gap-3">
 				<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{diagram.name}</h1>
@@ -2110,7 +2110,7 @@
 				{/if}
 			</p>
 		</div>
-		<div class="flex gap-2">
+		<div class="flex flex-wrap gap-2">
 			{#if isInContext}
 				<button
 					onclick={() => removeAiContextItem(diagram.id)}
@@ -2156,9 +2156,19 @@
 	</div>
 
 	<div class="mt-6 flex gap-4">
-	<!-- Collapsible hierarchy sidebar — hidden on mobile (ADR-229) so the canvas
-	     takes the full width; the diagram is pan/zoom view-first on a phone. -->
-	{#if sidebarOpen && !viewport.isMobile}
+	<!-- Collapsible hierarchy sidebar. On desktop it's an inline sticky column;
+	     on mobile (ADR-229) CSS turns [data-hierarchy-sidebar] into a fixed
+	     left overlay so the canvas stays full-width and the toggle still works.
+	     The backdrop below closes the overlay on tap. -->
+	{#if sidebarOpen && viewport.isMobile}
+		<button
+			type="button"
+			class="drawer-backdrop"
+			aria-label="Close hierarchy"
+			onclick={toggleSidebar}
+		></button>
+	{/if}
+	{#if sidebarOpen}
 		<aside
 			data-hierarchy-sidebar
 			style="width: 280px; max-height: calc(100vh - 216px); flex-shrink: 0; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; position: sticky; top: 16px; align-self: flex-start"
@@ -2667,7 +2677,6 @@
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
-							class:hidden={viewport.isMobile}
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
 							aria-label="Full screen"
 							title="Full screen"
@@ -2972,7 +2981,6 @@
 						<button
 							onclick={() => (focusMode = true)}
 							class="rounded px-3 py-1.5 text-sm"
-							class:hidden={viewport.isMobile}
 							style="border: 1px solid var(--color-border); color: var(--color-fg)"
 							aria-label="Full screen"
 							title="Full screen"
