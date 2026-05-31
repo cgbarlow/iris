@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.39.3] - 2026-05-31
+
+### Fixed
+
+- **Status dropdown re-released as v6.39.3.** The Status select-swap
+  fix was committed and pushed to the v6.39.2 PR branch but did not
+  land on `main` when the PR was merged (GitHub merge used the
+  earlier commit at PR-edit time). Re-shipped as v6.39.3 to actually
+  roll the fix out.
+
 ## [6.39.2] - 2026-05-31
 
 ### Fixed
