@@ -16,10 +16,27 @@
 const MOBILE_MAX = 767; // < 768px  → mobile
 const DESKTOP_MIN = 1024; // ≥ 1024px → desktop; the 768–1023px band is tablet.
 
-// SSR / prerender default: adapter-static prerenders without a window, so we
-// render the desktop tree (the historical default) and reconcile on mount.
-let isMobileState = $state(false);
-let isDesktopState = $state(true);
+function canMatch(): boolean {
+	return typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+}
+
+// Read the current breakpoint straight from matchMedia. Used both for the
+// eager initial value (below) and on every change event.
+function readMobile(): boolean {
+	return canMatch() ? window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches : false;
+}
+function readDesktop(): boolean {
+	// SSR / prerender (no window): default to desktop — adapter-static
+	// prerenders the desktop tree, then the browser reconciles eagerly below.
+	return canMatch() ? window.matchMedia(`(min-width: ${DESKTOP_MIN}px)`).matches : true;
+}
+
+// Eager initial values: in the browser the module loads during hydration when
+// `window` is available, so consumers (and toggle handlers that branch on
+// `isDesktop`) see the correct breakpoint on the very first render — no flash,
+// no race. Falls back to the desktop default during SSR.
+let isMobileState = $state(readMobile());
+let isDesktopState = $state(readDesktop());
 
 /**
  * Wire up the matchMedia listeners. Call once from the root layout's $effect
@@ -28,7 +45,7 @@ let isDesktopState = $state(true);
  * (SSR/prerender, or a test environment that hasn't stubbed it).
  */
 export function initViewport(): (() => void) | undefined {
-	if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+	if (!canMatch()) {
 		return undefined;
 	}
 
