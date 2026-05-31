@@ -117,7 +117,7 @@
 	<title>Sets — Iris</title>
 </svelte:head>
 
-<div class="flex items-center justify-between">
+<div class="flex flex-wrap items-center justify-between gap-2">
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">
 			Sets
@@ -161,7 +161,7 @@
 		</button>
 	</div>
 </div>
-<div class="mt-3 flex items-center gap-4">
+<div class="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">
 	<input
 		type="search"
 		bind:value={searchQuery}

@@ -363,7 +363,7 @@
 		{/if}
 
 		<!-- Main content landmark -->
-		<main id="main-content" class="flex flex-1 flex-col p-6" tabindex="-1">
+		<main id="main-content" class="flex min-w-0 flex-1 flex-col p-4 md:p-6" tabindex="-1">
 			{@render children()}
 		</main>
 	</div>

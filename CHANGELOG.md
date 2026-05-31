@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     scroll-lock, Escape, focus-restore), auto-closing on navigation and when
     the viewport grows to desktop. Desktop keeps the persistent collapsible
     sidebar unchanged. The nav markup is shared via a single snippet.
+  - **Lists + detail pages** — responsive page gutters (`p-4 md:p-6`),
+    wrapping toolbars/headers, horizontally-scrollable section tab bars, and
+    the two-column `auto 1fr` definition grids on element/package detail pages
+    collapse to a single column on mobile (new `.detail-grid` helper). Wide
+    metadata/relationship tables scroll within their section instead of
+    forcing page-wide horizontal overflow.
 
 ## [6.40.0] - 2026-05-31
 

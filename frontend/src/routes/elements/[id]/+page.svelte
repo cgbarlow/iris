@@ -544,7 +544,7 @@
 		{error}
 	</div>
 {:else if entity}
-	<div class="flex items-center justify-between">
+	<div class="flex flex-wrap items-center justify-between gap-2">
 		<div>
 			<div class="flex flex-wrap items-center gap-3">
 				<h1 class="text-2xl font-bold" style="color: var(--color-fg)">{entity.name}</h1>
@@ -604,7 +604,7 @@
 	<!-- Tab navigation. ADR-208 (v6.16.0): Relationships first; the
 		 old "Used In Diagrams" tab is folded into Relationships as a
 		 section, alongside the new Package membership section. -->
-	<div class="mt-6 flex gap-1 border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Element sections">
+	<div class="mt-6 flex gap-1 overflow-x-auto border-b" style="border-color: var(--color-border)" role="tablist" aria-label="Element sections">
 		<button
 			role="tab"
 			aria-selected={activeTab === 'relationships'}
@@ -686,8 +686,8 @@
 							<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
-					<Accordion.Content class="pb-4">
-						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+					<Accordion.Content class="pb-4 overflow-x-auto">
+						<dl class="detail-grid grid gap-3">
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">Name</dt>
 							<dd>
 								{#if editingDetails}
@@ -867,7 +867,7 @@
 								<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 							</Accordion.Trigger>
 						</Accordion.Header>
-						<Accordion.Content class="pb-4">
+						<Accordion.Content class="pb-4 overflow-x-auto">
 							{#if editingDetails}
 								<table class="w-full text-sm" style="color: var(--color-fg)">
 									<thead>
@@ -947,8 +947,8 @@
 							<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
-					<Accordion.Content class="pb-4">
-						<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+					<Accordion.Content class="pb-4 overflow-x-auto">
+						<dl class="detail-grid grid gap-3">
 							<dt class="text-sm font-medium" style="color: var(--color-muted)">ID</dt>
 							<dd class="text-sm" style="color: var(--color-fg)">{entity.id}</dd>
 
@@ -1027,7 +1027,7 @@
 							<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 						</Accordion.Trigger>
 					</Accordion.Header>
-					<Accordion.Content class="pb-4">
+					<Accordion.Content class="pb-4 overflow-x-auto">
 						{@const meta = entity.metadata as Record<string, unknown> | null | undefined}
 						{@const hasMeta = !!(meta && (meta.stereotype || meta.version || meta.scope || meta.abstract || meta.persistence || meta.author || meta.complexity || meta.phase || meta.created_date || meta.modified_date || meta.gen_type || (Array.isArray(meta.tagged_values) && (meta.tagged_values as unknown[]).length > 0)))}
 						{#if hasMeta || editingDetails}
@@ -1054,7 +1054,7 @@
 									</dd>
 								{/if}
 							{/snippet}
-							<dl class="grid gap-3" style="grid-template-columns: auto 1fr">
+							<dl class="detail-grid grid gap-3">
 								{@render scalarRow('Stereotype', (meta?.stereotype as string) ?? '', 'Stereotype', () => editStereotype, (v) => (editStereotype = v))}
 								{@render scalarRow('Metadata Version', (meta?.version as string) ?? '', 'Metadata Version', () => editMetaVersion, (v) => (editMetaVersion = v))}
 								{@render scalarRow('Scope', (meta?.scope as string) ?? '', 'Scope', () => editScope, (v) => (editScope = v))}
@@ -1232,6 +1232,7 @@
 				{:else if relationships.length === 0}
 					<p style="color: var(--color-muted)">No relationships yet. Relationships are created automatically when elements are connected by edges in a view canvas.</p>
 				{:else}
+					<div class="overflow-x-auto">
 					<table class="w-full text-sm">
 						<thead>
 							<tr style="border-bottom: 1px solid var(--color-border)">
@@ -1260,6 +1261,7 @@
 							{/each}
 						</tbody>
 					</table>
+					</div>
 				{/if}
 			</section>
 		{:else if activeTab === 'versions'}

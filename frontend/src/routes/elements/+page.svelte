@@ -383,7 +383,7 @@
 	<title>Elements — Iris</title>
 </svelte:head>
 
-<div class="flex items-center justify-between">
+<div class="flex flex-wrap items-center justify-between gap-2">
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Elements</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Browse and manage architectural elements.</p>

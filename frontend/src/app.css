@@ -161,6 +161,19 @@ body.scroll-locked {
 	}
 }
 
+/* Definition grids on detail pages (elements/packages) — term + value in two
+   columns on desktop, stacked single column on mobile (ADR-229). Replaces the
+   inline `grid-template-columns: auto 1fr` so a media query can override it
+   (inline styles can't be). Pair with Tailwind `grid gap-3`. */
+.detail-grid {
+	grid-template-columns: auto 1fr;
+}
+@media (max-width: 767px) {
+	.detail-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
 /* Screen-reader only utility */
 .sr-only {
 	position: absolute;
