@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.39.0] - 2026-05-31
+
+### Added
+
+- **Element metadata edit UI** (ADR-228, SPEC-228-A). Closes the
+  long-standing frontend gap where `metadata.status`, the Extended
+  section's eleven scalars (stereotype / version / scope / abstract /
+  persistence / author / complexity / phase / EA created+modified
+  dates / gen_type), and the `metadata.tagged_values` table were
+  display-only despite the backend accepting `metadata` on
+  `ElementUpdate` since v6.36.1. Now:
+  - Status edits via a free-text `<input list="status-suggestions">`
+    with a `<datalist>` of common Sparx values (Approved, Proposed,
+    Implemented, Validated, Mandatory).
+  - Each Extended scalar gets a plain `<input>` in edit mode,
+    initialised from `entity.metadata`. Blanking a field deletes the
+    key from `metadata` on save (matches the existing Attributes
+    pattern).
+  - Tagged-values table becomes an editable grid: per-row `property`,
+    `value`, `notes` inputs + ✕ delete + footer `+ Add Tagged Value`
+    button. Rows with a blank property are dropped at save.
+  - The Sparx `#NOTES#` convention (a `value` like `"3#NOTES#Values:
+    1,2,3"`) is preserved across the edit boundary via a new
+    `frontend/src/lib/utils/taggedValues.ts` util — `splitTaggedValue`
+    surfaces the meaningful value and the prescriptive description in
+    their own controls; `joinTaggedValue` reassembles on save; empty
+    notes omits the marker. `isUnsetTaggedValue` mirrors the backend's
+    `_extract_tagged_value` (`null` / `""` / `"-"` / `"-#NOTES#…"`).
+
+### Fixed
+
+- **Element PUT body no longer sends `element_type`** — `ElementUpdate`
+  doesn't accept it (element type is immutable per ADR-178), so the
+  field was a no-op. Dropped from `saveEntityMetadata`'s body
+  construction. The element-type edit control on the page is
+  unchanged for now (its no-op-on-save behaviour predates this PR
+  and is tracked as a follow-up affordance cleanup).
+
 ## [6.38.0] - 2026-05-31
 
 ### Added
