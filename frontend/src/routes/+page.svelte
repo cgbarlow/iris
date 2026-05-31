@@ -540,7 +540,7 @@
 	<!-- v5.4.0 (#12): Collections + Sets cards get a muted-grey background
 		 (`dashboard-card--ambient`) so they read as "scope filters" distinct
 		 from the working-content cards (Views, Elements). -->
-	<div class="mt-6 grid grid-cols-4 gap-4" style="max-width: 1000px">
+	<div class="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4" style="max-width: 1000px">
 		<div
 			class="dashboard-card--ambient rounded border p-4 text-center"
 			style="border-color: var(--color-border); color: var(--color-fg); background: var(--color-surface)"

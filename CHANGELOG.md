@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.1] - 2026-05-31
+
+### Fixed
+
+- **Mobile dashboard overflow (ADR-229 follow-up).** The dashboard
+  count-cards (Collections / Sets / Views / Elements) were forced into
+  four columns at every width, so on a phone each card was too narrow for
+  its label and the row pushed a few pixels of horizontal overflow. The
+  grid is now `grid-cols-2 md:grid-cols-4` — two columns on mobile, four
+  on desktop. Caught by driving the live production site at a 393px
+  viewport (the empty test backend didn't render enough to surface it).
+
 ## [6.41.0] - 2026-05-31
 
 ### Added
