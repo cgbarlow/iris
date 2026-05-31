@@ -980,11 +980,15 @@
 											style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 										/>
 										<datalist id="status-suggestions">
-											<option value="Approved"></option>
-											<option value="Proposed"></option>
-											<option value="Implemented"></option>
-											<option value="Validated"></option>
-											<option value="Mandatory"></option>
+											<!-- v6.39.1: Chrome/Edge show NOTHING in the datalist
+												 dropdown when an <option> has only a `value` attribute
+												 and no text node. Repeating the value as the label
+												 is the cross-browser pattern. -->
+											<option value="Approved">Approved</option>
+											<option value="Proposed">Proposed</option>
+											<option value="Implemented">Implemented</option>
+											<option value="Validated">Validated</option>
+											<option value="Mandatory">Mandatory</option>
 										</datalist>
 									{:else}
 										{(entity.metadata as Record<string, unknown>).status}
