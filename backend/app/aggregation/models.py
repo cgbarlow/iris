@@ -146,3 +146,10 @@ class AggregationResult(BaseModel):
     # cached values (or callers that hand-construct results) remain
     # parseable.
     profile_updated_at: str | None = None
+    # ADR-227 fix v6.39.2: the engine reads every inner-token element's
+    # `metadata` / `data` / `name` during the walk. The diagram-level
+    # `source_versions` doesn't change when only an element's metadata
+    # flips (e.g. a status edit), so the cache used to serve stale
+    # aggregated output. Track element versions too — checked alongside
+    # `source_versions` on revalidate.
+    element_versions: dict[str, int] = Field(default_factory=dict)
