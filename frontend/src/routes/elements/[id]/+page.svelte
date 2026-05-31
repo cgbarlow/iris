@@ -528,7 +528,7 @@
 </svelte:head>
 
 <nav aria-label="Breadcrumb" class="mb-4 text-sm" style="color: var(--color-muted)">
-	<ol class="flex flex-wrap items-baseline gap-1">
+	<ol class="flex flex-nowrap items-baseline gap-1 overflow-x-auto whitespace-nowrap">
 		<li><a href="/elements" style="color: var(--color-primary)">Elements</a></li>
 		<li class="flex items-baseline gap-1">
 			<span aria-hidden="true">/</span>

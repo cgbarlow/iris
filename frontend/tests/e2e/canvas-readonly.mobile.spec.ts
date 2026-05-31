@@ -57,19 +57,42 @@ test('canvas layout authoring is locked on mobile but panning works', async ({ p
 	const before = await viewportEl.evaluate((el) => getComputedStyle(el).transform);
 	const box = await page.locator('.svelte-flow__pane').boundingBox();
 	if (box) {
-		const cx = box.x + box.width / 2;
-		const cy = box.y + box.height / 2;
-		await page.mouse.move(cx, cy);
+		// Start in the top-right of the pane — empty canvas, clear of the
+		// fitView-centred node (centre), the mode badges (top-left) and xyflow's
+		// zoom Controls (bottom-left) — so the gesture pans the viewport.
+		const sx = box.x + box.width - 28;
+		const sy = box.y + 28;
+		await page.mouse.move(sx, sy);
 		await page.mouse.down();
-		await page.mouse.move(cx - 100, cy - 60, { steps: 8 });
+		await page.mouse.move(sx - 140, sy + 110, { steps: 10 });
 		await page.mouse.up();
 	}
 	const after = await viewportEl.evaluate((el) => getComputedStyle(el).transform);
 	expect(after).not.toBe(before);
 });
 
-test('the full-screen (FocusView) trigger is hidden on mobile', async ({ page }) => {
+test('the full-screen (FocusView) trigger is available on mobile', async ({ page }) => {
+	test.slow();
 	await loginAsAdmin(page);
 	await page.goto(`/views/${diagramId}`);
-	await expect(page.getByRole('button', { name: 'Full screen' })).toHaveCount(0);
+	await expect(page.getByText('Loading diagram...')).toHaveCount(0, { timeout: 20_000 });
+	// Restored on mobile (ADR-229 follow-up) — fullscreen canvas viewing.
+	await expect(page.getByRole('button', { name: 'Full screen' })).toBeVisible();
+});
+
+test('the hierarchy toggle opens an overlay drawer on mobile', async ({ page }) => {
+	test.slow();
+	await loginAsAdmin(page);
+	await page.goto(`/views/${diagramId}`);
+	await expect(page.getByText('Loading diagram...')).toHaveCount(0, { timeout: 20_000 });
+
+	const aside = page.locator('[data-hierarchy-sidebar]');
+	// Toggle the hierarchy on.
+	await page.getByRole('button', { name: 'Toggle hierarchy sidebar' }).first().click();
+	await expect(aside).toBeVisible();
+	// On mobile it's a fixed overlay (not the inline sticky column).
+	await expect(aside).toHaveCSS('position', 'fixed');
+	// The backdrop closes it.
+	await page.getByRole('button', { name: 'Close hierarchy' }).click();
+	await expect(aside).toBeHidden();
 });

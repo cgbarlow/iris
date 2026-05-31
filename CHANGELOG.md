@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.2] - 2026-05-31
+
+### Fixed
+
+- **Mobile views polish (ADR-229 follow-up).** Five fixes from testing the
+  diagram-view page on a phone:
+  - **Breadcrumbs** no longer wrap to several lines — they're a single
+    horizontally-scrollable row (`flex-nowrap overflow-x-auto`) on the view,
+    element and package pages.
+  - **Full-screen (FocusView) button** is shown on mobile again — fullscreen
+    canvas viewing is one of the most useful things to do on a phone.
+  - **View action buttons** (Add to context / Bookmark / Clone / Delete)
+    wrap instead of spilling off the right edge.
+  - **Header sign-out** stays inside the header: the scope breadcrumb
+    (collection / set) is hidden on mobile and the action group is pinned.
+  - **Hierarchy tree toggle** now works on mobile — it opens the tree as a
+    fixed left overlay drawer (with a tap-to-close backdrop) instead of
+    doing nothing; fullscreen stays pure-canvas.
+
 ## [6.41.1] - 2026-05-31
 
 ### Fixed
