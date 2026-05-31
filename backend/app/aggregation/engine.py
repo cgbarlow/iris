@@ -602,20 +602,34 @@ async def _format_output(
 async def run(
     db: DatabasePort,
     *,
-    profile_id: str,
+    profile_id: str | None = None,
+    profile_data: ProfileData | None = None,
     source_diagram_id: str,
 ) -> AggregationResult:
-    """Apply ``profile_id`` to ``source_diagram_id``. See SPEC-212-b.
+    """Apply a profile to ``source_diagram_id``. See SPEC-212-b.
 
-    ADR-227 (v6.38.0): two-layer cache wrapper. Layer 1 is per-request
-    memoisation via a ContextVar — within one HTTP request, repeated
-    `(profile_id, source_diagram_id)` calls (the common case for a
-    smart-markdown body with multiple `{{aggregation:<view>:…}}` tokens)
-    share a single result. Layer 2 is a process-wide LRU keyed by the
-    same pair, revalidated against profile `updated_at` plus the
-    `current_version` of every diagram in the cached
-    `AggregationResult.source_versions`.
+    Exactly one of ``profile_id`` (saved profile lookup) or
+    ``profile_data`` (inline draft, e.g. the form-editor live preview
+    per SPEC-212-f) must be provided. Inline drafts bypass both cache
+    layers — they're ephemeral and there's no stable key to revalidate
+    against. Saved-profile calls use the ADR-227 two-layer cache: a
+    ContextVar-scoped per-request memo plus a process-wide LRU keyed
+    by ``(profile_id, source_diagram_id)`` and revalidated against the
+    profile's ``updated_at`` and every cached diagram's
+    ``current_version``.
     """
+    if profile_data is not None:
+        # Inline draft — skip both caches; the caller is iterating on
+        # a profile that isn't saved anywhere so there's no stable key.
+        return await _run_uncached(
+            db,
+            profile_id=None,
+            profile_data=profile_data,
+            source_diagram_id=source_diagram_id,
+        )
+    if profile_id is None:
+        raise AggregationProfileNotFound("")
+
     # Layer 1 — per-request memo.
     req_key = ("agg", profile_id, source_diagram_id)
     hit = engine_cache.lookup_request(req_key)
@@ -656,16 +670,27 @@ async def run(
 async def _run_uncached(
     db: DatabasePort,
     *,
-    profile_id: str,
+    profile_id: str | None,
+    profile_data: ProfileData | None = None,
     source_diagram_id: str,
 ) -> AggregationResult:
     """Engine cold path — the original `run` body. Always runs end-to-end;
-    callers are responsible for any caching."""
-    profile_row = await get_aggregation_profile(db, profile_id)
-    if profile_row is None:
-        raise AggregationProfileNotFound(profile_id)
-    p = ProfileData(**profile_row["profile_data"])
-    profile_updated_at = str(profile_row.get("updated_at") or "")
+    callers are responsible for any caching.
+
+    Pass ``profile_data`` for an inline draft (the form-editor live
+    preview path); otherwise ``profile_id`` is loaded from the DB.
+    """
+    if profile_data is not None:
+        p = profile_data
+        profile_updated_at = ""
+    else:
+        if profile_id is None:
+            raise AggregationProfileNotFound("")
+        profile_row = await get_aggregation_profile(db, profile_id)
+        if profile_row is None:
+            raise AggregationProfileNotFound(profile_id)
+        p = ProfileData(**profile_row["profile_data"])
+        profile_updated_at = str(profile_row.get("updated_at") or "")
 
     # Sanity: source must exist.
     src_name, src_version = await _diagram_meta(db, source_diagram_id)

@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.40.0] - 2026-05-31
+
+### Added
+
+- **Form-based aggregation profile editor (SPEC-212-f).** A non-
+  technical user can now create or modify an aggregation profile
+  end-to-end without seeing JSON. Four UX additions land together:
+  - **Output fields** are lifted from the JSON textarea into form
+    widgets — `aggregation_fn` (Sum/Count radio), `group_by` text
+    input with helper menu, `sort_groups` / `sort_items_within_group`
+    selects, `show_per_source_breakdown` checkbox + `breakdown_format`
+    input, and the existing `include_provenance` checkbox.
+  - **`line_format` chip composer** with clickable placeholder chips
+    (`{element.name}`, `{element.id}`, `{sum_value}`, `{bucket}`,
+    `{bucket_spaced}`) that insert at the cursor. When the editor
+    runs against a known source diagram, a debounced live-preview
+    pane shows the first 5 rendered lines via the inline-draft run
+    path.
+  - **Traversal wizard** — a two-step builder for `traversal.outer`
+    (optional, with multiplier sub-form) and `traversal.inner`. The
+    value / bucket attribute-path inputs offer a drill-down picker
+    that reuses the existing `/api/elements/{id}/data-tree` endpoint;
+    falls back to a plain text input when no example element is
+    available (globals authoring path).
+  - **Template gallery** replaces the blank-form default on "New
+    profile". Card grid with the five seeded global profiles plus a
+    Blank card; selecting a card pre-populates the form (no JSON
+    visible).
+  The JSON textarea is retained as an opt-in "Advanced (JSON)"
+  disclosure for power users and for fields the form doesn't surface
+  yet. When Advanced is open, JSON is authoritative on save.
+- **Inline `profile_data` on `POST /api/aggregation/run`** — the
+  endpoint now accepts an optional inline profile draft alongside
+  the existing `profile_id` lookup. Exactly-one-of is enforced. The
+  inline path bypasses the ADR-227 two-layer cache and feeds the
+  draft straight through `_run_uncached`. Mirrored on the MCP
+  `aggregate` tool (new optional `profile_data` arg) and the
+  `iris aggregate` CLI (new `--profile-data <path|->` flag) per the
+  Protocol §14 surface-parity invariant.
+
+### Changed
+
+- `AggregationProfileEditor.svelte` orchestrates four new child
+  components — `LineFormatComposer.svelte`, `TraversalBuilder.svelte`,
+  `AttributePathPicker.svelte`, `AggregationTemplateGallery.svelte`
+  — plus a new `aggregationProfileHelpers.ts` module of pure
+  read/patch/assemble functions shared across the children (DRY §13).
+- `AggregationRunRequest.profile_id` is now optional (paired with
+  `profile_data`). The route handler enforces exactly-one-of and
+  returns a clear `400` on misuse.
+
 ## [6.39.3] - 2026-05-31
 
 ### Fixed

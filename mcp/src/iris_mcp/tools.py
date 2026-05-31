@@ -682,9 +682,16 @@ async def _aggregate(c: IrisClient, args: dict[str, Any]) -> str:
     to a downstream consumer.
     """
     body: dict[str, Any] = {
-        "profile_id": args["profile_id"],
         "source_diagram_id": args["source_diagram_id"],
     }
+    # Exactly-one-of: ``profile_id`` references a saved profile;
+    # ``profile_data`` is an inline draft (SPEC-212-f live preview).
+    # The REST endpoint enforces the mutual-exclusion; we pass through
+    # whichever the caller supplied.
+    if "profile_id" in args and args["profile_id"] is not None:
+        body["profile_id"] = args["profile_id"]
+    if "profile_data" in args and args["profile_data"] is not None:
+        body["profile_data"] = args["profile_data"]
     try:
         resp = await c._request(
             "POST", "/api/aggregation/run", json=body,
@@ -2187,8 +2194,25 @@ TOOLS: list[Tool] = [
         input_schema=_schema({
             "profile_id": _str_arg(
                 "profile_id",
-                "The aggregation profile to apply. Look up names via "
-                "`list_aggregation_profiles`.",
+                "The saved aggregation profile to apply. Look up names "
+                "via `list_aggregation_profiles`. Provide either this "
+                "OR `profile_data` (not both).",
+                required=False,
+            ),
+            "profile_data": (
+                {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "Inline profile draft (SPEC-212-f). Same shape "
+                        "as `create_aggregation_profile.profile_data` "
+                        "— must contain `traversal` and `output`. Use "
+                        "this for live-preview / one-off runs without "
+                        "persisting the profile. Provide either this "
+                        "OR `profile_id` (not both)."
+                    ),
+                },
+                False,
             ),
             "source_diagram_id": _str_arg(
                 "source_diagram_id",

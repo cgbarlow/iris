@@ -217,3 +217,9 @@ For the shopping-list demo (~30 recipes × ~10 ingredients), full computation is
 - Dangling outer token (deleted diagram) → warning, no contribution.
 
 `backend/tests/test_aggregation/test_seeded_profiles_smoke.py` — for each of the five seeded profiles, build a minimal fixture and assert the engine runs without raising. Asserts the seeded JSON validates against the schema. Does NOT assert specific output (output-format details are per-profile).
+
+## 12. Inline `profile_data` path (SPEC-212-f)
+
+`engine.run()` accepts an optional `profile_data: ProfileData | None` kwarg in addition to `profile_id`. When `profile_data` is supplied, the engine bypasses the ADR-227 two-layer cache (no stable key to revalidate against) and feeds the supplied `ProfileData` straight into the cold path — exactly the same internal walk/group/format pipeline as the persisted-profile case, no logic duplication. Used by the form-editor's live-preview pane (`LineFormatComposer.svelte`) and by callers that want a one-off run without persisting a profile. Exactly one of `profile_id` or `profile_data` must be set; the REST/MCP/CLI surfaces enforce this on their side and the engine treats the un-supplied case as `AggregationProfileNotFound`.
+
+`backend/tests/test_aggregation/test_inline_profile_run.py` — covers the inline path end-to-end via `POST /api/aggregation/run`.
