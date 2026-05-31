@@ -140,3 +140,9 @@ class AggregationResult(BaseModel):
     # `aggregation:<view>:group_count:<group>` smart-markdown token.
     # Empty when `output.group_by` is unset.
     group_counts: dict[str, int] = Field(default_factory=dict)
+    # ADR-227: profile `updated_at` at the time this result was
+    # computed. Used by the engine cache to revalidate a cached
+    # AggregationResult against the live profile. Optional so older
+    # cached values (or callers that hand-construct results) remain
+    # parseable.
+    profile_updated_at: str | None = None

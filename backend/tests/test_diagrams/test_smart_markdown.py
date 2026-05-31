@@ -1432,3 +1432,86 @@ async def test_set_element_count_excludes_deleted_elements(
     assert rendered.strip() == "size=1"
     # And the live element is the one we kept.
     assert keep != drop
+
+
+# ── ADR-227: per-request memo of element fetches ────────────────────
+
+
+def _count_sql_calls(db, substring: str):
+    """Wrap `db.execute` to count calls whose SQL contains `substring`.
+    Returns the original execute method (for restore) and a dict whose
+    `n` key records the count."""
+    counter = {"n": 0}
+    real_execute = db.execute
+
+    async def counting(sql, *args, **kwargs):
+        if substring in sql:
+            counter["n"] += 1
+        return await real_execute(sql, *args, **kwargs)
+
+    db.execute = counting  # type: ignore[method-assign]
+    return real_execute, counter
+
+
+@pytest.mark.asyncio
+async def test_element_row_memoised_within_one_render(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """Three tokens against the same element should read the element
+    row ONCE from SQL (per-request memo via the request_cache
+    ContextVar). The memo wrapper functions are still entered N times;
+    the assertion is that the underlying SELECT runs exactly once."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(
+        c, h, set_id, name="X", description="d",
+        metadata={"status": "Approved"},
+    )
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"a={{{{element:{eid}:name}}}} "
+        f"b={{{{element:{eid}:description}}}} "
+        f"c={{{{element:{eid}:meta:status}}}}",
+    )
+    # `db_manager.main_db` is a property that returns a fresh adapter
+    # each access — capture once so the wrapped `.execute` applies to
+    # the same instance we pass into compute_smart_markdown_content.
+    db = db_manager.main_db
+    real, counter = _count_sql_calls(
+        db,
+        "SELECT ev.name, ev.description, ev.data, ev.metadata FROM elements",
+    )
+    try:
+        rendered = await compute_smart_markdown_content(db, diag_id)
+    finally:
+        db.execute = real  # type: ignore[method-assign]
+    assert "X" in rendered and "Approved" in rendered
+    # 3 element tokens → 1 SELECT of the element row.
+    assert counter["n"] == 1, (
+        f"element row SELECT fired {counter['n']} times — expected 1"
+    )
+
+
+@pytest.mark.asyncio
+async def test_relationship_count_memoised_within_one_render(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """Two `relationship_count` tokens on the same element fire ONE
+    `SELECT COUNT(*) FROM relationships` query."""
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="X")
+    diag_id = await _create_smart_markdown_diagram(
+        c, h, set_id,
+        f"a={{{{element:{eid}:relationship_count}}}} "
+        f"b={{{{element:{eid}:relationship_count:raw}}}}",
+    )
+    db = db_manager.main_db
+    real, counter = _count_sql_calls(db, "FROM relationships")
+    try:
+        await compute_smart_markdown_content(db, diag_id)
+    finally:
+        db.execute = real  # type: ignore[method-assign]
+    assert counter["n"] == 1, (
+        f"relationships COUNT fired {counter['n']} times — expected 1"
+    )

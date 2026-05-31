@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.38.0] - 2026-05-31
+
+### Added
+
+- **Two-layer aggregation engine cache** (ADR-227, SPEC-227-A) — makes
+  smart-markdown dashboards composed of many `{{aggregation:<view>:…}}`
+  tokens fast to load.
+  - **Layer 1 — per-request memoisation via a `ContextVar`.** Wraps
+    `compute_smart_markdown_content` and the aggregation_list synth
+    hook in `diagrams/service.py`. Repeated calls within one render
+    for the same `(profile_id, source_diagram_id)` (or the same
+    element row / relationship count / diagram name) share a single
+    result. The GEANZ Dashboard's six aggregation tokens collapse to
+    three engine runs, and 20 hub-element fetches collapse to five.
+  - **Layer 2 — process-wide version-keyed LRU.** Hot path keyed by
+    `(profile_id, source_diagram_id)`, value = the full
+    `AggregationResult`. On lookup, revalidates against
+    `aggregation_profiles.updated_at` + a single batched
+    `SELECT id, current_version FROM diagrams WHERE id IN (...)` over
+    the diagrams in `AggregationResult.source_versions` — two
+    queries on hit vs the 50–150 queries the engine would otherwise
+    re-run. Invalidation is implicit: any version bump on a
+    referenced diagram or the bound profile causes the next lookup
+    to miss naturally; no explicit eviction hooks.
+  - New `AggregationResult.profile_updated_at` field carries the
+    bound profile's `updated_at` from compute time, supporting
+    Layer 2 revalidation.
+  - LRU size hard-coded to 512 entries; per-uvicorn-worker (in-process
+    only — no Redis dependency added). A shared cache is a clean
+    follow-up if cold-hit rates ever become a problem.
+- **Element-fetch memo helpers in `smart_markdown.py`** —
+  `_fetch_element_row` (new), plus per-request memo on
+  `_fetch_element_relationship_count`,
+  `_fetch_element_diagram_usage_count`, and the `element` /
+  `package` / `diagram` / `set` / `collection` branches of
+  `_fetch_entity_display_name`. The same element / link target is
+  read once per render regardless of how many tokens reference it.
+
 ## [6.37.3] - 2026-05-30
 
 ### Fixed
