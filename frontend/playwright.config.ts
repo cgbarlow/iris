@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';
 
 const bddTestDir = defineBddConfig({
@@ -32,8 +32,20 @@ export default defineConfig({
 		{
 			name: 'e2e',
 			testDir: 'tests/e2e',
-			testIgnore: ['**/uat/**'],
+			// Mobile specs run in the dedicated `mobile` project (Pixel 5 device);
+			// keep them out of the desktop suite so the two stay disjoint.
+			testIgnore: ['**/uat/**', '**/*.mobile.spec.ts'],
 			use: { browserName: 'chromium' },
+		},
+		{
+			// v6.41.0 (ADR-229): mobile-responsive verification. Pixel 5 device
+			// descriptor (393×851, touch, mobile UA). Shares the same
+			// localhost:4173 webServer as `e2e`; runs on demand via
+			// `npm run test:mobile`. Specs are named *.mobile.spec.ts.
+			name: 'mobile',
+			testDir: 'tests/e2e',
+			testMatch: /\.mobile\.spec\.ts$/,
+			use: { ...devices['Pixel 5'] },
 		},
 		{
 			name: 'bdd',

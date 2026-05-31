@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.0] - 2026-05-31
+
+### Added
+
+- **Mobile-responsive foundations (ADR-229 / SPEC-229-A, Phase 0 of the
+  mobile rollout).** Iris now has the primitives to adapt its UI when a
+  mobile screen is detected, ahead of adapting each surface in following
+  phases:
+  - **Viewport store** — `frontend/src/lib/stores/viewport.svelte.ts`
+    exposes reactive `isMobile` / `isTablet` / `isDesktop` flags built on
+    `matchMedia`, generalising the one-off responsive check that lived
+    inline on the dashboard. Breakpoints mirror Tailwind v4 defaults
+    (`< 768px` mobile, `768–1023px` tablet, `≥ 1024px` desktop). SSR-safe:
+    defaults to desktop during prerender and reconciles on mount. Wired
+    once from the root layout.
+  - **Responsive CSS tokens** in `app.css` — `--page-pad` (tighter gutters
+    on mobile), `.drawer-backdrop`, and `body.scroll-locked` for the
+    upcoming nav drawer and bottom sheets. Existing WCAG utilities are
+    reused, not duplicated.
+  - **Mobile test surface** — a Playwright `mobile` project (Pixel 5
+    device) running `*.mobile.spec.ts`, kept disjoint from the desktop
+    `e2e` suite; `npm run test:mobile`. Unit tests cover the store's
+    breakpoint boundaries, SSR default, reactivity, and listener cleanup.
+
 ## [6.40.0] - 2026-05-31
 
 ### Added
