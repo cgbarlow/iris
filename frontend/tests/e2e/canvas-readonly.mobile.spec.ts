@@ -92,7 +92,12 @@ test('the hierarchy toggle opens an overlay drawer on mobile', async ({ page }) 
 	await expect(aside).toBeVisible();
 	// On mobile it's a fixed overlay (not the inline sticky column).
 	await expect(aside).toHaveCSS('position', 'fixed');
-	// The backdrop closes it.
-	await page.getByRole('button', { name: 'Close hierarchy' }).click();
+	// It fills the viewport height (a fixed flex column can otherwise
+	// shrink-wrap to content, leaving the tree area looking empty).
+	const vh = await page.evaluate(() => window.innerHeight);
+	const box = await aside.boundingBox();
+	expect(box!.height).toBeGreaterThan(vh * 0.8);
+	// The backdrop closes it — tap the strip to the right of the ≤320px drawer.
+	await page.getByRole('button', { name: 'Close hierarchy' }).click({ position: { x: 370, y: 400 } });
 	await expect(aside).toBeHidden();
 });

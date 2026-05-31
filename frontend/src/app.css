@@ -170,10 +170,13 @@ body.scroll-locked {
 		position: fixed !important;
 		left: 0 !important;
 		top: 0 !important;
-		bottom: 0 !important;
+		/* Explicit height — a fixed flex column with top+bottom can shrink-wrap
+		   to content instead of filling, leaving the tree area looking empty.
+		   100dvh fills the drawer so the tree flex-grows and scrolls. */
+		height: 100dvh !important;
+		max-height: 100dvh !important;
 		width: 85vw !important;
 		max-width: 320px !important;
-		max-height: 100dvh !important;
 		z-index: 50 !important;
 	}
 	.focus-view [data-hierarchy-sidebar],

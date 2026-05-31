@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.41.3] - 2026-05-31
+
+### Fixed
+
+- **Mobile hierarchy drawer height (ADR-229 follow-up).** When opened on
+  mobile the hierarchy overlay shrank to a short box (a fixed flex column
+  with `top`+`bottom` set can shrink-wrap to content rather than fill),
+  leaving the tree area looking empty below the search field. The drawer
+  now takes an explicit `height: 100dvh`, so the tree grows to fill it and
+  scrolls.
+
 ## [6.41.2] - 2026-05-31
 
 ### Fixed
