@@ -324,19 +324,22 @@ def parse_sparx_xmi(path: str) -> SparxXmiModel:
         m = _child(dg, "model")
         props = _child(dg, "properties")
         pkg_guid = m.get("package") if m is not None else None
-        # ADR-221: a composite (element-owned) diagram carries an `owner`
-        # GUID that differs from its containing package. Map it to the
-        # owning element's int id so the orchestrator can set that
-        # element's detail_diagram_id. A package-owned diagram (owner ==
-        # package) is not composite → leave ParentID unset. The
-        # orchestrator further filters to element ids, so a stray
-        # non-element owner is harmless.
+        # ADR-221 / ADR-235: a composite diagram is the child-diagram of an
+        # element. EA records this with the `parent` attribute, which names
+        # the owning element directly — this is the nesting Sparx shows in
+        # its Project Browser. The `owner` attribute, by contrast, only names
+        # the package the diagram is *filed* under (the GEANZ capability
+        # diagrams are all filed flat in the root package, yet each `parent`
+        # points at its capability element). Prefer `parent`; fall back to a
+        # non-package `owner` for exports that only set the latter. The
+        # orchestrator filters ParentID to real element ids, so a stray
+        # package/diagram reference here is harmless.
         owner_guid = m.get("owner") if m is not None else None
-        parent_id = (
-            guid_to_int.get(owner_guid)
-            if owner_guid and owner_guid != pkg_guid
-            else None
+        parent_guid = m.get("parent") if m is not None else None
+        parent_ref = parent_guid or (
+            owner_guid if owner_guid and owner_guid != pkg_guid else None
         )
+        parent_id = guid_to_int.get(parent_ref) if parent_ref else None
 
         cx = cy = None
         style1 = _child(dg, "style1")
