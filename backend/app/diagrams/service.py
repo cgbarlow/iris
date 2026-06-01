@@ -907,10 +907,12 @@ async def get_diagram_hierarchy(
     params: list[object] = []
     pkg_set_filter = ""
     diag_set_filter = ""
+    elem_set_filter = ""
     if set_id is not None:
         pkg_set_filter = "AND p.set_id = ? "
         diag_set_filter = "AND d.set_id = ? "
-        params = [set_id, set_id]
+        elem_set_filter = "AND e.set_id = ? "
+        params = [set_id, set_id, set_id]
 
     # ADR-202: resolve sort preference for this scope. Sets without a
     # set_id (root_id-only or full-repo queries) fall back to 'manual'.
@@ -951,6 +953,23 @@ async def get_diagram_hierarchy(
         "  JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "       AND d.current_version = dv.version "
         f"  WHERE d.is_deleted = 0 {diag_set_filter}"
+        # ADR-231: nested elements as tree nodes. Only elements INVOLVED in
+        # containment (have a parent element, or are themselves a parent) are
+        # included — so a flat element pool with no containment adds nothing
+        # and existing hierarchies are unchanged. The parent key is the parent
+        # element if set, else the package (the §E2 precedence rule).
+        "  UNION ALL "
+        "  SELECT e.id, ev.name, 'element' AS node_type, "
+        "         COALESCE(e.parent_element_id, e.package_id) AS parent_package_id, "
+        "         NULL AS diagram_type, NULL AS data, NULL AS notation, "
+        "         NULL AS sequence_order, e.created_at "
+        "  FROM elements e "
+        "  JOIN element_versions ev ON e.id = ev.element_id "
+        "       AND e.current_version = ev.version "
+        f"  WHERE e.is_deleted = 0 {elem_set_filter}"
+        "       AND (e.parent_element_id IS NOT NULL "
+        "            OR e.id IN (SELECT parent_element_id FROM elements "
+        "                        WHERE parent_element_id IS NOT NULL AND is_deleted = 0)) "
         ") t "
         f"ORDER BY {order_by}"  # noqa: S608 - order_by is from _HIERARCHY_ORDER_BY whitelist
     )

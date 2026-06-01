@@ -25,9 +25,12 @@ from app.element_templates.service import (
 from app.elements.service import (
     ElementDetailDiagramError,
     ElementPackageInvariantError,
+    ElementParentInvariantError,
     cascade_delete_element,
     create_element,
     get_element,
+    get_element_ancestors,
+    get_element_children,
     get_element_version,
     get_element_versions,
     list_elements,
@@ -90,10 +93,12 @@ async def create(
             set_id=fields.get("set_id"),
             package_id=fields.get("package_id"),
             detail_diagram_id=fields.get("detail_diagram_id"),
+            parent_element_id=fields.get("parent_element_id"),
             metadata=fields.get("metadata"),
             notation=fields.get("notation") or "simple",
         )
-    except (ElementPackageInvariantError, ElementDetailDiagramError) as exc:
+    except (ElementPackageInvariantError, ElementDetailDiagramError,
+            ElementParentInvariantError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
 
     # Apply template-supplied tags (if any) to the element_tags table.
@@ -328,6 +333,48 @@ async def get_package_memberships(
     return [PackageMembership(id=str(package_id), name=str(package_name))]
 
 
+class ElementTreeNode(BaseModel):
+    """A child or ancestor element in the containment tree (ADR-231)."""
+
+    id: str
+    name: str
+    element_type: str
+
+
+@router.get("/{element_id}/children", response_model=list[ElementTreeNode])
+async def get_children(
+    element_id: str,
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> list[ElementTreeNode]:
+    """Direct child elements of this element (ADR-231 containment).
+
+    404 if the element is missing or soft-deleted.
+    """
+    db = request.app.state.db_manager.main_db
+    if await get_element(db, element_id) is None:
+        raise HTTPException(status_code=404, detail="Element not found")
+    rows = await get_element_children(db, element_id)
+    return [ElementTreeNode(**r) for r in rows]
+
+
+@router.get("/{element_id}/ancestors", response_model=list[ElementTreeNode])
+async def get_ancestors(
+    element_id: str,
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> list[ElementTreeNode]:
+    """Containment breadcrumb (root-first), excluding this element (ADR-231).
+
+    404 if the element is missing or soft-deleted.
+    """
+    db = request.app.state.db_manager.main_db
+    if await get_element(db, element_id) is None:
+        raise HTTPException(status_code=404, detail="Element not found")
+    rows = await get_element_ancestors(db, element_id)
+    return [ElementTreeNode(**r) for r in rows]
+
+
 @router.get("/{element_id}/data-tree")
 async def get_data_tree(
     element_id: str,
@@ -398,9 +445,12 @@ async def update(
         update_kwargs["package_id"] = body.package_id
     if body.detail_diagram_id is not _ELEMENT_UPDATE_UNSET:
         update_kwargs["detail_diagram_id"] = body.detail_diagram_id
+    if body.parent_element_id is not _ELEMENT_UPDATE_UNSET:
+        update_kwargs["parent_element_id"] = body.parent_element_id
     try:
         result = await update_element(db, element_id, **update_kwargs)
-    except (ElementPackageInvariantError, ElementDetailDiagramError) as exc:
+    except (ElementPackageInvariantError, ElementDetailDiagramError,
+            ElementParentInvariantError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))  # noqa: B904
     if result is None:
         raise HTTPException(status_code=409, detail="Version conflict")

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.43.0] - 2026-06-01
+
+### Added
+
+- **Element → element containment (ADR-231).** Elements can now own child
+  elements, forming a navigable hierarchy — a new optional
+  `parent_element_id` axis alongside package membership (ADR-184) and the
+  detail-diagram drill (ADR-221). This lets Sparx EA `nestedClassifier`
+  models import with their full depth: the GEANZ Common Business
+  Capabilities set (capability *zone* → capability → sub-capability, 3
+  levels) previously flattened to two packages because the importer read
+  each element's `<model package>` but dropped its `<model owner>`. The
+  XMI importer now reads `owner`, links child → parent in an idempotent
+  post-process pass, and the diagram-hierarchy tree nests the elements
+  under their parent element (or package), reusing the existing tree
+  component. The element page shows a "Parent element" link and a "Child
+  elements" list.
+  - Backend: nullable `elements.parent_element_id` (paired SQLite m081 +
+    Supabase m087 migrations); service validation (parent exists, same-set
+    only, no cycles, no self-parent → 422); tri-state on create/update;
+    `GET /api/elements/{id}/children` and `/ancestors`.
+  - Surface parity: `parent_element_id` is set via the existing
+    create/update verbs on backend, MCP and CLI (`--parent-element-id`) —
+    no new write verb, ADR-178 untouched.
+  - Manual drag-to-reparent is deferred to a later phase.
+
 ## [6.42.0] - 2026-06-01
 
 ### Fixed

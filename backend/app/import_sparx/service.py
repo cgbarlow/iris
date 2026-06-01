@@ -1026,4 +1026,24 @@ async def import_sparx_model(
     if linked_detail:
         await db.commit()
 
+    # 8. Post-process: populate elements.parent_element_id from nestedClassifier
+    # containment (ADR-231). elem.Parent_Object_ID is the EA object-id of the
+    # parent ELEMENT; now that every element has an Iris UUID, link child →
+    # parent. Idempotent and runs over ALL elements (incl. ones skipped on a
+    # re-import), so re-importing an existing set back-fills the links.
+    linked_parent = False
+    for elem in elements:
+        if not elem.Parent_Object_ID:
+            continue
+        child_iris = element_map.get(elem.Object_ID)
+        parent_iris = element_map.get(elem.Parent_Object_ID)
+        if child_iris and parent_iris and child_iris != parent_iris:
+            await db.execute(
+                "UPDATE elements SET parent_element_id = ? WHERE id = ?",
+                (parent_iris, child_iris),
+            )
+            linked_parent = True
+    if linked_parent:
+        await db.commit()
+
     return summary

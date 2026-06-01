@@ -43,6 +43,10 @@ class QeaElement:
     Alias: str | None = None
     PDATA1: str | None = None
     StyleEx: str | None = None
+    # EA object-id of the parent element (nestedClassifier owner), ADR-231.
+    # None for top-level / package-owned elements. Resolved to an Iris
+    # parent_element_id in a post-process pass by the orchestrator.
+    Parent_Object_ID: int | None = None
 
 
 @dataclass

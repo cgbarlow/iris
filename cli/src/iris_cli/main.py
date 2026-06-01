@@ -821,6 +821,14 @@ def create_element_cmd(
             "diagram in another set."
         ),
     ),
+    parent_element_id: str | None = typer.Option(
+        None, "--parent-element-id",
+        help=(
+            "Optional parent element — the containment hierarchy "
+            "(v6.43.0, ADR-231). The parent must be a live element in the "
+            "same set; cross-set or cyclic parents return 422."
+        ),
+    ),
     notation: str | None = typer.Option(None, "--notation"),
     description: str | None = typer.Option(None, "--description"),
     data_json: str | None = typer.Option(None, "--data-json"),
@@ -853,6 +861,8 @@ def create_element_cmd(
         body["package_id"] = package_id
     if detail_diagram_id is not None:
         body["detail_diagram_id"] = detail_diagram_id
+    if parent_element_id is not None:
+        body["parent_element_id"] = parent_element_id
     if notation is not None:
         body["notation"] = notation
     if description is not None:
@@ -1087,6 +1097,15 @@ def update_element_cmd(
             "unchanged."
         ),
     ),
+    parent_element_id: str | None = typer.Option(
+        None, "--parent-element-id",
+        help=(
+            "Set or clear the element's parent in the containment "
+            "hierarchy (v6.43.0, ADR-231). Pass an element UUID in the "
+            "same set to set, the literal 'null' to clear, or omit to "
+            "leave unchanged. Cross-set or cyclic parents return 422."
+        ),
+    ),
 ) -> None:
     """Update an Element. Note: elements cannot be moved between
     diagrams — they travel with their parent diagram (ADR-178 invariant)."""
@@ -1095,13 +1114,16 @@ def update_element_cmd(
         "data": _parse_json_opt(data_json, "--data-json"),
         "metadata": _parse_json_opt(metadata_json, "--metadata-json"),
     }
-    # package_id / detail_diagram_id are tri-state at the PUT body level:
-    # include the key to set (string) or clear (null), omit to leave
-    # untouched. The _put_merge_partial helper strips None so we wire them
-    # by hand.
+    # package_id / detail_diagram_id / parent_element_id are tri-state at the
+    # PUT body level: include the key to set (string) or clear (null), omit
+    # to leave untouched. The _put_merge_partial helper strips None so we
+    # wire them by hand.
     raw_package_id = _resolve_null(package_id) if package_id is not None else _UNSET
     raw_detail_diagram_id = (
         _resolve_null(detail_diagram_id) if detail_diagram_id is not None else _UNSET
+    )
+    raw_parent_element_id = (
+        _resolve_null(parent_element_id) if parent_element_id is not None else _UNSET
     )
 
     async def _do() -> Any:
@@ -1120,6 +1142,8 @@ def update_element_cmd(
                 body["package_id"] = raw_package_id
             if raw_detail_diagram_id is not _UNSET:
                 body["detail_diagram_id"] = raw_detail_diagram_id
+            if raw_parent_element_id is not _UNSET:
+                body["parent_element_id"] = raw_parent_element_id
             headers = {"If-Match": str(current.get("current_version", 1))}
             resp = await c._request(
                 "PUT", f"/api/elements/{element_id}", json=body, headers=headers,

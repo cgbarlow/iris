@@ -425,7 +425,7 @@ async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
         body["name"] = args["name"]
     for key in (
         "description", "data", "set_id", "metadata", "notation",
-        "package_id", "detail_diagram_id", "template_id",
+        "package_id", "detail_diagram_id", "parent_element_id", "template_id",
     ):
         if args.get(key) is not None:
             body[key] = args[key]
@@ -938,7 +938,7 @@ async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
     try:
         # Special-case the tri-state fields: only forward to the body the
         # ones the caller actually supplied (including JSON null).
-        tristate = [k for k in ("package_id", "detail_diagram_id") if k in args]
+        tristate = [k for k in ("package_id", "detail_diagram_id", "parent_element_id") if k in args]
         if tristate:
             current_resp = await c._request(
                 "GET", f"/api/elements/{args['element_id']}",
@@ -1718,6 +1718,15 @@ TOOLS: list[Tool] = [
                 "point at a diagram in another set.",
                 required=False,
             ),
+            "parent_element_id": _str_arg(
+                "parent_element_id",
+                "Optional parent element — the containment hierarchy "
+                "(v6.43.0, ADR-231). The new element becomes a child of "
+                "this element in the navigable tree. The parent must be a "
+                "live element in the SAME set; cross-set or cyclic "
+                "parents return 422.",
+                required=False,
+            ),
             "notation": _str_arg(
                 "notation",
                 "Notation id (default 'simple'). Should match the "
@@ -2466,6 +2475,19 @@ TOOLS: list[Tool] = [
                         "link (v6.33.0, ADR-221 / issue #242). Pass a "
                         "diagram UUID to set (may be in another set), "
                         "JSON null to clear, or omit to leave unchanged."
+                    ),
+                },
+                False,
+            ),
+            "parent_element_id": (
+                {
+                    "type": ["string", "null"],
+                    "description": (
+                        "Set or clear the element's parent in the "
+                        "containment hierarchy (v6.43.0, ADR-231). Pass an "
+                        "element UUID in the SAME set to set, JSON null to "
+                        "clear, or omit to leave unchanged. Cross-set or "
+                        "cyclic parents return 422."
                     ),
                 },
                 False,

@@ -32,8 +32,14 @@ export interface Element {
 	set_name?: string;
 	metadata?: Record<string, unknown> | null;
 	notation?: string;
+	// ADR-184: the package this element belongs to.
+	package_id?: string | null;
+	package_name?: string | null;
 	// ADR-221: the diagram this element drills into (Sparx composite element).
 	detail_diagram_id?: string | null;
+	// ADR-231: the element that owns this element (containment hierarchy).
+	parent_element_id?: string | null;
+	parent_element_name?: string | null;
 }
 
 export interface Diagram {
@@ -78,9 +84,11 @@ export interface Package {
 export interface DiagramHierarchyNode {
 	id: string;
 	name: string;
-	node_type: 'package' | 'diagram';
+	// ADR-231: 'element' nodes are nested elements (containment hierarchy).
+	node_type: 'package' | 'diagram' | 'element';
 	diagram_type: string | null;
 	notation: string | null;
+	// For an 'element' node this is its parent element (or package) id.
 	parent_package_id: string | null;
 	has_content: boolean;
 	sequence_order: number;
