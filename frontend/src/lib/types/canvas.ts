@@ -59,9 +59,15 @@ export interface NodeVisualOverrides {
 	bold?: boolean;
 	italic?: boolean;
 	borderStyle?: string;
+	/** Corner radius in px (ADR-230 F2). Ignored when cornerStyle is set. */
+	borderRadius?: number;
+	/** 'pill' = fully rounded; 'rounded' = use borderRadius; 'sharp' = no radius. */
+	cornerStyle?: 'pill' | 'rounded' | 'sharp';
 	width?: number;
 	height?: number;
 	icon?: IconRef;
+	/** Suppress the notation icon on this node (ADR-230 F3, GEANZ). */
+	hideIcon?: boolean;
 	/** Icon colour override (for navigation cell NID icons). */
 	iconColor?: string;
 	/** Description-specific font overrides. */

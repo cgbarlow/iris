@@ -685,11 +685,27 @@
 						? rawDesc.slice(rawDesc.indexOf('\n') + 1).replace(/^\r?\n/, '')
 						: rawDesc;
 					const prev = node.data as Record<string, unknown>;
-					const next: Record<string, unknown> = { ...node.data, ...hydrated, description: desc };
+					// ADR-230 F1: the element refresh must not clobber per-node
+					// presentation the diagram owns. elementToNodeData() reports the
+					// *element's* visual/notation/entityType, which is absent for
+					// EA-styled nodes (e.g. GEANZ capabilities carry their fill/border
+					// + explicit size only on the canvas node, never on the element).
+					// Spreading those in wiped the themed visual and forced a
+					// SvelteFlow re-measure, flipping the canvas to the
+					// iris-default-uml look a few seconds after first paint. Strip
+					// them so only genuine content fields refresh; node.data's own
+					// visual/notation/entityType survive untouched.
+					const { visual: _v, notation: _n, entityType: _et, ...contentOnly } =
+						hydrated as Record<string, unknown>;
+					void _v; void _n; void _et;
+					const next: Record<string, unknown> = { ...node.data, ...contentOnly, description: desc };
 					const diffKeys = [
 						'label', 'description', 'diagramUsageCount',
 						'attributes', 'operations', 'literals',
 						'stereotype', 'qualifier',
+						// Defence-in-depth: presentation is preserved above, but gate
+						// it too so a future change can't silently commit a stripped node.
+						'visual', 'notation', 'entityType',
 					];
 					const changed = diffKeys.some((k) =>
 						JSON.stringify(next[k]) !== JSON.stringify(prev[k]),

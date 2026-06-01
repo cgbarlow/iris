@@ -13,6 +13,7 @@ from app.diagrams.service import create_diagram
 from app.elements.service import create_element
 from app.import_common import ImportWarning
 from app.import_sparx.converter import build_edge_visual, build_node_visual, ea_rect_to_position, format_uml_visibility, parse_diagram_link_geometry, parse_diagram_link_path, parse_nid
+from app.import_sparx.geanz import apply_geanz_styling
 from app.import_sparx.icon_matcher import SemanticIconMatcher
 from app.import_sparx.mapper import map_archimate_stereotype, map_connector_type, map_diagram_type, map_object_type
 from app.import_sparx.reader import (
@@ -886,6 +887,13 @@ async def import_sparx_model(
             # Insert at beginning so it renders behind other nodes
             nodes.insert(0, frame_node)
 
+        # GEANZ Common Business Capabilities styling (ADR-230 F5): when this
+        # diagram is a GEANZ capability diagram, enrich each capability node's
+        # visual (rounded corners, dashed theme pills + redirects, pill +
+        # italic theme pills) and lower the zone z-index so it sits behind its
+        # children. Returns False (and changes nothing) for non-GEANZ diagrams.
+        is_geanz = apply_geanz_styling(nodes)
+
         model_data: dict[str, object] = {"nodes": nodes, "edges": edges}
 
         # Override diagram type for navigation-cell-dominated diagrams.
@@ -897,7 +905,12 @@ async def import_sparx_model(
             diagram_notation = "simple"
 
         # Build diagram metadata with ea_guid and theme
-        theme_id = "iris-default-simple" if diagram_notation == "simple" else "ea-default-uml"
+        if is_geanz:
+            theme_id = "geanz-default"
+        elif diagram_notation == "simple":
+            theme_id = "iris-default-simple"
+        else:
+            theme_id = "ea-default-uml"
         diag_metadata: dict[str, object] = {"theme_id": theme_id}
         if diag.ea_guid:
             diag_metadata["ea_guid"] = diag.ea_guid
