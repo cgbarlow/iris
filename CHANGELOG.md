@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.44.1] - 2026-06-01
+
+### Fixed
+
+- **GEANZ elements no longer render as a separate root tree from their
+  diagrams (ADR-232 follow-up).** Imported elements were created with no
+  `package_id`, so top-level capability zones floated at the hierarchy root
+  while the package held the diagrams — two side-by-side trees. The Sparx
+  importer now anchors each element in its EA package (`package_id`), so the
+  navigation tree shows a package's elements and diagrams together, with the
+  capability containment subtree nested under each zone. Import-side —
+  re-import the model to apply.
+
 ## [6.44.0] - 2026-06-01
 
 ### Added
