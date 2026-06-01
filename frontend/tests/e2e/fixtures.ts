@@ -134,6 +134,7 @@ export async function createElement(
 		data?: Record<string, unknown>;
 		set_id?: string;
 		package_id?: string;
+		parent_element_id?: string;
 		notation?: string;
 		metadata?: Record<string, unknown>;
 	},
@@ -152,6 +153,7 @@ export async function createElement(
 			data: data.data ?? {},
 			set_id: data.set_id ?? null,
 			package_id: data.package_id ?? null,
+			parent_element_id: data.parent_element_id ?? null,
 			notation: data.notation ?? 'simple',
 			metadata: data.metadata ?? null,
 		}),

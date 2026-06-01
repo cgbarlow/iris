@@ -221,6 +221,15 @@ def parse_sparx_xmi(path: str) -> SparxXmiModel:
         obj_id = guid_to_int.get(idref, -1) if idref else -1
         parent_pkg_guid = m.get("package") if m is not None else None
         pkg_id = guid_to_int.get(parent_pkg_guid, 0) if parent_pkg_guid else 0
+        # nestedClassifier containment (ADR-231): <model owner="..."> points
+        # at the parent ELEMENT when it differs from the containing package
+        # GUID (same disambiguation the diagram loop uses for ADR-221).
+        owner_guid = m.get("owner") if m is not None else None
+        parent_obj_id = (
+            guid_to_int.get(owner_guid)
+            if owner_guid and owner_guid != parent_pkg_guid
+            else None
+        )
         name = _attr(el, "name")
         s_type = props.get("sType") if props is not None else None
         documentation = props.get("documentation") if props is not None else None
@@ -268,6 +277,7 @@ def parse_sparx_xmi(path: str) -> SparxXmiModel:
                 Bordercolor=appearance.get("BorderColor"),
                 BorderWidth=appearance.get("BorderWidth"),
                 Alias=props.get("alias") if props is not None else None,
+                Parent_Object_ID=parent_obj_id,
             )
         )
         _collect_attributes(el, obj_id, model)

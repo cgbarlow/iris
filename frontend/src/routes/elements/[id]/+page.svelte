@@ -48,6 +48,8 @@
 	let activeTab = $state<'details' | 'versions' | 'relationships'>('relationships');
 	let userSelectedTab = $state(false);
 	let packageMemberships = $state<{id: string; name: string}[]>([]);
+	// ADR-231: child elements owned by this element (containment hierarchy).
+	let childElements = $state<{id: string; name: string; element_type: string}[]>([]);
 	let showDeleteDialog = $state(false);
 	let showSaveTemplateDialog = $state(false);
 	let isBookmarked = $state(false);
@@ -184,6 +186,7 @@
 				loadRelationships(id),
 				loadDiagrams(id),
 				loadPackageMemberships(id),
+				loadChildElements(id),
 				loadDetailDiagramName(),
 				loadAllTags(),
 				loadBookmarkStatus(id),
@@ -219,6 +222,15 @@
 			packageMemberships = await apiFetch<{id: string; name: string}[]>(`/api/elements/${id}/package-memberships`);
 		} catch {
 			packageMemberships = [];
+		}
+	}
+
+	// ADR-231: direct child elements in the containment hierarchy.
+	async function loadChildElements(id: string) {
+		try {
+			childElements = await apiFetch<{id: string; name: string; element_type: string}[]>(`/api/elements/${id}/children`);
+		} catch {
+			childElements = [];
 		}
 	}
 
@@ -1181,6 +1193,39 @@
 			<!-- ADR-208 (v6.16.0): the Relationships tab now hosts three
 				 sections — Package membership, Used in Views, and the
 				 explicit Relationships table. Empty sections are hidden. -->
+
+			{#if entity?.parent_element_id}
+				<section class="mb-6">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Parent element</h3>
+					<a
+						href="/elements/{entity.parent_element_id}"
+						class="flex items-center gap-3 rounded border block p-3"
+						style="border-color: var(--color-border); color: var(--color-primary)"
+					>
+						<span class="font-medium">{entity.parent_element_name ?? entity.parent_element_id}</span>
+					</a>
+				</section>
+			{/if}
+
+			{#if childElements.length > 0}
+				<section class="mb-6">
+					<h3 class="mb-2 text-sm font-semibold" style="color: var(--color-fg)">Child elements ({childElements.length})</h3>
+					<ul class="flex flex-col gap-2">
+						{#each childElements as child (child.id)}
+							<li>
+								<a
+									href="/elements/{child.id}"
+									class="flex items-center gap-3 rounded border block p-3"
+									style="border-color: var(--color-border); color: var(--color-primary)"
+								>
+									<span class="font-medium">{child.name}</span>
+									<span class="text-xs" style="color: var(--color-muted)">{child.element_type}</span>
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
 
 			{#if packageMemberships.length > 0}
 				<section class="mb-6">

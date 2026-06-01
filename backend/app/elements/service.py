@@ -34,6 +34,14 @@ class ElementDetailDiagramError(ValueError):
     """
 
 
+class ElementParentInvariantError(ValueError):
+    """Raised when an element's parent_element_id is invalid — missing,
+    soft-deleted, cross-set, a containment cycle, or self-parent (ADR-231).
+
+    The router translates this into HTTP 422 with the message intact.
+    """
+
+
 async def _validate_detail_diagram_exists(
     db: DatabasePort,
     detail_diagram_id: str | None,
@@ -92,6 +100,68 @@ async def _validate_element_package_set_consistency(
         raise ElementPackageInvariantError(msg)
 
 
+async def _validate_parent_element(
+    db: DatabasePort,
+    *,
+    parent_element_id: str | None,
+    set_id: str | None,
+    element_id: str | None = None,
+) -> None:
+    """Ensure ``parent_element_id`` is a live element in the same set, and
+    (on update) that linking it forms no cycle or self-parent (ADR-231).
+
+    ``None`` (clear / unset) is always valid. Element containment is
+    single-set — unlike the cross-set ADR-221 detail link.
+    """
+    if parent_element_id is None:
+        return
+    if element_id is not None and parent_element_id == element_id:
+        msg = "An element cannot be its own parent"
+        raise ElementParentInvariantError(msg)
+    cursor = await db.execute(
+        "SELECT set_id FROM elements WHERE id = ? AND is_deleted = 0",
+        (parent_element_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        msg = f"Parent element {parent_element_id} not found"
+        raise ElementParentInvariantError(msg)
+    parent_set_id = row[0]
+    if set_id is not None and parent_set_id is not None and parent_set_id != set_id:
+        msg = (
+            f"Element belongs to set {set_id} but parent element "
+            f"{parent_element_id} belongs to set {parent_set_id}"
+        )
+        raise ElementParentInvariantError(msg)
+    if element_id is not None:
+        await _validate_no_element_cycle(db, element_id, parent_element_id)
+
+
+async def _validate_no_element_cycle(
+    db: DatabasePort,
+    element_id: str,
+    proposed_parent_id: str,
+) -> None:
+    """Walk up the proposed parent's ancestry; reject if it reaches
+    ``element_id`` (a cycle). Mirrors ``packages.service.validate_no_cycle``.
+    """
+    seen: set[str] = set()
+    current: str | None = proposed_parent_id
+    while current is not None:
+        if current == element_id:
+            msg = "Cannot set parent: would create a containment cycle"
+            raise ElementParentInvariantError(msg)
+        if current in seen:
+            break  # pre-existing cycle elsewhere — bail rather than loop
+        seen.add(current)
+        cursor = await db.execute(
+            "SELECT parent_element_id FROM elements WHERE id = ? AND is_deleted = 0",
+            (current,),
+        )
+        r = await cursor.fetchone()
+        current = r[0] if r else None
+
+
 async def create_element(
     db: DatabasePort,
     *,
@@ -103,6 +173,7 @@ async def create_element(
     set_id: str | None = None,
     package_id: str | None = None,
     detail_diagram_id: str | None = None,
+    parent_element_id: str | None = None,
     metadata: dict[str, object] | None = None,
     change_summary: str | None = None,
     notation: str = "simple",
@@ -118,14 +189,18 @@ async def create_element(
         db, set_id=effective_set_id, package_id=package_id,
     )
     await _validate_detail_diagram_exists(db, detail_diagram_id)
+    # No cycle check at create — a brand-new id can't be an ancestor (ADR-231).
+    await _validate_parent_element(
+        db, parent_element_id=parent_element_id, set_id=effective_set_id,
+    )
 
     await db.execute(
         "INSERT INTO elements (id, element_type, current_version, "
         "created_at, created_by, updated_at, set_id, package_id, "
-        "detail_diagram_id, notation) "
-        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)",
+        "detail_diagram_id, parent_element_id, notation) "
+        "VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
         (element_id, element_type, now, created_by, now,
-         effective_set_id, package_id, detail_diagram_id, notation),
+         effective_set_id, package_id, detail_diagram_id, parent_element_id, notation),
     )
     await db.execute(
         "INSERT INTO element_versions (element_id, version, name, description, "
@@ -154,6 +229,7 @@ async def create_element(
         "set_id": effective_set_id,
         "package_id": package_id,
         "detail_diagram_id": detail_diagram_id,
+        "parent_element_id": parent_element_id,
         "metadata": metadata,
         "notation": notation,
     }
@@ -169,11 +245,15 @@ async def get_element(
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
         "u.username, e.set_id, s.name, ev.metadata, e.notation, "
-        "e.package_id, e.detail_diagram_id, "
+        "e.package_id, e.detail_diagram_id, e.parent_element_id, "
         "(SELECT pv.name FROM packages p "
         "  JOIN package_versions pv ON p.id = pv.package_id "
         "    AND p.current_version = pv.version "
-        "  WHERE p.id = e.package_id) AS package_name "
+        "  WHERE p.id = e.package_id) AS package_name, "
+        "(SELECT pev.name FROM elements pe "
+        "  JOIN element_versions pev ON pe.id = pev.element_id "
+        "    AND pe.current_version = pev.version "
+        "  WHERE pe.id = e.parent_element_id) AS parent_element_name "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -204,7 +284,9 @@ async def get_element(
         "notation": row[14] or "simple",
         "package_id": row[15],
         "detail_diagram_id": row[16],
-        "package_name": row[17],
+        "parent_element_id": row[17],
+        "package_name": row[18],
+        "parent_element_name": row[19],
     }
 
     # Enrich with tags
@@ -306,11 +388,15 @@ async def list_elements(
         "ev.name, ev.description, ev.data, "
         "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
         "e.set_id, s.name, ev.metadata, e.notation, "
-        "e.package_id, e.detail_diagram_id, "
+        "e.package_id, e.detail_diagram_id, e.parent_element_id, "
         "(SELECT pv.name FROM packages p "
         "  JOIN package_versions pv ON p.id = pv.package_id "
         "    AND p.current_version = pv.version "
-        "  WHERE p.id = e.package_id) AS package_name "
+        "  WHERE p.id = e.package_id) AS package_name, "
+        "(SELECT pev.name FROM elements pe "
+        "  JOIN element_versions pev ON pe.id = pev.element_id "
+        "    AND pe.current_version = pev.version "
+        "  WHERE pe.id = e.parent_element_id) AS parent_element_name "
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -339,7 +425,9 @@ async def list_elements(
             "notation": r[13] or "simple",
             "package_id": r[14],
             "detail_diagram_id": r[15],
-            "package_name": r[16],
+            "parent_element_id": r[16],
+            "package_name": r[17],
+            "parent_element_name": r[18],
         }
         for r in rows
     ]
@@ -378,8 +466,60 @@ async def list_elements(
     return items, total
 
 
+async def get_element_children(
+    db: DatabasePort,
+    element_id: str,
+) -> list[dict[str, object]]:
+    """Direct child elements (ADR-231), name + type, alphabetical."""
+    cursor = await db.execute(
+        "SELECT e.id, ev.name, e.element_type FROM elements e "
+        "JOIN element_versions ev ON e.id = ev.element_id "
+        "  AND e.current_version = ev.version "
+        "WHERE e.parent_element_id = ? AND e.is_deleted = 0 "
+        "ORDER BY ev.name",
+        (element_id,),
+    )
+    return [
+        {"id": r[0], "name": r[1], "element_type": r[2]}
+        for r in await cursor.fetchall()
+    ]
+
+
+async def get_element_ancestors(
+    db: DatabasePort,
+    element_id: str,
+) -> list[dict[str, object]]:
+    """Containment breadcrumb, root-first (ADR-231). Excludes the element
+    itself; cycle-guarded."""
+    chain: list[dict[str, object]] = []
+    seen: set[str] = set()
+    cursor = await db.execute(
+        "SELECT parent_element_id FROM elements WHERE id = ? AND is_deleted = 0",
+        (element_id,),
+    )
+    head = await cursor.fetchone()
+    current = head[0] if head else None
+    while current is not None and current not in seen:
+        seen.add(current)
+        c = await db.execute(
+            "SELECT e.id, ev.name, e.element_type, e.parent_element_id FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id "
+            "  AND e.current_version = ev.version "
+            "WHERE e.id = ? AND e.is_deleted = 0",
+            (current,),
+        )
+        row = await c.fetchone()
+        if row is None:
+            break
+        chain.append({"id": row[0], "name": row[1], "element_type": row[2]})
+        current = row[3]
+    chain.reverse()
+    return chain
+
+
 _UNSET_PACKAGE_ID: Any = object()
 _UNSET_DETAIL_DIAGRAM_ID: Any = object()
+_UNSET_PARENT_ELEMENT_ID: Any = object()
 
 
 async def update_element(
@@ -395,6 +535,7 @@ async def update_element(
     metadata: dict[str, object] | None = None,
     package_id: Any = _UNSET_PACKAGE_ID,
     detail_diagram_id: Any = _UNSET_DETAIL_DIAGRAM_ID,
+    parent_element_id: Any = _UNSET_PARENT_ELEMENT_ID,
 ) -> dict[str, object] | None:
     """Update an element with optimistic concurrency. Returns None on conflict.
 
@@ -424,6 +565,11 @@ async def update_element(
         )
     if detail_diagram_id is not _UNSET_DETAIL_DIAGRAM_ID:
         await _validate_detail_diagram_exists(db, detail_diagram_id)
+    if parent_element_id is not _UNSET_PARENT_ELEMENT_ID:
+        await _validate_parent_element(
+            db, parent_element_id=parent_element_id,
+            set_id=current_set_id, element_id=element_id,
+        )
 
     new_version = current_version + 1
     now = datetime.now(tz=UTC).isoformat()
@@ -441,6 +587,9 @@ async def update_element(
     if detail_diagram_id is not _UNSET_DETAIL_DIAGRAM_ID:
         set_clauses.append("detail_diagram_id = ?")
         set_params.append(detail_diagram_id)
+    if parent_element_id is not _UNSET_PARENT_ELEMENT_ID:
+        set_clauses.append("parent_element_id = ?")
+        set_params.append(parent_element_id)
     set_params.append(element_id)
     await db.execute(
         f"UPDATE elements SET {', '.join(set_clauses)} WHERE id = ?",  # noqa: S608

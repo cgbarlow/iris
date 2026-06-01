@@ -72,6 +72,8 @@
 	}
 
 	const isPackage = $derived(node.node_type === 'package');
+	// ADR-231: nested element nodes in the containment hierarchy.
+	const isElement = $derived(node.node_type === 'element');
 	const indicatorType = $derived<'solid' | 'hollow' | 'none'>(
 		node.has_content
 			? 'solid'
@@ -79,7 +81,9 @@
 				? 'hollow'
 				: 'none'
 	);
-	const nodeHref = $derived(isPackage ? `/packages/${node.id}` : `/views/${node.id}`);
+	const nodeHref = $derived(
+		isPackage ? `/packages/${node.id}` : isElement ? `/elements/${node.id}` : `/views/${node.id}`,
+	);
 
 	const passesDiagramFilter = $derived(
 		!showDiagramsOnly || node.has_content || descendantHasContent(node)
@@ -87,7 +91,7 @@
 	/** Issue #27: hide leaf nodes whose kind is toggled off; packages are always shown. */
 	const isText = $derived(node.diagram_type === 'text');
 	const passesKindFilter = $derived(
-		isPackage || (isText ? showText : showDiagrams),
+		isPackage || isElement || (isText ? showText : showDiagrams),
 	);
 	const visible = $derived(
 		(matchesSearch || childMatchesSearch) && passesDiagramFilter && passesKindFilter,
@@ -210,7 +214,7 @@
 			<a
 				href={nodeHref}
 				class="tree-node__link"
-				title={node.diagram_type ? node.diagram_type : isPackage ? 'package' : undefined}
+				title={node.diagram_type ? node.diagram_type : isPackage ? 'package' : isElement ? 'element' : undefined}
 				onclick={() => { if (hasChildren && !expanded) { expanded = true; expandedIds.add(node.id); } }}
 				onkeydown={handleKeydown}
 			>
