@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { canWrite } from '$lib/stores/auth.svelte.js';
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { onDestroy } from 'svelte';
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
@@ -2086,6 +2087,7 @@
 			<CommentsPanel
 				targetType="diagram"
 				targetId={diagram.id}
+				collectionId={diagram.collection_id}
 				onclose={() => (showCommentsSidebar = false)}
 				oncount={(c) => (commentCount = c)}
 			/>
@@ -2161,6 +2163,7 @@
 			>
 				Clone
 			</button>
+			{#if canWrite(diagram?.collection_id)}
 			<button
 				onclick={() => (showDeleteDialog = true)}
 				class="whitespace-nowrap rounded px-4 py-2 text-sm text-white"
@@ -2168,6 +2171,7 @@
 			>
 				Delete
 			</button>
+			{/if}
 		</div>
 	</div>
 
@@ -2813,6 +2817,7 @@
 									<CommentsPanel
 										targetType="diagram"
 										targetId={diagram.id}
+				collectionId={diagram.collection_id}
 										onclose={() => (showCommentsSidebar = false)}
 										oncount={(c) => (commentCount = c)}
 									/>
@@ -3338,6 +3343,7 @@
 										<CommentsPanel
 											targetType="diagram"
 											targetId={diagram.id}
+				collectionId={diagram.collection_id}
 											onclose={() => (showCommentsSidebar = false)}
 											oncount={(c) => (commentCount = c)}
 										/>

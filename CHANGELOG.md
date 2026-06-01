@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.45.0] - 2026-06-01
+
+### Added
+
+- **Per-user collection write-scope (ADR-237).** An admin can now keep a user's
+  global role (e.g. `architect`) but confine that role's WRITE/edit powers to a
+  whitelist of collections; everywhere else the user is read-only. Assignment is
+  a junction table (`user_collection_scope`) managed directly in Supabase — Iris
+  reads and enforces it. A user with no scope rows is unrestricted (unchanged
+  behaviour); admins always bypass. Scoped users cannot create or delete
+  collections, nor mutate global element templates, even inside their scope.
+  Every write endpoint (collections, sets, packages, diagrams, elements,
+  element-templates, comments, entity-images) is gated; reads are untouched.
+- **`GET /api/auth/me` now returns `write_scope`**, and element/diagram reads
+  carry `collection_id`, so the web UI hides Edit/Save/Delete affordances and
+  the comments panel in collections the user can't write to, and hides
+  New/Delete Collection for scoped users.
+
 ## [6.44.4] - 2026-06-01
 
 ### Fixed

@@ -7,6 +7,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import (
+    assert_unscoped_or_admin,
+    assert_write_allowed,
+    collection_of_set,
+    collection_of_template,
+)
 from app.element_templates.models import (
     ElementTemplateCreate,
     ElementTemplateListResponse,
@@ -42,6 +48,12 @@ async def create(
     yield non-empty content.
     """
     db = request.app.state.db_manager.main_db
+    # ADR-237: global templates are server-wide (scoped users denied);
+    # set-scoped templates require write-scope on the parent set's collection.
+    if body.is_global:
+        await assert_unscoped_or_admin(db, current_user)
+    else:
+        await assert_write_allowed(db, current_user, await collection_of_set(db, body.set_id))
     try:
         result = await create_element_template(
             db,
@@ -129,10 +141,13 @@ async def update(
     template_id: str,
     body: ElementTemplateUpdate,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> ElementTemplateResponse:
     """Edit a template. Templates are not versioned — no If-Match."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: editing a template requires write-scope on its collection
+    # (globals resolve to None → denied for scoped users).
+    await assert_write_allowed(db, current_user, await collection_of_template(db, template_id))
     # The model uses None to mean "leave untouched" for everything
     # except set_id; for set_id, we need a tri-state because None is
     # the legitimate value for globals. The Pydantic model's set_id
@@ -148,6 +163,9 @@ async def update(
         kwargs["included_fields"] = raw["included_fields"]
     if "is_global" in raw:
         kwargs["is_global"] = raw["is_global"]
+        if raw["is_global"]:
+            # ADR-237: promoting a template to global is admin/unscoped-only.
+            await assert_unscoped_or_admin(db, current_user)
     if "set_id" in raw:
         kwargs["set_id"] = raw["set_id"]  # may be None
     if "template_data" in raw:
@@ -167,10 +185,13 @@ async def update(
 async def delete(
     template_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> None:
     """Soft-delete a template."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: deleting a template requires write-scope on its collection
+    # (globals resolve to None → denied for scoped users).
+    await assert_write_allowed(db, current_user, await collection_of_template(db, template_id))
     ok = await delete_element_template(db, template_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Template not found")

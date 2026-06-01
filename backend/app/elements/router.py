@@ -9,6 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import (
+    assert_write_allowed,
+    collection_of_element,
+    collection_of_package,
+    collection_of_set,
+)
 from app.elements.models import (
     ElementCreate,
     ElementListResponse,
@@ -53,6 +59,13 @@ async def create(
     request fields always win over template defaults.
     """
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the element's target collection.
+    _coll = (
+        await collection_of_set(db, body.set_id)
+        if body.set_id
+        else await collection_of_package(db, body.package_id)
+    )
+    await assert_write_allowed(db, current_user, _coll)
     fields = body.model_dump(exclude_unset=True)
     template_id = fields.pop("template_id", None)
     template_tags: list[str] = []
@@ -429,6 +442,8 @@ async def update(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the element's collection.
+    await assert_write_allowed(db, current_user, await collection_of_element(db, element_id))
     # ElementUpdate's ``package_id`` defaults to the _UNSET sentinel
     # (meaning "do not touch"); the service layer treats an explicit
     # ``None`` as "clear". Forward as-is via the same sentinel.
@@ -480,6 +495,8 @@ async def rollback(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the element's collection.
+    await assert_write_allowed(db, current_user, await collection_of_element(db, element_id))
     result = await rollback_element(
         db,
         element_id,
@@ -515,6 +532,8 @@ async def delete(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the element's collection.
+    await assert_write_allowed(db, current_user, await collection_of_element(db, element_id))
     if cascade:
         deleted = await cascade_delete_element(
             db, element_id, deleted_by=current_user["id"],
@@ -640,6 +659,8 @@ async def add_tag(
 ) -> dict[str, str]:
     """Add a tag to an element."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: tagging is a write — gate by the element's collection.
+    await assert_write_allowed(db, current_user, await collection_of_element(db, element_id))
     tag = body.get("tag", "").strip()
     if not tag or len(tag) > 50:
         raise HTTPException(status_code=400, detail="Tag must be 1-50 characters")
@@ -663,10 +684,12 @@ async def remove_tag(
     element_id: str,
     tag: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
     """Remove a tag from an element."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: untagging is a write — gate by the element's collection.
+    await assert_write_allowed(db, current_user, await collection_of_element(db, element_id))
     await db.execute(
         "DELETE FROM element_tags WHERE element_id = ? AND tag = ?",
         (element_id, tag),

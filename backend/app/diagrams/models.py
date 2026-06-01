@@ -52,6 +52,9 @@ class DiagramResponse(BaseModel):
     tags: list[str] = Field(default_factory=list)
     set_id: str | None = None
     set_name: str | None = None
+    # ADR-237: owning collection, so the client can gate edit affordances by
+    # write-scope without an extra fetch.
+    collection_id: str | None = None
     notation: str = "simple"
     detected_notations: list[str] = Field(default_factory=list)
     metadata: dict[str, object] | None = None

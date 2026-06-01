@@ -11,6 +11,9 @@ export interface User {
 	username: string;
 	role: string;
 	is_active: boolean;
+	/** ADR-237: collections this user may WRITE in, or null when unrestricted
+	 *  (admins, or any user with no scope rows). Drives canWrite()/isScoped(). */
+	write_scope?: string[] | null;
 }
 
 export interface Element {
@@ -30,6 +33,8 @@ export interface Element {
 	diagram_usage_count?: number;
 	set_id?: string;
 	set_name?: string;
+	// ADR-237: owning collection — used to gate edit affordances by write-scope.
+	collection_id?: string | null;
 	metadata?: Record<string, unknown> | null;
 	notation?: string;
 	// ADR-184: the package this element belongs to.
@@ -60,6 +65,8 @@ export interface Diagram {
 	tags?: string[];
 	set_id?: string;
 	set_name?: string;
+	// ADR-237: owning collection — used to gate edit affordances by write-scope.
+	collection_id?: string | null;
 	notation?: string;
 	detected_notations?: string[];
 	metadata?: Record<string, unknown> | null;

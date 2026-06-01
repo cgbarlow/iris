@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { canWrite } from '$lib/stores/auth.svelte.js';
 	import { goto } from '$app/navigation';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { joinTaggedValue, splitTaggedValue } from '$lib/utils/taggedValues';
@@ -614,6 +615,7 @@
 			>
 				Save as template
 			</button>
+			{#if canWrite(entity?.collection_id)}
 			<button
 				onclick={() => (showDeleteDialog = true)}
 				class="rounded px-4 py-2 text-sm text-white"
@@ -621,6 +623,7 @@
 			>
 				Delete
 			</button>
+			{/if}
 		</div>
 	</div>
 
@@ -699,7 +702,7 @@
 					{#if detailsDirty}
 						<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
 					{/if}
-				{:else}
+				{:else if canWrite(entity?.collection_id)}
 					<button
 						onclick={enterDetailsEdit}
 						class="rounded px-3 py-1.5 text-sm text-white"
@@ -1337,7 +1340,7 @@
 
 	<!-- Comments section -->
 	<section class="mt-8">
-		<CommentsPanel targetType="element" targetId={entity.id} />
+		<CommentsPanel targetType="element" targetId={entity.id} collectionId={entity.collection_id} />
 	</section>
 
 	<ConfirmDialog

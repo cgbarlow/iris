@@ -10,6 +10,7 @@ from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth.dependencies import get_current_user
+from app.authz import load_scope
 from app.auth.models import (
     ChangePasswordRequest,
     LoginRequest,
@@ -36,8 +37,19 @@ async def get_me(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, Any]:
-    """Return the authenticated user's profile (both deployment modes)."""
-    return {**current_user, "is_active": True}
+    """Return the authenticated user's profile (both deployment modes).
+
+    ADR-237: ``write_scope`` is the list of collection ids this user may write
+    in, or ``None`` when unrestricted (admins, or any user with no scope rows).
+    The frontend uses it to gate edit affordances and the comments panel.
+    """
+    if current_user.get("role") == "admin":
+        write_scope: list[str] | None = None
+    else:
+        db = request.app.state.db_manager.main_db
+        scope = await load_scope(db, current_user["id"])
+        write_scope = sorted(scope) if scope else None
+    return {**current_user, "is_active": True, "write_scope": write_scope}
 
 
 async def _get_session_timeout(db: object) -> int | None:

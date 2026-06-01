@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFil
 from fastapi.responses import Response as FastAPIResponse
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import assert_write_allowed, collection_of_set
 from app.sets.models import (
     SetCreate,
     SetForceDeleteResponse,
@@ -41,6 +42,8 @@ async def create(
 ) -> SetResponse:
     """Create a new set."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: creating a set requires write-scope on its target collection.
+    await assert_write_allowed(db, current_user, body.collection_id)
     try:
         result = await create_set(
             db,
@@ -89,10 +92,15 @@ async def update(
     set_id: str,
     body: SetUpdate,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> SetResponse:
     """Update a set's name, description, and thumbnail settings."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: need write-scope on the set's current collection, plus the
+    # destination collection when this update moves the set.
+    await assert_write_allowed(db, current_user, await collection_of_set(db, set_id))
+    if body.collection_id:
+        await assert_write_allowed(db, current_user, body.collection_id)
     try:
         result = await update_set(
             db, set_id,
@@ -136,6 +144,8 @@ async def delete(
 ) -> FastAPIResponse | SetForceDeleteResponse:
     """Soft-delete a set. With force=true, also deletes all contents."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: deleting a set requires write-scope on its collection.
+    await assert_write_allowed(db, current_user, await collection_of_set(db, set_id))
 
     if force:
         result = await force_delete_set(db, set_id, deleted_by=current_user["id"])
@@ -169,10 +179,12 @@ async def upload_thumbnail(
     set_id: str,
     file: UploadFile,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> SetResponse:
     """Upload a thumbnail image for a set."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: a thumbnail is set content — gate by write-scope.
+    await assert_write_allowed(db, current_user, await collection_of_set(db, set_id))
 
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(

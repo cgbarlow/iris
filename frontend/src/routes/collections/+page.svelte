@@ -7,6 +7,7 @@
 	import { recordVisit } from '$lib/stores/visitHistory.svelte.js';
 	import type { IrisCollection } from '$lib/types/api';
 	import CollectionDialog from '$lib/components/CollectionDialog.svelte';
+	import { isScoped } from '$lib/stores/auth.svelte.js';
 
 	let contextItems = $derived(getAiContextItems());
 	let contextItemIds = $derived(new Set(contextItems.map((i) => i.id)));
@@ -116,22 +117,27 @@
 				Reset filter
 			</button>
 		{/if}
-		<button
-			onclick={() => (editMode = !editMode)}
-			class="rounded border px-3 py-2 text-sm"
-			style="border-color: var(--color-border); {editMode
-				? 'background: var(--color-primary); color: white'
-				: 'color: var(--color-fg)'}"
-		>
-			Edit Collections
-		</button>
-		<button
-			onclick={() => (showCreateDialog = true)}
-			class="rounded px-4 py-2 text-sm text-white"
-			style="background-color: var(--color-primary)"
-		>
-			New Collection
-		</button>
+		<!-- ADR-237: collection-management affordances are hidden for write-scoped
+		     users — they edit content within assigned collections, not the
+		     collection containers (create/delete). -->
+		{#if !isScoped()}
+			<button
+				onclick={() => (editMode = !editMode)}
+				class="rounded border px-3 py-2 text-sm"
+				style="border-color: var(--color-border); {editMode
+					? 'background: var(--color-primary); color: white'
+					: 'color: var(--color-fg)'}"
+			>
+				Edit Collections
+			</button>
+			<button
+				onclick={() => (showCreateDialog = true)}
+				class="rounded px-4 py-2 text-sm text-white"
+				style="background-color: var(--color-primary)"
+			>
+				New Collection
+			</button>
+		{/if}
 	</div>
 </div>
 <div class="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">

@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import assert_write_allowed, collection_of_package, collection_of_set
 from app.elements.models import ElementListResponse, ElementResponse
 from app.packages.models import (
     PackageCreate,
@@ -42,6 +43,8 @@ async def create(
 ) -> PackageResponse:
     """Create a new package."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the parent set's collection.
+    await assert_write_allowed(db, current_user, await collection_of_set(db, body.set_id))
     result = await create_package(
         db,
         name=body.name,
@@ -138,6 +141,8 @@ async def update(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the package's collection.
+    await assert_write_allowed(db, current_user, await collection_of_package(db, package_id))
     result = await update_package(
         db, package_id,
         name=body.name,
@@ -174,6 +179,8 @@ async def delete(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the package's collection.
+    await assert_write_allowed(db, current_user, await collection_of_package(db, package_id))
     deleted = await cascade_delete_package(
         db, package_id,
         deleted_by=current_user["id"],
@@ -234,13 +241,15 @@ async def set_parent(
     package_id: str,
     body: dict[str, Any],
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, Any]:
     """Set or unset the parent package."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: re-parenting stays within the set; gate by its collection.
+    await assert_write_allowed(db, current_user, await collection_of_package(db, package_id))
     parent_id = body.get("parent_package_id")
     result = await set_package_parent(
-        db, package_id, parent_id, updated_by=_current_user["id"],
+        db, package_id, parent_id, updated_by=current_user["id"],
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Package or parent not found")

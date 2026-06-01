@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import assert_write_allowed, collection_of_entity
 from app.images import service as image_service
 from app.images.entity_attachment_service import (
     ALLOWED_ENTITY_TYPES,
@@ -86,6 +87,8 @@ async def upload_and_attach(
     """
     et = _check_entity_type(entity_type)
     db = request.app.state.db_manager.main_db
+    # ADR-237: attaching an image is a write — gate by the entity's collection.
+    await assert_write_allowed(db, current_user, await collection_of_entity(db, et, entity_id))
 
     data = await file.read()
     declared = file.content_type or "application/octet-stream"
@@ -147,6 +150,8 @@ async def attach_existing(
     MCP / CLI / cross-entity re-use flows."""
     et = _check_entity_type(entity_type)
     db = request.app.state.db_manager.main_db
+    # ADR-237: attaching an image is a write — gate by the entity's collection.
+    await assert_write_allowed(db, current_user, await collection_of_entity(db, et, entity_id))
     try:
         attachment = await attach_image(
             db, entity_type=et, entity_id=entity_id,
@@ -213,12 +218,14 @@ async def detach(
     entity_id: str,
     attachment_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> None:
     """Detach the image from the entity. Does NOT delete the underlying
     image — other entities may reference it."""
     et = _check_entity_type(entity_type)
     db = request.app.state.db_manager.main_db
+    # ADR-237: detaching an image is a write — gate by the entity's collection.
+    await assert_write_allowed(db, current_user, await collection_of_entity(db, et, entity_id))
     try:
         await detach_image(
             db, entity_type=et, entity_id=entity_id, attachment_id=attachment_id,

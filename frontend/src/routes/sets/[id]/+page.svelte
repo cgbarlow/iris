@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { apiFetch } from '$lib/utils/api';
-	import { getAccessToken } from '$lib/stores/auth.svelte.js';
+	import { canWrite, getAccessToken } from '$lib/stores/auth.svelte.js';
 	import { API_BASE_URL } from '$lib/config.js';
 	import type {
 		IrisSet,
@@ -427,7 +427,8 @@
 			</div>
 		</fieldset>
 
-		<!-- Save button -->
+		<!-- Save button (ADR-237: only within the user's write-scope) -->
+		{#if canWrite(collectionId)}
 		<div class="mt-6">
 			<button
 				type="submit"
@@ -438,6 +439,7 @@
 				{saving ? 'Saving...' : 'Save Changes'}
 			</button>
 		</div>
+		{/if}
 	</form>
 
 	<!-- ADR-209 (v6.17.0): attached images for this set. -->
@@ -446,7 +448,7 @@
 		<EntityImagesEditor
 			entityType="set"
 			entityId={set?.id ?? ''}
-			editing={true}
+			editing={canWrite(collectionId)}
 			maxImages={1}
 		/>
 	</div>
@@ -477,6 +479,7 @@
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">
 			This will permanently delete this set and all {set.diagram_count} diagram{set.diagram_count !== 1 ? 's' : ''} and {set.element_count} element{set.element_count !== 1 ? 's' : ''} within it.
 		</p>
+		{#if canWrite(collectionId)}
 		<button
 			onclick={() => (showDeleteDialog = true)}
 			class="mt-3 rounded px-4 py-2 text-sm text-white"
@@ -484,6 +487,7 @@
 		>
 			Delete Set and All Contents
 		</button>
+		{/if}
 	</div>
 
 	<ConfirmDialog

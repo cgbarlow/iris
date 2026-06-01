@@ -150,7 +150,8 @@ async def get_diagram(
         "dv.name, dv.description, dv.data, "
         "d.created_at, d.created_by, d.updated_at, d.is_deleted, "
         "u.username, d.parent_package_id, d.set_id, s.name, dv.metadata, "
-        "d.notation, d.detected_notations "
+        "d.notation, d.detected_notations, "
+        "s.collection_id "  # ADR-237: owning collection for write-scope gating
         "FROM diagrams d "
         "JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "AND d.current_version = dv.version "
@@ -207,6 +208,7 @@ async def get_diagram(
         "tags": tags,
         "set_id": row[12],
         "set_name": row[13],
+        "collection_id": row[17],  # ADR-237: owning collection for client gating
         "notation": row[15] or "simple",
         "detected_notations": detected,
         "metadata": json.loads(row[14]) if row[14] else None,
