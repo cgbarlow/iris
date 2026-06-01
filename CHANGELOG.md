@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.44.2] - 2026-06-01
+
+### Fixed
+
+- **GEANZ capability diagrams now nest under their capability element instead
+  of sitting flat at the package root (ADR-235).** Each diagram in the Sparx
+  model is the composite child-diagram of an element, recorded on the
+  `<diagram><model parent="…">` attribute — but the importer only read
+  `owner`, which for every GEANZ diagram is the *root package* it is filed
+  under, so the composite link never fired and all 40 diagrams landed flat in
+  the tree. The XMI reader now derives a diagram's owning element from
+  `parent` (falling back to a non-package `owner`), so the existing ADR-221
+  post-process sets that element's `detail_diagram_id` and the navigation tree
+  nests the diagram under its capability — the structure Sparx EA's Project
+  Browser shows (e.g. "CCO.08 Payroll capability area" under the "Payroll"
+  element). 39/40 diagrams nest; the top-level capability-zones map correctly
+  stays at the package root. Import-side — **re-import** existing sets to pick
+  up the links (back-filled idempotently). No schema change.
+
 ## [6.44.1] - 2026-06-01
 
 ### Fixed
