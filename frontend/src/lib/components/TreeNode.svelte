@@ -1,6 +1,11 @@
 <script lang="ts">
 	/** Recursive tree node component for diagram hierarchy navigation. */
 	import type { DiagramHierarchyNode } from '$lib/types/api';
+	import type { IconRef } from '$lib/types/canvas';
+	import IconDisplay from '$lib/icons/IconDisplay.svelte';
+
+	/** ADR-232 (issue 6): element nodes show the cube (Lucide Box) icon. */
+	const ELEMENT_ICON: IconRef = { set: 'lucide', name: 'box' };
 
 	interface Props {
 		node: DiagramHierarchyNode;
@@ -40,7 +45,7 @@
 		onhover,
 		graphHoverIds,
 		peekExpandedIds,
-		autoExpandDepth = 2,
+		autoExpandDepth = 0,
 	}: Props = $props();
 
 	const isGraphHighlighted = $derived(graphHoverIds?.has(node.id) ?? false);
@@ -218,7 +223,11 @@
 				onclick={() => { if (hasChildren && !expanded) { expanded = true; expandedIds.add(node.id); } }}
 				onkeydown={handleKeydown}
 			>
-				{#if indicatorType === 'solid'}
+				{#if isElement}
+					<span class="tree-node__element-indicator" aria-hidden="true">
+						<IconDisplay icon={ELEMENT_ICON} size={13} />
+					</span>
+				{:else if indicatorType === 'solid'}
 					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--solid" aria-hidden="true"></span>
 				{:else if indicatorType === 'hollow'}
 					<span class="tree-node__diagram-indicator tree-node__diagram-indicator--hollow" aria-hidden="true"></span>
@@ -377,6 +386,14 @@
 	.tree-node__diagram-indicator--hollow {
 		background-color: transparent;
 		border: 1.5px solid var(--color-primary);
+	}
+	/* ADR-232 (issue 6): element nodes show the cube icon (muted). */
+	.tree-node__element-indicator {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		color: var(--color-muted, #6b7280);
 	}
 	.tree-node__name {
 		overflow: hidden;

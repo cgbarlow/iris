@@ -288,6 +288,8 @@ async def get_element(
         "package_name": row[18],
         "parent_element_name": row[19],
     }
+    # ADR-233: read-through stereotype from metadata for display.
+    element["stereotype"] = (element["metadata"] or {}).get("stereotype")  # type: ignore[union-attr]
 
     # Enrich with tags
     tag_cursor = await db.execute(
@@ -435,6 +437,8 @@ async def list_elements(
     # Enrich with tags and stats
     for item in items:
         element_id = item["id"]
+        # ADR-233: read-through stereotype from metadata for display.
+        item["stereotype"] = (item.get("metadata") or {}).get("stereotype")
 
         # Tags
         tag_cursor = await db.execute(

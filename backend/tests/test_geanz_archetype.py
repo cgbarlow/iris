@@ -11,6 +11,7 @@ from app.import_sparx.geanz import (
     PROPOSED,
     THEME_PILL,
     ZONE,
+    _Z_NOTE,
     apply_geanz_styling,
     classify_geanz_archetype,
     enrich_visual,
@@ -60,13 +61,16 @@ def test_enrich_capability_rounded():
     assert enrich_visual(CAPABILITY, {})["borderRadius"] == 10
 
 
-def _node(label, *, qualifier=None, entity_type="capability", visual=None):
+def _node(label, *, qualifier=None, entity_type="capability", visual=None, position=None):
     data = {"label": label, "entityType": entity_type}
     if qualifier:
         data["qualifier"] = qualifier
     if visual is not None:
         data["visual"] = visual
-    return {"id": label, "type": entity_type, "data": data}
+    node = {"id": label, "type": entity_type, "data": data}
+    if position is not None:
+        node["position"] = position
+    return node
 
 
 def test_is_geanz_diagram_detects_zone():
@@ -81,27 +85,36 @@ def test_is_geanz_diagram_ignores_generic_archimate():
 
 
 def test_apply_geanz_styling_enriches_and_sets_zindex():
+    # Containment: zone (0,0..900,500) ⊃ mid (10,10..810,410) ⊃ sub (20,20..120,90).
     zone = _node("Customer Service Delivery capability zone",
-                 visual={"bgColor": "#ccf2fe", "borderColor": "#4169e1", "borderWidth": 3, "width": 866, "height": 390})
-    cap = _node("Case Management", visual={"bgColor": "#ffffff", "borderColor": "#4169e1", "borderWidth": 2})
-    pill = _node("Strategy (theme)", qualifier="CBC Themes", visual={"bgColor": "#ffffff", "borderColor": "#4169e1"})
+                 visual={"bgColor": "#ccf2fe", "borderColor": "#4169e1", "borderWidth": 3, "width": 900, "height": 500},
+                 position={"x": 0, "y": 0})
+    mid = _node("Payroll", visual={"bgColor": "#ffffff", "borderColor": "#4169e1", "borderWidth": 2, "width": 800, "height": 400},
+                position={"x": 10, "y": 10})
+    sub = _node("Case Management", visual={"bgColor": "#ffffff", "borderColor": "#4169e1", "width": 100, "height": 70},
+                position={"x": 20, "y": 20})
+    pill = _node("Strategy (theme)", qualifier="CBC Themes",
+                 visual={"bgColor": "#ffffff", "borderColor": "#4169e1", "width": 120, "height": 30},
+                 position={"x": 0, "y": -50})  # above the zone, contained by nothing
     note = _node("August 2025", entity_type="note", visual={"width": 148, "height": 30})
-    nodes = [zone, cap, pill, note]
+    nodes = [zone, mid, sub, pill, note]
 
     assert apply_geanz_styling(nodes) is True
 
-    assert zone["zIndex"] == 0  # behind children
+    # Containment depth layering: zone behind mid behind sub.
+    assert zone["zIndex"] == 0
+    assert mid["zIndex"] == 1
+    assert sub["zIndex"] == 2
+    assert zone["zIndex"] < mid["zIndex"] < sub["zIndex"]
+    assert pill["zIndex"] == 0  # not inside anything
+
     assert zone["data"]["visual"]["borderRadius"] == 14
     assert zone["data"]["visual"]["bgColor"] == "#ccf2fe"  # preserved
-
-    assert cap["zIndex"] == 2
-    assert cap["data"]["visual"]["borderRadius"] == 10
-
+    assert sub["data"]["visual"]["borderRadius"] == 10
     assert pill["data"]["visual"]["borderStyle"] == "dashed"
     assert pill["data"]["visual"]["cornerStyle"] == "pill"
     assert pill["data"]["visual"]["italic"] is True
-
-    assert note["zIndex"] == 3  # notes float above
+    assert note["zIndex"] == _Z_NOTE  # notes float above
 
 
 def test_apply_geanz_styling_noop_on_generic():

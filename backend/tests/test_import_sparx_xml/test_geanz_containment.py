@@ -136,3 +136,28 @@ class TestGeanzContainment:
             return False
 
         assert has_nested_element(tree)
+
+    async def test_element_exposes_stereotype(self, client: httpx.AsyncClient) -> None:
+        """ADR-233 (issue 2): imported GEANZ elements expose `stereotype`
+        (derived from metadata.stereotype) on the element API. GEANZ
+        elements import as element_type 'class' with the ArchiMate
+        stereotype in metadata."""
+        headers = await auth_headers(client)
+        uid = await admin_user_id(client)
+        db = client._transport.app.state.db_manager.main_db  # type: ignore[union-attr]
+        resp = await client.post("/api/sets", json={"name": "GEANZ"}, headers=headers)
+        set_id = resp.json()["id"]
+        await import_sparx_xml_file(db, str(GEANZ_XML), imported_by=uid, set_id=set_id)
+
+        # Pick an element that actually carries a stereotype in metadata.
+        cursor = await db.execute(
+            "SELECT e.id FROM elements e "
+            "JOIN element_versions ev ON e.id = ev.element_id AND e.current_version = ev.version "
+            "WHERE e.set_id = ? AND e.is_deleted = FALSE AND ev.metadata LIKE '%stereotype%' "
+            "LIMIT 1",
+            (set_id,),
+        )
+        eid = (await cursor.fetchone())[0]
+        r = await client.get(f"/api/elements/{eid}", headers=headers)
+        assert r.status_code == 200, r.text
+        assert r.json()["stereotype"] == "ArchiMate_Capability", r.json()

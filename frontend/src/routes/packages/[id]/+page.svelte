@@ -129,6 +129,8 @@
 	let showDiagrams = $state(true);
 	let showText = $state(true);
 	let treeExpandedIds = $state(new Set<string>());
+	// ADR-232 (issue 4): drag-to-reorder, consistent with dashboard/element.
+	let reorderMode = $state(false);
 
 	$effect(() => {
 		const id = page.params.id;
@@ -328,6 +330,17 @@
 			goto('/');
 		} catch (e) {
 			error = e instanceof ApiError ? e.message : 'Failed to delete';
+		}
+	}
+
+	async function handleReorder(parentId: string | null, orderedIds: string[]) {
+		try {
+			await apiFetch('/api/diagrams/reorder', {
+				method: 'PUT',
+				body: JSON.stringify({ parent_package_id: parentId, ordered_ids: orderedIds }),
+			});
+		} finally {
+			await loadHierarchyTree();
 		}
 	}
 
@@ -604,6 +617,14 @@
 							oncreateelement={() => (showCreateChildElementDialog = true)}
 						/>
 						<button
+							onclick={() => (reorderMode = !reorderMode)}
+							class="rounded px-2 py-1 text-xs"
+							style="border: 1px solid {reorderMode ? 'var(--color-primary)' : 'var(--color-border)'}; background: {reorderMode ? 'var(--color-primary)' : 'transparent'}; color: {reorderMode ? 'white' : 'var(--color-muted)'}"
+							title={reorderMode ? 'Done — exit reorder mode' : 'Reorder — drag tree items to change their position'}
+						>
+							{reorderMode ? 'Done' : 'Reorder'}
+						</button>
+						<button
 							onclick={() => { sidebarOpen = false; localStorage.setItem('iris-hierarchy-sidebar-open', 'false'); }}
 							class="rounded p-1 text-xs"
 							style="color: var(--color-muted)"
@@ -631,7 +652,7 @@
 					{:else}
 						<ul role="tree">
 							{#each hierarchyTree as node (node.id)}
-								<TreeNode {node} currentDiagramId={pkg.id} searchQuery={treeSearchQuery} {showDiagrams} {showText} expandedIds={treeExpandedIds} />
+								<TreeNode {node} currentDiagramId={pkg.id} searchQuery={treeSearchQuery} {showDiagrams} {showText} expandedIds={treeExpandedIds} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} />
 							{/each}
 						</ul>
 					{/if}

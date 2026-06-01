@@ -28,6 +28,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
+	// ADR-232 (issue 4): drag-to-reorder in tree mode, consistent across screens.
+	let reorderMode = $state(false);
 	let sortField = $state<'name' | 'diagram_type' | 'updated_at'>('name');
 	let typeFilter = $state<string>('');
 	let notationFilter = $state<string>('');
@@ -169,6 +171,18 @@
 			hierarchyLoaded = true;
 		} catch {
 			hierarchyTree = [];
+		}
+	}
+
+	async function handleReorder(parentId: string | null, orderedIds: string[]) {
+		try {
+			await apiFetch('/api/diagrams/reorder', {
+				method: 'PUT',
+				body: JSON.stringify({ parent_package_id: parentId, ordered_ids: orderedIds }),
+			});
+		} finally {
+			hierarchyLoaded = false;
+			await loadHierarchy();
 		}
 	}
 
@@ -608,12 +622,22 @@
 			</p>
 		</div>
 		{#if viewMode === 'tree'}
+			<div class="mb-2 flex justify-end">
+				<button
+					onclick={() => (reorderMode = !reorderMode)}
+					class="rounded px-2 py-1 text-xs"
+					style="border: 1px solid {reorderMode ? 'var(--color-primary)' : 'var(--color-border)'}; background: {reorderMode ? 'var(--color-primary)' : 'transparent'}; color: {reorderMode ? 'white' : 'var(--color-muted)'}"
+					title={reorderMode ? 'Done — exit reorder mode' : 'Reorder — drag tree items to change their position'}
+				>
+					{reorderMode ? 'Done' : 'Reorder'}
+				</button>
+			</div>
 			<ul role="tree" aria-label="View hierarchy" class="tree-view" data-testid="diagrams-tree">
 				{#if hierarchyTree.length === 0}
 					<li style="color: var(--color-muted); padding: 8px">No views found.</li>
 				{:else}
 					{#each hierarchyTree as node (node.id)}
-						<TreeNode {node} searchQuery={searchQuery} {showDiagrams} {showText} />
+						<TreeNode {node} searchQuery={searchQuery} {showDiagrams} {showText} siblings={hierarchyTree} onreorder={reorderMode ? handleReorder : undefined} />
 					{/each}
 				{/if}
 			</ul>

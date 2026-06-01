@@ -83,6 +83,9 @@ class ElementResponse(BaseModel):
     detail_diagram_id: str | None = None
     parent_element_id: str | None = None
     parent_element_name: str | None = None
+    # ADR-233: read-through stereotype derived from metadata.stereotype
+    # (e.g. "ArchiMate_Capability"). No column — surfaced for display.
+    stereotype: str | None = None
     metadata: dict[str, object] | None = None
     notation: str = "simple"
 

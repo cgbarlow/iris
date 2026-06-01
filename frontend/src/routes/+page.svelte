@@ -91,7 +91,7 @@
 	let error = $state<string | null>(null);
 	let hierarchyTree = $state<DiagramHierarchyNode[]>([]);
 	let hierarchyLoading = $state(false);
-	let autoExpandDepth = $state(2);
+	let autoExpandDepth = $state(0);  // ADR-232 (issue 5): collapsed by default
 	let treeSearchQuery = $state('');
 	let treeExpandedIds = $state(new Set<string>());
 	let reorderMode = $state(false);
@@ -344,7 +344,9 @@
 			hierarchyTree = await apiFetch<DiagramHierarchyNode[]>(
 				`/api/diagrams/hierarchy?set_id=${setId}`
 			);
-			autoExpandDepth = calcAutoExpandDepth(hierarchyTree);
+			// ADR-232 (issue 5): collapsed by default — only the root level shows
+			// (graph-hover peek + search still expand on demand).
+			autoExpandDepth = 0;
 		} catch {
 			hierarchyTree = [];
 		}

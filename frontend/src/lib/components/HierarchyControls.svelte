@@ -25,8 +25,8 @@
 		showText: boolean;
 		onShowDiagrams: (v: boolean) => void;
 		onShowText: (v: boolean) => void;
-		oncreateview: () => void;
-		oncreatepackage: () => void;
+		oncreateview?: () => void;
+		oncreatepackage?: () => void;
 		oncreateelement?: () => void;
 	}
 
@@ -118,22 +118,26 @@
 		class="z-50 min-w-[160px] rounded border py-1 shadow-lg"
 		style="position: fixed; top: {newMenuPos.top}px; left: {newMenuPos.left}px; background-color: var(--color-bg, #fff); border-color: var(--color-border)"
 	>
-		<button
-			role="menuitem"
-			onclick={() => { oncreatepackage(); closeAll(); }}
-			class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
-			style="color: var(--color-fg)"
-		>
-			Package
-		</button>
-		<button
-			role="menuitem"
-			onclick={() => { oncreateview(); closeAll(); }}
-			class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
-			style="color: var(--color-fg); padding-left: 2rem"
-		>
-			View
-		</button>
+		{#if oncreatepackage}
+			<button
+				role="menuitem"
+				onclick={() => { oncreatepackage?.(); closeAll(); }}
+				class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
+				style="color: var(--color-fg)"
+			>
+				Package
+			</button>
+		{/if}
+		{#if oncreateview}
+			<button
+				role="menuitem"
+				onclick={() => { oncreateview?.(); closeAll(); }}
+				class="block w-full px-3 py-1 text-left text-xs hover:opacity-80"
+				style="color: var(--color-fg); padding-left: 2rem"
+			>
+				View
+			</button>
+		{/if}
 		{#if oncreateelement}
 			<!-- Issue #191: Element below View, indented to convey the
 			     view → element containment hint (a view is composed
