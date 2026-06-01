@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.44.3] - 2026-06-01
+
+### Changed
+
+- **Element screen: the hierarchy toggle is now an icon inline with the tab
+  row (ADR-232 follow-up).** It was a text "Hierarchy" button up in the
+  page-action row; it's now the same sidebar icon used on the view screen,
+  sitting to the left of the Relationships / Details / Version History tabs —
+  so the two screens look and behave consistently. Same `aria-label` and
+  toggle behaviour; purely cosmetic.
+
 ## [6.44.2] - 2026-06-01
 
 ### Fixed
