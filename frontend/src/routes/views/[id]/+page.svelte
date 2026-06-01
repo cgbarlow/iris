@@ -2031,7 +2031,7 @@
 			 is in flight. -->
 		<FocusView onexit={() => (focusMode = false)}>
 			<div class="flex h-full w-full items-center justify-center">
-				<p style="color: var(--color-muted)">Loading diagram...</p>
+				<p style="color: var(--color-muted)">Loading view...</p>
 			</div>
 		</FocusView>
 	{:else}
@@ -2042,7 +2042,7 @@
 				<li aria-current="page">{page.params.id}</li>
 			</ol>
 		</nav>
-		<p style="color: var(--color-muted)">Loading diagram...</p>
+		<p style="color: var(--color-muted)">Loading view...</p>
 	{/if}
 {:else if error}
 	{#if focusMode}

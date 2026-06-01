@@ -66,7 +66,7 @@
 	});
 </script>
 
-<div class="flex items-center gap-2">
+<div class="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
 	<label for="set-selector" class="text-sm font-medium" style="color: var(--color-fg)">
 		{label}
 	</label>
@@ -75,7 +75,7 @@
 		{value}
 		onchange={handleChange}
 		disabled={loading}
-		class="rounded border px-3 py-1.5 text-sm"
+		class="w-full min-w-0 max-w-full truncate rounded border px-3 py-1.5 text-sm sm:w-auto sm:max-w-xs"
 		style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 	>
 		{#if showAll}
