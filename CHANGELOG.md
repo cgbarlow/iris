@@ -25,6 +25,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the comments panel in collections the user can't write to, and hides
   New/Delete Collection for scoped users.
 
+## [6.44.4] - 2026-06-01
+
+### Fixed
+
+- **Set dropdown populates fast again (ADR-236).** `GET /api/sets` computed its
+  diagram/element/package counts with four `COUNT(*)` queries *per set* — slow on
+  Supabase, where each query is a network round-trip. Counts are now computed with
+  four grouped `GROUP BY` queries total; identical output, far fewer round-trips.
+- **Mobile: AI-chat model picker no longer opens off-screen (ADR-236).** The
+  provider dropdown is clamped to the viewport and re-anchored on small screens.
+- **Mobile: import set picker fits the screen (ADR-236).** It now stacks and
+  width-caps instead of overflowing.
+- **Mobile: the view-type selector no longer runs off the right (ADR-236).** The
+  AI-chat creation controls wrap onto the next line.
+- **Mobile: tapping the chat input no longer zooms the page (ADR-236).** Form
+  controls are bumped to 16px on small screens, below iOS Safari's auto-zoom
+  threshold; pinch-zoom still works.
+
+### Changed
+
+- **AI chat: "Create Diagram" is now "Create View"; the view screen says
+  "Loading view…" (ADR-236).** Part of the ongoing diagram→view wording shift.
+
 ## [6.44.3] - 2026-06-01
 
 ### Changed
