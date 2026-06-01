@@ -24,11 +24,9 @@ CAPABILITY = "geanz_capability"
 PROPOSED = "geanz_proposed_capability"
 THEME_PILL = "geanz_theme_pill"
 
-# z-index so the zone fill renders behind its child capabilities (EA draws
-# children on top of the zone), while notes float above everything.
-_Z_ZONE = 0
-_Z_CAPABILITY = 2
-_Z_NOTE = 3
+# Notes float above everything; capability z-index is computed per containment
+# depth in apply_geanz_styling (a containing box sits behind the boxes it holds).
+_Z_NOTE = 1000
 
 
 def classify_geanz_archetype(label: str | None, qualifier: str | None = None) -> str:
@@ -63,6 +61,36 @@ def enrich_visual(archetype: str, visual: dict[str, object] | None) -> dict[str,
     else:  # CAPABILITY
         v.setdefault("borderRadius", 10)
     return v
+
+
+def _node_rect(node: dict[str, object]) -> tuple[float, float, float, float] | None:
+    """(left, top, right, bottom) from the node's position + visual/measured
+    size, or None if unknown."""
+    pos = node.get("position")
+    if not isinstance(pos, dict):
+        return None
+    x, y = pos.get("x"), pos.get("y")
+    data = node.get("data")
+    visual = data.get("visual") if isinstance(data, dict) else None
+    w = h = None
+    if isinstance(visual, dict):
+        w, h = visual.get("width"), visual.get("height")
+    measured = node.get("measured")
+    if (w is None or h is None) and isinstance(measured, dict):
+        w = w if w is not None else measured.get("width")
+        h = h if h is not None else measured.get("height")
+    if not all(isinstance(v, (int, float)) for v in (x, y, w, h)):
+        return None
+    return (x, y, x + w, y + h)  # type: ignore[operator]
+
+
+def _rect_contains(outer: tuple, inner: tuple, tol: float = 1.0) -> bool:
+    """True when ``outer`` encloses ``inner`` and is strictly larger in area
+    (so two equal rects don't each 'contain' the other)."""
+    if not (outer[0] <= inner[0] + tol and outer[1] <= inner[1] + tol
+            and outer[2] >= inner[2] - tol and outer[3] >= inner[3] - tol):
+        return False
+    return (outer[2] - outer[0]) * (outer[3] - outer[1]) > (inner[2] - inner[0]) * (inner[3] - inner[1])
 
 
 def _entity_type(node: dict[str, object]) -> str:
@@ -106,6 +134,7 @@ def apply_geanz_styling(nodes: list[dict[str, object]]) -> bool:
     """
     if not is_geanz_diagram(nodes):
         return False
+    capability_nodes = []
     for node in nodes:
         et = _entity_type(node)
         if et == "note":
@@ -122,5 +151,19 @@ def apply_geanz_styling(nodes: list[dict[str, object]]) -> bool:
         )
         visual = data.get("visual")
         data["visual"] = enrich_visual(arch, visual if isinstance(visual, dict) else None)
-        node["zIndex"] = _Z_ZONE if arch == ZONE else _Z_CAPABILITY
+        capability_nodes.append(node)
+
+    # Layer by containment so a box that geometrically CONTAINS others renders
+    # BEHIND them (else a mid-level container like "Payroll" covers its nested
+    # sub-capabilities). z-index = how many other boxes contain this one, so a
+    # zone (depth 0) sits behind its capabilities (depth 1) behind sub-caps
+    # (depth 2). Notes float above everything (_Z_NOTE).
+    rects = [(_node_rect(n), n) for n in capability_nodes]
+    for rn, node in rects:
+        depth = 0
+        if rn is not None:
+            for rm, other in rects:
+                if other is not node and rm is not None and _rect_contains(rm, rn):
+                    depth += 1
+        node["zIndex"] = depth
     return True

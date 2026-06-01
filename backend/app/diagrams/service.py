@@ -879,8 +879,11 @@ _HIERARCHY_ORDER_BY: dict[str, str] = {
     # ADR-202: per-set hierarchy sort. Each entry maps a sort key from
     # ``sets.hierarchy_sort`` to the ORDER BY clause appended to the
     # UNION query in ``get_diagram_hierarchy``.
-    "manual": "t.node_type, t.sequence_order, t.name",
-    # No node_type tie-break — packages and diagrams interleave by name.
+    # ADR-232 (issue 1): interleave packages / diagrams / nested elements by
+    # position (no leading node_type) so they sit in document order instead of
+    # grouping into type-blocks. COALESCE so element nodes (no sequence_order)
+    # fall back to name order rather than scattering on NULL.
+    "manual": "COALESCE(t.sequence_order, 0), LOWER(t.name)",
     "alpha": "LOWER(t.name)",
     "newest": "t.created_at DESC",
     "oldest": "t.created_at ASC",
@@ -946,12 +949,22 @@ async def get_diagram_hierarchy(
         "       AND p.current_version = pv.version "
         f"  WHERE p.is_deleted = 0 {pkg_set_filter}"
         "  UNION ALL "
-        "  SELECT d.id, dv.name, 'diagram' AS node_type, d.parent_package_id, "
+        # ADR-232 (issue 1): a diagram owned by an element (EA composite
+        # diagram, ADR-221 detail_diagram_id) nests under that ELEMENT in the
+        # tree, not its package — but only when the owning element is itself a
+        # containment node (else it isn't in the tree and the diagram would
+        # orphan), so we keep the package fallback via COALESCE.
+        "  SELECT d.id, dv.name, 'diagram' AS node_type, "
+        "         COALESCE(oe.id, d.parent_package_id) AS parent_package_id, "
         "         d.diagram_type, dv.data, d.notation, d.sequence_order, "
         "         d.created_at "
         "  FROM diagrams d "
         "  JOIN diagram_versions dv ON d.id = dv.diagram_id "
         "       AND d.current_version = dv.version "
+        "  LEFT JOIN elements oe ON oe.detail_diagram_id = d.id AND oe.is_deleted = 0 "
+        "       AND (oe.parent_element_id IS NOT NULL "
+        "            OR oe.id IN (SELECT parent_element_id FROM elements "
+        "                         WHERE parent_element_id IS NOT NULL AND is_deleted = 0)) "
         f"  WHERE d.is_deleted = 0 {diag_set_filter}"
         # ADR-231: nested elements as tree nodes. Only elements INVOLVED in
         # containment (have a parent element, or are themselves a parent) are

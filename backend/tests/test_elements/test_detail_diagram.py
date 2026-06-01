@@ -313,3 +313,47 @@ class TestSmartMarkdownToken:
         # Unresolvable token → strikethrough fallback.
         assert "~~" in content
         assert "iris://diagram/" not in content
+
+
+class TestHierarchyNesting:
+    """ADR-232 (issue 1): an element-owned (composite) diagram nests under
+    its owning element in the diagram hierarchy, not under its package."""
+
+    async def test_owned_diagram_nests_under_owning_element(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id = await _create_set(client, headers)
+        diag = await _create_diagram(client, headers, set_id=set_id, name="Detail")
+        owner = await _create_element(
+            client, headers, set_id=set_id, name="Owner", detail_diagram_id=diag,
+        )
+        owner_id = owner["body"]["id"]
+        # A child element makes the owner a containment node (so it appears in
+        # the tree and the COALESCE can nest the diagram under it).
+        child = await client.post(
+            "/api/elements",
+            json={"element_type": "component", "name": "Child",
+                  "set_id": set_id, "parent_element_id": owner_id},
+            headers=headers,
+        )
+        assert child.status_code == 201, child.text
+
+        resp = await client.get(f"/api/diagrams/hierarchy?set_id={set_id}", headers=headers)
+        assert resp.status_code == 200, resp.text
+
+        def find(nodes: list) -> dict | None:
+            for n in nodes:
+                if n["id"] == owner_id:
+                    return n
+                hit = find(n["children"])
+                if hit:
+                    return hit
+            return None
+
+        owner_node = find(resp.json())
+        assert owner_node is not None, "owner element not in hierarchy"
+        assert any(
+            c["node_type"] == "diagram" and c["id"] == diag
+            for c in owner_node["children"]
+        ), owner_node

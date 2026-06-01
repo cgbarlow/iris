@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.44.0] - 2026-06-01
+
+### Added
+
+- **Unified hierarchy-tree UX (ADR-232).** Now that element containment
+  adds element nodes to the navigation tree:
+  - Element-owned (composite) diagrams nest under their owning **element**
+    instead of appearing in a separate block, and packages / diagrams /
+    nested elements **interleave by position** rather than grouping by type.
+  - **Element nodes show a cube icon** (Lucide Box); the diagram
+    solid/hollow content indicator and packages are unchanged.
+  - The tree is **collapsed by default** (only the root level shows; the
+    current node's ancestors are auto-revealed, and search/peek still
+    expand on demand).
+  - A shared `HierarchySidebar` component brings the tree to the **element
+    detail screen** (it previously had none), and the **Reorder** control
+    now works across dashboard / views / package / element.
+- **Element stereotype surfaced (ADR-233).** The EA stereotype (e.g.
+  `ArchiMate_Capability`) carried by imported elements is now a
+  read-through field on the element API and shown as a «chip» on the
+  element page. No schema change.
+
+### Fixed
+
+- **GEANZ diagrams render without overlaps or hidden boxes (ADR-234,
+  extends ADR-230).** Fixed-size (EA-imported) nodes now render at their
+  exact EA height with clipping, so a long label can no longer grow its
+  box past its footprint and collide with the tightly-packed neighbour
+  (the capability-grid overlap). Imported diagrams are also layered by
+  **containment depth** so a container (e.g. a mid-level capability) sits
+  behind the boxes it holds instead of covering them. Verified by a new
+  Playwright harness that renders every diagram of the full GEANZ import
+  and asserts zero box overlaps across all of them.
+
 ## [6.43.0] - 2026-06-01
 
 ### Added

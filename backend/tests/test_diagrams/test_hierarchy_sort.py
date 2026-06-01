@@ -135,19 +135,20 @@ class TestDefaultSort:
     async def test_existing_sets_keep_manual_order(
         self, client: httpx.AsyncClient,
     ) -> None:
-        """Without explicitly setting hierarchy_sort, the order is unchanged
-        from the historical default: diagrams above packages within the
-        same parent, then sequence_order (auto-assigned in creation order
-        per parent), then name as a final tiebreak."""
+        """ADR-232 (issue 1): the 'manual' sort now INTERLEAVES diagrams,
+        elements and packages by sequence_order then name, instead of
+        grouping by node_type — so diagrams no longer render as a separate
+        block. Drag order (sequence_order) is still honoured.
+
+        Diagrams: Alpha (seq 0), Tango (seq 1). Packages: Zulu (seq 0),
+        Mike (seq 1) — sequence_order is auto-incremented per parent group
+        on creation (packages/service.py:38-47). Interleaved by
+        (sequence_order, name): Alpha+Zulu at 0 → Alpha, Zulu; Mike+Tango at
+        1 → Mike, Tango."""
         h = await _auth(client)
         set_id = await _setup_mixed_set(client, h)
         names = await _names(client, h, set_id)
-        # Manual sort: node_type ('diagram' < 'package' alphabetically).
-        # Diagrams in creation order: Alpha (created at t1), Tango (at t3).
-        # Packages in creation order: Zulu (at t0), Mike (at t2).
-        # sequence_order is auto-incremented per parent group on creation
-        # (packages/service.py:38-47), so it reflects creation order.
-        assert names == ["Alpha", "Tango", "Zulu", "Mike"]
+        assert names == ["Alpha", "Zulu", "Mike", "Tango"]
 
 
 class TestAlphaSort:

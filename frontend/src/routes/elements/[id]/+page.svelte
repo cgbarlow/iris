@@ -22,6 +22,7 @@
 	import VersionHistory from '$lib/components/VersionHistory.svelte';
 	import CreateTemplateDialog from '$lib/components/CreateTemplateDialog.svelte';
 	import DiagramPicker from '$lib/components/DiagramPicker.svelte';
+	import HierarchySidebar from '$lib/components/HierarchySidebar.svelte';
 	import type { Diagram } from '$lib/types/api';
 	import { Accordion } from 'bits-ui';
 	import DOMPurify from 'dompurify';
@@ -48,6 +49,8 @@
 	let activeTab = $state<'details' | 'versions' | 'relationships'>('relationships');
 	let userSelectedTab = $state(false);
 	let packageMemberships = $state<{id: string; name: string}[]>([]);
+	// ADR-232 (issue 3): the shared hierarchy sidebar, collapsed by default.
+	let sidebarOpen = $state(false);
 	// ADR-231: child elements owned by this element (containment hierarchy).
 	let childElements = $state<{id: string; name: string; element_type: string}[]>([]);
 	let showDeleteDialog = $state(false);
@@ -556,6 +559,11 @@
 		{error}
 	</div>
 {:else if entity}
+	<div class="flex gap-4 items-start">
+	{#if entity.set_id}
+		<HierarchySidebar setId={entity.set_id} currentId={entity.id} bind:open={sidebarOpen} />
+	{/if}
+	<div class="min-w-0 flex-1">
 	<div class="flex flex-wrap items-center justify-between gap-2">
 		<div>
 			<div class="flex flex-wrap items-center gap-3">
@@ -569,9 +577,24 @@
 				{#if entity.notation && entity.notation !== 'simple'}
 					<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)">{entity.notation}</span>
 				{/if}
+				{#if entity.stereotype}
+					<span class="rounded-full px-2 py-0.5 text-xs" style="background: var(--color-surface); color: var(--color-fg); border: 1px solid var(--color-border)" title="Stereotype">«{entity.stereotype}»</span>
+				{/if}
 			</p>
 		</div>
 		<div class="flex gap-2">
+			{#if entity.set_id}
+				<button
+					onclick={() => (sidebarOpen = !sidebarOpen)}
+					aria-label="Toggle hierarchy sidebar"
+					aria-pressed={sidebarOpen}
+					class="rounded px-2 py-1 text-sm"
+					style="border: 1px solid var(--color-border); background: {sidebarOpen ? 'var(--color-primary)' : 'transparent'}; color: {sidebarOpen ? 'white' : 'var(--color-muted)'}"
+					title="Show the set hierarchy"
+				>
+					Hierarchy
+				</button>
+			{/if}
 			{#if entity.element_type.startsWith('scenia_')}
 				<button
 					onclick={() => openScenia(entity.set_id, entity.id)}
@@ -1351,4 +1374,6 @@
 		}}
 		oncancel={() => (showDetailDiagramPicker = false)}
 	/>
+	</div>
+	</div>
 {/if}

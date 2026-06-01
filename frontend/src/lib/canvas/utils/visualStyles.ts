@@ -25,9 +25,17 @@ export function nodeOverrideStyle(visual?: NodeVisualOverrides, fixedSize?: bool
 		}
 	}
 	if (visual.height != null) {
-		// Always use min-height to prevent content clipping — EA heights are
-		// exact for the EA renderer but Iris padding/borders differ slightly.
-		parts.push(`min-height: ${visual.height}px`);
+		if (fixedSize) {
+			// ADR-234 (issue 7): a node with an explicit EA width AND height is
+			// laid out to an exact footprint. Render at exact height + clip so a
+			// long label can't grow the box past its EA size and overlap the
+			// tightly-packed neighbour (the GEANZ capability-grid overlap bug).
+			parts.push(`height: ${visual.height}px`);
+			parts.push('overflow: hidden');
+		} else {
+			// Authored nodes (no explicit size): min-height avoids clipping.
+			parts.push(`min-height: ${visual.height}px`);
+		}
 	}
 	return parts.join('; ');
 }

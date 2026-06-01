@@ -40,6 +40,8 @@ export interface Element {
 	// ADR-231: the element that owns this element (containment hierarchy).
 	parent_element_id?: string | null;
 	parent_element_name?: string | null;
+	// ADR-233: read-through stereotype (e.g. "ArchiMate_Capability").
+	stereotype?: string | null;
 }
 
 export interface Diagram {
