@@ -627,7 +627,7 @@ function promptForLocation() {
 <div class="flex flex-col" style="height: 100%">
 	<!-- Header with mode toggle, clear, and history buttons -->
 	<div class="mb-3 flex items-center justify-between gap-2 flex-wrap">
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			<button
 				onclick={() => { creationMode = false; pendingDiagrams = null; creationHistory = []; locationChosen = false; selectedPackageId = null; }}
 				class="rounded px-3 py-1.5 text-sm"
@@ -653,15 +653,15 @@ function promptForLocation() {
 					? 'background: var(--color-primary); color: white; border: 1px solid var(--color-primary)'
 					: 'border: 1px solid var(--color-border); color: var(--color-fg)'}
 			>
-				Create Diagram
+				Create View
 			</button>
 			{#if creationMode}
 				<select
-					aria-label="Diagram notation"
+					aria-label="View notation"
 					bind:value={selectedNotation}
 					onchange={() => { selectedDiagramType = ''; }}
 					disabled={!catalogueLoaded || notationOptions.length === 0}
-					class="rounded border px-2 py-1.5 text-sm disabled:opacity-50"
+					class="min-w-0 max-w-full rounded border px-2 py-1.5 text-sm disabled:opacity-50"
 					style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 				>
 					<option value="" disabled>
@@ -673,12 +673,12 @@ function promptForLocation() {
 				</select>
 				{#if selectedNotation && requiresDiagramType}
 					<select
-						aria-label="Diagram type"
+						aria-label="View type"
 						bind:value={selectedDiagramType}
-						class="rounded border px-2 py-1.5 text-sm"
+						class="min-w-0 max-w-full rounded border px-2 py-1.5 text-sm"
 						style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 					>
-						<option value="" disabled>Select diagram type…</option>
+						<option value="" disabled>Select view type…</option>
 						{#each diagramTypeOptions as d (d.diagram_type)}
 							<option value={d.diagram_type}>{d.diagram_type_label}</option>
 						{/each}
@@ -1051,8 +1051,19 @@ function promptForLocation() {
 		margin: 0;
 		padding: 4px 0;
 		min-width: 100%;
+		max-width: calc(100vw - 32px);
 		white-space: nowrap;
 		box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+	}
+	/* ADR-236: on narrow screens anchor to the left of the (left-aligned)
+	   trigger and allow wrapping so the menu never runs off-screen. */
+	@media (max-width: 640px) {
+		.provider-dropdown-menu {
+			left: 0;
+			right: auto;
+			white-space: normal;
+			min-width: min(240px, calc(100vw - 32px));
+		}
 	}
 	.provider-dropdown-item {
 		display: flex;

@@ -765,3 +765,16 @@ body.scroll-locked {
 	pointer-events: none;
 }
 
+/* ── Mobile: stop iOS Safari auto-zooming on focus (ADR-236) ──
+   iOS zooms in whenever a focused form control has a font-size below 16px.
+   Many controls use Tailwind's text-sm (14px); bump them to 16px on small
+   screens so tapping the chat input / pickers no longer zooms the page.
+   The viewport meta is left untouched so pinch-zoom still works. */
+@media (max-width: 640px) {
+	input,
+	select,
+	textarea {
+		font-size: 16px;
+	}
+}
+

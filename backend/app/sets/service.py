@@ -51,6 +51,16 @@ def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, 
     }
 
 
+async def _grouped_counts(db: DatabasePort, sql: str) -> dict[object, int]:
+    """Run a ``SELECT key, COUNT(*) ... GROUP BY key`` and return ``{key: count}``.
+
+    Used by :func:`list_sets` (ADR-236) to fetch per-set counts in a single
+    query instead of one COUNT(*) per set. Positional row access (§15).
+    """
+    cursor = await db.execute(sql)
+    return {row[0]: row[1] for row in await cursor.fetchall()}
+
+
 _SET_COLUMNS = (
     "s.id, s.name, s.description, s.created_at, s.created_by, "
     "s.updated_at, s.is_deleted, s.thumbnail_source, s.thumbnail_diagram_id, "
@@ -185,36 +195,36 @@ async def list_sets(
         )
     rows = await cursor.fetchall()
 
+    # ADR-236: compute per-set counts with grouped aggregates (one query each)
+    # instead of four COUNT(*) queries per set. The old per-set loop was O(4N)
+    # round-trips — pathologically slow on Supabase, where each await is a
+    # network hop. One global GROUP BY per metric, mapped by set_id, is correct
+    # for both the filtered and unfiltered branches.
+    diagram_counts = await _grouped_counts(
+        db, "SELECT set_id, COUNT(*) FROM diagrams WHERE is_deleted = 0 GROUP BY set_id"
+    )
+    element_counts = await _grouped_counts(
+        db, "SELECT set_id, COUNT(*) FROM elements WHERE is_deleted = 0 GROUP BY set_id"
+    )
+    # Package counts (ADR-158, v5.13.0)
+    package_counts = await _grouped_counts(
+        db, "SELECT set_id, COUNT(*) FROM packages WHERE is_deleted = 0 GROUP BY set_id"
+    )
+    package_root_counts = await _grouped_counts(
+        db,
+        "SELECT set_id, COUNT(*) FROM packages "
+        "WHERE is_deleted = 0 AND parent_package_id IS NULL GROUP BY set_id",
+    )
+
     items = []
     for row in rows:
         item = _row_to_dict(row, has_thumbnail_image=bool(row[9]))
         set_id = row[0]
 
-        mc = await db.execute(
-            "SELECT COUNT(*) FROM diagrams WHERE set_id = ? AND is_deleted = 0",
-            (set_id,),
-        )
-        item["diagram_count"] = (await mc.fetchone())[0]
-
-        ec = await db.execute(
-            "SELECT COUNT(*) FROM elements WHERE set_id = ? AND is_deleted = 0",
-            (set_id,),
-        )
-        item["element_count"] = (await ec.fetchone())[0]
-
-        # Package counts (ADR-158, v5.13.0)
-        pc = await db.execute(
-            "SELECT COUNT(*) FROM packages WHERE set_id = ? AND is_deleted = 0",
-            (set_id,),
-        )
-        item["package_count"] = (await pc.fetchone())[0]
-
-        pcr = await db.execute(
-            "SELECT COUNT(*) FROM packages "
-            "WHERE set_id = ? AND is_deleted = 0 AND parent_package_id IS NULL",
-            (set_id,),
-        )
-        item["package_count_root"] = (await pcr.fetchone())[0]
+        item["diagram_count"] = diagram_counts.get(set_id, 0)
+        item["element_count"] = element_counts.get(set_id, 0)
+        item["package_count"] = package_counts.get(set_id, 0)
+        item["package_count_root"] = package_root_counts.get(set_id, 0)
 
         # Include thumbnail diagram data for client-side rendering (DRY)
         thumb_id = row[8]  # thumbnail_diagram_id
