@@ -464,6 +464,11 @@ async def import_sparx_model(
             data=element_data,
             created_by=imported_by,
             set_id=set_id,
+            # ADR-184/ADR-232: anchor the element in its EA package so the
+            # navigation tree shows elements (and their containment subtree)
+            # UNDER their package, interleaved with that package's diagrams —
+            # not floating in a separate root tree.
+            package_id=package_map.get(elem.Package_ID),
             metadata=element_metadata,
             change_summary=f"Imported from {source_label} ({elem.Object_Type})",
         )

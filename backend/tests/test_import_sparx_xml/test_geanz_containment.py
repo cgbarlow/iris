@@ -137,6 +137,38 @@ class TestGeanzContainment:
 
         assert has_nested_element(tree)
 
+    async def test_elements_and_diagrams_share_one_package_tree(self, client: httpx.AsyncClient) -> None:
+        """ADR-232 (issue 1): top-level capability elements are anchored in their
+        package (package_id set on import), so the tree shows elements AND that
+        package's diagrams together under the package — not elements floating in
+        a separate root tree."""
+        from app.diagrams.service import get_diagram_hierarchy
+
+        headers = await auth_headers(client)
+        uid = await admin_user_id(client)
+        db = client._transport.app.state.db_manager.main_db  # type: ignore[union-attr]
+        resp = await client.post("/api/sets", json={"name": "GEANZ"}, headers=headers)
+        set_id = resp.json()["id"]
+        await import_sparx_xml_file(db, str(GEANZ_XML), imported_by=uid, set_id=set_id)
+        tree = await get_diagram_hierarchy(db, set_id=set_id)
+
+        # No capability ZONE element should be a root node (they belong under a package).
+        root_element_count = sum(1 for n in tree if n["node_type"] == "element")
+        assert root_element_count == 0, f"{root_element_count} elements floating at root"
+
+        # A package node holds BOTH element children and diagram children.
+        def pkg_has_both(nodes: list) -> bool:
+            for n in nodes:
+                if n["node_type"] == "package":
+                    kinds = {c["node_type"] for c in n["children"]}
+                    if "element" in kinds and "diagram" in kinds:
+                        return True
+                if pkg_has_both(n["children"]):
+                    return True
+            return False
+
+        assert pkg_has_both(tree), "no package mixes element + diagram children (still a split tree)"
+
     async def test_element_exposes_stereotype(self, client: httpx.AsyncClient) -> None:
         """ADR-233 (issue 2): imported GEANZ elements expose `stereotype`
         (derived from metadata.stereotype) on the element API. GEANZ
