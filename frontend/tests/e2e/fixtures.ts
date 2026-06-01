@@ -120,6 +120,49 @@ export async function createEntity(
 }
 
 /**
+ * Create an element via POST /api/elements and return the response body.
+ * (The element domain is `/api/elements` with `element_type`; the older
+ * `createEntity` helper targets a route that no longer exists.)
+ */
+export async function createElement(
+	baseURL: string | undefined,
+	token: string,
+	data: {
+		name: string;
+		element_type: string;
+		description?: string;
+		data?: Record<string, unknown>;
+		set_id?: string;
+		package_id?: string;
+		notation?: string;
+		metadata?: Record<string, unknown>;
+	},
+): Promise<Record<string, unknown>> {
+	const origin = baseURL ?? API_BASE;
+	const res = await fetchWithRetry(`${origin}/api/elements`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body: JSON.stringify({
+			element_type: data.element_type,
+			name: data.name,
+			description: data.description ?? '',
+			data: data.data ?? {},
+			set_id: data.set_id ?? null,
+			package_id: data.package_id ?? null,
+			notation: data.notation ?? 'simple',
+			metadata: data.metadata ?? null,
+		}),
+	});
+	if (!res.ok) {
+		throw new Error(`createElement failed: ${res.status} ${await res.text()}`);
+	}
+	return (await res.json()) as Record<string, unknown>;
+}
+
+/**
  * Create a model via the API and return the response body.
  */
 export async function createModel(
@@ -217,6 +260,9 @@ export async function createDiagram(
 		name: string;
 		description?: string;
 		data?: Record<string, unknown>;
+		set_id?: string;
+		parent_package_id?: string;
+		metadata?: Record<string, unknown>;
 	},
 ): Promise<Record<string, unknown>> {
 	const origin = baseURL ?? API_BASE;
@@ -232,6 +278,9 @@ export async function createDiagram(
 			name: data.name,
 			description: data.description ?? '',
 			data: data.data ?? {},
+			set_id: data.set_id ?? null,
+			parent_package_id: data.parent_package_id ?? null,
+			metadata: data.metadata ?? null,
 		}),
 	});
 	if (!res.ok) {

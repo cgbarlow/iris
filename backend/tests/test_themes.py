@@ -106,8 +106,9 @@ async def test_seed_default_themes(db):
     all_themes = await list_themes(db)
     assert len(all_themes) >= 4  # iris-default-uml, ea-default-uml, iris-default-simple, c4-default
 
-    # Verify EA theme has correct structure
-    ea_themes = [t for t in all_themes if "EA" in str(t["name"])]
+    # Verify EA theme has correct structure (match "Sparx EA" specifically —
+    # a bare "EA" substring also matches "GEANZ Default", ADR-230).
+    ea_themes = [t for t in all_themes if "Sparx EA" in str(t["name"])]
     assert len(ea_themes) == 1
     ea = ea_themes[0]
     assert ea["notation"] == "uml"

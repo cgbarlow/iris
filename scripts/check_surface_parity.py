@@ -141,6 +141,12 @@ _KNOWN_ENTITIES = frozenset({
     "collection", "set", "package", "diagram", "element",
     # v6.8.0 (ADR-191) — element templates have full write parity.
     "element_template",
+    # NOTE: `theme` is intentionally NOT a known entity. Theme CRUD
+    # (POST/PUT /api/themes) is an admin-only styling surface with no MCP
+    # tool or CLI subcommand by design (ADR-230) — themes are seeded
+    # server-side and edited in the admin UI, not authored by agents. If
+    # theme authoring is ever exposed to MCP/CLI, add "theme" here so the
+    # §14 parity check starts enforcing it.
 })
 
 

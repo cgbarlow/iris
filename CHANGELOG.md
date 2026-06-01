@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.42.0] - 2026-06-01
+
+### Fixed
+
+- **GEANZ diagrams no longer flip to the UML default a few seconds after
+  load (ADR-230).** Opening a GEANZ capability view (e.g. CCS.00) first
+  painted the correct themed look, then `refreshNodeDescriptions()` —
+  the post-paint element refresh (ADR-192) — re-hydrated each node from
+  its source element and spread the result over `node.data`, clobbering
+  the canvas node's per-placement `visual` (the EA fill/border + explicit
+  size) with the element's empty `visual`. Colours vanished, SvelteFlow
+  re-measured (re-layout), and capability nodes fell back to the
+  `iris-default-uml` look (white boxes, thin black borders, ArchiMate
+  icons). The refresh now preserves the node's own `visual` / `notation`
+  / `entityType` and only updates genuine content fields, so the themed
+  render stays stable in view and edit mode. A Playwright regression
+  (`geanz-render.spec.ts`) locks this in.
+
+### Added
+
+- **GEANZ render fidelity (ADR-230).** A new built-in **GEANZ Default**
+  theme plus per-archetype canvas styling render the GEANZ Common
+  Business Capabilities set faithfully to the Sparx EA ground-truth:
+  light-cyan capability **zones** behind their children, white
+  **capabilities** with royal-blue rounded borders, dashed pill-shaped
+  italic **theme** elements, dashed **redirect/proposed** boxes, and no
+  ArchiMate icon or description text inside the boxes.
+  - `NodeVisualOverrides` gains `borderRadius` / `cornerStyle` (`pill`),
+    and `nodeOverrideStyle()` emits `border-radius` — so any EA import or
+    manual styling can now express rounded or pill-shaped nodes.
+  - `ArchimateRenderer` now honours theme rendering hints
+    (`hideIcons` / `hideDescription` / `textAlign`) like the other
+    renderers, plus per-node `hideIcon` / `hideDescription`.
+  - The Sparx importer classifies GEANZ archetypes (zone / capability /
+    theme-pill / redirect) from the element name + `CBC Themes`
+    qualifier and enriches each node's `visual` + z-index, and points
+    GEANZ diagrams at the `geanz-default` theme.
+  - `scripts/repair_geanz_render.py` — a targeted, idempotent,
+    dry-run-first repair that applies the same enrichment to an existing
+    set (for already-imported GEANZ content).
+
 ## [6.41.6] - 2026-05-31
 
 ### Fixed

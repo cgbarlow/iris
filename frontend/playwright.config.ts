@@ -19,12 +19,19 @@ const UAT_STORAGE_STATE = 'tests/e2e/uat/.auth/tester.json';
 // touches localhost:4173 / localhost:8000.
 const IS_UAT_RUN = process.env.PLAYWRIGHT_UAT === '1';
 
+// Fast-iteration escape hatch: point the local `e2e` project at an already-
+// running stack (e.g. the dev server on :5173 with HMR) by setting
+// IRIS_E2E_BASE_URL. When set we skip the build+preview webServer entirely
+// (the dev stack is assumed up, backend on :8000). Default behaviour —
+// build + preview on :4173 — is unchanged.
+const E2E_BASE_URL = process.env.IRIS_E2E_BASE_URL;
+
 export default defineConfig({
 	timeout: 30_000,
 	retries: 1,
 	workers: 1,
 	use: {
-		baseURL: 'http://localhost:4173',
+		baseURL: E2E_BASE_URL ?? 'http://localhost:4173',
 		actionTimeout: 10_000,
 		trace: 'on-first-retry',
 	},
@@ -108,7 +115,7 @@ export default defineConfig({
 			retries: 0,
 		},
 	],
-	webServer: IS_UAT_RUN
+	webServer: IS_UAT_RUN || E2E_BASE_URL
 		? undefined
 		: [
 				{

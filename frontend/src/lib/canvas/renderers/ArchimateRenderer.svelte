@@ -4,9 +4,11 @@
 	 * Uses layer-based colour coding (business=yellow, application=blue,
 	 * technology=green, motivation=purple, strategy=red, implementation=grey).
 	 */
+	import { getContext } from 'svelte';
 	import { Handle, Position } from '@xyflow/svelte';
-	import type { CanvasNodeData, ArchimateLayer } from '$lib/types/canvas';
+	import type { CanvasNodeData, ArchimateLayer, NotationType } from '$lib/types/canvas';
 	import { nodeOverrideStyle, titleFontStyle, descFontStyle } from '$lib/canvas/utils/visualStyles';
+	import { getThemeRendering } from '$lib/stores/themeStore.svelte';
 	import IconDisplay from '$lib/icons/IconDisplay.svelte';
 
 	interface Props {
@@ -15,6 +17,16 @@
 	}
 
 	let { data, selected = false }: Props = $props();
+
+	// ADR-230 F3: honour theme rendering hints (like UmlRenderer/NoteNode) plus
+	// per-node overrides, so GEANZ capability nodes can hide the ArchiMate icon
+	// and the description and align their label, matching the EA ground-truth.
+	const notation = getContext<NotationType>('notation') ?? 'archimate';
+	const preferredThemeId = getContext<string | undefined>('preferredThemeId');
+	const rendering = $derived(getThemeRendering(notation, preferredThemeId));
+	const hideIcons = $derived((rendering?.hideIcons ?? false) || (data.visual?.hideIcon ?? false));
+	const hideDesc = $derived((rendering?.hideDescription ?? false) || (data.hideDescription ?? false));
+	const headerAlign = $derived(rendering?.textAlign);
 
 	/** Derive ArchiMate layer from entityType when not explicitly set. */
 	function deriveLayer(entityType: string): ArchimateLayer {
@@ -147,24 +159,25 @@
 	class="archimate-node archimate-node--{layer}"
 	class:archimate-node--selected={selected}
 	class:archimate-node--fixed={hasFixedSize}
+	class:archimate-node--align-left={headerAlign === 'left'}
 	style={visualStyle}
 	aria-label="{data.label}, {data.entityType}"
 >
-	{#if hasCustomIcon && data.visual?.icon}
+	{#if !hideIcons && hasCustomIcon && data.visual?.icon}
 		<span class="archimate-node__icon" aria-hidden="true">
 			<IconDisplay icon={data.visual.icon} size={14} color={iconColor} />
 		</span>
-	{:else if iconSvg}
+	{:else if !hideIcons && iconSvg}
 		<span class="archimate-node__icon" aria-hidden="true">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="14" height="14">
 				{@html iconSvg}
 			</svg>
 		</span>
 	{/if}
-	<div class="archimate-node__header">
+	<div class="archimate-node__header" style={headerAlign ? `text-align: ${headerAlign}` : ''}>
 		<span class="archimate-node__label" style={titleStyle}>{data.label}</span>
 	</div>
-	{#if data.description}
+	{#if data.description && !hideDesc}
 		<div class="archimate-node__description" style={descStyle}>{data.description}</div>
 	{/if}
 	{#if data.browseMode && data.entityId}
@@ -239,6 +252,15 @@
 		white-space: nowrap;
 		display: block;
 	}
+	/* GEANZ/EA: zones + capabilities anchor their label top-left, not centred
+	   (ADR-230 F3). Driven by the theme's rendering.textAlign === 'left'. */
+	.archimate-node--align-left { text-align: left; }
+	.archimate-node--align-left.archimate-node--fixed {
+		justify-content: flex-start;
+		align-items: stretch;
+	}
+	.archimate-node--align-left .archimate-node__header { text-align: left; width: 100%; }
+	.archimate-node--align-left.archimate-node--fixed .archimate-node__label { white-space: normal; }
 	/* Layer colours — match EA/ArchiMate standard palette */
 	.archimate-node--business { background: #ffffb5; border-color: #b09a40; color: #333; }
 	.archimate-node--application { background: #b5ffff; border-color: #4098ad; color: #1a4a5a; }

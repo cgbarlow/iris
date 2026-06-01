@@ -419,4 +419,40 @@ async def seed_default_themes(db: DatabasePort) -> None:
          json.dumps(scenia_config), True, "system", now, now),
     )
 
+    # GEANZ Default — GEANZ Common Business Capabilities look (ADR-230).
+    # All GEANZ elements import as entityType 'capability'; per-archetype
+    # specifics (dashed pills, pill radius, italic, zone fill, larger radius)
+    # ride on each node's data.visual set at import time. The theme supplies
+    # the shared defaults: white capability fill, royal-blue border, and the
+    # rendering hints that strip the ArchiMate icon + description and left-
+    # align labels so capability boxes match the EA ground-truth (EA34.png).
+    geanz_config = {
+        "element_defaults": {
+            "capability": {"bgColor": "#ffffff", "borderColor": "#4169e1", "fontColor": "#1a1a2e", "borderWidth": 2, "bold": True},
+            "note": {"bgColor": "#ffffff", "borderColor": "#000000", "fontColor": "#000000", "borderWidth": 1},
+        },
+        "stereotype_overrides": {},
+        "edge_defaults": {
+            "association": {"lineColor": "#555555", "lineWidth": 1},
+        },
+        "global": {
+            "defaultBgColor": "#ffffff",
+            "defaultBorderColor": "#4169e1",
+            "defaultFontColor": "#1a1a2e",
+        },
+        "rendering": {
+            "hideIcons": True,
+            "hideDescription": True,
+            "borderRadius": 10,
+            "wrapLabels": True,
+            "textAlign": "left",
+        },
+    }
+    await db.execute(
+        "INSERT OR REPLACE INTO themes (id, name, description, notation, config, is_default, created_by, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("geanz-default", "GEANZ Default", "GEANZ Common Business Capabilities — light-blue zones, royal-blue rounded capabilities, dashed theme pills", "uml",
+         json.dumps(geanz_config), True, "system", now, now),
+    )
+
     await db.commit()

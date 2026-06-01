@@ -10,6 +10,10 @@ export function nodeOverrideStyle(visual?: NodeVisualOverrides, fixedSize?: bool
 	if (visual.fontColor) parts.push(`color: ${visual.fontColor}`);
 	if (visual.borderWidth != null) parts.push(`border-width: ${visual.borderWidth}px`);
 	if (visual.borderStyle) parts.push(`border-style: ${visual.borderStyle}`);
+	// Corner radius / pill (ADR-230 F2). 'pill' wins over an explicit radius.
+	if (visual.cornerStyle === 'pill') parts.push('border-radius: 9999px');
+	else if (visual.cornerStyle === 'sharp') parts.push('border-radius: 0');
+	else if (visual.borderRadius != null) parts.push(`border-radius: ${visual.borderRadius}px`);
 	if (visual.fontSize != null && visual.fontSize > 0) parts.push(`font-size: ${visual.fontSize}px`);
 	if (visual.bold) parts.push('font-weight: bold');
 	if (visual.italic) parts.push('font-style: italic');
