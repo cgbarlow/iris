@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFil
 from fastapi.responses import Response as FastAPIResponse
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import assert_unscoped_or_admin, assert_write_allowed
 from app.collections.models import (
     CollectionCreate,
     CollectionListResponse,
@@ -40,6 +41,8 @@ async def create(
 ) -> CollectionResponse:
     """Create a new collection."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: a scoped user may not create new top-level collections.
+    await assert_unscoped_or_admin(db, current_user)
     try:
         result = await create_collection(
             db,
@@ -86,10 +89,12 @@ async def update(
     collection_id: str,
     body: CollectionUpdate,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> CollectionResponse:
     """Update a collection's name, description, and thumbnail settings."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: editing collection metadata is allowed only within write-scope.
+    await assert_write_allowed(db, current_user, collection_id)
     try:
         result = await update_collection(
             db, collection_id,
@@ -115,10 +120,12 @@ async def update(
 async def delete(
     collection_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> FastAPIResponse:
     """Soft-delete a collection and unlink its sets."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: a scoped user may not delete collections, even in-scope ones.
+    await assert_unscoped_or_admin(db, current_user)
 
     result = await soft_delete_collection(db, collection_id)
     if result is not None:
@@ -133,10 +140,12 @@ async def upload_thumbnail(
     collection_id: str,
     file: UploadFile,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> CollectionResponse:
     """Upload a thumbnail image for a collection."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: a thumbnail is collection content — gate by write-scope.
+    await assert_write_allowed(db, current_user, collection_id)
 
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(

@@ -5,16 +5,23 @@
 	 */
 	import DOMPurify from 'dompurify';
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { canWrite } from '$lib/stores/auth.svelte.js';
 	import type { Comment } from '$lib/types/api';
 
 	interface Props {
 		targetType: 'diagram' | 'element';
 		targetId: string;
+		/** ADR-237: owning collection. When provided and the user can't write to
+		 *  it, the whole panel is hidden — commenting is a write. */
+		collectionId?: string | null;
 		onclose?: () => void;
 		oncount?: (count: number) => void;
 	}
 
-	let { targetType, targetId, onclose, oncount }: Props = $props();
+	let { targetType, targetId, collectionId, onclose, oncount }: Props = $props();
+
+	// ADR-237: hide the comments section entirely in read-only collections.
+	const writable = $derived(canWrite(collectionId));
 
 	let comments = $state<Comment[]>([]);
 	let loading = $state(true);
@@ -122,6 +129,7 @@
 	}
 </script>
 
+{#if writable}
 <div class="comments-panel">
 	<div class="flex items-center justify-between">
 		<h3 class="text-base font-semibold" style="color: var(--color-fg)">Comments</h3>
@@ -228,3 +236,4 @@
 		</form>
 	{/if}
 </div>
+{/if}

@@ -157,14 +157,24 @@
 
 			const tokens: AuthTokens = await response.json();
 
-			// Decode user from JWT payload (base64url)
-			const payload = JSON.parse(atob(tokens.access_token.split('.')[1]));
-			const user: User = {
-				id: payload.sub,
-				username: payload.username,
-				role: payload.role,
-				is_active: true,
-			};
+			// ADR-237: fetch the full profile (role + write_scope) rather than
+			// decoding the JWT, so the UI can gate edit affordances by scope.
+			// Fall back to the JWT payload if /me is unavailable.
+			let user: User;
+			const meResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
+				headers: { Authorization: `Bearer ${tokens.access_token}` },
+			});
+			if (meResponse.ok) {
+				user = await meResponse.json();
+			} else {
+				const payload = JSON.parse(atob(tokens.access_token.split('.')[1]));
+				user = {
+					id: payload.sub,
+					username: payload.username,
+					role: payload.role,
+					is_active: true,
+				};
+			}
 
 			setAuth(tokens, user);
 			await goto(safeRedirectTarget());

@@ -9,6 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response as FastAPIResponse
 
 from app.auth.dependencies import get_current_user, get_optional_user
+from app.authz import (
+    assert_write_allowed,
+    collection_of_diagram,
+    collection_of_package,
+    collection_of_set,
+)
 from app.diagrams.models import (
     DiagramCreate,
     DiagramHierarchyNode,
@@ -65,6 +71,13 @@ async def create(
 ) -> DiagramResponse:
     """Create a new diagram."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the target set/package's collection.
+    _coll = (
+        await collection_of_set(db, body.set_id)
+        if body.set_id
+        else await collection_of_package(db, body.parent_package_id)
+    )
+    await assert_write_allowed(db, current_user, _coll)
     result = await create_diagram(
         db,
         diagram_type=body.diagram_type,
@@ -97,10 +110,19 @@ async def hierarchy(
 async def reorder(
     body: ReorderRequest,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
     """Reorder diagrams and packages within a parent group."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: reordering is a write within a parent group; gate by collection.
+    if body.parent_package_id:
+        _coll = await collection_of_package(db, body.parent_package_id)
+    elif body.ordered_ids:
+        _coll = await collection_of_diagram(db, body.ordered_ids[0]) or \
+            await collection_of_package(db, body.ordered_ids[0])
+    else:
+        _coll = None
+    await assert_write_allowed(db, current_user, _coll)
     await reorder_siblings(
         db,
         parent_package_id=body.parent_package_id,
@@ -174,6 +196,8 @@ async def update(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the diagram's collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     result = await update_diagram(
         db, diagram_id,
         name=body.name,
@@ -211,6 +235,8 @@ async def delete(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the diagram's collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     deleted = await soft_delete_diagram(
         db, diagram_id,
         deleted_by=current_user["id"],
@@ -247,13 +273,15 @@ async def set_parent(
     diagram_id: str,
     body: dict[str, Any],
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, Any]:
     """Set or unset the parent package for a diagram."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: re-parenting stays within the set; gate by its collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     parent_id = body.get("parent_package_id")
     result = await set_diagram_parent(
-        db, diagram_id, parent_id, updated_by=_current_user["id"],
+        db, diagram_id, parent_id, updated_by=current_user["id"],
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Diagram or parent not found")
@@ -302,6 +330,8 @@ async def rollback(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by write-scope on the diagram's collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     result = await rollback_diagram(
         db,
         diagram_id,
@@ -345,6 +375,8 @@ async def add_tag(
 ) -> dict[str, str]:
     """Add a tag to a diagram."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: tagging is a write — gate by the diagram's collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     tag = body.get("tag", "").strip()
     if not tag or len(tag) > 50:
         raise HTTPException(status_code=400, detail="Tag must be 1-50 characters")
@@ -368,10 +400,12 @@ async def remove_tag(
     diagram_id: str,
     tag: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
     """Remove a tag from a diagram."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: untagging is a write — gate by the diagram's collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     await db.execute(
         "DELETE FROM diagram_tags WHERE diagram_id = ? AND tag = ?",
         (diagram_id, tag),
@@ -501,10 +535,18 @@ diagram_rel_router = APIRouter(prefix="/api/diagram-relationships", tags=["diagr
 async def delete_diagram_relationship(
     relationship_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, str]:
     """Delete a diagram link."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: gate by the source diagram's collection.
+    src = await db.execute(
+        "SELECT source_diagram_id FROM diagram_links WHERE id = ?", (relationship_id,)
+    )
+    link = await src.fetchone()
+    if link is None:
+        raise HTTPException(status_code=404, detail="Diagram link not found")
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, link[0]))
     cursor = await db.execute(
         "DELETE FROM diagram_links WHERE id = ?", (relationship_id,)
     )

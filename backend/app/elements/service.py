@@ -253,7 +253,8 @@ async def get_element(
         "(SELECT pev.name FROM elements pe "
         "  JOIN element_versions pev ON pe.id = pev.element_id "
         "    AND pe.current_version = pev.version "
-        "  WHERE pe.id = e.parent_element_id) AS parent_element_name "
+        "  WHERE pe.id = e.parent_element_id) AS parent_element_name, "
+        "s.collection_id "  # ADR-237: owning collection for write-scope gating
         "FROM elements e "
         "JOIN element_versions ev ON e.id = ev.element_id "
         "AND e.current_version = ev.version "
@@ -287,6 +288,7 @@ async def get_element(
         "parent_element_id": row[17],
         "package_name": row[18],
         "parent_element_name": row[19],
+        "collection_id": row[20],  # ADR-237: lets the client gate by write-scope
     }
     # ADR-233: read-through stereotype from metadata for display.
     element["stereotype"] = (element["metadata"] or {}).get("stereotype")  # type: ignore[union-attr]

@@ -120,6 +120,23 @@ export function isAnonymous(): boolean {
 	return accessToken === null;
 }
 
+/** ADR-237: the user is restricted to a whitelist of writable collections.
+ *  `write_scope` is a string[] when scoped, null when unrestricted (admins or
+ *  users with no scope rows), and may be undefined before the profile loads. */
+export function isScoped(): boolean {
+	return Array.isArray(currentUser?.write_scope);
+}
+
+/** ADR-237: may the current user WRITE in this collection? Unrestricted users
+ *  always can; scoped users only within their whitelist. A null/unknown
+ *  collection id is not writable for scoped users. The backend enforces this
+ *  regardless — this only gates UI affordances so they match permissions. */
+export function canWrite(collectionId: string | null | undefined): boolean {
+	const scope = currentUser?.write_scope;
+	if (!Array.isArray(scope)) return true; // unrestricted (or profile not yet loaded)
+	return collectionId != null && scope.includes(collectionId);
+}
+
 export function setAuth(tokens: AuthTokens, user: User): void {
 	accessToken = tokens.access_token;
 	refreshToken = tokens.refresh_token ?? null;

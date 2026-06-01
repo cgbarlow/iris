@@ -7,6 +7,7 @@
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import NamedPromptsSection from '$lib/components/NamedPromptsSection.svelte';
 	import DOMPurify from 'dompurify';
+	import { canWrite, isScoped } from '$lib/stores/auth.svelte.js';
 
 	let collection = $state<IrisCollection | null>(null);
 	let sets = $state<IrisSet[]>([]);
@@ -199,7 +200,8 @@
 			<NamedPromptsSection scope_type="collection" scope_id={collection.id} />
 		{/if}
 
-		<!-- Save button -->
+		<!-- Save button (ADR-237: only when the user can write this collection) -->
+		{#if canWrite(collection?.id)}
 		<div class="mt-6">
 			<button
 				type="submit"
@@ -210,6 +212,7 @@
 				{saving ? 'Saving...' : 'Save Changes'}
 			</button>
 		</div>
+		{/if}
 	</form>
 
 	<!-- ADR-209 (v6.17.0): attached images for this collection. -->
@@ -218,7 +221,7 @@
 		<EntityImagesEditor
 			entityType="collection"
 			entityId={collection?.id ?? ''}
-			editing={true}
+			editing={canWrite(collection?.id)}
 			maxImages={1}
 		/>
 	</div>
@@ -255,7 +258,8 @@
 		<p>{collection.set_count} set{collection.set_count !== 1 ? 's' : ''} in this collection</p>
 	</div>
 
-	<!-- Danger zone -->
+	<!-- Danger zone (ADR-237: scoped users may not delete collections) -->
+	{#if !isScoped()}
 	<div
 		class="mt-8 rounded border p-4"
 		style="border-color: var(--color-danger); max-width: 600px"
@@ -272,6 +276,7 @@
 			Delete Collection
 		</button>
 	</div>
+	{/if}
 
 	<ConfirmDialog
 		open={showDeleteDialog}

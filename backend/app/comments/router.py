@@ -9,6 +9,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth.dependencies import get_current_user
+from app.authz import (
+    assert_write_allowed,
+    collection_of_diagram,
+    collection_of_element,
+)
 from app.comments.models import CommentCreate, CommentResponse, CommentUpdate
 
 router = APIRouter(tags=["comments"])
@@ -68,6 +73,8 @@ async def create_element_comment(
 ) -> CommentResponse:
     """Add a comment on an element."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: commenting is a write — gate by the element's collection.
+    await assert_write_allowed(db, current_user, await collection_of_element(db, element_id))
     comment_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
@@ -111,6 +118,8 @@ async def create_diagram_comment(
 ) -> CommentResponse:
     """Add a comment on a diagram."""
     db = request.app.state.db_manager.main_db
+    # ADR-237: commenting is a write — gate by the diagram's collection.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
     comment_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
@@ -153,6 +162,13 @@ async def update_comment(
     if row[3] != current_user["id"] and current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Not comment owner")
 
+    # ADR-237: editing a comment is a write — gate by the target's collection.
+    if row[1] == "element":
+        target_coll = await collection_of_element(db, row[2])
+    else:
+        target_coll = await collection_of_diagram(db, row[2])
+    await assert_write_allowed(db, current_user, target_coll)
+
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
         "UPDATE comments SET content = ?, updated_at = ? WHERE id = ?",
@@ -175,7 +191,8 @@ async def delete_comment(
     """Soft-delete a comment (owner or admin)."""
     db = request.app.state.db_manager.main_db
     cursor = await db.execute(
-        "SELECT user_id FROM comments WHERE id = ? AND is_deleted = 0",
+        "SELECT user_id, target_type, target_id FROM comments "
+        "WHERE id = ? AND is_deleted = 0",
         (comment_id,),
     )
     row = await cursor.fetchone()
@@ -183,6 +200,13 @@ async def delete_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
     if row[0] != current_user["id"] and current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Not comment owner")
+
+    # ADR-237: deleting a comment is a write — gate by the target's collection.
+    if row[1] == "element":
+        target_coll = await collection_of_element(db, row[2])
+    else:
+        target_coll = await collection_of_diagram(db, row[2])
+    await assert_write_allowed(db, current_user, target_coll)
 
     await db.execute(
         "UPDATE comments SET is_deleted = 1 WHERE id = ?", (comment_id,),

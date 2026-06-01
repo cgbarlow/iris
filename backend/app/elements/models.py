@@ -78,6 +78,9 @@ class ElementResponse(BaseModel):
     diagram_usage_count: int = 0
     set_id: str | None = None
     set_name: str | None = None
+    # ADR-237: owning collection, so the client can gate edit affordances by
+    # write-scope without an extra fetch.
+    collection_id: str | None = None
     package_id: str | None = None
     package_name: str | None = None
     detail_diagram_id: str | None = None
