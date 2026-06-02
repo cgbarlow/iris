@@ -40,6 +40,7 @@ The default self-hosted mode requires no external services. The optional Render 
 - **Collection write-scope (ADR-237):** optionally confine a user's write/edit
   permissions to a whitelist of collections (read-only elsewhere); assigned via
   the `user_collection_scope` table in Supabase, enforced on every write endpoint
+  — operator runbook: [docs/collection-write-scope.md](docs/collection-write-scope.md)
 - **Audit:** SHA-256 hash-chained immutable audit log (separate DB in SQLite; table in Supabase)
 - **Versioning:** Immutable append-only entity versions with revert-as-new-version rollback
 - **Search:** Full-text search with SQLite FTS5 (default) or PostgreSQL tsvector/GIN (Supabase)

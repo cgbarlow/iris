@@ -221,7 +221,10 @@ def test_registered_tool_names_parse_correctly() -> None:
     # Known anchor tools that have been registered since v5.x — if
     # this set ever drops one, the parser is broken or a tool was
     # genuinely removed (in which case update the anchor list).
-    anchors = {"search", "package_hierarchy", "create_diagram", "ask"}
+    # NB: `ask` is deliberately NOT here — it is a CLI-only command
+    # (ADR-168: MCP clients bring their own LLM), so it is never a
+    # registered MCP tool. Anchor only on real MCP tools.
+    anchors = {"search", "package_hierarchy", "create_diagram", "create_collection"}
     missing = anchors - registered
     assert not missing, (
         f"Tool name parser couldn't find expected anchor tools: "

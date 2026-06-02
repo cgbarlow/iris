@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.45.1] - 2026-06-02
+
+### Fixed
+
+- **`test_no_unregistered_iris_tool_refs` anchor list (ADR-237 follow-up).** The
+  parser smoke-test listed `ask` as an expected MCP tool, but `ask` is CLI-only
+  (ADR-168 — MCP clients bring their own LLM) and is intentionally not a
+  registered MCP tool, so the test failed. Anchored on `create_collection`
+  instead and documented why `ask` is excluded.
+
+### Documentation
+
+- **Collection write-scope operator runbook** at
+  [docs/collection-write-scope.md](docs/collection-write-scope.md): step-by-step
+  Supabase SQL to assign/verify/remove a user's write-scope (find user by email
+  via `auth.users`, set role, insert `user_collection_scope` rows), plus the
+  SQLite variant. Linked from the README.
+
 ## [6.45.0] - 2026-06-01
 
 ### Added
