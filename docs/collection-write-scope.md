@@ -1,7 +1,8 @@
 # Collection Write-Scope — Operator Runbook
 
 How to confine a user's **write/edit** permissions to a specific list of
-collections. Background and rationale: [ADR-237](adrs/ADR-237-Per-User-Collection-Write-Scope.md),
+collections. Background and rationale: [ADR-237](adrs/ADR-237-Per-User-Collection-Write-Scope.md)
+and [ADR-238](adrs/ADR-238-Write-Scope-Consistency-And-Completeness.md),
 spec: [SPEC-237-A](adrs/specs/SPEC-237-A-Per-User-Collection-Write-Scope.md).
 
 ## What it does
@@ -21,6 +22,11 @@ collections** — everywhere else they are read-only.
 - **Reads are never restricted** — a scoped user can still view everything; only
   writes are gated (API returns `403`, and the web UI hides Edit/Save/Delete and
   the comments box outside their scope).
+- **Edits happen inside a set/collection context** (ADR-238): a scoped user works
+  within their collections via the in-collection hierarchy/canvas. Root-level
+  "New Set/View/Element" buttons are hidden for scoped users, and an out-of-scope
+  view opens read-only (no canvas Edit). Creating content under a package files it
+  in that package's set — so it stays in the right collection.
 
 > A scope on a **viewer** has no effect — viewers can't write anywhere anyway.
 > To give someone "architect on these collections only", set their role to

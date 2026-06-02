@@ -14,6 +14,7 @@ from app.authz import (
     collection_of_diagram,
     collection_of_package,
     collection_of_set,
+    resolve_effective_set,
 )
 from app.diagrams.models import (
     DiagramCreate,
@@ -71,13 +72,11 @@ async def create(
 ) -> DiagramResponse:
     """Create a new diagram."""
     db = request.app.state.db_manager.main_db
-    # ADR-237: gate by write-scope on the target set/package's collection.
-    _coll = (
-        await collection_of_set(db, body.set_id)
-        if body.set_id
-        else await collection_of_package(db, body.parent_package_id)
-    )
-    await assert_write_allowed(db, current_user, _coll)
+    # ADR-237/238: gate on the EFFECTIVE set's collection — the same set the
+    # service persists into (set_id, else the parent package's set, else
+    # Default) — so create and the later save/update agree.
+    eff_set = await resolve_effective_set(db, body.set_id, body.parent_package_id)
+    await assert_write_allowed(db, current_user, await collection_of_set(db, eff_set))
     result = await create_diagram(
         db,
         diagram_type=body.diagram_type,

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import '../app.css';
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import favicon from '$lib/assets/favicon.svg';
 	import AppShell from '$lib/components/AppShell.svelte';
 	import SessionTimeoutWarning from '$lib/components/SessionTimeoutWarning.svelte';
-	import { isAuthenticated } from '$lib/stores/auth.svelte.js';
+	import { isAuthenticated, refreshProfile } from '$lib/stores/auth.svelte.js';
 	import { initViewport } from '$lib/stores/viewport.svelte';
 	import { ModeWatcher } from 'mode-watcher';
 
@@ -13,6 +14,13 @@
 	// Wire up the shared viewport breakpoint store once for the whole app
 	// (ADR-229). Runs browser-only; returns the matchMedia cleanup.
 	$effect(() => initViewport());
+
+	// ADR-238: on every app load, refresh the profile so `write_scope` is
+	// current even when the session was restored from cache (otherwise a
+	// scoped user could load with no scope and see write UI everywhere).
+	onMount(() => {
+		if (isAuthenticated()) refreshProfile();
+	});
 
 	// /login renders without the AppShell (clean full-page login form).
 	// Every other route renders inside the AppShell — anonymous visitors

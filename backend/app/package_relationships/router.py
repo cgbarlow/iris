@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
+from app.authz import assert_write_allowed, collection_of_package
 from app.package_relationships.service import (
     create_package_relationship,
     delete_package_relationship,
@@ -31,6 +32,8 @@ async def create(
 ) -> dict:
     """Create a relationship from this package to another."""
     db = request.app.state.db_manager.main_db
+    # ADR-238: gate by the source package's collection.
+    await assert_write_allowed(db, current_user, await collection_of_package(db, package_id))
 
     # Verify source package exists
     cursor = await db.execute(
@@ -89,6 +92,17 @@ async def delete(
 ) -> None:
     """Delete a package relationship."""
     db = request.app.state.db_manager.main_db
+    # ADR-238: gate by the relationship's source package's collection.
+    cur = await db.execute(
+        "SELECT source_package_id FROM package_relationships WHERE id = ?",
+        (relationship_id,),
+    )
+    src_row = await cur.fetchone()
+    if src_row is None:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    await assert_write_allowed(
+        db, current_user, await collection_of_package(db, src_row[0])
+    )
     deleted = await delete_package_relationship(db, relationship_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Relationship not found")

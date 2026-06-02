@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
+	import { isScoped } from '$lib/stores/auth.svelte.js';
 	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
 	import { getActiveCollectionId } from '$lib/stores/activeCollection.svelte.js';
 	import type { Element, PaginatedResponse, BatchResult } from '$lib/types/api';
@@ -403,6 +404,7 @@
 		>
 			Templates
 		</button>
+		{#if !isScoped()}
 		<button
 			onclick={() => (showCreateDialog = true)}
 			class="rounded px-4 py-2 text-sm text-white"
@@ -410,6 +412,7 @@
 		>
 			New Element
 		</button>
+		{/if}
 	</div>
 </div>
 

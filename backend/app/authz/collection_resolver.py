@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from app.migrations.m012_sets import DEFAULT_SET_ID
+
 if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
 
@@ -66,6 +68,18 @@ async def collection_of_template(db: DatabasePort, template_id: str | None) -> s
     return await collection_of_set(db, set_id)
 
 
+async def collection_of_relationship(
+    db: DatabasePort, relationship_id: str | None
+) -> str | None:
+    """The collection an element-relationship belongs to, via its source element."""
+    if not relationship_id:
+        return None
+    src = await _scalar(
+        db, "SELECT source_element_id FROM relationships WHERE id = ?", relationship_id
+    )
+    return await collection_of_element(db, src)
+
+
 async def collection_of_entity(
     db: DatabasePort, entity_type: str, entity_id: str
 ) -> str | None:
@@ -83,3 +97,26 @@ async def collection_of_entity(
     if entity_type == "element":
         return await collection_of_element(db, entity_id)
     return None
+
+
+async def resolve_effective_set(
+    db: DatabasePort, set_id: str | None, parent_package_id: str | None
+) -> str:
+    """The set a new diagram / element / package will be persisted into:
+    an explicit ``set_id``; else the parent package's set; else the seeded
+    ``DEFAULT_SET_ID`` (ADR-238).
+
+    Used by BOTH the create-gate (router) and the create services so the create
+    check, the persisted row, and the later update/delete check all resolve the
+    SAME collection — otherwise a create can pass while the subsequent save
+    403s (the original ADR-237 defect).
+    """
+    if set_id:
+        return set_id
+    if parent_package_id:
+        pkg_set = await _scalar(
+            db, "SELECT set_id FROM packages WHERE id = ?", parent_package_id
+        )
+        if pkg_set:
+            return pkg_set
+    return DEFAULT_SET_ID

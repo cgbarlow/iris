@@ -39,6 +39,8 @@ class PackageResponse(BaseModel):
     parent_package_id: str | None = None
     set_id: str | None = None
     set_name: str | None = None
+    # ADR-238: owning collection, so the client can gate edit affordances.
+    collection_id: str | None = None
     metadata: dict[str, object] | None = None
 
 

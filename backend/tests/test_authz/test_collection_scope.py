@@ -341,3 +341,131 @@ class TestAuthMeWriteScope:
         admin = await _admin_headers(client)
         me = (await client.get("/api/auth/me", headers=admin)).json()
         assert me["write_scope"] is None
+
+
+class TestScopeConsistencyADR238:
+    """ADR-238: create-gate, persisted row, and update-gate must resolve the
+    SAME collection — the original ADR-237 defect let a create pass while the
+    subsequent save 403'd."""
+
+    async def test_create_under_package_without_set_id_then_update(self, ctx) -> None:
+        client, dbm = ctx
+        admin = await _admin_headers(client)
+        coll_a = await _mk_collection(client, admin, "A")
+        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
+        pkg = (
+            await client.post(
+                "/api/packages", json={"name": "p", "set_id": set_a}, headers=admin
+            )
+        ).json()
+        uid = await _create_architect(client, admin)
+        await _add_scope(dbm, uid, coll_a)
+        arch = await _login(client, "arch")
+
+        # Diagram created with ONLY parent_package_id (the canvas/hierarchy shape)
+        dg = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "simple-view", "name": "d", "data": {},
+                "parent_package_id": pkg["id"],
+            },
+            headers=arch,
+        )
+        assert dg.status_code == 201, dg.text
+        dg_id = dg.json()["id"]
+        # It lands in the package's set (collection A), NOT the un-grouped Default.
+        got = (await client.get(f"/api/diagrams/{dg_id}", headers=arch)).json()
+        assert got["set_id"] == set_a
+        assert got["collection_id"] == coll_a
+        # And the subsequent save/update SUCCEEDS (the regression).
+        upd = await client.put(
+            f"/api/diagrams/{dg_id}",
+            json={"name": "d2", "data": {}},
+            headers={**arch, "If-Match": str(dg.json()["current_version"])},
+        )
+        assert upd.status_code == 200, upd.text
+
+        # Same for an element created with only package_id.
+        el = await client.post(
+            "/api/elements",
+            json={
+                "element_type": "component", "name": "e", "data": {},
+                "package_id": pkg["id"],
+            },
+            headers=arch,
+        )
+        assert el.status_code == 201, el.text
+        el_got = (await client.get(f"/api/elements/{el.json()['id']}", headers=arch)).json()
+        assert el_got["collection_id"] == coll_a
+
+    async def test_element_create_without_context_denied_for_scoped(self, ctx) -> None:
+        client, dbm = ctx
+        admin = await _admin_headers(client)
+        coll_a = await _mk_collection(client, admin, "A")
+        uid = await _create_architect(client, admin)
+        await _add_scope(dbm, uid, coll_a)
+        arch = await _login(client, "arch")
+        # No set_id and no package_id → resolves to the Default set (collection
+        # NULL) → 403 for a scoped user.
+        r = await client.post(
+            "/api/elements",
+            json={"element_type": "component", "name": "e", "data": {}},
+            headers=arch,
+        )
+        assert r.status_code == 403, r.text
+        # An UNSCOPED architect can still do it (lands in Default) — unchanged.
+        await _create_architect(client, admin, username="free")
+        free = await _login(client, "free")
+        r2 = await client.post(
+            "/api/elements",
+            json={"element_type": "component", "name": "e", "data": {}},
+            headers=free,
+        )
+        assert r2.status_code == 201, r2.text
+
+    async def test_relationship_create_gated_by_collection(self, ctx) -> None:
+        client, dbm = ctx
+        admin = await _admin_headers(client)
+        coll_a = await _mk_collection(client, admin, "A")
+        coll_b = await _mk_collection(client, admin, "B")
+        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
+        set_b = (await _mk_set(client, admin, "sb", coll_b)).json()["id"]
+        a1 = await _mk_element(client, admin, set_a, "a1")
+        a2 = await _mk_element(client, admin, set_a, "a2")
+        b1 = await _mk_element(client, admin, set_b, "b1")
+        b2 = await _mk_element(client, admin, set_b, "b2")
+        uid = await _create_architect(client, admin)
+        await _add_scope(dbm, uid, coll_a)
+        arch = await _login(client, "arch")
+
+        ok = await client.post(
+            "/api/relationships",
+            json={
+                "source_element_id": a1["id"], "target_element_id": a2["id"],
+                "relationship_type": "uses",
+            },
+            headers=arch,
+        )
+        assert ok.status_code == 201, ok.text
+        no = await client.post(
+            "/api/relationships",
+            json={
+                "source_element_id": b1["id"], "target_element_id": b2["id"],
+                "relationship_type": "uses",
+            },
+            headers=arch,
+        )
+        assert no.status_code == 403, no.text
+
+    async def test_package_response_carries_collection_id(self, ctx) -> None:
+        client, dbm = ctx
+        admin = await _admin_headers(client)
+        coll_a = await _mk_collection(client, admin, "A")
+        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
+        pkg = (
+            await client.post(
+                "/api/packages", json={"name": "p", "set_id": set_a}, headers=admin
+            )
+        ).json()
+        got = (await client.get(f"/api/packages/{pkg['id']}", headers=admin)).json()
+        assert got["collection_id"] == coll_a

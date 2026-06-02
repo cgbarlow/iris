@@ -87,6 +87,8 @@ export interface Package {
 	parent_package_id: string | null;
 	set_id?: string;
 	set_name?: string;
+	// ADR-238: owning collection, for write-scope gating.
+	collection_id?: string | null;
 	metadata?: Record<string, unknown> | null;
 }
 

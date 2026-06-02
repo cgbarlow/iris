@@ -12,8 +12,8 @@ from app.auth.dependencies import get_current_user, get_optional_user
 from app.authz import (
     assert_write_allowed,
     collection_of_element,
-    collection_of_package,
     collection_of_set,
+    resolve_effective_set,
 )
 from app.elements.models import (
     ElementCreate,
@@ -59,13 +59,10 @@ async def create(
     request fields always win over template defaults.
     """
     db = request.app.state.db_manager.main_db
-    # ADR-237: gate by write-scope on the element's target collection.
-    _coll = (
-        await collection_of_set(db, body.set_id)
-        if body.set_id
-        else await collection_of_package(db, body.package_id)
-    )
-    await assert_write_allowed(db, current_user, _coll)
+    # ADR-237/238: gate on the EFFECTIVE set's collection — the same set the
+    # service persists into — so create and the later save/update agree.
+    eff_set = await resolve_effective_set(db, body.set_id, body.package_id)
+    await assert_write_allowed(db, current_user, await collection_of_set(db, eff_set))
     fields = body.model_dump(exclude_unset=True)
     template_id = fields.pop("template_id", None)
     template_tags: list[str] = []

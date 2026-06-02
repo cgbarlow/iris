@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { isScoped } from '$lib/stores/auth.svelte.js';
 	import { goto } from '$app/navigation';
 	import { apiFetch } from '$lib/utils/api';
 	import { API_BASE_URL } from '$lib/config.js';
@@ -152,6 +153,7 @@
 		>
 			Edit Sets
 		</button>
+		{#if !isScoped()}
 		<button
 			onclick={() => (showCreateDialog = true)}
 			class="rounded px-4 py-2 text-sm text-white"
@@ -159,6 +161,7 @@
 		>
 			New Set
 		</button>
+		{/if}
 	</div>
 </div>
 <div class="mt-3 flex flex-wrap items-center gap-2 sm:gap-4">

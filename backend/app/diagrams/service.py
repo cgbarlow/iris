@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.migrations.m012_sets import DEFAULT_SET_ID
+from app.authz.collection_resolver import resolve_effective_set
 from app.diagrams.canvas_normalize import normalize_canvas_data
 from app.diagrams.thumbnail import VALID_THEMES, generate_and_store_thumbnail
 from app.package_relationships.service import create_package_relationship
@@ -46,7 +47,9 @@ async def create_diagram(
     data = normalize_canvas_data(data)
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
-    effective_set_id = set_id or DEFAULT_SET_ID
+    # ADR-238: resolve the same effective set the create-gate authorized
+    # (set_id, else the parent package's set, else Default).
+    effective_set_id = await resolve_effective_set(db, set_id, parent_package_id)
 
     # Validate set_id exists — fall back to default if not
     cursor = await db.execute(

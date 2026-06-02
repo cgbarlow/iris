@@ -12,8 +12,10 @@ from app.authz.collection_resolver import (
     collection_of_element,
     collection_of_entity,
     collection_of_package,
+    collection_of_relationship,
     collection_of_set,
     collection_of_template,
+    resolve_effective_set,
 )
 from app.authz.collection_scope import load_scope
 from app.authz.enforce import assert_unscoped_or_admin, assert_write_allowed
@@ -25,7 +27,9 @@ __all__ = [
     "collection_of_element",
     "collection_of_entity",
     "collection_of_package",
+    "collection_of_relationship",
     "collection_of_set",
     "collection_of_template",
     "load_scope",
+    "resolve_effective_set",
 ]

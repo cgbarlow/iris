@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.46.0] - 2026-06-02
+
+### Fixed
+
+- **Collection write-scope: "created but can't save" (ADR-238).** A scoped user
+  could create a view but got `403 "Outside your collection write-scope"` when
+  adding an element / saving. The create-gate, the persisted row, and the
+  update-gate now resolve the **same** collection via one shared
+  `resolve_effective_set` helper, and the canvas's add-element call carries the
+  diagram's `set_id`. Content created under a package now files in that package's
+  set instead of silently orphaning into the Default set (also fixed for
+  unscoped users).
+- **Write-scope UI gating now reliable & comprehensive (ADR-238).** `write_scope`
+  is refreshed from `/api/auth/me` on every app load (so a cached session can't
+  leave a scoped user ungated); out-of-scope views open read-only (canvas Edit
+  hidden, edit-mode entry blocked); the global New Set/View/Element buttons and
+  package edit controls are hidden outside scope.
+
+### Security
+
+- **All write surfaces are now scope-gated (ADR-238).** Element-relationships and
+  package-relationships create/edit/delete were previously ungated; they now
+  enforce write-scope via the source element/package's collection. Package read
+  responses carry `collection_id` for client gating.
+
 ## [6.45.1] - 2026-06-02
 
 ### Fixed
