@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { isScoped } from '$lib/stores/auth.svelte.js';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { API_BASE_URL } from '$lib/config.js';
 	import { getActiveSetId, setActiveSet, clearActiveSet } from '$lib/stores/activeSet.svelte.js';
@@ -423,6 +424,7 @@
 			 primary button matching the Elements-page button style + size.
 			 HierarchyControls is still used by the dashboard (/) and
 			 packages/[id]; only the views index page steps off it. -->
+		{#if !isScoped()}
 		<button
 			onclick={() => (showCreateDialog = true)}
 			class="rounded px-4 py-2 text-sm text-white"
@@ -430,6 +432,7 @@
 		>
 			New View
 		</button>
+		{/if}
 		<button
 			onclick={() => { selectMode = !selectMode; if (!selectMode) cancelSelection(); }}
 			class="rounded border px-3 py-2 text-sm"

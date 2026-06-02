@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { canWrite } from '$lib/stores/auth.svelte.js';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
@@ -262,6 +263,7 @@
 
 	function enterDetailsEdit() {
 		if (!pkg) return;
+		if (!canWrite(pkg.collection_id)) return; // ADR-238: no editing outside write-scope
 		editName = pkg.name;
 		editDescription = pkg.description ?? '';
 		editingDetails = true;
@@ -724,7 +726,7 @@
 					{#if detailsDirty}
 						<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
 					{/if}
-				{:else}
+				{:else if canWrite(pkg?.collection_id)}
 					<button
 						onclick={enterDetailsEdit}
 						class="rounded px-3 py-1.5 text-sm text-white"

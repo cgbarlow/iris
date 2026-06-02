@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.common.nullable_filter import parse_nullable_id
-from app.migrations.m012_sets import DEFAULT_SET_ID
+from app.authz.collection_resolver import resolve_effective_set
 from app.search.service import index_element as _index_element
 from app.search.service import remove_element_index as _remove_element_index
 
@@ -183,7 +183,9 @@ async def create_element(
     now = datetime.now(tz=UTC).isoformat()
     data_json = json.dumps(data)
     metadata_json = json.dumps(metadata) if metadata else None
-    effective_set_id = set_id or DEFAULT_SET_ID
+    # ADR-238: persist into the same effective set the create-gate authorized
+    # (set_id, else the parent package's set, else Default).
+    effective_set_id = await resolve_effective_set(db, set_id, package_id)
 
     await _validate_element_package_set_consistency(
         db, set_id=effective_set_id, package_id=package_id,

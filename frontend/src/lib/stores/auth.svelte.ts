@@ -137,6 +137,14 @@ export function canWrite(collectionId: string | null | undefined): boolean {
 	return collectionId != null && scope.includes(collectionId);
 }
 
+/** ADR-238: re-fetch /api/auth/me to refresh the profile (notably
+ *  `write_scope`) for the current token. Called on app load so a cached or
+ *  stale session can't leave a scoped user without their scope. No-op when
+ *  unauthenticated. */
+export async function refreshProfile(): Promise<void> {
+	if (accessToken) await _fetchProfile(accessToken);
+}
+
 export function setAuth(tokens: AuthTokens, user: User): void {
 	accessToken = tokens.access_token;
 	refreshToken = tokens.refresh_token ?? null;

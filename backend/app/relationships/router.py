@@ -7,6 +7,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.auth.dependencies import get_current_user
+from app.authz import (
+    assert_write_allowed,
+    collection_of_element,
+    collection_of_relationship,
+)
 from app.relationships.models import (
     RelationshipCreate,
     RelationshipListResponse,
@@ -32,6 +37,10 @@ async def create(
 ) -> RelationshipResponse:
     """Create a new relationship between elements."""
     db = request.app.state.db_manager.main_db
+    # ADR-238: a relationship is content in its source element's collection.
+    await assert_write_allowed(
+        db, current_user, await collection_of_element(db, body.source_element_id)
+    )
     result = await create_relationship(
         db,
         source_element_id=body.source_element_id,
@@ -101,6 +110,10 @@ async def update(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-238: gate by the relationship's collection (via its source element).
+    await assert_write_allowed(
+        db, current_user, await collection_of_relationship(db, rel_id)
+    )
     result = await update_relationship(
         db, rel_id,
         label=body.label,
@@ -137,6 +150,10 @@ async def delete(
         )
 
     db = request.app.state.db_manager.main_db
+    # ADR-238: gate by the relationship's collection (via its source element).
+    await assert_write_allowed(
+        db, current_user, await collection_of_relationship(db, rel_id)
+    )
     deleted = await soft_delete_relationship(
         db, rel_id,
         deleted_by=current_user["id"],

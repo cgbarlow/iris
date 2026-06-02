@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.migrations.m012_sets import DEFAULT_SET_ID
+from app.authz.collection_resolver import resolve_effective_set
 from app.search.service import (
     index_package as _index_package,
     remove_package_index as _remove_package_index,
@@ -33,7 +33,9 @@ async def create_package(
     package_id = str(uuid.uuid4())
     now = datetime.now(tz=UTC).isoformat()
     metadata_json = json.dumps(metadata) if metadata else None
-    effective_set_id = set_id or DEFAULT_SET_ID
+    # ADR-238: persist into the same effective set the create-gate authorized
+    # (set_id, else the parent package's set, else Default).
+    effective_set_id = await resolve_effective_set(db, set_id, parent_package_id)
 
     # Compute next sequence_order within the parent group
     if parent_package_id:
@@ -95,7 +97,8 @@ async def get_package(
         "SELECT p.id, p.current_version, "
         "pv.name, pv.description, "
         "p.created_at, p.created_by, p.updated_at, p.is_deleted, "
-        "u.username, p.parent_package_id, p.set_id, s.name, pv.metadata "
+        "u.username, p.parent_package_id, p.set_id, s.name, pv.metadata, "
+        "s.collection_id "  # ADR-238: owning collection for write-scope gating
         "FROM packages p "
         "JOIN package_versions pv ON p.id = pv.package_id "
         "AND p.current_version = pv.version "
@@ -122,6 +125,7 @@ async def get_package(
         "set_id": row[10],
         "set_name": row[11],
         "metadata": json.loads(row[12]) if row[12] else None,
+        "collection_id": row[13],  # ADR-238: for frontend write-scope gating
     }
 
 
@@ -222,7 +226,8 @@ async def list_packages(
         f"SELECT p.id, p.current_version, "  # noqa: S608
         "pv.name, pv.description, "
         "p.created_at, p.created_by, p.updated_at, p.is_deleted, "
-        "p.parent_package_id, p.set_id, s.name, pv.metadata "
+        "p.parent_package_id, p.set_id, s.name, pv.metadata, "
+        "s.collection_id "  # ADR-238: owning collection for write-scope gating
         "FROM packages p "
         "JOIN package_versions pv ON p.id = pv.package_id "
         "AND p.current_version = pv.version "
@@ -247,6 +252,7 @@ async def list_packages(
             "set_id": r[9],
             "set_name": r[10],
             "metadata": json.loads(r[11]) if r[11] else None,
+            "collection_id": r[12],  # ADR-238: for frontend write-scope gating
         }
         for r in rows
     ]

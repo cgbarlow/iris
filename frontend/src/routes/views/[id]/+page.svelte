@@ -148,6 +148,9 @@
 	let canvasNodes = $state.raw<CanvasNode[]>([]);
 	let canvasEdges = $state.raw<CanvasEdge[]>([]);
 	let editing = $state(false);
+	// ADR-238: read-only when the user can't write this view's collection —
+	// force browse mode and hide edit affordances (the backend also 403s).
+	const readOnly = $derived(!canWrite(diagram?.collection_id));
 	let showAddElement = $state(false);
 	let canvasDirty = $state(false);
 	let saving = $state(false);
@@ -1202,6 +1205,10 @@
 					description,
 					data: {},
 					notation: effectiveNotation,
+					// ADR-238: carry the diagram's set so the element lands in the
+					// right collection (not the Default set) and the create passes
+					// write-scope for a scoped user editing this view.
+					set_id: diagram?.set_id,
 				}),
 			});
 			if (canvasType === 'text') {
@@ -1908,6 +1915,7 @@
 	}
 
 	async function handleStartEditing() {
+		if (readOnly) return; // ADR-238: no editing outside write-scope
 		if (lockManager) {
 			const acquired = await lockManager.acquireLock();
 			if (acquired) {
@@ -2950,7 +2958,7 @@
 								<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
 							{/if}
 						</div>
-					{:else}
+					{:else if !readOnly}
 						<button
 							onclick={handleStartEditing}
 							class="rounded px-3 py-1.5 text-sm"
