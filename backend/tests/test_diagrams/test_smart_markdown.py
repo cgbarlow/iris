@@ -145,6 +145,38 @@ async def test_resolves_element_description(
     assert _unwrap_iris_links(rendered) == "Note: lean cut"
 
 
+# ── ADR-239 (issue #255): checklist task markers survive resolution ──
+
+
+@pytest.mark.asyncio
+async def test_task_list_markers_survive_token_resolution(
+    context: tuple[httpx.AsyncClient, DatabaseManager, dict[str, str]],
+) -> None:
+    """Checklist mode stores tick state as GFM task markers in
+    markdown_source. The resolver is a splice between {{...}} tokens, so
+    `- [ ]` / `- [x]` markers must pass through untouched AND the list-item
+    order/count must be preserved — that 1:1 mapping is what lets a tapped
+    checkbox in the resolved view map back to a source line by index.
+    """
+    c, db_manager, h = context
+    set_id = await _create_set(c, h)
+    eid = await _create_element(c, h, set_id, name="Pork mince")
+    source = (
+        f"- [ ] Buy {{{{element:{eid}:name}}}}\n"
+        "- [x] Clean kitchen\n"
+        "- Walk dog"
+    )
+    diag_id = await _create_smart_markdown_diagram(c, h, set_id, source)
+    rendered = await compute_smart_markdown_content(db_manager.main_db, diag_id)
+    lines = _unwrap_iris_links(rendered).split("\n")
+    # Markers preserved, token resolved inline, item order/count intact.
+    assert lines == [
+        "- [ ] Buy Pork mince",
+        "- [x] Clean kitchen",
+        "- Walk dog",
+    ]
+
+
 # ── ADR-222: diagram element_count token ─────────────────────────────
 
 

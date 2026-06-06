@@ -32,6 +32,10 @@
 		textareaEl?: HTMLTextAreaElement;
 		/** v5.4.1 (#46 item #4): called when clipboard image paste fails (network, MIME, auth). The parent can surface a toast; the handler also console.errors so dev tools shows the underlying cause. */
 		onpasteerror?: (err: unknown) => void;
+		/** ADR-239: render list items as tappable checkboxes in view mode. */
+		checklist?: boolean;
+		/** ADR-239: called with the tapped item's 0-based index. */
+		ontoggle?: (index: number) => void;
 	}
 
 	let {
@@ -42,6 +46,8 @@
 		onheadings,
 		textareaEl = $bindable(),
 		onpasteerror,
+		checklist = false,
+		ontoggle,
 	}: Props = $props();
 
 	function onInput(e: Event) {
@@ -211,7 +217,7 @@
 		/>
 	{:else}
 		<div class="text-canvas__view">
-			<MarkdownView source={content ?? ''} {textDiagramIds} {onheadings} />
+			<MarkdownView source={content ?? ''} {textDiagramIds} {onheadings} {checklist} {ontoggle} />
 		</div>
 	{/if}
 </div>
