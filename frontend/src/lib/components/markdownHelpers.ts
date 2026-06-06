@@ -204,11 +204,22 @@ export function decorateChecklist(root: ParentNode, states?: boolean[]): void {
 	const items = root.querySelectorAll('li');
 	let i = 0;
 	for (const li of items) {
-		const existing = li.querySelector('input[type="checkbox"]');
+		// marked renders a task item as `<input> text`. DOMPurify keeps the
+		// <input> but may strip its `type` attribute, so match any input —
+		// not just `input[type=checkbox]` — or a stray text box is left behind.
+		const existing = li.querySelector('input');
 		const checked = states
 			? Boolean(states[i])
 			: existing instanceof HTMLInputElement ? existing.checked : false;
+		// Removing the input leaves a leading space on the following text node,
+		// which otherwise adds to the flex gap and reads as a big space before
+		// the label — trim it.
+		const host = existing?.parentElement ?? li;
 		existing?.remove();
+		const firstText = host.firstChild;
+		if (firstText && firstText.nodeType === 3 && firstText.textContent) {
+			firstText.textContent = firstText.textContent.replace(/^\s+/, '');
+		}
 		const btn = (root.ownerDocument ?? document).createElement('button');
 		btn.type = 'button';
 		btn.className = 'md-check';

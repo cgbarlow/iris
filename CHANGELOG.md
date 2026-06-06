@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.47.1] - 2026-06-06
+
+### Fixed
+
+- **Checklist mode: 409 conflict when ticking an item (ADR-239, #255).** Each tick
+  persists independently; the save now adopts the new `current_version` directly
+  from the PUT response instead of relying on a follow-up read, which on Render's
+  Supabase read-replicas could lag and make the next tick send a stale `If-Match`
+  (→ 409). A genuine conflict now refetches the latest and retries once, and
+  concurrent taps are serialised.
+- **Checklist mode: large gap between the checkbox and the (struck-through) text
+  (ADR-239, #255).** `marked` renders a task item as `<input> text` and DOMPurify
+  keeps the `<input>` while stripping its `type` attribute; the decoration pass
+  now removes the stray input regardless of `type` and trims the leading space it
+  left behind, so the label sits snug against the checkbox.
+
 ## [6.47.0] - 2026-06-06
 
 ### Added

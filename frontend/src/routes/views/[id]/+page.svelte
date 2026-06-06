@@ -561,28 +561,90 @@
 	);
 	const checklistMode = $derived(checklistEligible && Boolean(diagram?.metadata?.checklist));
 
+	let checklistSaving = $state(false);
+
+	/** The editable-source payload for a checklist persist. Text diagrams
+	 *  store markdown at data.content; smart_markdown at data.markdown_source
+	 *  (the server recomputes the resolved content on read). */
+	function checklistDataPayload(d: Diagram): Record<string, unknown> {
+		return d.diagram_type === 'smart_markdown'
+			? { markdown_source: (d.data?.markdown_source as string | undefined) ?? '' }
+			: { content: (d.data?.content as string | undefined) ?? '' };
+	}
+
+	/**
+	 * Persist a checklist change (mode flag and/or a ticked item) without the
+	 * heavyweight saveCanvas() reload. `build` mutates `diagram` in place from
+	 * its CURRENT state, then we PUT and adopt the new `current_version` from
+	 * the PUT response itself — so we never depend on a read-after-write GET,
+	 * which on Render's Supabase read-replicas can lag and cause a 409. On a
+	 * genuine 409 (concurrent edit / stale version) we refetch the latest and
+	 * re-apply `build` once.
+	 */
+	async function persistChecklist(build: (d: Diagram) => void): Promise<void> {
+		if (!diagram || checklistSaving) return;
+		checklistSaving = true;
+		error = null;
+		try {
+			for (let attempt = 0; attempt < 2; attempt++) {
+				build(diagram);
+				try {
+					const res = await apiFetch<Diagram>(`/api/diagrams/${diagram.id}`, {
+						method: 'PUT',
+						headers: { 'If-Match': String(diagram.current_version) },
+						body: JSON.stringify({
+							name: diagram.name,
+							description: diagram.description ?? '',
+							data: checklistDataPayload(diagram),
+							metadata: diagram.metadata,
+							change_summary: 'Checklist update',
+						}),
+					});
+					// Adopt the authoritative post-write state from the response.
+					diagram.current_version = res.current_version;
+					diagram.data = res.data;
+					diagram.metadata = res.metadata;
+					loadVersions(diagram.id);
+					return;
+				} catch (e) {
+					if (e instanceof ApiError && e.status === 409 && attempt === 0) {
+						// Stale version — refetch the latest, then rebuild on top.
+						const fresh = await apiFetch<Diagram>(`/api/diagrams/${diagram.id}`);
+						diagram.current_version = fresh.current_version;
+						diagram.data = fresh.data;
+						diagram.metadata = fresh.metadata;
+						continue;
+					}
+					throw e;
+				}
+			}
+		} catch (e) {
+			error = e instanceof ApiError ? e.message : 'Failed to update checklist';
+		} finally {
+			checklistSaving = false;
+		}
+	}
+
 	/** Toggle the per-diagram checklist-mode flag (metadata) and persist. */
 	async function toggleChecklistMode() {
-		if (!diagram) return;
-		diagram.metadata = { ...(diagram.metadata ?? {}), checklist: !diagram.metadata?.checklist };
-		canvasDirty = true;
-		await saveCanvas();
+		await persistChecklist((d) => {
+			d.metadata = { ...(d.metadata ?? {}), checklist: !d.metadata?.checklist };
+		});
 	}
 
 	/** A checklist item was tapped — flip its GFM marker in the editable
 	 *  source (smart_markdown → markdown_source; text → content) and save.
 	 *  The index maps 1:1 because token resolution preserves item order. */
 	async function handleChecklistToggle(index: number) {
-		if (!diagram) return;
-		if (diagram.diagram_type === 'smart_markdown') {
-			const src = (diagram.data?.markdown_source as string | undefined) ?? '';
-			diagram.data = { ...(diagram.data ?? {}), markdown_source: toggleChecklistItem(src, index) };
-		} else {
-			const c = (diagram.data?.content as string | undefined) ?? '';
-			diagram.data = { ...(diagram.data ?? {}), content: toggleChecklistItem(c, index) };
-		}
-		canvasDirty = true;
-		await saveCanvas();
+		await persistChecklist((d) => {
+			if (d.diagram_type === 'smart_markdown') {
+				const src = (d.data?.markdown_source as string | undefined) ?? '';
+				d.data = { ...(d.data ?? {}), markdown_source: toggleChecklistItem(src, index) };
+			} else {
+				const c = (d.data?.content as string | undefined) ?? '';
+				d.data = { ...(d.data ?? {}), content: toggleChecklistItem(c, index) };
+			}
+		});
 	}
 	/** Bound to the textarea inside TextCanvas so we can insert markdown links at the cursor. */
 	let textTextareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
@@ -2727,7 +2789,7 @@
 								 smart_markdown views. When on, tap a list item to tick it. -->
 							<button
 								onclick={toggleChecklistMode}
-								disabled={saving}
+								disabled={checklistSaving}
 								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-50"
 								style={checklistMode
 									? 'border: 1px solid var(--color-primary); color: var(--color-primary)'
@@ -3049,7 +3111,7 @@
 								 smart_markdown views. When on, tap a list item to tick it. -->
 							<button
 								onclick={toggleChecklistMode}
-								disabled={saving}
+								disabled={checklistSaving}
 								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-50"
 								style={checklistMode
 									? 'border: 1px solid var(--color-primary); color: var(--color-primary)'
