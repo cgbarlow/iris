@@ -25,6 +25,8 @@
 	import {
 		extractHeadings,
 		renderMarkdown,
+		checklistItemStates,
+		decorateChecklist,
 		type ExtractedLink,
 		type TocHeading,
 	} from './markdownHelpers';
@@ -39,9 +41,16 @@
 		onheadings?: (headings: TocHeading[]) => void;
 		/** Called once per render with the iris:// links found in the source. */
 		onlinks?: (links: ExtractedLink[]) => void;
+		/** Issue #255 / ADR-239: when true, list items render as interactive
+		 *  (tappable) checkboxes. Strictly opt-in — defaults off so the User
+		 *  Guide (the other MarkdownView consumer) is unaffected. */
+		checklist?: boolean;
+		/** Called when a checklist item is tapped, with its 0-based
+		 *  document-order index. The caller flips the source marker + saves. */
+		ontoggle?: (index: number) => void;
 	}
 
-	let { source, textDiagramIds, onheadings, onlinks }: Props = $props();
+	let { source, textDiagramIds, onheadings, onlinks, checklist = false, ontoggle }: Props = $props();
 
 	const rendered = $derived(renderMarkdown(source, textDiagramIds));
 	const html = $derived(rendered.html);
@@ -51,6 +60,17 @@
 	$effect(() => { onlinks?.(rendered.links); });
 
 	function onClick(e: MouseEvent) {
+		// ADR-239: a checklist checkbox tap toggles the item. Mutually
+		// exclusive with the iris-link branch below (different targets).
+		const check = (e.target as HTMLElement | null)?.closest('.md-check');
+		if (check && checklist) {
+			const idx = Number(check.getAttribute('data-checklist-index'));
+			if (!Number.isNaN(idx)) {
+				e.preventDefault();
+				ontoggle?.(idx);
+			}
+			return;
+		}
 		const t = (e.target as HTMLElement | null)?.closest('a.md-iris-link');
 		if (!t) return;
 		const kind = t.getAttribute('data-iris-kind');
@@ -90,6 +110,17 @@
 		void theme;
 		if (!rootEl) return;
 		void runMermaidIn(rootEl, theme);
+	});
+
+	// ADR-239: decorate list items as interactive checkboxes when checklist
+	// mode is on. Re-runs whenever {@html} replaces the content (html change)
+	// or the mode flips. Checked-state is derived from the source markers
+	// (the render pipeline strips marked's <input>, and the markers survive
+	// Smart Markdown token resolution so the index mapping holds).
+	$effect(() => {
+		void html;
+		if (!rootEl) return;
+		if (checklist) decorateChecklist(rootEl, checklistItemStates(source));
 	});
 
 	onMount(() => {
@@ -154,6 +185,47 @@
 		margin: 0 0 1rem;
 	}
 	.md-view :global(li) { margin-bottom: 0.25rem; }
+	/* ADR-239: checklist mode. Items carrying a .md-check button drop their
+	   bullet and gain a tappable square that strikes the item when checked. */
+	.md-view :global(li:has(.md-check)) {
+		list-style: none;
+		margin-left: -1.1rem;
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+	}
+	.md-view :global(.md-check) {
+		flex: 0 0 auto;
+		width: 1.05em;
+		height: 1.05em;
+		margin-top: 0.15em;
+		padding: 0;
+		border: 1.5px solid var(--color-border, #9ca3af);
+		border-radius: 4px;
+		background: var(--color-surface, #fff);
+		cursor: pointer;
+		line-height: 1;
+		position: relative;
+	}
+	.md-view :global(.md-check[aria-checked='true']) {
+		background: var(--color-primary, #2563eb);
+		border-color: var(--color-primary, #2563eb);
+	}
+	.md-view :global(.md-check[aria-checked='true'])::after {
+		content: '';
+		position: absolute;
+		left: 0.3em;
+		top: 0.08em;
+		width: 0.28em;
+		height: 0.55em;
+		border: solid #fff;
+		border-width: 0 2px 2px 0;
+		transform: rotate(45deg);
+	}
+	.md-view :global(li.md-check-checked) {
+		text-decoration: line-through;
+		color: var(--color-muted, #6b7280);
+	}
 	.md-view :global(strong) { font-weight: 600; }
 	.md-view :global(em) { font-style: italic; }
 	.md-view :global(code) {

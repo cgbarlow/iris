@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.47.0] - 2026-06-06
+
+### Added
+
+- **Checklist mode for Markdown & Smart Markdown views (ADR-239, #255).** Flip a
+  text or smart_markdown view into checklist mode with the new **Checklist**
+  toolbar toggle, then tap any list item to tick it off (strike-through); tap
+  again to clear. Tick state is stored as native GFM task markers (`- [ ]` /
+  `- [x]`) in the document source, so it exports cleanly, round-trips through the
+  existing diagram save (versioned, OCC-protected), and survives Smart Markdown
+  token resolution. The flag lives on diagram metadata and is shared with anyone
+  who opens the view. No schema change, and the User Guide's lists are
+  unaffected (the behaviour is strictly opt-in).
+
 ## [6.46.0] - 2026-06-02
 
 ### Fixed

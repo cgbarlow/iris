@@ -22,6 +22,7 @@
 	import AggregationListCanvas from '$lib/canvas/text/AggregationListCanvas.svelte';
 	import MarkdownToc from '$lib/components/MarkdownToc.svelte';
 	import type { TocHeading } from '$lib/components/MarkdownView.svelte';
+	import { toggleChecklistItem } from '$lib/components/markdownHelpers';
 	import SequenceToolbar from '$lib/canvas/sequence/SequenceToolbar.svelte';
 	import ParticipantDialog from '$lib/canvas/sequence/ParticipantDialog.svelte';
 	import MessageDialog from '$lib/canvas/sequence/MessageDialog.svelte';
@@ -550,6 +551,39 @@
 	);
 	let textHeadings = $state<TocHeading[]>([]);
 	let showTocDrawer = $state(false);
+
+	// ADR-239 (issue #255): checklist mode. The flag lives on diagram
+	// metadata so it persists and is shared; tick state lives as GFM task
+	// markers in the markdown source. Only text + smart_markdown can persist
+	// taps (their source is editable); the synthesised list types cannot.
+	const checklistEligible = $derived(
+		diagram?.diagram_type === 'text' || diagram?.diagram_type === 'smart_markdown',
+	);
+	const checklistMode = $derived(checklistEligible && Boolean(diagram?.metadata?.checklist));
+
+	/** Toggle the per-diagram checklist-mode flag (metadata) and persist. */
+	async function toggleChecklistMode() {
+		if (!diagram) return;
+		diagram.metadata = { ...(diagram.metadata ?? {}), checklist: !diagram.metadata?.checklist };
+		canvasDirty = true;
+		await saveCanvas();
+	}
+
+	/** A checklist item was tapped — flip its GFM marker in the editable
+	 *  source (smart_markdown → markdown_source; text → content) and save.
+	 *  The index maps 1:1 because token resolution preserves item order. */
+	async function handleChecklistToggle(index: number) {
+		if (!diagram) return;
+		if (diagram.diagram_type === 'smart_markdown') {
+			const src = (diagram.data?.markdown_source as string | undefined) ?? '';
+			diagram.data = { ...(diagram.data ?? {}), markdown_source: toggleChecklistItem(src, index) };
+		} else {
+			const c = (diagram.data?.content as string | undefined) ?? '';
+			diagram.data = { ...(diagram.data ?? {}), content: toggleChecklistItem(c, index) };
+		}
+		canvasDirty = true;
+		await saveCanvas();
+	}
 	/** Bound to the textarea inside TextCanvas so we can insert markdown links at the cursor. */
 	let textTextareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
 
@@ -2688,6 +2722,23 @@
 								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
 							</button>
 						{/if}
+						{#if !editing && checklistEligible}
+							<!-- ADR-239 (issue #255): checklist mode toggle for text +
+								 smart_markdown views. When on, tap a list item to tick it. -->
+							<button
+								onclick={toggleChecklistMode}
+								disabled={saving}
+								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-50"
+								style={checklistMode
+									? 'border: 1px solid var(--color-primary); color: var(--color-primary)'
+									: 'border: 1px solid var(--color-border); color: var(--color-fg)'}
+								aria-pressed={checklistMode}
+								aria-label="Toggle checklist mode"
+								title="Checklist mode — tap list items to tick them off"
+							>
+								Checklist
+							</button>
+						{/if}
 						{#if (canvasType as string) === 'text'}
 							<!-- Issue #32 reopen: TOC drawer toggle for Text views.
 								 The drawer was wired in v5.1.0 but no button toggled it. -->
@@ -2991,6 +3042,23 @@
 							>
 								Comments
 								<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
+							</button>
+						{/if}
+						{#if !editing && checklistEligible}
+							<!-- ADR-239 (issue #255): checklist mode toggle for text +
+								 smart_markdown views. When on, tap a list item to tick it. -->
+							<button
+								onclick={toggleChecklistMode}
+								disabled={saving}
+								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-50"
+								style={checklistMode
+									? 'border: 1px solid var(--color-primary); color: var(--color-primary)'
+									: 'border: 1px solid var(--color-border); color: var(--color-fg)'}
+								aria-pressed={checklistMode}
+								aria-label="Toggle checklist mode"
+								title="Checklist mode — tap list items to tick them off"
+							>
+								Checklist
 							</button>
 						{/if}
 						{#if (canvasType as string) === 'text'}
@@ -3817,6 +3885,8 @@
 				}
 			}}
 			onheadings={(h) => (textHeadings = h)}
+			checklist={checklistMode}
+			ontoggle={handleChecklistToggle}
 		/>
 	{:else if diagram?.diagram_type === 'aggregation_list'}
 		<AggregationListCanvas
@@ -3851,6 +3921,8 @@
 				}
 			}}
 			onheadings={(h) => (textHeadings = h)}
+			checklist={checklistMode}
+			ontoggle={handleChecklistToggle}
 		/>
 	{/if}
 {/snippet}

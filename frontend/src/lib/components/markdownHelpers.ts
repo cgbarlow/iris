@@ -110,6 +110,118 @@ export interface RenderedMarkdown {
 	links: ExtractedLink[];
 }
 
+// ─── Issue #255 / ADR-239: checklist mode ──────────────────────────────
+//
+// State lives as native GFM task markers (`- [ ]` / `- [x]`) in the
+// markdown SOURCE — portable, exports cleanly, and survives Smart
+// Markdown token resolution (which is a splice that preserves list-item
+// order/count). `toggleChecklistItem` rewrites the source; the rendered
+// view is decorated client-side by `decorateChecklist`.
+
+/** A markdown list-item line: indent, bullet, then the remainder text. */
+const LIST_ITEM_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+/** A leading GFM task marker on a list item's remainder. */
+const TASK_MARKER_RE = /^\[([ xX])\]\s?/;
+
+/** Walk source lines, invoking `visit` for each list-item line that is NOT
+ *  inside a fenced code block. Document order; mirrors extractHeadings'
+ *  fence handling so a `- [ ]`-looking line inside ``` ``` ``` is ignored. */
+function eachListItem(
+	source: string,
+	visit: (lineIndex: number, match: RegExpExecArray) => void,
+): void {
+	const lines = (source ?? '').split(/\r?\n/);
+	let inFence = false;
+	for (let i = 0; i < lines.length; i++) {
+		if (/^(```|~~~)/.test(lines[i].trim())) { inFence = !inFence; continue; }
+		if (inFence) continue;
+		const m = LIST_ITEM_RE.exec(lines[i]);
+		if (m) visit(i, m);
+	}
+}
+
+/** Count list items (ul + ol, all nesting levels) in document order,
+ *  ignoring lines inside fenced code blocks. */
+export function countChecklistItems(source: string): number {
+	let n = 0;
+	eachListItem(source, () => { n += 1; });
+	return n;
+}
+
+/** Toggle the GFM task marker on the Nth (0-based, document order) list
+ *  item. A plain item is ticked in one action (`- a` → `- [x] a`); an
+ *  item with an existing marker is flipped. The remainder text (including
+ *  any user-authored `~~strike~~`) is preserved verbatim. Returns the
+ *  source unchanged if `index` is out of range. */
+export function toggleChecklistItem(source: string, index: number): string {
+	if (index < 0) return source;
+	const lines = (source ?? '').split(/\r?\n/);
+	let counter = -1;
+	let targetLine = -1;
+	let targetMatch: RegExpExecArray | null = null;
+	eachListItem(source, (lineIndex, match) => {
+		counter += 1;
+		if (counter === index) { targetLine = lineIndex; targetMatch = match; }
+	});
+	if (targetLine === -1 || !targetMatch) return source;
+	const [, indent, bullet, remainder] = targetMatch as RegExpExecArray;
+	const marker = TASK_MARKER_RE.exec(remainder);
+	let nextRemainder: string;
+	if (marker) {
+		const checked = marker[1].toLowerCase() === 'x';
+		nextRemainder = `[${checked ? ' ' : 'x'}] ${remainder.slice(marker[0].length)}`;
+	} else {
+		// Plain item — a tap means "tick it".
+		nextRemainder = `[x] ${remainder}`;
+	}
+	lines[targetLine] = `${indent}${bullet} ${nextRemainder}`;
+	return lines.join('\n');
+}
+
+/** Checked-state of each list item in document order, derived from the
+ *  source markers. Used to drive `decorateChecklist`, because the render
+ *  pipeline's DOMPurify pass strips marked's `<input>` checkboxes — so the
+ *  rendered DOM no longer carries the checked flag. The marker survives
+ *  Smart Markdown token resolution, so reading it from the (resolved)
+ *  source the view renders keeps the index mapping intact. */
+export function checklistItemStates(source: string): boolean[] {
+	const states: boolean[] = [];
+	eachListItem(source, (_lineIndex, match) => {
+		const marker = TASK_MARKER_RE.exec(match[3]);
+		states.push(marker ? marker[1].toLowerCase() === 'x' : false);
+	});
+	return states;
+}
+
+/** Post-render DOM pass (checklist mode only). For each rendered `<li>` in
+ *  document order, removes any leftover `<input type=checkbox>` and
+ *  prepends an accessible `<button role="checkbox">` carrying a 0-based
+ *  `data-checklist-index` that maps back to the source list item. Checked
+ *  items get `aria-checked="true"` plus the `md-check-checked` class so CSS
+ *  can strike them through. `states` (from `checklistItemStates`) supplies
+ *  the checked flags; if omitted, falls back to any surviving input. */
+export function decorateChecklist(root: ParentNode, states?: boolean[]): void {
+	const items = root.querySelectorAll('li');
+	let i = 0;
+	for (const li of items) {
+		const existing = li.querySelector('input[type="checkbox"]');
+		const checked = states
+			? Boolean(states[i])
+			: existing instanceof HTMLInputElement ? existing.checked : false;
+		existing?.remove();
+		const btn = (root.ownerDocument ?? document).createElement('button');
+		btn.type = 'button';
+		btn.className = 'md-check';
+		btn.setAttribute('role', 'checkbox');
+		btn.setAttribute('aria-checked', checked ? 'true' : 'false');
+		btn.setAttribute('data-checklist-index', String(i));
+		btn.setAttribute('aria-label', 'Toggle checklist item');
+		li.classList.toggle('md-check-checked', checked);
+		li.insertBefore(btn, li.firstChild);
+		i += 1;
+	}
+}
+
 /**
  * Run the full sanitise + iris:// rewrite pipeline. Returns the safe
  * HTML string and the iris:// links discovered in it.

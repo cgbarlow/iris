@@ -40,6 +40,12 @@
 		 *  collection) so the user opens at their current location, not
 		 *  at the global root. */
 		contextSetId?: string | null;
+		/** ADR-239: render list items as tappable checkboxes in view mode. */
+		checklist?: boolean;
+		/** ADR-239: called with the tapped item's 0-based index. The parent
+		 *  flips the marker in `markdown_source` (not the server-locked
+		 *  resolved content) and saves. */
+		ontoggle?: (index: number) => void;
 	}
 
 	let {
@@ -50,6 +56,8 @@
 		onsourcechange,
 		onheadings,
 		contextSetId = null,
+		checklist = false,
+		ontoggle,
 	}: Props = $props();
 
 	let textareaEl = $state<HTMLTextAreaElement | undefined>(undefined);
@@ -196,7 +204,7 @@
 		/>
 	{:else}
 		<div class="smart-markdown-canvas__view">
-			<MarkdownView source={content ?? ''} {textDiagramIds} {onheadings} />
+			<MarkdownView source={content ?? ''} {textDiagramIds} {onheadings} {checklist} {ontoggle} />
 		</div>
 	{/if}
 </div>
