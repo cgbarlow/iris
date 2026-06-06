@@ -164,10 +164,20 @@ describe('decorateChecklist — DOM pass', () => {
 		expect(el.querySelector('.md-check')?.getAttribute('aria-checked')).toBe('true');
 	});
 
-	it('leaves no <input> checkbox in the decorated output', () => {
+	it('leaves no <input> in the decorated output (DOMPurify may strip the type attr)', () => {
 		const el = decorate('- [x] done');
-		expect(el.querySelector('input[type="checkbox"]')).toBeNull();
+		expect(el.querySelector('input')).toBeNull();
 		expect(el.querySelector('.md-check')).not.toBeNull();
+	});
+
+	it('trims the leading space marked leaves after a task checkbox', () => {
+		// marked emits `<input> done`; after stripping the input the text
+		// node would start with a space and read as a big gap before the label.
+		const el = decorate('- [x] done');
+		const li = el.querySelector('li')!;
+		// The label text node (after the button) must not start with whitespace.
+		const label = [...li.childNodes].find((n) => n.nodeType === 3 && n.textContent?.trim());
+		expect(label?.textContent).toBe('done');
 	});
 
 	it('indexes nested items in document order matching toggleChecklistItem', () => {
