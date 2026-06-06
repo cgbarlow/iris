@@ -562,6 +562,7 @@
 	const checklistMode = $derived(checklistEligible && Boolean(diagram?.metadata?.checklist));
 
 	let checklistSaving = $state(false);
+	let checklistDirty = false;
 
 	/** The editable-source payload for a checklist persist. Text diagrams
 	 *  store markdown at data.content; smart_markdown at data.markdown_source
@@ -573,61 +574,71 @@
 	}
 
 	/**
-	 * Persist a checklist change (mode flag and/or a ticked item) without the
-	 * heavyweight saveCanvas() reload. `build` mutates `diagram` in place from
-	 * its CURRENT state, then we PUT and adopt the new `current_version` from
-	 * the PUT response itself — so we never depend on a read-after-write GET,
-	 * which on Render's Supabase read-replicas can lag and cause a 409. On a
-	 * genuine 409 (concurrent edit / stale version) we refetch the latest and
-	 * re-apply `build` once.
+	 * Drain pending checklist changes to the server. Coalescing loop: while the
+	 * state is dirty, PUT the CURRENT local state and adopt the new
+	 * `current_version` from the PUT response itself (so we never depend on a
+	 * read-after-write GET, which on Render's Supabase read-replicas can lag and
+	 * cause a 409). Rapid taps that arrive mid-flight just re-set the dirty flag
+	 * and are flushed in the next iteration — no tap is dropped and we don't
+	 * queue one PUT per tap. On a genuine 409 we refresh only the version
+	 * (preserving the user's local ticks) and retry.
 	 */
-	async function persistChecklist(build: (d: Diagram) => void): Promise<void> {
-		if (!diagram || checklistSaving) return;
+	async function flushChecklist(): Promise<void> {
+		if (!diagram) return;
+		let conflicts = 0;
+		while (checklistDirty) {
+			checklistDirty = false;
+			try {
+				const res = await apiFetch<Diagram>(`/api/diagrams/${diagram.id}`, {
+					method: 'PUT',
+					headers: { 'If-Match': String(diagram.current_version) },
+					body: JSON.stringify({
+						name: diagram.name,
+						description: diagram.description ?? '',
+						data: checklistDataPayload(diagram),
+						metadata: diagram.metadata,
+						change_summary: 'Checklist update',
+					}),
+				});
+				diagram.current_version = res.current_version;
+				diagram.data = res.data;
+				diagram.metadata = res.metadata;
+			} catch (e) {
+				if (e instanceof ApiError && e.status === 409 && conflicts < 3) {
+					conflicts += 1;
+					// Stale version — refresh ONLY the version (keep local ticks).
+					const fresh = await apiFetch<Diagram>(`/api/diagrams/${diagram.id}`);
+					diagram.current_version = fresh.current_version;
+					checklistDirty = true;
+					continue;
+				}
+				throw e;
+			}
+		}
+		loadVersions(diagram.id);
+	}
+
+	/**
+	 * Apply a checklist change locally (instant) and persist it in the
+	 * background. `build` mutates `diagram` in place from its CURRENT state, so
+	 * the view re-renders immediately; the server save is coalesced via
+	 * flushChecklist() and never blocks the tap.
+	 */
+	function persistChecklist(build: (d: Diagram) => void): void {
+		if (!diagram) return;
+		build(diagram);
+		checklistDirty = true;
+		if (checklistSaving) return; // an in-flight flush will pick this up
 		checklistSaving = true;
 		error = null;
-		try {
-			for (let attempt = 0; attempt < 2; attempt++) {
-				build(diagram);
-				try {
-					const res = await apiFetch<Diagram>(`/api/diagrams/${diagram.id}`, {
-						method: 'PUT',
-						headers: { 'If-Match': String(diagram.current_version) },
-						body: JSON.stringify({
-							name: diagram.name,
-							description: diagram.description ?? '',
-							data: checklistDataPayload(diagram),
-							metadata: diagram.metadata,
-							change_summary: 'Checklist update',
-						}),
-					});
-					// Adopt the authoritative post-write state from the response.
-					diagram.current_version = res.current_version;
-					diagram.data = res.data;
-					diagram.metadata = res.metadata;
-					loadVersions(diagram.id);
-					return;
-				} catch (e) {
-					if (e instanceof ApiError && e.status === 409 && attempt === 0) {
-						// Stale version — refetch the latest, then rebuild on top.
-						const fresh = await apiFetch<Diagram>(`/api/diagrams/${diagram.id}`);
-						diagram.current_version = fresh.current_version;
-						diagram.data = fresh.data;
-						diagram.metadata = fresh.metadata;
-						continue;
-					}
-					throw e;
-				}
-			}
-		} catch (e) {
-			error = e instanceof ApiError ? e.message : 'Failed to update checklist';
-		} finally {
-			checklistSaving = false;
-		}
+		flushChecklist()
+			.catch((e) => { error = e instanceof ApiError ? e.message : 'Failed to update checklist'; })
+			.finally(() => { checklistSaving = false; });
 	}
 
 	/** Toggle the per-diagram checklist-mode flag (metadata) and persist. */
-	async function toggleChecklistMode() {
-		await persistChecklist((d) => {
+	function toggleChecklistMode() {
+		persistChecklist((d) => {
 			d.metadata = { ...(d.metadata ?? {}), checklist: !d.metadata?.checklist };
 		});
 	}
@@ -635,8 +646,8 @@
 	/** A checklist item was tapped — flip its GFM marker in the editable
 	 *  source (smart_markdown → markdown_source; text → content) and save.
 	 *  The index maps 1:1 because token resolution preserves item order. */
-	async function handleChecklistToggle(index: number) {
-		await persistChecklist((d) => {
+	function handleChecklistToggle(index: number) {
+		persistChecklist((d) => {
 			if (d.diagram_type === 'smart_markdown') {
 				const src = (d.data?.markdown_source as string | undefined) ?? '';
 				d.data = { ...(d.data ?? {}), markdown_source: toggleChecklistItem(src, index) };

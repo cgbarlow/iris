@@ -67,6 +67,13 @@
 			const idx = Number(check.getAttribute('data-checklist-index'));
 			if (!Number.isNaN(idx)) {
 				e.preventDefault();
+				// Optimistic, instant feedback — flip the checkbox + strike now,
+				// without waiting for the (possibly slow) server round-trip. The
+				// background persist re-renders to the authoritative state, which
+				// matches what we just set, so there is no flicker.
+				const next = check.getAttribute('aria-checked') !== 'true';
+				check.setAttribute('aria-checked', next ? 'true' : 'false');
+				check.closest('li')?.classList.toggle('md-check-checked', next);
 				ontoggle?.(idx);
 			}
 			return;
@@ -196,9 +203,10 @@
 	}
 	.md-view :global(.md-check) {
 		flex: 0 0 auto;
-		width: 1.05em;
-		height: 1.05em;
-		margin-top: 0.15em;
+		box-sizing: border-box;
+		width: 1.15em;
+		height: 1.15em;
+		margin-top: 0.12em;
 		padding: 0;
 		border: 1.5px solid var(--color-border, #9ca3af);
 		border-radius: 4px;
@@ -214,13 +222,13 @@
 	.md-view :global(.md-check[aria-checked='true'])::after {
 		content: '';
 		position: absolute;
-		left: 0.3em;
-		top: 0.08em;
-		width: 0.28em;
-		height: 0.55em;
+		left: 50%;
+		top: 47%;
+		width: 0.3em;
+		height: 0.56em;
 		border: solid #fff;
 		border-width: 0 2px 2px 0;
-		transform: rotate(45deg);
+		transform: translate(-50%, -50%) rotate(45deg);
 	}
 	.md-view :global(li.md-check-checked) {
 		text-decoration: line-through;
