@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.47.3] - 2026-06-06
+
+### Fixed
+
+- **Checklist mode: ticking several items in quick succession no longer unchecks
+  them (ADR-239, #255).** When a tap arrived while a save was in flight, the
+  save's response (an older snapshot) overwrote the newer local ticks, so the
+  next coalesced save resent the stale state and cleared them. The background
+  save now adopts the server response only when no newer taps are pending,
+  preserving every in-flight tick. Guarded by a rapid-multi-tap E2E test.
+
 ## [6.47.2] - 2026-06-06
 
 ### Fixed
