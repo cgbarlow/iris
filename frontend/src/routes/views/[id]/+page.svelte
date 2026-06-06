@@ -601,8 +601,14 @@
 					}),
 				});
 				diagram.current_version = res.current_version;
-				diagram.data = res.data;
-				diagram.metadata = res.metadata;
+				// Only adopt the server's authoritative state when NO newer taps
+				// arrived during this PUT. Otherwise res.data is an older snapshot
+				// and overwriting it would discard ticks made mid-flight (which the
+				// loop is about to resend) — the "rapid taps uncheck them" bug.
+				if (!checklistDirty) {
+					diagram.data = res.data;
+					diagram.metadata = res.metadata;
+				}
 			} catch (e) {
 				if (e instanceof ApiError && e.status === 409 && conflicts < 3) {
 					conflicts += 1;

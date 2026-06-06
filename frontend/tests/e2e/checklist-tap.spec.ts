@@ -66,6 +66,55 @@ test.describe('Checklist mode (ADR-239)', () => {
 		await expect(page.locator('.md-view li').nth(1)).not.toHaveClass(/md-check-checked/);
 	});
 
+	test('rapid taps on multiple items all stick (no uncheck race)', async ({ page }) => {
+		const token = await getAuthToken();
+		const set = (await createSet(undefined, token, { name: `Set-${Date.now()}` })) as {
+			id: string;
+		};
+		const diagram = (await createDiagram(undefined, token, {
+			diagram_type: 'text',
+			notation: 'markdown',
+			name: 'Rapid-Checklist',
+			set_id: set.id,
+			data: { content: '- one\n- two\n- three\n- four\n- five' },
+			metadata: { checklist: true },
+		})) as { id: string };
+
+		await loginAsAdmin(page);
+		await page.goto(`/views/${diagram.id}`);
+
+		const boxes = page.locator('.md-check');
+		await expect(boxes).toHaveCount(5);
+
+		// Tap all five as fast as possible (no waiting between taps) — exercises
+		// the coalescing save while PUTs are in flight.
+		for (let i = 0; i < 5; i++) {
+			await boxes.nth(i).click({ noWaitAfter: true });
+		}
+
+		// Every item must end up checked and stay checked.
+		for (let i = 0; i < 5; i++) {
+			await expect(page.locator('.md-view li').nth(i)).toHaveClass(/md-check-checked/);
+		}
+
+		// And it must persist: poll the API until all five markers are saved.
+		await expect
+			.poll(async () => {
+				const res = await fetch(`${API_BASE}/api/diagrams/${diagram.id}`, {
+					headers: { Authorization: `Bearer ${token}` },
+				});
+				const body = (await res.json()) as { data: { content: string } };
+				return (body.data.content.match(/- \[x\] /g) ?? []).length;
+			})
+			.toBe(5);
+
+		// A fresh load reflects all five ticked.
+		await page.reload();
+		for (let i = 0; i < 5; i++) {
+			await expect(page.locator('.md-view li').nth(i)).toHaveClass(/md-check-checked/);
+		}
+	});
+
 	test('toggle button enables checklist mode from a plain text view', async ({ page }) => {
 		const token = await getAuthToken();
 		const set = (await createSet(undefined, token, { name: `Set-${Date.now()}` })) as {
