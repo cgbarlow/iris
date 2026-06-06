@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.47.2] - 2026-06-06
+
+### Fixed
+
+- **Checklist mode: ticking now feels instant (ADR-239, #255).** A tap flips the
+  checkbox and strike-through immediately (optimistic UI) instead of waiting for
+  the server round-trip, which could take many seconds. The save runs in the
+  background and coalesces rapid taps into the latest state, so no tap is dropped
+  and only one write is in flight at a time.
+- **Checklist mode: checkmark is now centred in the box (ADR-239, #255).** The
+  tick was anchored to the top-left corner; it is now centred via a translate
+  transform, and the box is slightly larger with `box-sizing: border-box`.
+
 ## [6.47.1] - 2026-06-06
 
 ### Fixed
