@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.47.4] - 2026-06-08
+
+### Fixed
+
+- **Mobile: Bookmarks filter dropdowns no longer spill off the right edge
+  (ADR-240).** The **Collection** and **Set** selectors are now full-width and
+  stack under the title on narrow screens, reverting to the title-left /
+  filters-right row at `sm` and up. `CollectionSelector` was brought to parity with
+  the already-responsive `SetSelector` (DRY).
+- **Mobile: Markdown/Smart Markdown view toolbar no longer overflows (ADR-240).**
+  Adding the **Checklist** button (ADR-239) pushed the Comments / Checklist /
+  Full-screen group past the viewport; the button group now wraps to a second line
+  instead of spilling right.
+
 ## [6.47.3] - 2026-06-06
 
 ### Fixed

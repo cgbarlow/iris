@@ -2776,7 +2776,7 @@
 						</button>
 					{/if}
 					<!-- View group (always visible) -->
-					<div class="ml-auto flex items-center gap-2">
+					<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
 						{#if notation && editing && (notation as string) !== 'bpmn' && (notation as string) !== 'markdown' && (canvasType as string) !== 'text'}
 							<!-- v5.4.0 (#6): theme selector irrelevant on BPMN (theme fixed by m043
 								 bpmn-default seed) and on Text views (no canvas to theme). -->
@@ -3098,7 +3098,7 @@
 						</button>
 					{/if}
 					<!-- View group (always visible) -->
-					<div class="ml-auto flex items-center gap-2">
+					<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
 						{#if notation && editing && (notation as string) !== 'bpmn' && (notation as string) !== 'markdown' && (canvasType as string) !== 'text'}
 							<!-- v5.4.0 (#6): theme selector irrelevant on BPMN (theme fixed by m043
 								 bpmn-default seed) and on Text views (no canvas to theme). -->
