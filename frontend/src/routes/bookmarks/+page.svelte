@@ -135,12 +135,12 @@
 	<title>Bookmarks — Iris</title>
 </svelte:head>
 
-<div class="flex items-center justify-between">
+<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 	<div>
 		<h1 class="text-2xl font-bold" style="color: var(--color-fg)">Bookmarks</h1>
 		<p class="mt-1 text-sm" style="color: var(--color-muted)">Your bookmarked diagrams and packages.</p>
 	</div>
-	<div class="flex items-center gap-2">
+	<div class="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
 		<CollectionSelector value={currentCollectionId} onchange={handleCollectionChange} />
 		<SetSelector value={currentSetId} onchange={handleSetChange} collectionId={currentCollectionId || null} />
 	</div>

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { seedAdmin, getAuthToken, loginAsAdmin } from './fixtures';
+import { seedAdmin, getAuthToken, loginAsAdmin, createSet, createDiagram } from './fixtures';
 
 // Phase 2 of the mobile-responsive rollout (ADR-229 / SPEC-229-A).
 // No page should scroll horizontally at the Pixel 5 viewport (393px). A
@@ -54,6 +54,43 @@ test.describe('no horizontal overflow on mobile', () => {
 		await page.goto(`/elements/${elementId}`);
 		await page.getByRole('tab', { name: 'Details' }).click();
 		await expect(page.locator('.detail-grid').first()).toBeVisible();
+		await expectNoHorizontalOverflow(page);
+	});
+
+	// The Bookmarks header carries the Collection + Set filter dropdowns. On
+	// mobile they must stack under the title rather than spilling off the right
+	// edge (CollectionSelector previously had no responsive width constraints).
+	test('bookmarks page filters do not overflow', async ({ page }) => {
+		await seedAdmin();
+		await loginAsAdmin(page);
+		await page.goto('/bookmarks');
+		await expect(page.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+		// Both filter selects are present in the header.
+		await expect(page.locator('#collection-selector')).toBeVisible();
+		await expect(page.locator('#set-selector')).toBeVisible();
+		await expectNoHorizontalOverflow(page);
+	});
+
+	// A text/smart_markdown view's toolbar gained a Checklist button (ADR-239).
+	// With Comments + Checklist + Full-screen all present, the view-group must
+	// wrap on mobile instead of pushing buttons off the right edge.
+	test('markdown view toolbar with checklist button does not overflow', async ({ page }) => {
+		const token = await getAuthToken();
+		const set = (await createSet(undefined, token, { name: `Overflow-Set-${Date.now()}` })) as {
+			id: string;
+		};
+		const diagram = (await createDiagram(undefined, token, {
+			diagram_type: 'text',
+			notation: 'markdown',
+			name: 'Toolbar-Overflow-View',
+			set_id: set.id,
+			data: { content: '- Buy milk\n- Clean kitchen\n- Walk dog' },
+		})) as { id: string };
+
+		await loginAsAdmin(page);
+		await page.goto(`/views/${diagram.id}`);
+		// The Checklist toggle is only rendered for text/smart_markdown views.
+		await expect(page.getByRole('button', { name: 'Toggle checklist mode' })).toBeVisible();
 		await expectNoHorizontalOverflow(page);
 	});
 });
