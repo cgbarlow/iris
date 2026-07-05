@@ -28,6 +28,14 @@ services:
       # in the Render dashboard (sync: false).
       - key: PUBLIC_SITE_URL
         sync: false
+      # Google Analytics 4 measurement ID (e.g. `G-5B0T5HKVQ9`). Baked into
+      # src/app.html at build time via %sveltekit.env.PUBLIC_GA_MEASUREMENT_ID%
+      # (SvelteKit only exposes PUBLIC_-prefixed vars to app.html). Provided
+      # by the shared Render env group, or set here per environment. Only the
+      # frontend needs it — the API/MCP backends serve no browser pages, so
+      # gtag.js has nothing to run in. Leave unset to disable analytics.
+      - key: PUBLIC_GA_MEASUREMENT_ID
+        sync: false
     routes:
       - type: rewrite
         source: /*
@@ -128,3 +136,15 @@ services:
         # OAuth dance. Without this env var, `resource` falls back to
         # IRIS_API_URL, which works but isn't the actual MCP endpoint.
         value: https://iris-mcp.onrender.com
+      # Google Analytics 4 (Measurement Protocol). iris-mcp emits a
+      # `mcp_tool_call` event per tool dispatch into the SAME GA4 property
+      # as the frontend — no separate stream. Tracking activates only when
+      # BOTH a measurement ID and an API secret are present, else it's a
+      # no-op. The measurement ID is inherited from the shared env group's
+      # PUBLIC_GA_MEASUREMENT_ID (analytics.py falls back to it), so the
+      # only value to set here is the secret below. Set GA_MEASUREMENT_ID
+      # explicitly only if you want a different ID than the frontend's.
+      - key: GA_API_SECRET
+        # GA4 Admin → Data Streams → [Iris UAT] → Measurement Protocol API
+        # secrets → Create. Sensitive — set per environment, never commit.
+        sync: false
