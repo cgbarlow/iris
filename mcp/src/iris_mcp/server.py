@@ -7,14 +7,15 @@ the server via `build_server(client)`; transport (stdio) is owned by
 
 from __future__ import annotations
 
-from typing import Any
-
+import time
 from importlib.metadata import PackageNotFoundError, version
+from typing import Any
 
 from iris_client import IrisClient
 from mcp import types
 from mcp.server import Server
 
+from iris_mcp import analytics as iris_analytics
 from iris_mcp import prompts as iris_prompts
 from iris_mcp import resources as iris_resources
 from iris_mcp import tools as iris_tools
@@ -57,7 +58,17 @@ def build_server(
     async def _call_tool(
         name: str, arguments: dict[str, Any] | None,
     ) -> list[types.TextContent]:
-        return await iris_tools.dispatch(name, client, arguments or {})
+        start = time.perf_counter()
+        result = await iris_tools.dispatch(name, client, arguments or {})
+        duration_ms = (time.perf_counter() - start) * 1000
+        # `dispatch` reports failures as a leading "ERROR:" TextContent
+        # rather than raising, so read success off the result. Tracking is
+        # fire-and-forget and a no-op unless GA env vars are set.
+        success = not (result and result[0].text.startswith("ERROR:"))
+        iris_analytics.track_tool_call(
+            name, success=success, duration_ms=duration_ms,
+        )
+        return result
 
     @server.list_resources()
     async def _list_resources() -> list[types.Resource]:
