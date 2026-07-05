@@ -28,6 +28,14 @@ services:
       # in the Render dashboard (sync: false).
       - key: PUBLIC_SITE_URL
         sync: false
+      # Google Analytics 4 measurement ID (e.g. `G-5B0T5HKVQ9`). Baked into
+      # src/app.html at build time via %sveltekit.env.PUBLIC_GA_MEASUREMENT_ID%
+      # (SvelteKit only exposes PUBLIC_-prefixed vars to app.html). Provided
+      # by the shared Render env group, or set here per environment. Only the
+      # frontend needs it — the API/MCP backends serve no browser pages, so
+      # gtag.js has nothing to run in. Leave unset to disable analytics.
+      - key: PUBLIC_GA_MEASUREMENT_ID
+        sync: false
     routes:
       - type: rewrite
         source: /*
