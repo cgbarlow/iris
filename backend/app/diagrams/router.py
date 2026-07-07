@@ -57,10 +57,15 @@ async def regenerate_thumbnails(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> dict[str, int]:
-    """Regenerate PNG thumbnails for all diagrams. Requires admin role."""
+    """Regenerate PNG thumbnails for all diagrams. Requires admin role.
+
+    ADR-242: an explicit admin action always force-refreshes (``force=True``),
+    bypassing the content-hash skip that keeps the automatic startup sweep
+    bandwidth-free.
+    """
     _require_admin(current_user)
     db = request.app.state.db_manager.main_db
-    count = await regenerate_all_thumbnails(db)
+    count = await regenerate_all_thumbnails(db, force=True)
     return {"count": count}
 
 

@@ -1,7 +1,9 @@
 """Thumbnail generation for diagram gallery cards."""
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from html import escape as html_escape
@@ -10,6 +12,28 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import aiosqlite
     from app.db.adapter import DatabasePort
+
+log = logging.getLogger(__name__)
+
+# ADR-242: bump when the rasteriser changes in a way that does NOT alter the
+# generated SVG string (e.g. cairosvg output dimensions), to force a global
+# thumbnail regeneration. Changes to ``generate_svg_from_diagram_data`` are
+# captured automatically because the content hash is taken over the SVG itself.
+_THUMBNAIL_RENDERER_VERSION = "1"
+
+# Sentinel distinguishing "caller did not supply a known hash" (do the lookup)
+# from "caller prefetched the hash and it is None" (no existing row).
+_UNSET = object()
+
+
+def _compute_thumbnail_hash(svg_str: str) -> str:
+    """Content hash identifying a rendered thumbnail (ADR-242).
+
+    Taken over the exact SVG that would be rasterised, prefixed with the
+    renderer version, so it changes iff the resulting PNG would change.
+    """
+    payload = f"{_THUMBNAIL_RENDERER_VERSION}\x00{svg_str}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 THEME_COLORS: dict[str, dict[str, str]] = {
     "light": {
@@ -252,10 +276,22 @@ async def generate_and_store_thumbnail(
     data: dict,
     diagram_type: str,
     theme: str = "dark",
-) -> None:
+    *,
+    force: bool = False,
+    known_hash: object = _UNSET,
+) -> bool:
     """Generate PNG thumbnail and store in database.
 
     Falls back to storing SVG as bytes if cairosvg is not available.
+
+    ADR-242: content-addressed / idempotent. Unless ``force`` is set, the
+    cairosvg render and the DB write are **skipped** when the stored
+    ``content_hash`` already matches the SVG that would be produced — this is
+    what stops the startup sweep from re-writing every thumbnail to Supabase on
+    each restart. ``known_hash`` lets a batch caller
+    (:func:`regenerate_all_thumbnails`) pass a prefetched hash so no per-row
+    ``SELECT`` is needed. Returns ``True`` if the thumbnail was (re)written,
+    ``False`` if an up-to-date thumbnail already existed and was left untouched.
     """
     # v6.17.9 (issue #208): for smart_markdown, resolve `{{...}}` tokens
     # to their rendered values so the thumbnail shows the actual content
@@ -277,6 +313,24 @@ async def generate_and_store_thumbnail(
             )
 
     svg_str = generate_svg_from_diagram_data(data, diagram_type, theme=theme)
+
+    # ADR-242: skip the render + write when the stored thumbnail is already
+    # up to date. The hash is over the rendered SVG, so it captures diagram
+    # edits, smart_markdown token resolution, theme, and renderer changes.
+    content_hash = _compute_thumbnail_hash(svg_str)
+    if not force:
+        if known_hash is _UNSET:
+            cursor = await db.execute(
+                "SELECT content_hash FROM diagram_thumbnails "
+                "WHERE diagram_id = ? AND theme = ?",
+                (diagram_id, theme),
+            )
+            row = await cursor.fetchone()
+            existing_hash = row[0] if row is not None else None
+        else:
+            existing_hash = known_hash
+        if existing_hash is not None and existing_hash == content_hash:
+            return False
 
     png_bytes: bytes
     try:
@@ -305,10 +359,12 @@ async def generate_and_store_thumbnail(
     now = datetime.now(tz=UTC).isoformat()
     await db.execute(
         "INSERT OR REPLACE INTO diagram_thumbnails "
-        "(diagram_id, theme, thumbnail, updated_at) VALUES (?, ?, ?, ?)",
-        (diagram_id, theme, png_bytes, now),
+        "(diagram_id, theme, thumbnail, content_hash, updated_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (diagram_id, theme, png_bytes, content_hash, now),
     )
     await db.commit()
+    return True
 
 
 async def get_thumbnail(
@@ -347,15 +403,29 @@ async def get_thumbnail(
     return None
 
 
-async def regenerate_all_thumbnails(db: DatabasePort) -> int:
+async def regenerate_all_thumbnails(db: DatabasePort, *, force: bool = False) -> int:
     """Regenerate PNG thumbnails for all non-deleted diagrams in all themes.
 
     Called during startup to ensure all diagrams have up-to-date PNG thumbnails,
     including diagrams created before the thumbnail migration and diagrams with
     stale SVG-byte thumbnails from when cairosvg was not installed.
 
+    ADR-242: idempotent. Existing ``content_hash`` values are prefetched in a
+    single query and passed through, so a boot with no diagram or renderer
+    changes performs one read and **zero** writes instead of re-writing every
+    thumbnail to Supabase (~56 MB egress per restart on the free tier). Pass
+    ``force=True`` (e.g. the admin regenerate endpoint) to rewrite regardless.
+
     Returns the number of diagrams processed.
     """
+    existing_hashes: dict[tuple[str, str], object] = {}
+    if not force:
+        cursor = await db.execute(
+            "SELECT diagram_id, theme, content_hash FROM diagram_thumbnails"
+        )
+        for hrow in await cursor.fetchall():
+            existing_hashes[(hrow[0], hrow[1])] = hrow[2]
+
     cursor = await db.execute(
         "SELECT d.id, d.diagram_type, dv.data "
         "FROM diagrams d "
@@ -365,13 +435,24 @@ async def regenerate_all_thumbnails(db: DatabasePort) -> int:
     )
     rows = await cursor.fetchall()
 
+    written = 0
     for row in rows:
         diagram_id = row[0]
         diagram_type = row[1]
         data = json.loads(row[2]) if row[2] else {}
         for theme in VALID_THEMES:
-            await generate_and_store_thumbnail(
+            known = _UNSET if force else existing_hashes.get((diagram_id, theme))
+            wrote = await generate_and_store_thumbnail(
                 db, diagram_id, data, diagram_type, theme=theme,
+                force=force, known_hash=known,
             )
+            if wrote:
+                written += 1
 
+    total = len(rows) * len(VALID_THEMES)
+    log.info(
+        "[Thumbnails] regen sweep: %d written, %d skipped "
+        "(%d diagrams x %d themes, force=%s)",
+        written, total - written, len(rows), len(VALID_THEMES), force,
+    )
     return len(rows)

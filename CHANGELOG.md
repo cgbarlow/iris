@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Thumbnail regeneration is now idempotent — stops ~56 MB of Supabase egress per
+  restart (ADR-242).** `iris-api` re-rendered and re-wrote a PNG for **all 1221
+  diagrams × 3 themes** back to Supabase on **every** boot, and the free-tier
+  service restarts ~12–24×/day — a Render metrics/logs investigation traced the
+  service's runaway bandwidth (6 GB and climbing) to this: hours with no restart
+  transferred ~0 MB, hours with a restart ~56 MB. Each stored thumbnail now
+  carries a `content_hash` (`sha256(renderer_version ‖ svg)`); the startup sweep
+  prefetches all hashes in one query and **skips the render and the DB write for
+  any unchanged `(diagram, theme)`**, so a steady boot writes **zero** thumbnails
+  (verified: a repeat sweep over an unchanged database performs no writes). New
+  and edited diagrams still render on demand and on change; the admin
+  `POST /api/admin/thumbnails/regenerate` endpoint force-refreshes via
+  `force=True`; bump `_THUMBNAIL_RENDERER_VERSION` to force a global rebuild.
+  Adds a nullable `content_hash` column to `diagram_thumbnails` (SQLite migration
+  `m083`; Supabase `ADD COLUMN IF NOT EXISTS`). Legacy rows regenerate once, then
+  settle. No schema-write endpoint / MCP tool / CLI change (Protocol §14 parity
+  unaffected).
 - **MCP analytics: `mcp_tool_call` events now actually reach GA4 (ADR-241).** The
   server-side Measurement Protocol tracking added in PR #288 was a silent no-op in
   production: `iris-mcp` had `GA_API_SECRET` but was never given a measurement ID
