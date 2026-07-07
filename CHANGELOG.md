@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP analytics: `mcp_tool_call` events now actually reach GA4 (ADR-241).** The
+  server-side Measurement Protocol tracking added in PR #288 was a silent no-op in
+  production: `iris-mcp` had `GA_API_SECRET` but was never given a measurement ID
+  (`PUBLIC_GA_MEASUREMENT_ID` was frontend-only and no env group was linked in the
+  Blueprint), so `is_enabled()` failed closed with no log or error. Both GA vars now
+  live in the `iris shared environment vars` env group, declared at the Blueprint
+  top level and linked to `iris-frontend` and `iris-mcp` via `fromGroup`; the
+  redundant per-service `GA_API_SECRET` is removed. Verified live — a single tool
+  dispatch produces exactly one `mcp_tool_call` event in GA Realtime. Deploy config
+  only; no schema/endpoint/tool/CLI change.
+
 ## [6.47.4] - 2026-06-08
 
 ### Fixed
