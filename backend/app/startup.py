@@ -87,6 +87,7 @@ from app.migrations.m079_rename_quantified_item_to_ingredient import up as m079_
 from app.migrations.m080_element_detail_diagram import up as m080_up
 from app.migrations.m081_element_parent_element import up as m081_up
 from app.migrations.m082_user_collection_scope import up as m082_up
+from app.migrations.m083_thumbnail_content_hash import up as m083_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import rebuild_search_index
 from app.seed.creation_prompts import seed_creation_prompts
@@ -200,6 +201,7 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m080_up(main)  # issue #242, v6.33.0: elements.detail_diagram_id drill link (ADR-221)
     await m081_up(main)  # v6.43.0: elements.parent_element_id containment axis (ADR-231)
     await m082_up(main)  # v6.45.0: user_collection_scope per-user write-scope (ADR-237)
+    await m083_up(main)  # content_hash guard for idempotent thumbnail regen (ADR-242)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db
@@ -312,6 +314,14 @@ async def _initialize_supabase(db_manager: DatabaseManager) -> None:
     )
     await port.execute(
         "ALTER TABLE packages ADD COLUMN IF NOT EXISTS sequence_order INTEGER NOT NULL DEFAULT 0"
+    )
+    await port.commit()
+
+    # m083 (ADR-242): content_hash guard so startup thumbnail regeneration
+    # skips the render + write for unchanged (diagram, theme) pairs, instead of
+    # re-writing every thumbnail to Supabase (~56 MB egress) on each restart.
+    await port.execute(
+        "ALTER TABLE diagram_thumbnails ADD COLUMN IF NOT EXISTS content_hash TEXT"
     )
     await port.commit()
 
