@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import re
 from datetime import UTC, datetime
 from html import escape as html_escape
@@ -12,8 +11,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import aiosqlite
     from app.db.adapter import DatabasePort
-
-log = logging.getLogger(__name__)
 
 # ADR-242: bump when the rasteriser changes in a way that does NOT alter the
 # generated SVG string (e.g. cairosvg output dimensions), to force a global
@@ -450,9 +447,14 @@ async def regenerate_all_thumbnails(db: DatabasePort, *, force: bool = False) ->
                 written += 1
 
     total = len(rows) * len(VALID_THEMES)
-    log.info(
-        "[Thumbnails] regen sweep: %d written, %d skipped "
-        "(%d diagrams x %d themes, force=%s)",
-        written, total - written, len(rows), len(VALID_THEMES), force,
+    # ADR-242: emit via print (not logging) so the written-vs-skipped counter
+    # actually surfaces in Render stdout, matching the rest of the startup path.
+    # This is the line that shows the bandwidth fix working: after the one-time
+    # back-fill boot, subsequent boots report "0 written".
+    print(  # noqa: T201 — intentional startup stdout, matches startup.py logging
+        f"[Thumbnails] regen sweep: {written} written, "
+        f"{total - written} skipped "
+        f"({len(rows)} diagrams x {len(VALID_THEMES)} themes, force={force})",
+        flush=True,
     )
     return len(rows)

@@ -84,8 +84,11 @@ rasterisation in a way that does **not** change `svg_str` requires a manual
 - **Surface parity (Protocol §14 / ADR-182):** no new write endpoint, MCP tool,
   or CLI subcommand — this is an internal idempotency optimisation of an existing
   code path. Parity unaffected.
-- **Observability:** `regenerate_all_thumbnails()` logs written-vs-skipped counts
-  so the effect is visible in Render logs after deploy.
+- **Observability:** `regenerate_all_thumbnails()` **prints** (not `logging`, which
+  this app does not propagate to stdout) a `[Thumbnails] regen sweep: N written,
+  M skipped` line so the effect is visible in Render logs after deploy — the
+  one-time back-fill boot shows all rows written, every subsequent boot shows
+  `0 written`.
 
 ## Related
 
