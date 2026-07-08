@@ -24,8 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `force=True`; bump `_THUMBNAIL_RENDERER_VERSION` to force a global rebuild.
   Adds a nullable `content_hash` column to `diagram_thumbnails` (SQLite migration
   `m083`; Supabase `ADD COLUMN IF NOT EXISTS`). Legacy rows regenerate once, then
-  settle. No schema-write endpoint / MCP tool / CLI change (Protocol §14 parity
-  unaffected).
+  settle. Each sweep prints `[Thumbnails] regen sweep: N written, M skipped` to
+  stdout so the effect is visible in Render logs (the back-fill boot writes all;
+  every boot after shows `0 written`). No schema-write endpoint / MCP tool / CLI
+  change (Protocol §14 parity unaffected).
 - **MCP analytics: `mcp_tool_call` events now actually reach GA4 (ADR-241).** The
   server-side Measurement Protocol tracking added in PR #288 was a silent no-op in
   production: `iris-mcp` had `GA_API_SECRET` but was never given a measurement ID
