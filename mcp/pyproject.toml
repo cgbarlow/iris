@@ -1,13 +1,15 @@
 [project]
 name = "iris-mcp"
-version = "6.48.0"
+version = "6.48.1"
 description = "Stdio MCP server for Iris (ADR-131)"
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 dependencies = [
   "iris-client",
-  "mcp>=1.2",
+  # ADR-244: cap below SDK 2.x — 2.0 removed the low-level Server.list_tools()
+  # decorator family build_server() uses; the service image has no lockfile.
+  "mcp>=1.2,<2",
   "httpx>=0.28",
   "pydantic>=2.9",
   # iris_mcp.http_main builds a FastAPI app for the standalone service

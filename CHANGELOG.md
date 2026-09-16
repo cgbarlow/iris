@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.48.1] - 2026-09-16
+
+### Fixed
+
+- **iris-mcp crashed at startup on the v6.48.0 deploy — MCP SDK capped below 2.x
+  (ADR-244).** The service image installs without a lockfile and `mcp>=1.2` was
+  unbounded, so the rebuild pulled `mcp` 2.2.0, which removed the low-level
+  `Server.list_tools()` decorator family the server is built on
+  (`AttributeError: 'Server' object has no attribute 'list_tools'`). The dependency
+  is now `mcp>=1.2,<2` (resolves to 1.30.0), guarded by a test that fails if the
+  constraint admits 2.x or the installed SDK lacks those decorators. Verified by
+  reproducing the crash with `mcp/Dockerfile` and booting the fixed image. No
+  endpoint, MCP tool, or CLI change. Porting to SDK 2.x is a tracked follow-up.
+
 ## [6.48.0] - 2026-09-16
 
 ### Added
