@@ -37,7 +37,8 @@ Rows keep `Object.entries` (authored/insertion) order.
   - `dd` — `json` → `<pre class="whitespace-pre-wrap break-words …">`;
     `href` → `<a target="_blank" rel="noopener noreferrer" class="break-all underline">`;
     otherwise a `whitespace-pre-wrap break-words` span.
-- Read-only in both view and edit mode. No change to the save path: it already does
+- Read-only in both view and edit mode. *(Superseded for edit mode by
+  [SPEC-245-A](./SPEC-245-A-Element-Data-Panel-Editing.md) / ADR-245.)* No change to the save path: it already does
   `const updatedData = { ...(entity.data ?? {}) }` and only replaces `attributes`,
   so these keys round-trip through an ordinary edit.
 - No `{@html}` (Protocol §7).
@@ -62,5 +63,5 @@ Run: `npm run test:unit`, `npm run test:e2e`, `npm run test:mobile` (frontend).
 
 ## 4. Out of scope (follow-ups per ADR-243)
 
-- Editing non-`attributes` `data` keys in place.
+- ~~Editing non-`attributes` `data` keys in place.~~ Done in ADR-245 / SPEC-245-A.
 - Element-template-driven labels, ordering, and typed forms for `data`.

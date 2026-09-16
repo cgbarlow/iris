@@ -85,6 +85,11 @@ test.describe('no horizontal overflow on mobile', () => {
 		await page.getByRole('button', { name: /^Data \(3\)/ }).click();
 		await expect(page.getByTestId('element-data-panel')).toBeVisible();
 		await expectNoHorizontalOverflow(page);
+
+		// ADR-245: the edit-mode rows stack on mobile rather than widening.
+		await page.getByRole('button', { name: 'Edit Details' }).click();
+		await expect(page.getByTestId('element-data-editor')).toBeVisible();
+		await expectNoHorizontalOverflow(page);
 	});
 
 	// The Bookmarks header carries the Collection + Set filter dropdowns. On

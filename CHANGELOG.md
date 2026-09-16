@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.49.0] - 2026-09-16
+
+### Added
+
+- **Element page: edit the Data panel in place (ADR-245, #292).** Clicking **Edit
+  Details** now turns the **Data** section into typed key/value rows — **Text**,
+  **Number**, **Yes / No**, or **JSON** — with **+ Add Data Field** and per-row
+  remove. Existing values keep their stored type on save (a number stays a number,
+  an object stays an object). Problems (a value without a key, duplicate keys,
+  a non-numeric Number, invalid JSON, or an `attributes` key while the Attributes
+  table owns it) show inline and disable **Save** until fixed. Removing a row
+  deletes that key; the Attributes table's array is untouched. Uses the existing
+  element update — no schema, endpoint, MCP tool, or CLI change.
+
 ## [6.48.1] - 2026-09-16
 
 ### Fixed

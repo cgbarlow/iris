@@ -25,7 +25,7 @@
 	import DiagramPicker from '$lib/components/DiagramPicker.svelte';
 	import HierarchySidebar from '$lib/components/HierarchySidebar.svelte';
 	import type { Diagram } from '$lib/types/api';
-	import { extraDataEntries } from '$lib/utils/elementData';
+	import { applyDataEditRows, extraDataEntries, toDataEditRows, type DataEditRow } from '$lib/utils/elementData';
 	import { Accordion } from 'bits-ui';
 	import DOMPurify from 'dompurify';
 	import {
@@ -95,6 +95,12 @@
 	let editModifiedDate = $state('');
 	let editGenType = $state('');
 	let editTaggedValues = $state<{ property: string; value: string; notes: string }[]>([]);
+	// ADR-245 — Data panel edit rows (every `data` key except the
+	// `attributes` array). Validated live so Save can't send bad JSON.
+	let editDataRows = $state<DataEditRow[]>([]);
+	const dataEditResult = $derived(
+		applyDataEditRows(editDataRows, { attributesArrayInUse: editAttributes.length > 0 })
+	);
 	// ADR-221 — element → detail diagram drill link. ``detailDiagramName``
 	// is the resolved name shown in read mode; the edit-mode picker
 	// updates ``editDetailDiagramId`` / ``editDetailDiagramName``.
@@ -176,7 +182,8 @@
 		if (rebuiltTV.length) editedMeta.tagged_values = rebuiltTV;
 		else delete editedMeta.tagged_values;
 		const metaChanged = JSON.stringify(editedMeta) !== JSON.stringify(origMeta);
-		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged || detailDiagramChanged || metaChanged;
+		const dataChanged = JSON.stringify(editDataRows) !== JSON.stringify(toDataEditRows(entity.data));
+		detailsDirty = nameChanged || descChanged || tagsChanged || attrsChanged || typeChanged || pkgChanged || detailDiagramChanged || metaChanged || dataChanged;
 	});
 
 	async function loadEntity(id: string) {
@@ -356,6 +363,7 @@
 		editAttributes = Array.isArray(srcAttrs)
 			? srcAttrs.map((a: any) => ({ name: a.name ?? '', type: a.type ?? '', scope: a.scope ?? 'Public', notes: a.notes ?? '', lower_bound: a.lower_bound ?? '', upper_bound: a.upper_bound ?? '' }))
 			: [];
+		editDataRows = toDataEditRows(entity.data);
 		editPackageId = (entity as any).package_id ?? null;
 		editDetailDiagramId = entity.detail_diagram_id ?? null;
 		editDetailDiagramName = detailDiagramName;
@@ -411,11 +419,16 @@
 				savingDetails = false;
 				return;
 			}
-			const updatedData = { ...(entity.data ?? {}) } as Record<string, unknown>;
+			// ADR-245: the Data rows are the full set of non-`attributes`
+			// keys, so rebuild `data` from them (removed rows are deleted)
+			// and merge the Attributes table on top.
+			if (!dataEditResult.ok) {
+				savingDetails = false;
+				return;
+			}
+			const updatedData: Record<string, unknown> = { ...dataEditResult.data };
 			if (editAttributes.length > 0) {
 				updatedData.attributes = editAttributes.filter(a => a.name.trim());
-			} else {
-				delete updatedData.attributes;
 			}
 			const putBody: Record<string, unknown> = {
 				name: sanitizedName,
@@ -687,7 +700,7 @@
 				{#if editingDetails}
 					<button
 						onclick={saveEntityMetadata}
-						disabled={!detailsDirty || savingDetails}
+						disabled={!detailsDirty || savingDetails || !dataEditResult.ok}
 						class="rounded px-3 py-1.5 text-sm text-white disabled:opacity-50"
 						style="background-color: var(--color-success, #16a34a)"
 					>
@@ -702,6 +715,9 @@
 					</button>
 					{#if detailsDirty}
 						<span class="text-xs" style="color: var(--color-muted)">Unsaved changes</span>
+					{/if}
+					{#if !dataEditResult.ok}
+						<span role="alert" class="text-xs" style="color: var(--color-danger)">{dataEditResult.error}</span>
 					{/if}
 				{:else if canWrite(entity?.collection_id)}
 					<button
@@ -1202,34 +1218,108 @@
 					</Accordion.Content>
 				</Accordion.Item>
 
-				<!-- ADR-243 (issue #292): read-only Data group (collapsed) for
-					 every `data` key not rendered above — everything except a
-					 UML `attributes` array. Stays read-only in edit mode; the
-					 save path spreads `entity.data`, so these keys survive edits. -->
+				<!-- ADR-243 (issue #292) / ADR-245: Data group (collapsed) for every
+					 `data` key not rendered above — everything except a UML
+					 `attributes` array. View mode lists the values; edit mode
+					 gives typed key/value rows (Text / Number / Yes-No / JSON). -->
 				{@const dataEntries = extraDataEntries(entity.data)}
-				{#if dataEntries.length > 0}
+				{#if dataEntries.length > 0 || editingDetails}
 					<Accordion.Item value="data" class="border-b" style="border-color: var(--color-border)">
 						<Accordion.Header>
 							<Accordion.Trigger class="group flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
-								Data ({dataEntries.length})
+								Data ({editingDetails ? editDataRows.length : dataEntries.length})
 								<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
 							</Accordion.Trigger>
 						</Accordion.Header>
 						<Accordion.Content class="pb-4 overflow-x-auto">
-							<dl class="detail-grid grid gap-3" data-testid="element-data-panel">
-								{#each dataEntries as entry (entry.key)}
-									<dt class="text-sm font-medium font-mono break-all" style="color: var(--color-muted)">{entry.key}</dt>
-									<dd class="text-sm min-w-0" style="color: var(--color-fg)">
-										{#if entry.kind === 'json'}
-											<pre class="whitespace-pre-wrap break-words rounded p-2 text-xs font-mono" style="background: var(--color-surface); border: 1px solid var(--color-border)">{entry.value}</pre>
-										{:else if entry.href}
-											<a href={entry.href} target="_blank" rel="noopener noreferrer" class="break-all underline" style="color: var(--color-primary)">{entry.value}</a>
-										{:else}
-											<span class="whitespace-pre-wrap break-words">{entry.value}</span>
-										{/if}
-									</dd>
-								{/each}
-							</dl>
+							{#if editingDetails}
+								<div class="flex flex-col gap-3" data-testid="element-data-editor">
+									{#each editDataRows as row, i (i)}
+										<div class="flex flex-col gap-1 border-b pb-3 sm:flex-row sm:items-start sm:gap-2" style="border-color: var(--color-border)">
+											<input
+												type="text"
+												bind:value={row.key}
+												aria-label={`Data field ${i + 1} key`}
+												placeholder="key"
+												class="w-full min-w-0 rounded border px-2 py-1 text-sm font-mono sm:w-48"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+											/>
+											<select
+												bind:value={row.type}
+												aria-label={`Data field ${i + 1} type`}
+												class="rounded border px-2 py-1 text-sm sm:w-28"
+												style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+											>
+												<option value="text">Text</option>
+												<option value="number">Number</option>
+												<option value="boolean">Yes / No</option>
+												<option value="json">JSON</option>
+											</select>
+											{#if row.type === 'json'}
+												<textarea
+													bind:value={row.value}
+													rows={Math.min(10, Math.max(3, row.value.split('\n').length))}
+													aria-label={`Data field ${i + 1} value`}
+													class="w-full min-w-0 flex-1 rounded border px-2 py-1 text-xs font-mono"
+													style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+												></textarea>
+											{:else if row.type === 'boolean'}
+												<select
+													bind:value={row.value}
+													aria-label={`Data field ${i + 1} value`}
+													class="w-full min-w-0 flex-1 rounded border px-2 py-1 text-sm"
+													style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+												>
+													<option value="true">true</option>
+													<option value="false">false</option>
+												</select>
+											{:else}
+												<input
+													type="text"
+													inputmode={row.type === 'number' ? 'decimal' : undefined}
+													bind:value={row.value}
+													aria-label={`Data field ${i + 1} value`}
+													class="w-full min-w-0 flex-1 rounded border px-2 py-1 text-sm"
+													style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
+												/>
+											{/if}
+											<button
+												type="button"
+												aria-label={`Remove data field ${i + 1}`}
+												onclick={() => { editDataRows = editDataRows.filter((_, j) => j !== i); }}
+												class="self-end rounded px-2 py-0.5 text-sm sm:self-auto"
+												style="color: var(--color-muted)"
+											>✕</button>
+										</div>
+									{/each}
+									{#if !dataEditResult.ok}
+										<p role="alert" class="text-sm" style="color: var(--color-danger)">{dataEditResult.error}</p>
+									{/if}
+									<div>
+										<button
+											type="button"
+											onclick={() => { editDataRows = [...editDataRows, { key: '', type: 'text', value: '' }]; }}
+											class="rounded px-2 py-1 text-sm"
+											style="border: 1px solid var(--color-border); color: var(--color-fg)"
+										>+ Add Data Field</button>
+									</div>
+								</div>
+							{:else}
+								<dl class="detail-grid grid gap-3" data-testid="element-data-panel">
+									{#each dataEntries as entry (entry.key)}
+										<dt class="text-sm font-medium font-mono break-all" style="color: var(--color-muted)">{entry.key}</dt>
+										<dd class="text-sm min-w-0" style="color: var(--color-fg)">
+											{#if entry.kind === 'json'}
+												<pre class="whitespace-pre-wrap break-words rounded p-2 text-xs font-mono" style="background: var(--color-surface); border: 1px solid var(--color-border)">{entry.value}</pre>
+											{:else if entry.href}
+												<a href={entry.href} target="_blank" rel="noopener noreferrer" class="break-all underline" style="color: var(--color-primary)">{entry.value}</a>
+											{:else}
+												<span class="whitespace-pre-wrap break-words">{entry.value}</span>
+											{/if}
+										</dd>
+									{/each}
+								</dl>
+							{/if}
 						</Accordion.Content>
 					</Accordion.Item>
 				{/if}

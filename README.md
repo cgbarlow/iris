@@ -179,7 +179,7 @@ A hand-written user guide at `/guide` covers every user-facing capability across
 - View and entity detail pages with accordion layout (Summary, Details, Extended groups)
 - Entity clone button on detail page
 - Extended metadata display for imported entities (scope, abstract, persistence, author, dates, tagged values)
-- Read-only **Data** group on element pages *(v6.48.0)* — every key in an element's `data` blob other than UML `attributes` (e.g. content written via MCP or element templates), with nested values as formatted JSON and `http(s)` URLs as links
+- **Data** group on element pages *(v6.48.0; editable v6.49.0)* — every key in an element's `data` blob other than UML `attributes` (e.g. content written via MCP or element templates), with nested values as formatted JSON and `http(s)` URLs as links; in **Edit Details**, typed key/value rows (Text / Number / Yes-No / JSON) with add, remove, and inline validation
 - View relationships: inter-view dependency tracking with dedicated Relationships tab, create from tab or canvas
 - Unified relationship management: create entity and view relationships from Relationships tab with "Add to canvas?" prompt
 - Canvas viewref-to-viewref connections auto-create backend view relationships

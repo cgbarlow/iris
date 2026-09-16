@@ -9,6 +9,8 @@
  *   2. A UML `attributes` array stays in the Attributes accordion and is not
  *      duplicated into Data; an element with nothing else shows no Data group.
  *   3. The unrecognised keys survive an ordinary edit + save round-trip.
+ *   4. ADR-245: in edit mode, fields can be changed, retyped, added and
+ *      removed; invalid JSON blocks Save; the attributes array is untouched.
  */
 
 import { expect, test } from '@playwright/test';
@@ -112,9 +114,9 @@ test.describe('ADR-243 element data panel', () => {
 		await loginAsAdmin(page);
 		await page.goto(`/elements/${el.id}?edit=true`);
 
-		// The panel stays visible (read-only) while editing.
+		// The Data editor is seeded with the existing keys while editing.
 		await openAccordion(page, /^Data \(8\)/);
-		await expect(page.getByTestId('element-data-panel')).toBeVisible();
+		await expect(page.getByTestId('element-data-editor')).toBeVisible();
 
 		await openAccordion(page, /^Details/);
 		await page.getByRole('textbox', { name: 'Status', exact: true }).fill('Validated');
@@ -135,5 +137,76 @@ test.describe('ADR-243 element data panel', () => {
 		};
 		expect(body.metadata.status).toBe('Validated');
 		expect(body.data).toEqual(ARTICLE_DATA);
+	});
+
+	test('data fields can be edited, added, removed, and retyped (ADR-245)', async ({ page }) => {
+		const token = await getAuthToken();
+		const set = (await createSet(undefined, token, { name: `Set-edit-${Date.now()}` })) as {
+			id: string;
+		};
+		const el = (await createElement(undefined, token, {
+			name: 'EditData',
+			element_type: 'note',
+			set_id: set.id,
+			data: {
+				...ARTICLE_DATA,
+				attributes: [{ name: 'id', type: 'int', scope: 'Public' }],
+			},
+		})) as { id: string };
+
+		await loginAsAdmin(page);
+		await page.goto(`/elements/${el.id}`);
+		await page.getByRole('tab', { name: 'Details' }).click();
+		await page.getByRole('button', { name: 'Edit Details' }).click();
+		await openAccordion(page, /^Data \(8\)/);
+		const editor = page.getByTestId('element-data-editor');
+		await expect(editor).toBeVisible();
+
+		// Edit a text value (row 4 = publication) and a number (row 7 = part).
+		await page.getByLabel('Data field 4 value').fill('Uncharted Quests Weekly');
+		await page.getByLabel('Data field 7 value').fill('3');
+
+		// Invalid JSON blocks Save with an inline error, then gets fixed.
+		const save = page.getByRole('button', { name: /^Save$/i }).first();
+		await page.getByLabel('Data field 8 value').fill('{ "canonical": ');
+		await expect(editor.getByRole('alert')).toHaveText('Data "links" is not valid JSON');
+		await expect(save).toBeDisabled();
+		await page.getByLabel('Data field 8 value').fill('{ "canonical": "/articles/quest-3" }');
+		await expect(editor.getByRole('alert')).toHaveCount(0);
+
+		// Remove `slug` (row 2), then add a boolean field.
+		await page.getByRole('button', { name: 'Remove data field 2' }).click();
+		await page.getByRole('button', { name: '+ Add Data Field' }).click();
+		await page.getByLabel('Data field 8 key').fill('featured');
+		await page.getByLabel('Data field 8 type').selectOption('boolean');
+		await page.getByLabel('Data field 8 value').selectOption('true');
+
+		await expect(save).toBeEnabled();
+		await save.click();
+		await page.waitForResponse(
+			(r) =>
+				r.url().includes(`/api/elements/${el.id}`) &&
+				!r.url().includes('/tags') &&
+				r.request().method() === 'PUT',
+		);
+
+		const res = await fetch(`${API_BASE}/api/elements/${el.id}`, {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		const body = (await res.json()) as { data: Record<string, unknown> };
+		const { slug: _slug, ...rest } = ARTICLE_DATA;
+		expect(body.data).toEqual({
+			...rest,
+			publication: 'Uncharted Quests Weekly',
+			part: 3,
+			links: { canonical: '/articles/quest-3' },
+			featured: true,
+			// The Attributes table's array is untouched by Data edits.
+			attributes: [expect.objectContaining({ name: 'id', type: 'int' })],
+		});
+
+		// Back in view mode the saved values render.
+		await openAccordion(page, /^Data \(8\)/);
+		await expect(page.getByTestId('element-data-panel').getByText('featured', { exact: true })).toBeVisible();
 	});
 });
