@@ -57,6 +57,36 @@ test.describe('no horizontal overflow on mobile', () => {
 		await expectNoHorizontalOverflow(page);
 	});
 
+	// ADR-243: the Data panel renders arbitrary `data` keys — an unbroken URL,
+	// a long slug-like key and a nested JSON block must wrap, not widen the page.
+	test('element Data panel with long values does not overflow', async ({ page }) => {
+		test.slow();
+		await seedAdmin();
+		const token = await getAuthToken();
+		const res = await fetch(`${API_BASE}/api/elements`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+			body: JSON.stringify({
+				element_type: 'note',
+				name: 'Mobile Overflow Probe Data',
+				data: {
+					url: 'https://unchartedquests.substack.com/p/an-epic-quest-in-career-development-d1a-with-a-very-long-tail',
+					an_unusually_long_machine_readable_key_name_without_spaces: 'epic-quest-career-development-part-2-slug-value',
+					links: { canonical: '/articles/an-epic-quest-in-career-development-part-2-with-a-long-path' }
+				}
+			})
+		});
+		if (!res.ok) throw new Error(`create element failed: ${res.status} ${await res.text()}`);
+		const elementId = (await res.json()).id as string;
+
+		await loginAsAdmin(page);
+		await page.goto(`/elements/${elementId}`);
+		await page.getByRole('tab', { name: 'Details' }).click();
+		await page.getByRole('button', { name: /^Data \(3\)/ }).click();
+		await expect(page.getByTestId('element-data-panel')).toBeVisible();
+		await expectNoHorizontalOverflow(page);
+	});
+
 	// The Bookmarks header carries the Collection + Set filter dropdowns. On
 	// mobile they must stack under the title rather than spilling off the right
 	// edge (CollectionSelector previously had no responsive width constraints).

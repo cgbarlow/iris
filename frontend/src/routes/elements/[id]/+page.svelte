@@ -25,6 +25,7 @@
 	import DiagramPicker from '$lib/components/DiagramPicker.svelte';
 	import HierarchySidebar from '$lib/components/HierarchySidebar.svelte';
 	import type { Diagram } from '$lib/types/api';
+	import { extraDataEntries } from '$lib/utils/elementData';
 	import { Accordion } from 'bits-ui';
 	import DOMPurify from 'dompurify';
 	import {
@@ -1200,6 +1201,38 @@
 						{/if}
 					</Accordion.Content>
 				</Accordion.Item>
+
+				<!-- ADR-243 (issue #292): read-only Data group (collapsed) for
+					 every `data` key not rendered above — everything except a
+					 UML `attributes` array. Stays read-only in edit mode; the
+					 save path spreads `entity.data`, so these keys survive edits. -->
+				{@const dataEntries = extraDataEntries(entity.data)}
+				{#if dataEntries.length > 0}
+					<Accordion.Item value="data" class="border-b" style="border-color: var(--color-border)">
+						<Accordion.Header>
+							<Accordion.Trigger class="group flex w-full items-center justify-between py-3 text-sm font-semibold" style="color: var(--color-fg)">
+								Data ({dataEntries.length})
+								<span class="transition-transform duration-200 group-data-[state=open]:rotate-90" style="color: var(--color-muted); font-size: 0.75rem" aria-hidden="true">&#9654;</span>
+							</Accordion.Trigger>
+						</Accordion.Header>
+						<Accordion.Content class="pb-4 overflow-x-auto">
+							<dl class="detail-grid grid gap-3" data-testid="element-data-panel">
+								{#each dataEntries as entry (entry.key)}
+									<dt class="text-sm font-medium font-mono break-all" style="color: var(--color-muted)">{entry.key}</dt>
+									<dd class="text-sm min-w-0" style="color: var(--color-fg)">
+										{#if entry.kind === 'json'}
+											<pre class="whitespace-pre-wrap break-words rounded p-2 text-xs font-mono" style="background: var(--color-surface); border: 1px solid var(--color-border)">{entry.value}</pre>
+										{:else if entry.href}
+											<a href={entry.href} target="_blank" rel="noopener noreferrer" class="break-all underline" style="color: var(--color-primary)">{entry.value}</a>
+										{:else}
+											<span class="whitespace-pre-wrap break-words">{entry.value}</span>
+										{/if}
+									</dd>
+								{/each}
+							</dl>
+						</Accordion.Content>
+					</Accordion.Item>
+				{/if}
 			</Accordion.Root>
 			<!-- ADR-209 (v6.17.0 / v6.17.3): attached images for this
 				 element. Always-editable (matches collections/sets) — image
