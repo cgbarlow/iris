@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.48.0] - 2026-09-16
+
+### Added
+
+- **Element page: read-only Data panel for every `data` key (ADR-243, #292).** An
+  element's free-form `data` blob — written by MCP `create_element(s)` or pre-filled
+  by element templates, and carried verbatim by the collection export — was
+  invisible in the UI unless it lived under `data.attributes`. The Details tab now
+  shows a collapsed **Data (N)** accordion after Extended listing every other key in
+  authored order: scalars as text, nested objects/arrays as formatted JSON, and
+  whole-value `http(s)` URLs as external links. It stays read-only in edit mode (and
+  those keys still round-trip through an ordinary save); it's hidden when there's
+  nothing extra to show, so imported models are unchanged. No `{@html}`; no schema,
+  endpoint, MCP tool, or CLI change (Protocol §14 parity unaffected).
+
 ### Fixed
 
 - **Thumbnail regeneration is now idempotent — stops ~56 MB of Supabase egress per
