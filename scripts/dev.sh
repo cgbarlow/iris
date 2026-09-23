@@ -88,7 +88,10 @@ start_backend() {
     fi
     echo "Starting backend..."
     cd "$BACKEND_DIR"
-    nohup uv run uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000 > /tmp/iris-backend.log 2>&1 &
+    # create_asgi_app (not create_app): wraps in ProxyHeadersMiddleware per
+    # IRIS_TRUSTED_PROXY_CIDRS (ADR-246). No-op locally (default trusts only
+    # 127.0.0.1, same as uvicorn's own default) unless that env var is set.
+    nohup uv run uvicorn app.main:create_asgi_app --factory --host 0.0.0.0 --port 8000 > /tmp/iris-backend.log 2>&1 &
     # Wait up to 15s for health check
     for i in $(seq 1 15); do
         if curl -sf http://localhost:8000/health >/dev/null 2>&1; then

@@ -230,7 +230,32 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     return app
 
 
+def create_asgi_app(config: AppConfig | None = None) -> object:
+    """Entry point for the ASGI server (ADR-246).
+
+    Wraps `create_app()` in uvicorn's `ProxyHeadersMiddleware` so
+    `request.client` reflects the real caller's IP — read from
+    `X-Forwarded-For` — when the immediate TCP peer is a trusted reverse
+    proxy (`config.trusted_proxy_cidrs`; Render sets `IRIS_TRUSTED_PROXY_CIDRS
+    =10.0.0.0/8`). Without this, `request.client.host` is the proxy's own
+    address for every request, which both `RateLimitMiddleware` and
+    `AuditMiddleware` key on — collapsing every real caller into one shared
+    identity.
+
+    Deliberately separate from `create_app`, which must keep returning a
+    plain `FastAPI` instance: tests and the embedded-MCP wiring rely on
+    `.state` and other FastAPI/Starlette attributes that a middleware-wrapped
+    ASGI callable doesn't expose. Use this function (not `create_app`) as the
+    `--factory` target when actually serving traffic.
+    """
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware  # noqa: PLC0415
+
+    app = create_app(config)
+    trusted = (config or get_config()).trusted_proxy_cidrs
+    return ProxyHeadersMiddleware(app, trusted_hosts=trusted)
+
+
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:create_app", factory=True, host="0.0.0.0", port=8000)
+    uvicorn.run("app.main:create_asgi_app", factory=True, host="0.0.0.0", port=8000)

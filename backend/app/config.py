@@ -112,6 +112,16 @@ class AppConfig:
         default_factory=lambda: os.environ.get("IRIS_DB_BACKEND", "sqlite")
     )
     supabase: SupabaseConfig | None = field(default=None)
+    # ADR-246: comma-separated IPs/CIDRs of reverse proxies to trust
+    # X-Forwarded-For from, passed to uvicorn's ProxyHeadersMiddleware in
+    # `app.main.create_asgi_app`. Defaults to uvicorn's own default
+    # (localhost only) so self-hosted/dev deployments are unaffected.
+    # Render sets this to "10.0.0.0/8" (its internal proxy network) —
+    # without it, request.client is Render's proxy IP for every request,
+    # which both RateLimitMiddleware and AuditMiddleware key on.
+    trusted_proxy_cidrs: str = field(
+        default_factory=lambda: os.environ.get("IRIS_TRUSTED_PROXY_CIDRS", "127.0.0.1")
+    )
 
 
 def get_config() -> AppConfig:

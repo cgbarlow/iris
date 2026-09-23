@@ -40,5 +40,11 @@ COPY extensions/ extensions/
 RUN pip install --no-cache-dir -e ./iris-client -e ./mcp \
  && cd backend && pip install --no-cache-dir -e ".[supabase]"
 
-# Render sets PORT env var
-CMD cd backend && uvicorn app.main:create_app --host 0.0.0.0 --port ${PORT:-10000} --factory
+# Render sets PORT env var.
+#
+# `create_asgi_app` (not `create_app`) — wraps the FastAPI app in
+# ProxyHeadersMiddleware per IRIS_TRUSTED_PROXY_CIDRS (ADR-246). Render
+# proxies every request to this container from its own internal network, so
+# without this, RateLimitMiddleware and AuditMiddleware key on Render's own
+# proxy IP for every request instead of the real client.
+CMD cd backend && uvicorn app.main:create_asgi_app --host 0.0.0.0 --port ${PORT:-10000} --factory

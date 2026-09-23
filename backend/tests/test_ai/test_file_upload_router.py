@@ -84,7 +84,9 @@ class TestFileExtractEndpoint:
     @pytest.mark.anyio
     async def test_extract_allows_anonymous(self, client: httpx.AsyncClient) -> None:
         # Per ADR-129: parity with other AI endpoints — anonymous callers
-        # can extract files, subject to the anon_ai rate-limit bucket.
+        # can extract files. Local parsing only (no AI-provider call), so
+        # it's in the `anon` rate-limit bucket, not anon_ai (see
+        # `_get_rate_category` in app/middleware/rate_limit.py).
         content = b"Hello"
         resp = await client.post(
             "/api/ai/files/extract",

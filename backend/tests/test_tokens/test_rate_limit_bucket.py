@@ -34,8 +34,28 @@ class TestCategoriser:
         assert _get_rate_category(_req("/api/auth/refresh")) == "refresh"
 
     def test_anon_ai_bucket(self) -> None:
-        # No Authorization, AI path → anon_ai.
+        # No Authorization, an actual AI-provider-calling path → anon_ai.
         assert _get_rate_category(_req("/api/ai/ask")) == "anon_ai"
+
+    def test_anon_ai_bucket_covers_set_scoped_ask(self) -> None:
+        assert (
+            _get_rate_category(_req("/api/ai/sets/abc-123/ask")) == "anon_ai"
+        )
+
+    def test_non_ask_ai_paths_use_anon_not_anon_ai(self) -> None:
+        # Regression (ADR-246): these are plain DB reads with no AI-provider
+        # call, so a path-prefix match on `/api/ai/*` alone wrongly swept
+        # them into the 10/hour anon_ai bucket — shared globally by every
+        # anonymous caller including iris-mcp's per-session
+        # GET /api/ai/server-instructions (ADR-163). They belong in the
+        # much larger `anon` bucket instead.
+        for path in (
+            "/api/ai/server-instructions",
+            "/api/ai/providers/active",
+            "/api/ai/files/extract",
+            "/api/ai/usage",
+        ):
+            assert _get_rate_category(_req(path)) == "anon", path
 
     def test_pat_bucket(self) -> None:
         assert _get_rate_category(_req("/api/search", auth="Bearer iris_pat_x")) == "pat"
