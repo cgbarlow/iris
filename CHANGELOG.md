@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.50.1] - 2026-09-24
+
+### Fixed
+
+- **Large diagrams failed to load for anonymous viewers, with a canvas full
+  of "Too many requests" errors (ADR-248).** Opening a diagram fetched every
+  element on the canvas one at a time — four times each, because the page
+  loaded itself twice on the first visit and then looked each element up
+  once to refresh its node and again to collect its tags. A 37-node diagram
+  made 166 requests; the 274-node Full Family Tree needed about 1,100, far
+  past the anonymous limit of 30 a minute. The page now loads once and gets
+  all of a diagram's elements in a single request: in local testing a
+  274-node diagram opened with 11 requests in total, and the Full Family
+  Tree should need no more than about 18. Node labels, descriptions, class
+  compartments, usage counts and inherited tags show the same as before; if
+  that request fails, the diagram still opens as saved.
+
+### Added
+
+- **`GET /api/diagrams/{id}/elements` (ADR-248).** Returns every element
+  drawn on a diagram's current canvas in one call — each item identical to
+  `GET /api/elements/{id}`, in canvas order, without duplicates or deleted
+  elements. Readable anonymously, like the single-element endpoint. It is a
+  read-only endpoint, so no MCP tool or CLI command is needed (surface
+  parity applies to writes).
+
 ## [6.50.0] - 2026-09-23
 
 ### Added

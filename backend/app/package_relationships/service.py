@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+from app.diagrams.canvas_entities import get_canvas_entity_ids
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -89,35 +90,12 @@ async def list_element_relationships_for_diagram(
     diagram_id: str,
 ) -> list[dict[str, object]]:
     """List element-to-element relationships for elements on a diagram's canvas."""
-    # Get diagram's canvas data to extract element IDs
-    cursor = await db.execute(
-        "SELECT dv.data FROM diagrams d "
-        "JOIN diagram_versions dv ON d.id = dv.diagram_id AND d.current_version = dv.version "
-        "WHERE d.id = ? AND d.is_deleted = 0",
-        (diagram_id,),
-    )
-    row = await cursor.fetchone()
-    if not row or not row[0]:
-        return []
-
-    try:
-        data = json.loads(row[0]) if isinstance(row[0], str) else row[0]
-    except (json.JSONDecodeError, TypeError):
-        return []
-
-    nodes = data.get("nodes", [])
-    element_ids: set[str] = set()
-    for node in nodes:
-        node_data = node.get("data", {})
-        if isinstance(node_data, dict):
-            eid = node_data.get("entityId")
-            if eid:
-                element_ids.add(eid)
-
+    # Element ids drawn on the diagram's current canvas (shared helper, ADR-248)
+    element_ids = await get_canvas_entity_ids(db, diagram_id)
     if not element_ids:
         return []
 
-    # Query relationships where both source and target are in this diagram's elements
+    # Query relationships where either endpoint is in this diagram's elements
     placeholders = ",".join("?" for _ in element_ids)
     id_list = list(element_ids)
     cursor = await db.execute(
