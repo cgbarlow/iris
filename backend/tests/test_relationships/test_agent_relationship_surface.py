@@ -578,6 +578,84 @@ class TestDiagramEdgeReuse:
         assert lst["total"] == 1
         assert lst["items"][0]["id"] == rid
 
+    async def _save_single_edge(
+        self, client, h, s: str, a: str, b: str, edge_data: dict[str, object],
+    ) -> None:
+        """Save a diagram with nodes A (n1), B (n2) and one edge n2 -> n1
+        (drawn opposite to an A -> B relationship)."""
+        d = await client.post("/api/diagrams", json={
+            "diagram_type": "class", "name": "D", "set_id": s, "notation": "uml",
+            "data": {"nodes": [], "edges": []},
+        }, headers=h)
+        assert d.status_code == 201, d.text
+        data = {
+            "nodes": [
+                {"id": "n1", "type": "class", "position": {"x": 0, "y": 0},
+                 "data": {"label": "A", "entityId": a}},
+                {"id": "n2", "type": "class", "position": {"x": 200, "y": 0},
+                 "data": {"label": "B", "entityId": b}},
+            ],
+            "edges": [
+                {"id": "e1", "source": "n2", "target": "n1", "type": "association",
+                 "data": edge_data},
+            ],
+        }
+        u = await client.put(
+            f"/api/diagrams/{d.json()['id']}",
+            json={"name": "D", "data": data},
+            headers={**h, "If-Match": str(d.json()["current_version"])},
+        )
+        assert u.status_code == 200, u.text
+
+    async def test_reversed_edge_with_relationship_id_creates_no_duplicate(
+        self, client,
+    ) -> None:
+        """An edge drawn target -> source that names the relationship via
+        data.relationshipId refers to that relationship; saving must not
+        auto-create a second, reversed one."""
+        h = await _auth(client)
+        s = await _mk_set(client, h)
+        a = await _mk_el(client, h, s, "A")
+        b = await _mk_el(client, h, s, "B")
+        rid = (await _batch(client, h, [{
+            "source_element_id": a, "target_element_id": b,
+            "relationship_type": "association",
+        }])).json()["ids"][0]
+
+        await self._save_single_edge(client, h, s, a, b, {
+            "relationshipType": "association", "relationshipId": rid,
+        })
+
+        lst = (await client.get(f"/api/relationships?element_id={a}", headers=h)).json()
+        assert lst["total"] == 1
+        assert lst["items"][0]["id"] == rid
+
+    async def test_relationship_id_for_other_elements_does_not_suppress_create(
+        self, client,
+    ) -> None:
+        """A relationshipId that names a relationship between different
+        elements (stale or copied edge) does not stand in for this edge."""
+        h = await _auth(client)
+        s = await _mk_set(client, h)
+        a = await _mk_el(client, h, s, "A")
+        b = await _mk_el(client, h, s, "B")
+        c = await _mk_el(client, h, s, "C")
+        other = (await _batch(client, h, [{
+            "source_element_id": a, "target_element_id": c,
+            "relationship_type": "association",
+        }])).json()["ids"][0]
+
+        await self._save_single_edge(client, h, s, a, b, {
+            "relationshipType": "association", "relationshipId": other,
+        })
+
+        lst = (await client.get(f"/api/relationships?element_id={b}", headers=h)).json()
+        assert lst["total"] == 1
+        created = lst["items"][0]
+        assert created["id"] != other
+        assert created["source_element_id"] == b
+        assert created["target_element_id"] == a
+
 
 # ── Existing flows untouched ─────────────────────────────────────────
 
@@ -610,3 +688,9 @@ def test_server_instructions_seed_points_at_relationship_tools() -> None:
     ):
         assert f"`{name}`" in MCP_SERVER_INSTRUCTIONS_BODY
     assert "data.relationshipId" in MCP_SERVER_INSTRUCTIONS_BODY
+    # Relationship reads require auth (unlike element reads) — the AUTH
+    # RECOVERY text must say so.
+    assert (
+        "except `list_relationships` / `get_relationship`, which need it"
+        in MCP_SERVER_INSTRUCTIONS_BODY
+    )

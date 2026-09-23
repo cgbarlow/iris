@@ -1912,8 +1912,10 @@ TOOLS: list[Tool] = [
             "errors name the failing item's index. Call list_relationships "
             "first to avoid creating duplicates. To draw a relationship on "
             "a diagram, pass the returned id as the edge's "
-            "data.relationshipId in update_diagram (with source/target "
-            "nodes whose data.entityId are the two elements) — no "
+            "data.relationshipId in update_diagram, with the edge's source "
+            "node's data.entityId = the relationship's source_element_id "
+            "and its target node's = target_element_id (keep the direction "
+            "so the arrow and role ends are drawn correctly) — no "
             "duplicate relationship is created. The canvas draws role "
             "names from the edge, so also copy them to the edge's "
             "data.sourceRole / data.targetRole (as the Sparx importer does)."
@@ -2014,7 +2016,9 @@ TOOLS: list[Tool] = [
             "page_size <= 100); returns {items, total, page, page_size}. "
             "Each item has id, source/target element ids and names, "
             "relationship_type, label, source_role, target_role and data. "
-            "Use it to check what exists before create_relationships."
+            "Use it to check what exists before create_relationships. "
+            "Needs sign-in (unlike other list_* reads) — returns "
+            "auth_required when anonymous."
         ),
         input_schema=_schema({
             "element_id": _str_arg(
@@ -2034,7 +2038,11 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="get_relationship",
-        description="Fetch one relationship by id (v6.50.0, ADR-249).",
+        description=(
+            "Fetch one relationship by id (v6.50.0, ADR-249). Needs "
+            "sign-in (unlike other get_* reads) — returns auth_required "
+            "when anonymous."
+        ),
         input_schema=_schema({
             "relationship_id": _str_arg("relationship_id", "Relationship id"),
         }),

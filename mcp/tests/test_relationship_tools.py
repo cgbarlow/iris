@@ -87,10 +87,27 @@ class TestInventory:
             assert f"`{name}`" in _FALLBACK_INSTRUCTIONS
         assert "data.relationshipId" in _FALLBACK_INSTRUCTIONS
 
+    def test_server_instructions_say_relationship_reads_need_sign_in(self) -> None:
+        """GET /api/relationships[/{id}] require auth (unlike element reads),
+        so the AUTH RECOVERY text must not promise every list_* / get_*
+        works anonymously (ADR-249)."""
+        from iris_mcp.server_instructions import _FALLBACK_INSTRUCTIONS
+
+        assert (
+            "except `list_relationships` / `get_relationship`, which need it"
+            in _FALLBACK_INSTRUCTIONS
+        )
+
+    def test_read_tool_descriptions_say_sign_in_required(self) -> None:
+        for name in ("list_relationships", "get_relationship"):
+            assert "sign-in" in _defs()[name].description.lower()
+
     def test_create_description_mentions_diagram_edge_reuse(self) -> None:
         desc = _defs()["create_relationships"].description
         assert "relationshipId" in desc
         assert "update_diagram" in desc
+        # Edge direction must be spelled out (reviewer finding, ADR-249).
+        assert "edge's source node" in desc
 
 
 class TestCreateRelationships:

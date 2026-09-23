@@ -30,7 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `source_role` and `target_role`.
 - A relationship id returned by `create_relationships` can be used as a
   diagram edge's `relationshipId` in `update_diagram`; saving the diagram
-  doesn't create a duplicate.
+  doesn't create a duplicate, even when the edge is drawn in the opposite
+  direction to the relationship.
+- `list_relationships` and `get_relationship` need sign-in, unlike other
+  read tools; their descriptions and the MCP server instructions say so.
 - REST: `POST /api/batch/relationships/create`; `GET /api/relationships`
   filters by `set_id` and `relationship_type`; `PUT /api/relationships/{id}`
   can change `relationship_type` and accepts `source_role` / `target_role`.

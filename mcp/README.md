@@ -138,10 +138,12 @@ ADR-123/129).
     `relationship_type`, roles, `label`, `description`, `data`.
   - `list_relationships(element_id | set_id, relationship_type?, page?, page_size?)`
     and `get_relationship(relationship_id)` — items include roles and
-    `data`.
+    `data`. Unlike other reads these need sign-in (`IRIS_TOKEN` / OAuth).
   - `delete_relationship(relationship_id)` — soft delete.
   - Pass a returned id as an edge's `data.relationshipId` in
-    `update_diagram` to draw it without creating a duplicate.
+    `update_diagram` to draw it without creating a duplicate. Keep the
+    edge's source node on the relationship's source element so the
+    arrow and role ends point the right way.
 - **Render tools** (v6.2.0, ADR-179):
   - `render_diagram(diagram_id, format)` and
     `render_markdown(markdown, title, format)` — produce md/docx/pdf

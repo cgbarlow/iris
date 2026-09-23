@@ -53,7 +53,13 @@ relationship`, `iris delete relationship`, `iris relationships list|get`) on
 them only (protocol §13);
 (6) add `relationship` to the §14 parity checker's known entities, attribute
 `/api/batch/<entities>/<verb>` routes to their entity, and count plural batch
-tool / command names (`create_relationships`) for the singular entity,
+tool / command names (`create_relationships`) for the singular entity;
+(7) make the diagram-edge auto-create honour `data.relationshipId`: an edge
+whose `relationshipId` names a live relationship between the same two
+elements, in either direction, is taken to represent it and no relationship
+is auto-created for it (previously only a same-direction source/target match
+suppressed the create, so an edge drawn target → source added a reversed
+duplicate),
 
 **and neglected**
 (a) rejecting self-referencing and cross-set relationships inside
@@ -82,13 +88,23 @@ the caller gives none;
 tool covers one item, and one entry point keeps validation identical for MCP
 and CLI (`iris create relationship` also sends a one-item batch);
 (f) doing the role-name mapping in `iris-client` — rejected: putting it in
-the backend means any REST client gets the same storage convention,
+the backend means any REST client gets the same storage convention;
+(g) opening `GET /api/relationships` and `GET /api/relationships/{id}` to
+anonymous callers (`get_optional_user`, like element reads per ADR-123) so
+`list_relationships` / `get_relationship` work without sign-in — rejected
+here: it changes the access contract of pre-existing routes, which is a
+security decision outside issue #298. The asymmetry is instead stated in the
+two tools' descriptions and in the server instructions' AUTH RECOVERY text
+(seed and fallback), which previously promised every `get_*` / `list_*`
+works anonymously,
 
 **to achieve** relationships created by agents that are indistinguishable
 from UI- and import-created ones (same table, same `data` keys, same counts,
 same Relationships tab, same queries), ids that can be dropped into a
 diagram edge's `data.relationshipId` without the edge auto-create adding a
-duplicate (it dedups by source/target pair), clear per-item errors for
+duplicate (it skips an edge whose `relationshipId` links the same two
+elements in either direction, and otherwise dedups by source/target pair),
+clear per-item errors for
 self-referencing and cross-set requests, and §14 parity enforced for
 relationships in CI,
 
@@ -97,8 +113,10 @@ edge auto-create may still create reflexive (and, through the canvas,
 cross-set) relationships while the agent path can't; that `set_id` listing
 matches either end, so a pre-existing cross-set relationship appears under
 both sets; that `update_relationship` costs one extra GET to read the
-version; and that a type change's history lives in `change_summary` rather
-than in a versioned column.
+version; that a type change's history lives in `change_summary` rather
+than in a versioned column; and that relationship reads need sign-in while
+element reads don't, so an anonymous agent gets `auth_required` from
+`list_relationships` / `get_relationship`.
 
 ---
 
@@ -120,7 +138,13 @@ than in a versioned column.
   can't silently drop a role.
 - MCP server instructions (seed body re-applied on startup, ADR-177, and the
   iris-mcp fallback) point agents at `list_relationships` →
-  `create_relationships` → `data.relationshipId` in `update_diagram`.
+  `create_relationships` → `data.relationshipId` in `update_diagram`, and
+  their AUTH RECOVERY text now says `list_relationships` /
+  `get_relationship` need sign-in.
+- Diagram saves (`diagrams.service.update_diagram`) do one extra indexed
+  lookup per edge that carries a `relationshipId`. A `relationshipId`
+  naming a relationship between other elements (a stale or copied edge) is
+  ignored and the edge is treated as before.
 - Package versions: backend, frontend, iris-client and iris-mcp → 6.50.0.
 
 ### Follow-up (out of scope)
