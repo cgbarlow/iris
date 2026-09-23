@@ -452,6 +452,10 @@ The frontend starts on `http://localhost:5173` with API proxy to the backend.
 cd backend
 uv run python -m pytest
 
+# Backend tests that need PostgreSQL (Supabase-mode schema; skipped unless the DSN is set)
+docker run -d --name iris-test-pg -e POSTGRES_PASSWORD=iris -p 55499:5432 postgres:16-alpine
+IRIS_TEST_POSTGRES_DSN=postgresql://postgres:iris@localhost:55499/postgres uv run python -m pytest
+
 # Frontend vitest unit suite
 cd frontend
 npm test

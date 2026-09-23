@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.49.2] - 2026-09-23
+
+### Fixed
+
+- **Personal access tokens returned 500 on Supabase deployments (ADR-247).**
+  Every request with an `iris_pat_…` bearer failed with `operator does not
+  exist: text = uuid`: the token check joined `users.id` (text) to the token's
+  owner id (a UUID pointing at `profiles`). The owner is now looked up in
+  `profiles` on Supabase deployments and `users` on SQLite, the same place a
+  signed-in session is checked, so a PAT carries the user's current role and
+  is refused once the account is deactivated. Existing tokens start working
+  with no action needed. New PostgreSQL-backed tests cover this path; they run
+  when `IRIS_TEST_POSTGRES_DSN` is set (see README → Running Tests). No
+  schema, endpoint, MCP tool, or CLI change.
+
 ## [6.49.1] - 2026-09-23
 
 ### Fixed

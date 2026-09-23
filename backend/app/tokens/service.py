@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
+from app.auth.users import get_user
+
 if TYPE_CHECKING:
     import aiosqlite
 
@@ -83,12 +85,17 @@ async def verify_pat(  # noqa: PLR0911 — short-circuit returns for distinct re
     db: aiosqlite.Connection,
     token: str,
     hasher: PasswordHasher,
+    db_backend: str = "sqlite",
 ) -> dict[str, Any] | None:
     """Verify a PAT bearer value. Returns the user dict or None.
 
     Rejects (→ None) on: malformed token, unknown prefix, hash mismatch,
     revoked, expired, or inactive user. Successful calls touch
     `last_used_at` on the PAT row.
+
+    The owner is resolved with `get_user` rather than a SQL join to
+    `users`: in Supabase mode `pat.user_id` is a UUID referencing
+    `profiles`, and joining it to `users.id` (TEXT) fails (ADR-247).
     """
     parsed = _parse(token)
     if parsed is None:
@@ -98,24 +105,24 @@ async def verify_pat(  # noqa: PLR0911 — short-circuit returns for distinct re
     now = datetime.now(tz=UTC).isoformat()
 
     cursor = await db.execute(
-        "SELECT pat.id, pat.user_id, pat.token_hash, pat.revoked_at, pat.expires_at,"
-        " u.username, u.role, u.is_active"
-        " FROM personal_access_tokens pat"
-        " JOIN users u ON u.id = pat.user_id"
-        " WHERE pat.prefix = ?",
+        "SELECT id, user_id, token_hash, revoked_at, expires_at"
+        " FROM personal_access_tokens"
+        " WHERE prefix = ?",
         (prefix,),
     )
     row = await cursor.fetchone()
     if row is None:
         return None
 
-    pat_id, user_id, token_hash, revoked_at, expires_at, username, role, is_active = row
+    pat_id, user_id, token_hash, revoked_at, expires_at = row
 
     if revoked_at is not None:
         return None
     if expires_at is not None and expires_at <= now:
         return None
-    if not is_active:
+
+    user = await get_user(db, user_id, db_backend)  # type: ignore[arg-type]
+    if user is None or not user["is_active"]:
         return None
 
     try:
@@ -130,9 +137,9 @@ async def verify_pat(  # noqa: PLR0911 — short-circuit returns for distinct re
     await db.commit()
 
     return {
-        "id": user_id,
-        "username": username,
-        "role": role,
+        "id": user["id"],
+        "username": user["username"],
+        "role": user["role"],
         "jti": pat_id,  # the PAT id doubles as the token's jti for audit parity
         "auth_type": "pat",
     }

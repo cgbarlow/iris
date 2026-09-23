@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, Request
 from jose import JWTError
 
 from app.auth.service import decode_access_token
+from app.auth.users import get_user
 
 
 async def get_current_user(request: Request) -> dict[str, Any]:
@@ -48,7 +49,7 @@ async def _get_current_user_pat(request: Request, token: str) -> dict[str, Any]:
 
     db = request.app.state.db_manager.main_db
     hasher = request.app.state.pat_hasher
-    user = await verify_pat(db, token, hasher)
+    user = await verify_pat(db, token, hasher, request.app.state.config.db_backend)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid or revoked token")
     return user
@@ -87,18 +88,14 @@ async def _get_current_user_sqlite(
         raise HTTPException(status_code=401, detail="Invalid token claims")
 
     db = request.app.state.db_manager.main_db
-    cursor = await db.execute(
-        "SELECT id, username, role, is_active FROM users WHERE id = ?",
-        (user_id,),
-    )
-    row = await cursor.fetchone()
-    if row is None or not row[3]:
+    user = await get_user(db, user_id, "sqlite")
+    if user is None or not user["is_active"]:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
     return {
-        "id": row[0],
-        "username": row[1],
-        "role": row[2],
+        "id": user["id"],
+        "username": user["username"],
+        "role": user["role"],
         "jti": payload.get("jti"),
     }
 
@@ -126,13 +123,14 @@ async def _get_current_user_supabase(
     from this same function before re-validation), so the `sub` in our
     OAuth-issued token IS the profile id.
     """
+    from jose import jwt as _jose_jwt  # noqa: PLC0415
+
     from app.auth.service import decode_access_token  # noqa: PLC0415
     from app.auth.supabase_service import (  # noqa: PLC0415
         decode_supabase_jwt,
         fetch_jwks,
         get_profile,
     )
-    from jose import jwt as _jose_jwt  # noqa: PLC0415
 
     config = request.app.state.config
     if config.supabase is None:
@@ -151,7 +149,7 @@ async def _get_current_user_supabase(
         try:
             payload = decode_access_token(token, config.auth)
         except JWTError as e:
-            raise HTTPException(  # noqa: B904
+            raise HTTPException(
                 status_code=401,
                 detail="Invalid iris-OAuth token",
             ) from e
