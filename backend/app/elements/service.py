@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.common.nullable_filter import parse_nullable_id
 from app.authz.collection_resolver import resolve_effective_set
+from app.elements.diagram_usage import count_diagram_usage
 from app.search.service import index_element as _index_element
 from app.search.service import remove_element_index as _remove_element_index
 
@@ -357,12 +358,17 @@ async def get_elements_by_ids(
     appearance in ``element_ids``; deleted or unknown ids are skipped.
     Each dict equals what ``get_element`` returns for that id.
 
-    Cost is four queries per chunk of ``_ID_CHUNK_SIZE`` ids (rows, tags,
-    relationship counts, diagram usage counts), however many ids are
-    asked for. The usage count keeps ``get_element``'s exact semantics —
-    distinct live diagrams whose current-version data contains the id
-    (``LIKE '%' || id || '%'``) — but evaluates the whole chunk in one
-    scan of current diagram versions instead of one scan per element.
+    Cost is three queries per chunk of ``_ID_CHUNK_SIZE`` ids (rows, tags,
+    relationship counts) plus one query for diagram usage counts, however
+    many ids are asked for. The usage count is the number of distinct live
+    diagrams whose current-version data mentions the id, as in
+    ``get_element``. It is computed by reading every current diagram's
+    data once and matching all ids in a single pass
+    (:func:`app.elements.diagram_usage.count_diagram_usage`), so the
+    server's work is O(total diagram bytes) per request rather than one
+    substring scan of all diagram data per element. See that module for
+    the two documented differences from ``LIKE`` (case-sensitive; ``_``
+    and ``%`` are literal).
     """
     ordered = list(dict.fromkeys(eid for eid in element_ids if eid))
     found: dict[str, dict[str, object]] = {}
@@ -415,23 +421,22 @@ async def get_elements_by_ids(
             if r[0] in chunk_found:
                 chunk_found[r[0]]["relationship_count"] = r[1]
 
-        # CROSS JOIN keeps diagram versions as the outer loop in SQLite, so
-        # each diagram's data is read once and matched against the chunk.
+        found.update(chunk_found)
+
+    if found:
+        # One read of every live diagram's current data for the whole
+        # request; all ids are matched against it in a single pass.
         usage_cursor = await db.execute(
-            "SELECT e.id, COUNT(DISTINCT d.id) FROM diagrams d "  # noqa: S608
+            "SELECT dv.data FROM diagrams d "
             "JOIN diagram_versions dv ON d.id = dv.diagram_id "
             "  AND d.current_version = dv.version "
-            "CROSS JOIN elements e "
-            f"WHERE d.is_deleted = 0 AND e.id IN ({placeholders}) "
-            "  AND dv.data LIKE '%' || e.id || '%' "
-            "GROUP BY e.id",
-            params,
+            "WHERE d.is_deleted = 0",
         )
-        for r in await usage_cursor.fetchall():
-            if r[0] in chunk_found:
-                chunk_found[r[0]]["diagram_usage_count"] = r[1]
-
-        found.update(chunk_found)
+        usage = count_diagram_usage(
+            found, (r[0] for r in await usage_cursor.fetchall()),
+        )
+        for eid, element in found.items():
+            element["diagram_usage_count"] = usage[eid]
 
     return [found[eid] for eid in ordered if eid in found]
 

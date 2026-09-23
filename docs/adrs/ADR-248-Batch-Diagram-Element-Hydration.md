@@ -52,10 +52,20 @@ load diagram" and a canvas of 429s. Three causes, confirmed in the code:
   skipping nodes without an entityId and deleted or unknown elements;
 - compute it in the elements service (`get_elements_by_ids`) with a bounded
   number of queries: per chunk of up to 400 ids, one query each for element
-  rows, tags, relationship counts (grouped) and diagram usage counts (one
-  scan of current diagram versions for the whole chunk, with `get_element`'s
-  exact `LIKE '%' || id || '%'` semantics). Chunking keeps every statement
-  under SQLite's historical 999-variable limit;
+  rows, tags and relationship counts (grouped); chunking keeps every
+  statement under SQLite's historical 999-variable limit. Diagram usage
+  counts take **one** further query for the whole request, which reads every
+  live diagram's current-version data once. `count_diagram_usage`
+  (`app/elements/diagram_usage.py`) then matches all the ids in a single pass
+  per diagram: it finds every UUID-shaped substring (overlapping ones
+  included) and intersects them with the requested ids, and falls back to a
+  plain substring test for any id that is not UUID-shaped. The count means
+  what `get_element`'s `LIKE '%<id>%'` means (distinct live diagrams whose
+  current version mentions the id anywhere), with two documented
+  differences: matching is case-sensitive (PostgreSQL `LIKE` behaviour;
+  SQLite's `LIKE` folds ASCII case, which only matters if a diagram holds an
+  id in another letter case, and Iris always writes ids verbatim), and `_` /
+  `%` in an id are literal rather than wildcards;
 - share code rather than copy it (protocol §13): `get_element` and
   `get_elements_by_ids` use one element `SELECT` and one row-to-dict mapper;
   the canvas-entityId extraction that was inlined in
@@ -75,24 +85,35 @@ its own; (2) raising the anonymous rate limit — rejected: it hides the
 problem and raises the cost of every scrape; (3) dropping
 `diagram_usage_count` from the batch to make it cheaper — rejected: the
 canvas shows it, and a payload that differs from the single-element
-endpoint invites drift; (4) matching usage in Python by loading every
-diagram's data into the app — rejected: it ships every diagram's JSON over
-the wire on each page load (costly against a remote Supabase database), and
-reproducing `LIKE`'s per-backend case rules in Python risks subtle
-differences; (5) adding MCP/CLI surfaces — not needed: this is a read
-endpoint, and protocol §14 applies to write endpoints,
+endpoint invites drift; (4) keeping the usage count in SQL as one
+`CROSS JOIN elements … WHERE dv.data LIKE '%' || e.id || '%'` per chunk
+(the first implementation of this ADR) — rejected in review: it reads each
+diagram row once but still runs one substring scan of it **per element**,
+so the database does the same O(N × total diagram bytes) work as N
+single-element requests, now inside one statement on the page's critical
+path. In a local SQLite benchmark with 7.7 MB of live diagram data it took
+148 ms for 37 ids, 1,015 ms for 274 and 1,390 ms for 400, against a flat
+100–107 ms for the single-pass matcher at every size, with identical counts;
+(5) building the matcher as a regex alternation of the ids or a pure-Python
+Aho-Corasick automaton — rejected: the first still backtracks through
+every id at most positions, and the second runs a Python loop per byte;
+(6) adding MCP/CLI surfaces — not needed: this is a read endpoint, and
+protocol §14 applies to write endpoints,
 
 **to achieve** a diagram page load that makes **one** element request
 instead of 4N — the Full Family Tree goes from about 1,100 requests to about
 18 at most in total (measured after the change: 11), comfortably inside the
-anonymous bucket — and a server cost that no longer scales as one diagram
-scan per node,
+anonymous bucket — and a usage-count cost of one read of the live diagram
+data per request, O(total diagram bytes), no longer multiplied by the
+number of nodes,
 
 **accepting that** the endpoint returns the full element payload even
 though the canvas uses only part of it (it keeps the contract identical to
-`GET /api/elements/{id}` and lets the page reuse `elementToNodeData`), and
-that the usage-count query is still a `LIKE` scan over diagram data — now
-one scan per 400 elements rather than one per element.
+`GET /api/elements/{id}` and lets the page reuse `elementToNodeData`); that
+each request transfers every live diagram's current data from the database
+to the app once (a few MB on a large instance; the database used to read the
+same bytes N times); and that usage counts differ from `LIKE` in the two
+edge cases above.
 
 ---
 
@@ -112,7 +133,14 @@ one scan per 400 elements rather than one per element.
   are unchanged.
 - The query count is independent of the node count and is pinned by
   `tests/test_diagrams/test_diagram_elements.py`
-  (`TestDiagramElementsQueryBound`).
+  (`TestDiagramElementsQueryBound`), which also checks that diagram data is
+  read exactly once for usage counts and that no `LIKE` query runs.
+  `TestDiagramElementsUsageCount` compares usage counts across several
+  diagrams (a repeated mention, an edge-id-only mention, a deleted diagram
+  and a superseded version) with `GET /api/elements/{id}`, and
+  `tests/test_elements/test_diagram_usage.py` unit-tests the matcher.
+- `GET /api/elements/{id}` still uses its single-id `LIKE` query: for one
+  id that is one scan, and it avoids transferring all diagram data.
 - `list_element_relationships_for_diagram` now tolerates a canvas whose
   `nodes` is not a list of objects instead of raising.
 

@@ -29,9 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`GET /api/diagrams/{id}/elements` (ADR-248).** Returns every element
   drawn on a diagram's current canvas in one call — each item identical to
   `GET /api/elements/{id}`, in canvas order, without duplicates or deleted
-  elements. Readable anonymously, like the single-element endpoint. It is a
-  read-only endpoint, so no MCP tool or CLI command is needed (surface
-  parity applies to writes).
+  elements. Readable anonymously, like the single-element endpoint. Usage
+  counts for all of the diagram's elements are worked out in one pass over
+  the saved diagrams, so the call stays quick however many nodes the
+  diagram has. It is a read-only endpoint, so no MCP tool or CLI command is
+  needed (surface parity applies to writes).
 
 ## [6.50.0] - 2026-09-23
 

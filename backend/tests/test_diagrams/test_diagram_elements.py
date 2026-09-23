@@ -358,7 +358,87 @@ class TestDiagramElementsQueryBound:
         items = resp.json()
         assert [i["id"] for i in items] == ids
         assert all(i["diagram_usage_count"] == 1 for i in items)
-        # 30 ids / 7 per chunk = 5 chunks; each chunk adds its batched
-        # queries, so the total grows with chunks, never with nodes.
-        per_chunk = baseline - 1  # baseline = 1 canvas read + one chunk
-        assert len(seen) == 1 + 5 * per_chunk
+        # 30 ids / 7 per chunk = 5 chunks. Rows, tags and relationship
+        # counts are batched per chunk; the canvas read and the diagram
+        # usage pass happen once per request, so the total grows with
+        # chunks, never with nodes.
+        per_chunk = baseline - 2  # baseline = canvas + one chunk + usage
+        assert len(seen) == 2 + 5 * per_chunk
+
+    async def test_diagram_data_is_read_once_per_request(
+        self, client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Usage counts come from ONE read of current diagram versions for
+        the whole request: not one substring scan per element (the old
+        per-node cost), nor one per chunk (ADR-248 review finding)."""
+        import app.elements.service as element_service
+
+        headers = await _auth_headers(client)
+        monkeypatch.setattr(element_service, "_ID_CHUNK_SIZE", 7)
+        ids = await _batch_create(client, headers, 30)
+        diagram_id = await _create_diagram(
+            client, headers, [_node(f"n{i}", eid) for i, eid in enumerate(ids)],
+        )
+        seen = self._count_queries(monkeypatch)
+        resp = await client.get(f"/api/diagrams/{diagram_id}/elements")
+        assert resp.status_code == 200, resp.text
+        version_reads = [q for q in seen if "diagram_versions" in q]
+        # One for the canvas itself, one for every current diagram's data.
+        assert len(version_reads) == 2, version_reads
+        assert not any("LIKE" in q.upper() for q in seen), seen
+
+
+class TestDiagramElementsUsageCount:
+    """diagram_usage_count keeps GET /api/elements/{id}'s semantics:
+    distinct live diagrams whose CURRENT version mentions the id."""
+
+    async def test_usage_counts_across_several_diagrams_match_single_endpoint(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        a = await _create_element(client, headers, "A")
+        b = await _create_element(client, headers, "B")
+        c = await _create_element(client, headers, "C")
+
+        main = await _create_diagram(
+            client, headers, [_node("1", a), _node("2", b), _node("3", c)],
+            name="Main",
+        )
+        # A appears twice in one other diagram: counts once for it.
+        await _create_diagram(
+            client, headers, [_node("x", a), _node("y", a)], name="Twice",
+        )
+        # B and C are mentioned only inside an edge id (substring semantics).
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "component",
+                "name": "Edge only",
+                "data": {"nodes": [], "edges": [{"id": f"e-{b}-{c}"}]},
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        # A deleted diagram mentioning A does not count.
+        gone = await _create_diagram(client, headers, [_node("g", a)], name="Gone")
+        d = await client.delete(
+            f"/api/diagrams/{gone}", headers={**headers, "If-Match": "1"},
+        )
+        assert d.status_code == 204, d.text
+        # C was on this diagram's first version only: no longer counts.
+        moved = await _create_diagram(client, headers, [_node("m", c)], name="Moved")
+        upd = await client.put(
+            f"/api/diagrams/{moved}",
+            json={"name": "Moved", "data": {"nodes": [], "edges": []}},
+            headers={**headers, "If-Match": "1"},
+        )
+        assert upd.status_code == 200, upd.text
+
+        resp = await client.get(f"/api/diagrams/{main}/elements")
+        assert resp.status_code == 200, resp.text
+        counts = {i["id"]: i["diagram_usage_count"] for i in resp.json()}
+        # Main + Twice for A; Main + Edge only for B and C.
+        assert counts == {a: 2, b: 2, c: 2}
+        for eid, count in counts.items():
+            single = await client.get(f"/api/elements/{eid}")
+            assert single.json()["diagram_usage_count"] == count
