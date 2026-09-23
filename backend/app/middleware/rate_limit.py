@@ -52,7 +52,8 @@ def _get_rate_category(request: Request) -> str:
 
     - ``login`` — POST /api/auth/login
     - ``refresh`` — POST /api/auth/refresh
-    - ``anon_ai`` — anonymous calls on /api/ai/* (stricter, 1h window)
+    - ``anon_ai`` — anonymous calls that actually invoke an AI provider
+      (stricter, 1h window; ADR-123's cost-exposure guardrail)
     - ``pat`` — PAT-authenticated calls (Authorization: Bearer iris_pat_...)
     - ``anon`` — other anonymous calls (no Authorization header)
     - ``general`` — JWT-authenticated (or other Bearer) calls
@@ -66,7 +67,16 @@ def _get_rate_category(request: Request) -> str:
         return "refresh"
     auth = request.headers.get("Authorization", "")
     is_anon = not auth
-    if path.startswith("/api/ai/") and is_anon:
+    # Only the endpoints that actually call out to an AI provider belong in
+    # the 10/hour cost-exposure bucket. Everything else under /api/ai/* is a
+    # plain DB read (providers list, server-instructions, creation-prompts,
+    # usage, ...) and was previously swept into anon_ai by path prefix alone
+    # — which meant every anonymous caller of those cheap reads (notably
+    # iris-mcp's per-session GET /api/ai/server-instructions, ADR-163)
+    # shared and exhausted the same tiny global bucket as real "ask" calls.
+    # `/api/ai/ask` and `/api/ai/sets/{set_id}/ask` are the only routes that
+    # spend AI provider tokens on an anonymous caller's behalf.
+    if is_anon and path.startswith("/api/ai/") and path.endswith("/ask"):
         return "anon_ai"
     if auth.startswith("Bearer iris_pat_"):
         return "pat"

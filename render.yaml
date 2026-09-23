@@ -67,6 +67,13 @@ services:
     envVars:
       - key: IRIS_DB_BACKEND
         value: supabase
+      - key: IRIS_TRUSTED_PROXY_CIDRS
+        # ADR-246: Render proxies every request to this container from its
+        # own internal network (observed as 10.x.x.x peers). Without this,
+        # request.client is Render's proxy IP for every request, so
+        # RateLimitMiddleware and AuditMiddleware key on one shared identity
+        # for every real caller instead of X-Forwarded-For's actual client.
+        value: 10.0.0.0/8
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

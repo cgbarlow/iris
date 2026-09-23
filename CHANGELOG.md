@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.49.1] - 2026-09-23
+
+### Fixed
+
+- **False-positive rate limiting reported as "Supabase is rate limiting us"
+  after the Supabase project moved to the free tier (ADR-246).** It wasn't
+  Supabase — it was Iris's own `RateLimitMiddleware` and `AuditMiddleware`,
+  both keyed on `request.client.host`. Behind Render's reverse proxy, that's
+  Render's own internal-network address for every request (uvicorn's default
+  trusted-proxy list is `127.0.0.1` only, so `X-Forwarded-For` was ignored),
+  collapsing every real visitor and every iris-mcp-proxied MCP caller into
+  one shared rate-limit bucket and one shared audit-log IP. `iris-api` now
+  serves via a new `app.main:create_asgi_app` factory that trusts
+  `X-Forwarded-For` from `IRIS_TRUSTED_PROXY_CIDRS` (Render:
+  `10.0.0.0/8`; self-hosted default unchanged at `127.0.0.1`). Separately,
+  the `anon_ai` (10/hour) bucket no longer catches every `/api/ai/*` path by
+  prefix — only `/api/ai/ask` and `/api/ai/sets/{id}/ask` actually spend AI-
+  provider tokens; `GET /api/ai/server-instructions` (a zero-cost DB read
+  iris-mcp calls every session, ADR-163) and other plain `/api/ai/*` reads
+  now use the much larger `anon` bucket. Reproduced locally and confirmed
+  against live Render logs before the fix; verified fixed the same way. No
+  Supabase-side or performance change — no schema, endpoint, MCP tool, or
+  CLI change.
+
 ## [6.49.0] - 2026-09-16
 
 ### Added
