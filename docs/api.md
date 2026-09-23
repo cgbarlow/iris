@@ -100,6 +100,27 @@ headers and upgrade proactively.
   generated diagram JSON (ADR-093/094).
 - **`GET /api/export/{diagrams|elements|packages|sets|collections}/{id}?format=json|markdown`**
   — headless export bundles (ADR-128).
+- **Relationships (ADR-249, v6.50.0)** — connect existing elements:
+  - `POST /api/batch/relationships/create` — body
+    `{"relationships": [{source_element_id, target_element_id,
+    relationship_type, source_role?, target_role?, label?, description?,
+    data?}, ...]}` (1–100 items). Each item succeeds or fails on its own;
+    the response is `{succeeded, failed, errors[], ids[]}` and each error
+    names the item's index. Items are rejected when source and target are
+    the same element, when they are in different sets, or when either
+    element doesn't exist. `source_role` / `target_role` are stored as
+    `data.sourceRole` / `data.targetRole`.
+  - `GET /api/relationships?element_id=&set_id=&relationship_type=&page=&page_size=`
+    — `element_id` matches either end; `set_id` matches when either end is
+    in the set. Every item includes `source_role`, `target_role` and `data`.
+  - `PUT /api/relationships/{id}` (`If-Match: <current_version>`) — full
+    replace of `label` / `description` / `data`; optional
+    `relationship_type` (omit to keep), `source_role` / `target_role`
+    (merged into `data`; `""` clears).
+  - `DELETE /api/relationships/{id}` (`If-Match`) — soft delete.
+  - A returned id can be set as a diagram edge's `data.relationshipId` in
+    `PUT /api/diagrams/{id}`; saving the diagram does not create a second
+    relationship for that source/target pair.
 
 ## Client libraries
 

@@ -13,6 +13,7 @@ from app.batch.models import (
     BatchIds,
     BatchModifySet,
     BatchModifyTags,
+    BatchRelationshipsCreate,
     BatchResult,
     BatchResultWithIds,
 )
@@ -20,6 +21,7 @@ from app.batch.service import (
     batch_clone_elements,
     batch_clone_diagrams,
     batch_create_elements,
+    batch_create_relationships,
     batch_delete_elements,
     batch_delete_diagrams,
     batch_set_elements,
@@ -176,4 +178,21 @@ async def update_elements(
     result = await batch_update_elements(
         db, items, updated_by=current_user["id"],
     )
+    return BatchResultWithIds(**result)
+
+
+# --- Bulk relationship create (v6.50.0, ADR-249, #298) ---
+
+
+@router.post("/relationships/create", response_model=BatchResultWithIds)
+async def create_relationships(
+    body: BatchRelationshipsCreate,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> BatchResultWithIds:
+    """Bulk create relationships. Per-item failure isolation; rejects
+    self-referencing and cross-set items; per-item collection write-scope."""
+    db = request.app.state.db_manager.main_db
+    items = [r.model_dump() for r in body.relationships]
+    result = await batch_create_relationships(db, items, user=current_user)
     return BatchResultWithIds(**result)

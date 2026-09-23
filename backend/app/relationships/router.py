@@ -19,6 +19,7 @@ from app.relationships.models import (
     RelationshipUpdate,
 )
 from app.relationships.service import (
+    apply_role_fields,
     create_relationship,
     get_relationship,
     list_relationships,
@@ -58,14 +59,19 @@ async def create(
 async def list_all(
     request: Request,
     element_id: str | None = None,
+    set_id: str | None = None,
+    relationship_type: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> RelationshipListResponse:
-    """List relationships, optionally filtered by element."""
+    """List relationships, optionally filtered by element (either end),
+    set (either end in the set) and/or relationship type (ADR-249)."""
     db = request.app.state.db_manager.main_db
     items, total = await list_relationships(
-        db, element_id=element_id, page=page, page_size=page_size,
+        db, element_id=element_id, set_id=set_id,
+        relationship_type=relationship_type,
+        page=page, page_size=page_size,
     )
     return RelationshipListResponse(
         items=[RelationshipResponse(**item) for item in items],
@@ -118,10 +124,16 @@ async def update(
         db, rel_id,
         label=body.label,
         description=body.description,
-        data=body.data,
+        # ADR-249: role names merge into data.sourceRole / data.targetRole.
+        data=apply_role_fields(
+            body.data,
+            source_role=body.source_role,
+            target_role=body.target_role,
+        ),
         change_summary=body.change_summary,
         updated_by=current_user["id"],
         expected_version=expected_version,
+        relationship_type=body.relationship_type,
     )
     if result is None:
         raise HTTPException(status_code=409, detail="Version conflict")

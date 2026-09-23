@@ -5,8 +5,16 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from fastapi import HTTPException
+
+from app.authz import assert_write_allowed, collection_of_element
+from app.relationships.service import (
+    apply_role_fields,
+    create_relationship,
+    validate_new_relationship,
+)
 from app.search.service import index_element as _index_element
 from app.search.service import index_diagram as _index_diagram
 from app.search.service import remove_element_index as _remove_element_index
@@ -334,6 +342,71 @@ async def batch_create_elements(
         except Exception as exc:
             failed += 1
             errors.append(f"Element at index {idx}: {exc}")
+
+    return {
+        "succeeded": succeeded, "failed": failed,
+        "errors": errors, "ids": created_ids,
+    }
+
+
+async def batch_create_relationships(
+    db: DatabasePort,
+    relationships: list[dict[str, Any]],
+    *,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    """Bulk create relationships with per-item failure isolation (ADR-249, #298).
+
+    Per item: required fields → ``validate_new_relationship`` (both
+    endpoints exist, not self-referencing, same set) → collection
+    write-scope (ADR-237/238, via the source element) → create. Role names
+    are merged into ``data`` by ``apply_role_fields`` so the row is
+    identical to a Sparx-imported or canvas-created one.
+    """
+    succeeded = 0
+    failed = 0
+    errors: list[str] = []
+    created_ids: list[str] = []
+
+    for idx, item in enumerate(relationships):
+        try:
+            source = item.get("source_element_id") or ""
+            target = item.get("target_element_id") or ""
+            rel_type = item.get("relationship_type") or ""
+            if not source:
+                raise ValueError("source_element_id is required")
+            if not target:
+                raise ValueError("target_element_id is required")
+            if not rel_type:
+                raise ValueError("relationship_type is required")
+            await validate_new_relationship(
+                db, source_element_id=source, target_element_id=target,
+            )
+            try:
+                await assert_write_allowed(
+                    db, user, await collection_of_element(db, source),
+                )
+            except HTTPException as exc:
+                raise ValueError(str(exc.detail)) from exc
+            result = await create_relationship(
+                db,
+                source_element_id=source,
+                target_element_id=target,
+                relationship_type=rel_type,
+                label=item.get("label"),
+                description=item.get("description"),
+                data=apply_role_fields(
+                    item.get("data") or {},
+                    source_role=item.get("source_role"),
+                    target_role=item.get("target_role"),
+                ),
+                created_by=user["id"],
+            )
+            created_ids.append(str(result["id"]))
+            succeeded += 1
+        except Exception as exc:
+            failed += 1
+            errors.append(f"Relationship at index {idx}: {exc}")
 
     return {
         "succeeded": succeeded, "failed": failed,

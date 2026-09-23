@@ -17,12 +17,24 @@ class RelationshipCreate(BaseModel):
 
 
 class RelationshipUpdate(BaseModel):
-    """Request body for updating a relationship."""
+    """Request body for updating a relationship.
+
+    ``label`` / ``description`` / ``data`` are full-replace (omitting ``data``
+    stores ``{}``), unchanged since SPEC-003-A.
+
+    ADR-249 (v6.50.0): ``relationship_type`` is updatable — omit (or send
+    null) to keep the current type. ``source_role`` / ``target_role`` are
+    merged into ``data.sourceRole`` / ``data.targetRole`` (the canvas / Sparx
+    convention); omit to take ``data`` as sent, send ``""`` to clear.
+    """
 
     label: str | None = None
     description: str | None = None
     data: dict[str, object] = Field(default_factory=dict)
     change_summary: str | None = None
+    relationship_type: str | None = Field(default=None, min_length=1)
+    source_role: str | None = None
+    target_role: str | None = None
 
 
 class RelationshipResponse(BaseModel):
@@ -42,6 +54,11 @@ class RelationshipResponse(BaseModel):
     is_deleted: bool = False
     source_element_name: str = ""
     target_element_name: str = ""
+    # ADR-249: UML role names, read from data.sourceRole / data.targetRole
+    # (the canvas / Sparx-importer convention) so list consumers don't have
+    # to know the data keys. ``data`` remains the source of truth.
+    source_role: str | None = None
+    target_role: str | None = None
 
 
 class RelationshipVersionResponse(BaseModel):
