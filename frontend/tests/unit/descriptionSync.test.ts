@@ -6,6 +6,10 @@ import { resolve } from 'path';
  * Canvas node description sync tests (WP-5).
  * Verifies that the model detail page refreshes node descriptions
  * from linked entities after canvas load.
+ *
+ * ADR-248 (v6.50.1): the elements now arrive in one
+ * `GET /api/diagrams/{id}/elements` call (see
+ * diagramElementHydration.test.ts for the hydration logic itself).
  */
 
 describe('Node description sync', () => {
@@ -13,31 +17,32 @@ describe('Node description sync', () => {
 		resolve(__dirname, '../../src/routes/views/[id]/+page.svelte'),
 		'utf-8',
 	);
+	const helperSrc = readFileSync(
+		resolve(__dirname, '../../src/lib/canvas/diagramElementHydration.ts'),
+		'utf-8',
+	);
 
-	it('defines refreshNodeDescriptions function', () => {
-		expect(pageSrc).toContain('async function refreshNodeDescriptions()');
+	it('defines refreshNodeDescriptions over the batched elements', () => {
+		expect(pageSrc).toContain('function refreshNodeDescriptions(elements: Element[])');
 	});
 
-	it('calls refreshNodeDescriptions after parseCanvasData in loadModel', () => {
-		// Verify the call order: parseCanvasData() then refreshNodeDescriptions()
-		const parseIndex = pageSrc.indexOf('parseCanvasData()');
-		const refreshIndex = pageSrc.indexOf('refreshNodeDescriptions()');
+	it('refreshes node descriptions after parseCanvasData in loadDiagram', () => {
+		// Verify the call order: parseCanvasData() then the elements load
+		// that drives refreshNodeDescriptions().
+		const loadBody = pageSrc.slice(pageSrc.indexOf('async function loadDiagram('));
+		const parseIndex = loadBody.indexOf('parseCanvasData()');
+		const refreshIndex = loadBody.indexOf('loadDiagramElements(id)');
 		expect(parseIndex).toBeGreaterThan(-1);
-		expect(refreshIndex).toBeGreaterThan(-1);
 		expect(refreshIndex).toBeGreaterThan(parseIndex);
+		expect(pageSrc).toContain('refreshNodeDescriptions(elements)');
 	});
 
-	it('fetches element data for nodes with entityId', () => {
-		// The function should fetch element data for nodes with entityId
-		expect(pageSrc).toContain("node.data?.entityId");
+	it('hydrates nodes with entityId via elementToNodeData', () => {
+		expect(helperSrc).toContain('node.data?.entityId');
 		// ADR-192 (issue #164): label + description (and all other
-		// renderer-visible fields) now flow through the shared
+		// renderer-visible fields) flow through the shared
 		// elementToNodeData() helper.
-		expect(pageSrc).toContain('elementToNodeData(element)');
-		expect(pageSrc).toMatch(/hydrated\.(label|description)/);
-	});
-
-	it('uses Promise.all for parallel entity fetching', () => {
-		expect(pageSrc).toContain('Promise.all');
+		expect(helperSrc).toContain('elementToNodeData(element)');
+		expect(helperSrc).toMatch(/hydrated\.(label|description)/);
 	});
 });

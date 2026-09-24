@@ -16,6 +16,7 @@ from app.authz import (
     collection_of_set,
     resolve_effective_set,
 )
+from app.diagrams.canvas_entities import get_canvas_entity_ids
 from app.diagrams.models import (
     DiagramCreate,
     DiagramHierarchyNode,
@@ -41,6 +42,8 @@ from app.diagrams.service import (
     update_diagram,
 )
 from app.diagrams.thumbnail import get_thumbnail, regenerate_all_thumbnails
+from app.elements.models import ElementResponse
+from app.elements.service import get_elements_by_ids
 
 router = APIRouter(prefix="/api/diagrams", tags=["diagrams"])
 admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -418,6 +421,27 @@ async def remove_tag(
     return {"status": "ok"}
 
 
+@router.get("/{diagram_id}/elements", response_model=list[ElementResponse])
+async def get_diagram_elements(
+    diagram_id: str,
+    request: Request,
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
+) -> list[ElementResponse]:
+    """Every live element drawn on the diagram's current canvas (ADR-248).
+
+    One item per distinct ``node.data.entityId`` in canvas order, each
+    identical to ``GET /api/elements/{id}``. Nodes without an entityId and
+    deleted/unknown elements are skipped. Lets the diagram view hydrate
+    its canvas in one request instead of one per node.
+    """
+    db = request.app.state.db_manager.main_db
+    element_ids = await get_canvas_entity_ids(db, diagram_id)
+    if element_ids is None:
+        raise HTTPException(status_code=404, detail="Diagram not found")
+    elements = await get_elements_by_ids(db, element_ids)
+    return [ElementResponse(**e) for e in elements]
+
+
 @router.get("/{diagram_id}/relationships")
 async def get_diagram_relationships(
     diagram_id: str,
@@ -474,28 +498,7 @@ async def get_diagram_relationships(
     # Element → package memberships for elements drawn on this diagram
     # (ADR-184). Extracts entityIds from the diagram's current canvas,
     # then looks up which of those elements have a non-null package_id.
-    diag_cursor = await db.execute(
-        "SELECT dv.data FROM diagrams d "
-        "JOIN diagram_versions dv ON d.id = dv.diagram_id "
-        "  AND d.current_version = dv.version "
-        "WHERE d.id = ?",
-        (diagram_id,),
-    )
-    diag_row = await diag_cursor.fetchone()
-    element_ids: list[str] = []
-    if diag_row and diag_row[0]:
-        try:
-            import json as _json
-            canvas = _json.loads(diag_row[0]) if isinstance(diag_row[0], str) else diag_row[0]
-            if isinstance(canvas, dict):
-                for node in canvas.get("nodes", []) or []:
-                    node_data = node.get("data") if isinstance(node, dict) else None
-                    if isinstance(node_data, dict):
-                        eid = node_data.get("entityId")
-                        if isinstance(eid, str):
-                            element_ids.append(eid)
-        except (TypeError, ValueError):
-            element_ids = []
+    element_ids = await get_canvas_entity_ids(db, diagram_id) or []
 
     element_package_memberships: list[dict[str, Any]] = []
     if element_ids:

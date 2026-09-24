@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { canWrite } from '$lib/stores/auth.svelte.js';
 	import { goto, beforeNavigate } from '$app/navigation';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import { viewBreadcrumbHref, type BreadcrumbAncestor } from '$lib/utils/viewBreadcrumb';
@@ -53,6 +53,7 @@
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import { elementToNodeData } from '$lib/canvas/elementToNodeData';
+	import { hasLinkedElements, hydrateCanvasNodes, inheritedTagsFromElements } from '$lib/canvas/diagramElementHydration';
 	import { createLockManager } from '$lib/utils/locks.svelte';
 	import DOMPurify from 'dompurify';
 	import type { Element, DiagramHierarchyNode, Package } from '$lib/types/api';
@@ -370,7 +371,10 @@
 		const id = page.params.id;
 		if (id) {
 			userSelectedTab = false;
-			loadDiagram(id);
+			// ADR-248: untracked — loadDiagram() reads the theme store (areThemesLoaded())
+			// before its first await; tracked, loadThemes() flipping it re-ran this
+			// effect and loaded every diagram twice on first visit.
+			untrack(() => loadDiagram(id));
 		}
 	});
 
@@ -760,10 +764,9 @@
 					activeTab = hasContent ? 'canvas' : 'details';
 				}
 			}
-			refreshNodeDescriptions();
+			loadDiagramElements(id);
 			loadVersions(id);
 			loadBookmarkStatus(id);
-			loadInheritedTags();
 			loadAllTags();
 			loadAncestors(id);
 			loadDiagramRelationships(id);
@@ -782,77 +785,39 @@
 		loading = false;
 	}
 
-	/** Sync node data from linked elements. Originally label+description
-	 *  only (WP-5); now hydrates via elementToNodeData() so class
+	/** ADR-248: hydrate the canvas and inherited tags from ONE
+	 *  `GET /api/diagrams/{id}/elements` call. It used to be one
+	 *  `GET /api/elements/{id}` per node for the refresh plus another per
+	 *  node for tags — 4N requests per first visit with the double load,
+	 *  which tripped the anonymous rate limit on large diagrams. On failure
+	 *  the canvas stays as stored. */
+	async function loadDiagramElements(id: string) {
+		let elements: Element[] = [];
+		if (hasLinkedElements(canvasNodes)) {
+			try {
+				elements = await apiFetch<Element[]>(`/api/diagrams/${id}/elements`);
+			} catch { /* keep the canvas as stored */ }
+			if (diagram?.id !== id) return; // navigated away mid-request
+		}
+		refreshNodeDescriptions(elements);
+		loadInheritedTags(elements);
+	}
+
+	/** Sync node data from linked elements via elementToNodeData() so class
 	 *  attributes/operations/literals authored later on /elements/[id]
-	 *  appear on the canvas without a hard reload (ADR-192, issue #164). */
-	async function refreshNodeDescriptions() {
-		let updated = false;
-		const refreshed = await Promise.all(
-			canvasNodes.map(async (node) => {
-				const entityId = node.data?.entityId;
-				if (!entityId) return node;
-				try {
-					const element = await apiFetch<Element>(`/api/elements/${entityId}`);
-					const hydrated = elementToNodeData(element);
-					// Keep the description's "starts-with-label" trim so
-					// BPMN-style payloads don't double-show the title.
-					const rawDesc = hydrated.description;
-					const desc = rawDesc.startsWith(hydrated.label)
-						? rawDesc.slice(rawDesc.indexOf('\n') + 1).replace(/^\r?\n/, '')
-						: rawDesc;
-					const prev = node.data as Record<string, unknown>;
-					// ADR-230 F1: the element refresh must not clobber per-node
-					// presentation the diagram owns. elementToNodeData() reports the
-					// *element's* visual/notation/entityType, which is absent for
-					// EA-styled nodes (e.g. GEANZ capabilities carry their fill/border
-					// + explicit size only on the canvas node, never on the element).
-					// Spreading those in wiped the themed visual and forced a
-					// SvelteFlow re-measure, flipping the canvas to the
-					// iris-default-uml look a few seconds after first paint. Strip
-					// them so only genuine content fields refresh; node.data's own
-					// visual/notation/entityType survive untouched.
-					const { visual: _v, notation: _n, entityType: _et, ...contentOnly } =
-						hydrated as Record<string, unknown>;
-					void _v; void _n; void _et;
-					const next: Record<string, unknown> = { ...node.data, ...contentOnly, description: desc };
-					const diffKeys = [
-						'label', 'description', 'diagramUsageCount',
-						'attributes', 'operations', 'literals',
-						'stereotype', 'qualifier',
-						// Defence-in-depth: presentation is preserved above, but gate
-						// it too so a future change can't silently commit a stripped node.
-						'visual', 'notation', 'entityType',
-					];
-					const changed = diffKeys.some((k) =>
-						JSON.stringify(next[k]) !== JSON.stringify(prev[k]),
-					);
-					if (changed) {
-						updated = true;
-						return { ...node, data: next as typeof node.data };
-					}
-				} catch { /* element may be deleted */ }
-				return node;
-			}),
-		);
+	 *  appear on the canvas without a hard reload (ADR-192, issue #164).
+	 *  Diagram-owned presentation is preserved (ADR-230 F1). */
+	function refreshNodeDescriptions(elements: Element[]) {
+		const { nodes, updated } = hydrateCanvasNodes(canvasNodes, elements);
 		if (updated) {
-			canvasNodes = refreshed;
+			canvasNodes = nodes;
 		}
 	}
 
-	async function loadInheritedTags() {
-		// Compute inherited tags from elements placed on this diagram's canvas
-		const elementTags = new Set<string>();
-		for (const node of canvasNodes) {
-			const entityId = node.data?.entityId;
-			if (!entityId) continue;
-			try {
-				const e = await apiFetch<{ tags?: string[] }>(`/api/elements/${entityId}`);
-				if (e.tags) e.tags.forEach((t) => elementTags.add(t));
-			} catch { /* skip inaccessible elements */ }
-		}
-		const ownTags = new Set(diagram?.tags ?? []);
-		inheritedTags = [...elementTags].filter((t) => !ownTags.has(t)).sort();
+	/** Inherited tags: tags on the elements placed on this canvas that the
+	 *  diagram doesn't carry itself. */
+	function loadInheritedTags(elements: Element[]) {
+		inheritedTags = inheritedTagsFromElements(elements, diagram?.tags ?? []);
 	}
 
 	async function loadAllTags() {

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.common.nullable_filter import parse_nullable_id
 from app.authz.collection_resolver import resolve_effective_set
+from app.elements.diagram_usage import count_diagram_usage
 from app.search.service import index_element as _index_element
 from app.search.service import remove_element_index as _remove_element_index
 
@@ -237,39 +238,45 @@ async def create_element(
     }
 
 
-async def get_element(
-    db: DatabasePort,
-    element_id: str,
-) -> dict[str, object] | None:
-    """Get an element with its current version data."""
-    cursor = await db.execute(
-        "SELECT e.id, e.element_type, e.current_version, "
-        "ev.name, ev.description, ev.data, "
-        "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
-        "u.username, e.set_id, s.name, ev.metadata, e.notation, "
-        "e.package_id, e.detail_diagram_id, e.parent_element_id, "
-        "(SELECT pv.name FROM packages p "
-        "  JOIN package_versions pv ON p.id = pv.package_id "
-        "    AND p.current_version = pv.version "
-        "  WHERE p.id = e.package_id) AS package_name, "
-        "(SELECT pev.name FROM elements pe "
-        "  JOIN element_versions pev ON pe.id = pev.element_id "
-        "    AND pe.current_version = pev.version "
-        "  WHERE pe.id = e.parent_element_id) AS parent_element_name, "
-        "s.collection_id "  # ADR-237: owning collection for write-scope gating
-        "FROM elements e "
-        "JOIN element_versions ev ON e.id = ev.element_id "
-        "AND e.current_version = ev.version "
-        "LEFT JOIN users u ON e.created_by = u.id "
-        "LEFT JOIN sets s ON e.set_id = s.id "
-        "WHERE e.id = ? AND e.is_deleted = 0",
-        (element_id,),
-    )
-    row = await cursor.fetchone()
-    if row is None:
-        return None
+# Current-version element row with its display joins. Shared by
+# get_element() and get_elements_by_ids() (ADR-248) so the single and
+# batched reads can never drift apart; callers append their WHERE.
+_ELEMENT_DETAIL_SELECT = (
+    "SELECT e.id, e.element_type, e.current_version, "
+    "ev.name, ev.description, ev.data, "
+    "e.created_at, e.created_by, e.updated_at, e.is_deleted, "
+    "u.username, e.set_id, s.name, ev.metadata, e.notation, "
+    "e.package_id, e.detail_diagram_id, e.parent_element_id, "
+    "(SELECT pv.name FROM packages p "
+    "  JOIN package_versions pv ON p.id = pv.package_id "
+    "    AND p.current_version = pv.version "
+    "  WHERE p.id = e.package_id) AS package_name, "
+    "(SELECT pev.name FROM elements pe "
+    "  JOIN element_versions pev ON pe.id = pev.element_id "
+    "    AND pe.current_version = pev.version "
+    "  WHERE pe.id = e.parent_element_id) AS parent_element_name, "
+    "s.collection_id "  # ADR-237: owning collection for write-scope gating
+    "FROM elements e "
+    "JOIN element_versions ev ON e.id = ev.element_id "
+    "AND e.current_version = ev.version "
+    "LEFT JOIN users u ON e.created_by = u.id "
+    "LEFT JOIN sets s ON e.set_id = s.id "
+)
 
-    element = {
+# ADR-248: ids per IN-list. The relationship-count query binds each chunk
+# twice, so 400 keeps every statement under SQLite's historical
+# 999-variable limit (and far under PostgreSQL's 32767).
+_ID_CHUNK_SIZE = 400
+
+
+def _element_detail_from_row(row: Any) -> dict[str, object]:
+    """Map an ``_ELEMENT_DETAIL_SELECT`` row to the element dict.
+
+    Tags, relationship_count and diagram_usage_count are not part of the
+    row; callers add them.
+    """
+    metadata = json.loads(row[13]) if row[13] else None
+    return {
         "id": row[0],
         "element_type": row[1],
         "current_version": row[2],
@@ -283,7 +290,7 @@ async def get_element(
         "created_by_username": row[10] or "Unknown",
         "set_id": row[11],
         "set_name": row[12],
-        "metadata": json.loads(row[13]) if row[13] else None,
+        "metadata": metadata,
         "notation": row[14] or "simple",
         "package_id": row[15],
         "detail_diagram_id": row[16],
@@ -291,9 +298,25 @@ async def get_element(
         "package_name": row[18],
         "parent_element_name": row[19],
         "collection_id": row[20],  # ADR-237: lets the client gate by write-scope
+        # ADR-233: read-through stereotype from metadata for display.
+        "stereotype": (metadata or {}).get("stereotype"),
     }
-    # ADR-233: read-through stereotype from metadata for display.
-    element["stereotype"] = (element["metadata"] or {}).get("stereotype")  # type: ignore[union-attr]
+
+
+async def get_element(
+    db: DatabasePort,
+    element_id: str,
+) -> dict[str, object] | None:
+    """Get an element with its current version data."""
+    cursor = await db.execute(
+        _ELEMENT_DETAIL_SELECT + "WHERE e.id = ? AND e.is_deleted = 0",
+        (element_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return None
+
+    element = _element_detail_from_row(row)
 
     # Enrich with tags
     tag_cursor = await db.execute(
@@ -323,6 +346,99 @@ async def get_element(
     element["diagram_usage_count"] = diagram_row[0] if diagram_row else 0
 
     return element
+
+
+async def get_elements_by_ids(
+    db: DatabasePort,
+    element_ids: list[str],
+) -> list[dict[str, object]]:
+    """Batched :func:`get_element` for many ids (ADR-248, SPEC-248-A).
+
+    Returns one dict per distinct live element, in order of first
+    appearance in ``element_ids``; deleted or unknown ids are skipped.
+    Each dict equals what ``get_element`` returns for that id.
+
+    Cost is three queries per chunk of ``_ID_CHUNK_SIZE`` ids (rows, tags,
+    relationship counts) plus one query for diagram usage counts, however
+    many ids are asked for. The usage count is the number of distinct live
+    diagrams whose current-version data mentions the id, as in
+    ``get_element``. It is computed by reading every current diagram's
+    data once and matching all ids in a single pass
+    (:func:`app.elements.diagram_usage.count_diagram_usage`), so the
+    server's work is O(total diagram bytes) per request rather than one
+    substring scan of all diagram data per element. See that module for
+    the two documented differences from ``LIKE`` (case-sensitive; ``_``
+    and ``%`` are literal).
+    """
+    ordered = list(dict.fromkeys(eid for eid in element_ids if eid))
+    found: dict[str, dict[str, object]] = {}
+
+    for start in range(0, len(ordered), _ID_CHUNK_SIZE):
+        chunk = ordered[start:start + _ID_CHUNK_SIZE]
+        placeholders = ",".join("?" for _ in chunk)
+        params = tuple(chunk)
+
+        cursor = await db.execute(
+            _ELEMENT_DETAIL_SELECT
+            + f"WHERE e.id IN ({placeholders}) AND e.is_deleted = 0",
+            params,
+        )
+        rows = await cursor.fetchall()
+        if not rows:
+            continue
+        chunk_found: dict[str, dict[str, object]] = {}
+        tags: dict[str, list[str]] = {}
+        for row in rows:
+            element = _element_detail_from_row(row)
+            tags[row[0]] = []
+            element["tags"] = tags[row[0]]
+            element["relationship_count"] = 0
+            element["diagram_usage_count"] = 0
+            chunk_found[row[0]] = element
+
+        tag_cursor = await db.execute(
+            "SELECT element_id, tag FROM element_tags "  # noqa: S608
+            f"WHERE element_id IN ({placeholders}) ORDER BY element_id, tag",
+            params,
+        )
+        for r in await tag_cursor.fetchall():
+            if r[0] in tags:
+                tags[r[0]].append(r[1])
+
+        # UNION (not UNION ALL) of (relationship, endpoint) pairs counts a
+        # self-loop once — matching get_element's ``source = ? OR target = ?``.
+        rel_cursor = await db.execute(
+            "SELECT eid, COUNT(*) FROM ("  # noqa: S608
+            "  SELECT id AS rid, source_element_id AS eid FROM relationships "
+            f"  WHERE is_deleted = 0 AND source_element_id IN ({placeholders}) "
+            "  UNION "
+            "  SELECT id AS rid, target_element_id AS eid FROM relationships "
+            f"  WHERE is_deleted = 0 AND target_element_id IN ({placeholders})"
+            ") AS rel_ends GROUP BY eid",
+            params + params,
+        )
+        for r in await rel_cursor.fetchall():
+            if r[0] in chunk_found:
+                chunk_found[r[0]]["relationship_count"] = r[1]
+
+        found.update(chunk_found)
+
+    if found:
+        # One read of every live diagram's current data for the whole
+        # request; all ids are matched against it in a single pass.
+        usage_cursor = await db.execute(
+            "SELECT dv.data FROM diagrams d "
+            "JOIN diagram_versions dv ON d.id = dv.diagram_id "
+            "  AND d.current_version = dv.version "
+            "WHERE d.is_deleted = 0",
+        )
+        usage = count_diagram_usage(
+            found, (r[0] for r in await usage_cursor.fetchall()),
+        )
+        for eid, element in found.items():
+            element["diagram_usage_count"] = usage[eid]
+
+    return [found[eid] for eid in ordered if eid in found]
 
 
 async def list_elements(

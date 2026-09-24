@@ -121,6 +121,13 @@ headers and upgrade proactively.
   - A returned id can be set as a diagram edge's `data.relationshipId` in
     `PUT /api/diagrams/{id}`; saving the diagram does not create a second
     relationship for that source/target pair.
+- **`GET /api/diagrams/{id}/elements`** — every element drawn on the
+  diagram's current canvas, in one call (ADR-248). Each item is identical
+  to `GET /api/elements/{id}` (tags, relationship and diagram-usage counts
+  included); canvas order, duplicates and deleted elements removed; `404`
+  if the diagram is missing or deleted. Anonymous-friendly — use it instead
+  of one element request per node, which quickly exhausts the `anon`
+  bucket above.
 
 ## Client libraries
 
