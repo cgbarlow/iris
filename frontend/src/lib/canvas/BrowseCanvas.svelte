@@ -4,6 +4,7 @@
 	 * Used by viewers and reviewers per SPEC-005-A role-based access.
 	 */
 	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
+	import { CANVAS_MIN_ZOOM } from '$lib/canvas/zoom';
 	import '@xyflow/svelte/dist/style.css';
 
 	import { simpleViewNodeTypes } from './nodes';
@@ -48,6 +49,7 @@
 		nodeTypes={simpleViewNodeTypes}
 		edgeTypes={simpleViewEdgeTypes}
 		fitView
+		minZoom={CANVAS_MIN_ZOOM}
 		nodesDraggable={false}
 		nodesConnectable={false}
 		elementsSelectable={true}
