@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.50.2] - 2026-09-24
+
+### Security
+
+- **Batch endpoints ignored collection write-scope (ADR-250).** A user
+  restricted to certain collections (ADR-237) could still delete, clone,
+  retag, move, create or update elements and diagrams in any other collection
+  through the `/api/batch/*` endpoints that MCP agents and the CLI use. The
+  single-item endpoints already refused these writes. Every batch operation
+  now checks each item against the user's scope. Moving items between sets
+  requires write access to both the collection they leave and the one they
+  join. Out-of-scope items fail individually with "Outside your collection
+  write-scope" and are left unchanged; the rest of the batch still runs.
+  Unrestricted users and admins see no change.
+
 ## [6.50.1] - 2026-09-24
 
 ### Fixed
