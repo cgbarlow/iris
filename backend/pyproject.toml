@@ -1,6 +1,6 @@
 [project]
 name = "iris-backend"
-version = "6.51.1"
+version = "6.51.2"
 description = "Iris — Integrated Repository for Information & Systems"
 requires-python = ">=3.11"
 dependencies = [
@@ -43,6 +43,10 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+# Every test gets a SQLite DB under tmp_path (~1.4 GB per full run), and pytest
+# keeps the last 3 runs by default, which fills a tmpfs /tmp. Keep only the
+# directories of failed tests.
+tmp_path_retention_policy = "failed"
 
 [tool.ruff]
 target-version = "py311"

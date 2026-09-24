@@ -19,23 +19,9 @@ from app.elements.service import (
     soft_delete_element,
     update_element,
 )
-from app.migrations.m001_roles_users import up as m001_up
-from app.migrations.m002_entities_relationships_models import up as m002_up
-from app.migrations.m004_comments_bookmarks import up as m004_up
-from app.migrations.m005_search import up as m005_up
-from app.migrations.m007_thumbnails import up as m007_up
-from app.migrations.m008_entity_tags import up as m008_up
-from app.migrations.m009_model_tags import up as m009_up
-from app.migrations.m010_thumbnail_themes import up as m010_up
-from app.migrations.m011_model_hierarchy import up as m011_up
-from app.migrations.m012_sets import up as m012_up
-from app.migrations.m013_set_thumbnails import up as m013_up
-from app.migrations.m014_sets_partial_unique import up as m014_up
-from app.migrations.m015_model_relationships import up as m015_up
-from app.migrations.m016_naming_rename import up as m016_up
-from app.migrations.m022_element_notation import up as m022_up
 from app.migrations.seed import seed_roles_and_permissions
 from app.search.service import search
+from app.startup import run_sqlite_main_migrations
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -43,21 +29,7 @@ if TYPE_CHECKING:
 
 async def _run_migrations(db: aiosqlite.Connection) -> None:
     """Run all required migrations for search tests."""
-    await m001_up(db)
-    await m002_up(db)
-    await m004_up(db)
-    await m005_up(db)
-    await m007_up(db)
-    await m008_up(db)
-    await m009_up(db)
-    await m010_up(db)
-    await m011_up(db)
-    await m012_up(db)
-    await m013_up(db)
-    await m014_up(db)
-    await m015_up(db)
-    await m016_up(db)
-    await m022_up(db)
+    await run_sqlite_main_migrations(db)
     await seed_roles_and_permissions(db)
 
 
