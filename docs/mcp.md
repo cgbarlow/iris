@@ -53,6 +53,7 @@ Or use `iris login` from `iris-cli` (mints + saves a PAT in one step).
 | `ask` | Multi-set AI question with optional file contexts |
 | `apply_diagram_creation` | Apply an AI-generated diagram bundle (`mode="creation"` output of `ask`) |
 | `list_conversations` | AI conversation history for a set |
+| `create_relationships` / `update_relationship` / `list_relationships` / `get_relationship` / `delete_relationship` | Connect elements: batch create (≤100, per-item errors, same-set only, `source_role` / `target_role`), partial update, list by element or set, soft delete (ADR-249) |
 | `aggregate` / `create_aggregation_profile` / `list_aggregation_profiles` / `get_aggregation_profile` / `update_aggregation_profile` / `delete_aggregation_profile` | Run and manage generic aggregation profiles (ADR-212) |
 
 Each tool ships with an LLM-facing description with "when to use"

@@ -86,6 +86,9 @@ Config resolution order (first match wins):
 | `iris search <query>` | Full-text search (`--set`, `--collection`, `--limit`) |
 | `iris diagrams list` / `get <id>` / `versions <id>` | Diagrams |
 | `iris elements list` / `get <id>` | Elements |
+| `iris relationships list` (`--element-id`, `--set-id`, `--type`) / `get <id>` | Relationships, with roles and data (ADR-249) |
+| `iris create relationship --source S --target T --type association [--source-role R] [--target-role R]` / `iris create relationships --from-json FILE` | Create relationships (same set only; per-item errors) |
+| `iris update relationship <id>` / `iris delete relationship <id>` | Change type, roles, label or data; soft delete |
 | `iris packages list` / `get <id>` | Packages |
 | `iris sets list` / `get <id>` | Sets |
 | `iris collections list` / `get <id>` | Collections |

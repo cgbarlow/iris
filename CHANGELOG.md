@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.50.0] - 2026-09-23
+
+### Added
+
+- **Agents can create, update, list and delete relationships (ADR-249,
+  #298).** Until now the MCP server could add elements to a set but not
+  connect them, so new elements showed no relationships and diagram edges
+  couldn't point at a real relationship. New MCP tools:
+  `create_relationships` (up to 100 per call; each item succeeds or fails on
+  its own and the response lists `succeeded`, `failed`, `errors` and `ids`),
+  `update_relationship`, `list_relationships` (by element, in either
+  direction, or by set, with an optional type filter and paging),
+  `get_relationship` and `delete_relationship` (soft delete). The CLI gains
+  the same: `iris create relationship`, `iris create relationships
+  --from-json`, `iris update relationship`, `iris delete relationship` and
+  `iris relationships list|get`.
+- UML role names (`source_role` / `target_role`) are saved as
+  `data.sourceRole` / `data.targetRole`, the keys the Sparx importer and the
+  canvas already use, so a relationship made by an agent matches one made in
+  the UI or by import. Relationship responses now also return
+  `source_role` and `target_role`.
+- A relationship id returned by `create_relationships` can be used as a
+  diagram edge's `relationshipId` in `update_diagram`; saving the diagram
+  doesn't create a duplicate, even when the edge is drawn in the opposite
+  direction to the relationship.
+- `list_relationships` and `get_relationship` need sign-in, unlike other
+  read tools; their descriptions and the MCP server instructions say so.
+- REST: `POST /api/batch/relationships/create`; `GET /api/relationships`
+  filters by `set_id` and `relationship_type`; `PUT /api/relationships/{id}`
+  can change `relationship_type` and accepts `source_role` / `target_role`.
+
+### Changed
+
+- Relationships created through the new batch endpoint (and so through MCP
+  and the CLI) are rejected when source and target are the same element or
+  are in different sets, with a per-item error. Creating a relationship from
+  the canvas, by import or from diagram edges works as before, including
+  self-loops.
+- The surface-parity check now covers relationships and counts batch
+  endpoints and plural batch tool names (`create_relationships`) towards
+  their entity.
+
 ## [6.49.2] - 2026-09-23
 
 ### Fixed

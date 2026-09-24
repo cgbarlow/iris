@@ -84,10 +84,18 @@ def parse_backend_writes() -> set[WriteOp]:
         r'@router\.(post|put|patch|delete)\(\s*"([^"]*)"',
     )
     for router in routers:
+        text = router.read_text(encoding="utf-8")
+        if router.parent.name == "batch":
+            # ADR-249: /api/batch/<entities>/<verb> routes are attributed
+            # to their entity so a batch-only write is still enforced.
+            for method, path in pat.findall(text):
+                op = _batch_route_op(method, path)
+                if op is not None:
+                    results.add(WriteOp("backend", *op))
+            continue
         entity = _entity_from_router_path(router)
         if entity is None:
             continue
-        text = router.read_text(encoding="utf-8")
         for method, path in pat.findall(text):
             verb = _verb_from_method_and_path(method, path)
             if verb is None:
@@ -107,8 +115,11 @@ def parse_mcp_writes() -> set[WriteOp]:
     text = tools_path.read_text(encoding="utf-8")
     pat = re.compile(r'name="((?:create|update|move|delete)_[a-z_]+)"')
     for name in pat.findall(text):
-        verb, entity = name.split("_", 1)
-        if entity in _KNOWN_ENTITIES:
+        verb, raw_entity = name.split("_", 1)
+        # ADR-249: plural batch tools (create_relationships,
+        # update_elements) count for their entity.
+        entity = _normalise_entity(raw_entity)
+        if entity is not None:
             results.add(WriteOp("mcp", verb, entity))
     return results
 
@@ -128,8 +139,8 @@ def parse_cli_writes() -> set[WriteOp]:
         r'@(create|update|move|delete)_app\.command\(\s*"([a-z_-]+)"',
     )
     for verb, entity in pat.findall(text):
-        normalised = entity.replace("-", "_")
-        if normalised in _KNOWN_ENTITIES:
+        normalised = _normalise_entity(entity.replace("-", "_"))
+        if normalised is not None:
             results.add(WriteOp("cli", verb, normalised))
     return results
 
@@ -147,7 +158,44 @@ _KNOWN_ENTITIES = frozenset({
     # server-side and edited in the admin UI, not authored by agents. If
     # theme authoring is ever exposed to MCP/CLI, add "theme" here so the
     # §14 parity check starts enforcing it.
+    # v6.50.0 (ADR-249, #298) — element relationships: create (batch),
+    # update and delete on every surface. Not under the delete_* deferral.
+    "relationship",
 })
+
+
+def _normalise_entity(name: str) -> str | None:
+    """Map a (possibly plural) entity name to a known entity, else None.
+
+    Batch tools and commands are named in the plural (``create_elements``,
+    ``create_relationships``, ``iris create relationships``); they count for
+    the singular entity (ADR-249).
+    """
+    if name in _KNOWN_ENTITIES:
+        return name
+    if name.endswith("s") and name[:-1] in _KNOWN_ENTITIES:
+        return name[:-1]
+    return None
+
+
+_BATCH_VERBS = frozenset({"create", "update", "delete"})
+
+
+def _batch_route_op(method: str, path: str) -> tuple[str, str] | None:
+    """Attribute a batch route ``POST /<entities>/<verb>`` to (verb, entity).
+
+    Operational batch actions (``clone``, ``set``, ``tags``) aren't entity
+    CRUD and return None, as do non-POST routes and unknown entities.
+    """
+    if method.lower() != "post":
+        return None
+    m = re.fullmatch(r"/([a-z_]+)/([a-z_]+)", path)
+    if m is None or m.group(2) not in _BATCH_VERBS:
+        return None
+    entity = _normalise_entity(m.group(1))
+    if entity is None:
+        return None
+    return (m.group(2), entity)
 
 
 def _entity_from_router_path(router_path: Path) -> str | None:

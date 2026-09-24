@@ -99,3 +99,35 @@ class BatchResultWithIds(BatchResult):
     """Response for batch operations that return the ids of successful items."""
 
     ids: list[str] = Field(default_factory=list)
+
+
+# ── v6.50.0 / ADR-249 / issue #298 ───────────────────────────────────
+# Bulk relationship create for MCP / CLI agents.
+
+
+class BatchRelationshipCreateItem(BaseModel):
+    """Per-item relationship create payload for batch create.
+
+    Mirrors ``RelationshipCreate`` plus UML role names, with every field
+    optional at the model boundary so a bad row surfaces as a per-item
+    error instead of rejecting the whole batch. ``source_role`` /
+    ``target_role`` are stored as ``data.sourceRole`` / ``data.targetRole``
+    (the canvas / Sparx-importer convention).
+    """
+
+    source_element_id: str = ""
+    target_element_id: str = ""
+    relationship_type: str = ""
+    source_role: str | None = None
+    target_role: str | None = None
+    label: str | None = None
+    description: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class BatchRelationshipsCreate(BaseModel):
+    """Request body for POST /api/batch/relationships/create."""
+
+    relationships: list[BatchRelationshipCreateItem] = Field(
+        min_length=1, max_length=100,
+    )

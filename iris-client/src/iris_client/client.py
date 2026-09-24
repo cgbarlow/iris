@@ -49,6 +49,11 @@ USER_AGENT = "iris-client/0.1"
 
 ExportFormat = Literal["json", "markdown"]
 
+# ADR-249: relationship UML role names live in ``data`` under these keys
+# (the canvas / Sparx-importer convention; the backend maps the
+# ``source_role`` / ``target_role`` fields onto them).
+_ROLE_DATA_KEYS = ("sourceRole", "targetRole")
+
 
 class IrisClient:
     """Async HTTP client for the Iris API.
@@ -472,6 +477,124 @@ class IrisClient:
             body["metadata"] = metadata
         response = await self._request("POST", "/api/packages", json=body)
         return Package.model_validate(response.json())
+
+    # --- Relationships (ADR-249, v6.50.0, #298) -----------------------------
+
+    async def create_relationships(
+        self, relationships: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Bulk-create up to 100 element relationships in one call.
+
+        POST /api/batch/relationships/create. Each item takes
+        ``source_element_id``, ``target_element_id``, ``relationship_type``
+        and optional ``source_role`` / ``target_role`` (stored as
+        ``data.sourceRole`` / ``data.targetRole``), ``label``,
+        ``description`` and ``data``. Per-item failure isolation: returns
+        the ``{succeeded, failed, errors, ids}`` envelope. Self-referencing
+        and cross-set items are rejected per item. Auth required.
+        """
+        response = await self._request(
+            "POST", "/api/batch/relationships/create",
+            json={"relationships": relationships},
+        )
+        payload: dict[str, Any] = response.json()
+        return payload
+
+    async def list_relationships(
+        self,
+        *,
+        element_id: str | None = None,
+        set_id: str | None = None,
+        relationship_type: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """List relationships (GET /api/relationships). Auth required.
+
+        ``element_id`` matches either end; ``set_id`` matches when either
+        end is in the set; ``relationship_type`` is an exact match. Returns
+        the paginated envelope ``{items, total, page, page_size}``; every
+        item carries ``source_role`` / ``target_role`` and ``data``.
+        """
+        params: dict[str, Any] = {"page": page, "page_size": page_size}
+        if element_id:
+            params["element_id"] = element_id
+        if set_id:
+            params["set_id"] = set_id
+        if relationship_type:
+            params["relationship_type"] = relationship_type
+        response = await self._request("GET", "/api/relationships", params=params)
+        payload: dict[str, Any] = response.json()
+        return payload
+
+    async def get_relationship(self, relationship_id: str) -> dict[str, Any]:
+        """Fetch one relationship (GET /api/relationships/{id}). Auth required."""
+        response = await self._request(
+            "GET", f"/api/relationships/{relationship_id}",
+        )
+        payload: dict[str, Any] = response.json()
+        return payload
+
+    async def update_relationship(
+        self,
+        relationship_id: str,
+        *,
+        relationship_type: str | None = None,
+        source_role: str | None = None,
+        target_role: str | None = None,
+        label: str | None = None,
+        description: str | None = None,
+        data: dict[str, Any] | None = None,
+        change_summary: str | None = None,
+    ) -> dict[str, Any]:
+        """Partially update a relationship. Auth required.
+
+        The backend PUT is full-replace and needs ``If-Match``, so this
+        reads the relationship first, keeps every field the caller left as
+        ``None``, and sends the current version. ``data`` replaces the
+        stored data except the role keys (``sourceRole`` / ``targetRole``),
+        which carry over unless ``source_role`` / ``target_role`` are given
+        (``""`` clears a role). A concurrent edit surfaces as HTTP 409.
+        """
+        current = await self.get_relationship(relationship_id)
+        current_data: dict[str, Any] = current.get("data") or {}
+        if data is None:
+            new_data = dict(current_data)
+        else:
+            new_data = dict(data)
+            for key in _ROLE_DATA_KEYS:
+                if key not in new_data and key in current_data:
+                    new_data[key] = current_data[key]
+        body: dict[str, Any] = {
+            "label": label if label is not None else current.get("label"),
+            "description": (
+                description if description is not None else current.get("description")
+            ),
+            "data": new_data,
+        }
+        for key, value in (
+            ("relationship_type", relationship_type),
+            ("source_role", source_role),
+            ("target_role", target_role),
+            ("change_summary", change_summary),
+        ):
+            if value is not None:
+                body[key] = value
+        response = await self._request(
+            "PUT", f"/api/relationships/{relationship_id}",
+            json=body,
+            headers={"If-Match": str(current.get("current_version", 1))},
+        )
+        payload: dict[str, Any] = response.json()
+        return payload
+
+    async def delete_relationship(self, relationship_id: str) -> None:
+        """Soft-delete a relationship (reads its version for If-Match)."""
+        current = await self.get_relationship(relationship_id)
+        await self._request(
+            "DELETE", f"/api/relationships/{relationship_id}",
+            headers={"If-Match": str(current.get("current_version", 1))},
+        )
 
     # --- Scope prompts (ADR-152) --------------------------------------------
 

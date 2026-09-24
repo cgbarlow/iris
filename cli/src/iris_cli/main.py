@@ -45,6 +45,10 @@ aggregation_profile_app = typer.Typer(
     help="Aggregation profile commands (v6.20.0, ADR-212).",
     no_args_is_help=True,
 )
+relationships_app = typer.Typer(
+    help="Element relationship commands (v6.50.0, ADR-249).",
+    no_args_is_help=True,
+)
 packages_app = typer.Typer(help="Package commands.", no_args_is_help=True)
 sets_app = typer.Typer(help="Set commands.", no_args_is_help=True)
 collections_app = typer.Typer(help="Collection commands.", no_args_is_help=True)
@@ -55,7 +59,10 @@ conversations_app = typer.Typer(help="Conversation commands.", no_args_is_help=T
 create_app = typer.Typer(help="Create new entities.", no_args_is_help=True)
 update_app = typer.Typer(help="Update entity metadata (partial).", no_args_is_help=True)
 delete_app = typer.Typer(
-    help="Delete entities (currently: element-template only — ADR-191).",
+    help=(
+        "Delete entities (element-template — ADR-191; aggregation-profile; "
+        "relationship — ADR-249)."
+    ),
     no_args_is_help=True,
 )
 move_app = typer.Typer(help="Re-parent entities (diagram / package / set).", no_args_is_help=True)
@@ -65,6 +72,7 @@ app.add_typer(diagrams_app, name="diagrams")
 app.add_typer(elements_app, name="elements")
 app.add_typer(element_templates_app, name="element-templates")
 app.add_typer(aggregation_profile_app, name="aggregation-profile")
+app.add_typer(relationships_app, name="relationships")
 app.add_typer(packages_app, name="packages")
 app.add_typer(sets_app, name="sets")
 app.add_typer(collections_app, name="collections")
@@ -1365,6 +1373,181 @@ def delete_element_template_cmd(
                 "DELETE", f"/api/element-templates/{template_id}",
             )
             return {"deleted": True, "template_id": template_id}
+    output.print_json(_run(_do()))
+
+
+# ── Relationships (v6.50.0, ADR-249, #298) ─────────────────────────────────
+# Protocol §14 parity with the MCP create_relationships /
+# update_relationship / delete_relationship / list_relationships /
+# get_relationship tools. All go through the shared IrisClient methods.
+
+
+@relationships_app.command("list")
+def relationships_list_cmd(
+    element_id: str | None = typer.Option(
+        None, "--element-id", help="Relationships with this element at either end.",
+    ),
+    set_id: str | None = typer.Option(
+        None, "--set-id", help="Relationships with either end in this set.",
+    ),
+    relationship_type: str | None = typer.Option(None, "--type"),
+    page: int = typer.Option(1, "--page", min=1),
+    page_size: int = typer.Option(50, "--page-size", min=1, max=100),
+) -> None:
+    """List relationships (roles and data included)."""
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            return await c.list_relationships(
+                element_id=element_id, set_id=set_id,
+                relationship_type=relationship_type,
+                page=page, page_size=page_size,
+            )
+
+    envelope = _run(_do())
+    rows = envelope.get("items", [])
+    if state.as_json:
+        output.print_json(rows)
+    else:
+        output.print_table(
+            rows,
+            columns=[
+                "id", "source_element_name", "relationship_type",
+                "target_element_name", "source_role", "target_role", "label",
+            ],
+            title=f"Relationships ({len(rows)} of {envelope.get('total', len(rows))})",
+        )
+
+
+@relationships_app.command("get")
+def relationships_get_cmd(relationship_id: str) -> None:
+    """Show one relationship as JSON."""
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            return await c.get_relationship(relationship_id)
+
+    output.print_json(_run(_do()))
+
+
+@create_app.command("relationship")
+def create_relationship_cmd(
+    source: str = typer.Option(..., "--source", help="Source element id."),
+    target: str = typer.Option(
+        ..., "--target", help="Target element id (same set as the source).",
+    ),
+    relationship_type: str = typer.Option(
+        ..., "--type", help="Relationship type, e.g. association.",
+    ),
+    source_role: str | None = typer.Option(
+        None, "--source-role", help="UML role name at the source end.",
+    ),
+    target_role: str | None = typer.Option(
+        None, "--target-role", help="UML role name at the target end.",
+    ),
+    label: str | None = typer.Option(None, "--label"),
+    description: str | None = typer.Option(None, "--description"),
+    data_json: str | None = typer.Option(None, "--data-json"),
+) -> None:
+    """Create one relationship (v6.50.0, ADR-249).
+
+    Sent through the batch endpoint so it gets the same validation as
+    `iris create relationships` / MCP create_relationships: self-referencing
+    and cross-set relationships are rejected (exit code 1).
+    """
+    item: dict[str, Any] = {
+        "source_element_id": source,
+        "target_element_id": target,
+        "relationship_type": relationship_type,
+    }
+    for key, value in (
+        ("source_role", source_role), ("target_role", target_role),
+        ("label", label), ("description", description),
+        ("data", _parse_json_opt(data_json, "--data-json")),
+    ):
+        if value is not None:
+            item[key] = value
+
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            return await c.create_relationships([item])
+
+    result = _run(_do())
+    output.print_json(result)
+    if result.get("failed"):
+        output.print_error("; ".join(result.get("errors") or ["create failed"]))
+        raise typer.Exit(code=1)
+
+
+@create_app.command("relationships")
+def create_relationships_cmd(
+    from_json: str = typer.Option(
+        ...,
+        "--from-json",
+        help=(
+            "Path to a JSON file, or '-' for stdin. Format: "
+            '{"relationships": [{"source_element_id": "...", '
+            '"target_element_id": "...", "relationship_type": "...", '
+            '"source_role": "...", "target_role": "...", "label": "...", '
+            '"data": {...}}, ...]} (max 100). v6.50.0, ADR-249.'
+        ),
+    ),
+) -> None:
+    """Bulk-create relationships (v6.50.0, ADR-249). Per-item failure isolation."""
+    body = _load_batch_payload(from_json, key="relationships")
+
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            return await c.create_relationships(body["relationships"])
+
+    output.print_json(_run(_do()))
+
+
+@update_app.command("relationship")
+def update_relationship_cmd(
+    relationship_id: str = typer.Argument(...),
+    relationship_type: str | None = typer.Option(None, "--type"),
+    source_role: str | None = typer.Option(
+        None, "--source-role", help="UML role name at the source end ('' clears).",
+    ),
+    target_role: str | None = typer.Option(
+        None, "--target-role", help="UML role name at the target end ('' clears).",
+    ),
+    label: str | None = typer.Option(None, "--label"),
+    description: str | None = typer.Option(None, "--description"),
+    data_json: str | None = typer.Option(
+        None, "--data-json",
+        help="Replacement data object; role names carry over unless --*-role is given.",
+    ),
+    change_summary: str | None = typer.Option(None, "--change-summary"),
+) -> None:
+    """Partially update a relationship (v6.50.0, ADR-249)."""
+    data = _parse_json_opt(data_json, "--data-json")
+
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            return await c.update_relationship(
+                relationship_id,
+                relationship_type=relationship_type,
+                source_role=source_role,
+                target_role=target_role,
+                label=label,
+                description=description,
+                data=data,
+                change_summary=change_summary,
+            )
+
+    output.print_json(_run(_do()))
+
+
+@delete_app.command("relationship")
+def delete_relationship_cmd(
+    relationship_id: str = typer.Argument(...),
+) -> None:
+    """Soft-delete a relationship (v6.50.0, ADR-249)."""
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            await c.delete_relationship(relationship_id)
+            return {"deleted": True, "relationship_id": relationship_id}
+
     output.print_json(_run(_do()))
 
 

@@ -135,6 +135,110 @@ class TestEndToEnd:
             assert "404" in str(excinfo.value) or "not found" in str(excinfo.value).lower()
 
 
+class TestRelationshipToolsEndToEnd:
+    """ADR-249 (v6.50.0, #298): the MCP relationship tools against a real
+    backend — batch create with per-item rejections, list with roles + data,
+    partial update, diagram-edge reuse without duplicates, soft delete."""
+
+    @pytest.mark.asyncio
+    async def test_relationship_lifecycle(
+        self, backend_transport: httpx.ASGITransport,
+    ) -> None:
+        from iris_client import IrisClient
+        from iris_mcp import tools
+
+        base, pat = await _setup_admin_and_pat(backend_transport)
+
+        async def call(name: str, args: dict) -> dict:
+            out = await tools.dispatch(name, client, args)
+            return json.loads(out[0].text)
+
+        async with IrisClient(url=base, token=pat, transport=backend_transport) as client:
+            s1 = (await client._request(
+                "POST", "/api/sets", json={"name": "Family"},
+            )).json()["id"]
+            s2 = (await client._request(
+                "POST", "/api/sets", json={"name": "Other"},
+            )).json()["id"]
+            els = await call("create_elements", {"elements": [
+                {"element_type": "class", "name": "Family F1", "set_id": s1},
+                {"element_type": "class", "name": "Alice", "set_id": s1},
+                {"element_type": "class", "name": "Bob", "set_id": s1},
+                {"element_type": "class", "name": "Elsewhere", "set_id": s2},
+            ]})
+            fam, alice, bob, other = els["ids"]
+
+            created = await call("create_relationships", {"relationships": [
+                {"source_element_id": fam, "target_element_id": alice,
+                 "relationship_type": "association",
+                 "source_role": "family", "target_role": "partner",
+                 "data": {"gedcom_role": "WIFE"}},
+                {"source_element_id": fam, "target_element_id": bob,
+                 "relationship_type": "association", "target_role": "child",
+                 "data": {"child_order": 1}},
+                {"source_element_id": fam, "target_element_id": fam,
+                 "relationship_type": "association"},
+                {"source_element_id": fam, "target_element_id": other,
+                 "relationship_type": "association"},
+            ]})
+            assert created["succeeded"] == 2
+            assert created["failed"] == 2
+            assert "index 2" in created["errors"][0]
+            assert "self-referencing" in created["errors"][0]
+            assert "index 3" in created["errors"][1]
+            assert "cross-set" in created["errors"][1]
+            wife_rel, child_rel = created["ids"]
+
+            listed = await call("list_relationships", {"element_id": alice})
+            assert listed["total"] == 1
+            item = listed["items"][0]
+            assert item["source_role"] == "family"
+            assert item["target_role"] == "partner"
+            assert item["data"] == {
+                "gedcom_role": "WIFE", "sourceRole": "family", "targetRole": "partner",
+            }
+            by_set = await call("list_relationships", {"set_id": s1})
+            assert by_set["total"] == 2
+
+            updated = await call("update_relationship", {
+                "relationship_id": child_rel,
+                "relationship_type": "composition",
+                "data": {"child_order": 2},
+            })
+            assert updated["relationship_type"] == "composition"
+            assert updated["data"] == {"child_order": 2, "targetRole": "child"}
+            assert updated["current_version"] == 2
+
+            # Returned ids work as diagram-edge relationshipId, no duplicates.
+            diagram = (await client._request("POST", "/api/diagrams", json={
+                "diagram_type": "class", "name": "Tree", "set_id": s1,
+                "notation": "uml", "data": {"nodes": [], "edges": []},
+            })).json()
+            canvas = {
+                "nodes": [
+                    {"id": "n-fam", "type": "class", "position": {"x": 0, "y": 0},
+                     "data": {"label": "Family F1", "entityId": fam}},
+                    {"id": "n-alice", "type": "class", "position": {"x": 0, "y": 200},
+                     "data": {"label": "Alice", "entityId": alice}},
+                ],
+                "edges": [
+                    {"id": "e1", "source": "n-fam", "target": "n-alice",
+                     "type": "association",
+                     "data": {"relationshipType": "association",
+                              "relationshipId": wife_rel}},
+                ],
+            }
+            await call("update_diagram", {"diagram_id": diagram["id"], "data": canvas})
+            after = await call("list_relationships", {"element_id": alice})
+            assert after["total"] == 1
+            assert after["items"][0]["id"] == wife_rel
+
+            deleted = await call("delete_relationship", {"relationship_id": child_rel})
+            assert deleted["deleted"] is True
+            remaining = await call("list_relationships", {"set_id": s1})
+            assert remaining["total"] == 1
+
+
 def test_cli_dispatch_noop() -> None:
     """Sanity: the Typer app imports cleanly; no commands shell out at import."""
     from iris_cli.main import app

@@ -42,6 +42,14 @@ iris elements list --package-id <pkg-id>                # filter by package
 iris elements list --package-id null                    # list unmembered
 iris packages list-elements <pkg-id>                    # all members of a pkg
 
+# Relationships (v6.50.0, ADR-249)
+iris relationships list --set-id <set-id> --type association
+iris create relationship --source <el-a> --target <el-b> --type association \
+  --source-role partner --target-role child             # same set only
+iris create relationships --from-json rels.json         # {"relationships": [...]}, max 100
+iris update relationship <rel-id> --type composition --data-json '{"child_order": 2}'
+iris delete relationship <rel-id>                       # soft delete
+
 iris move diagram <diag-id> --to-package <pkg-id>       # in-set re-parent
 iris move diagram <diag-id> --to-package null           # move to set root
 iris move set <set-id> --to-collection <new-col-id>     # cross-collection

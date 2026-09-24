@@ -160,6 +160,13 @@ A hand-written user guide at `/guide` covers every user-facing capability across
 - **Templates** browser on the elements list shows set-scoped and global templates; "Use" pre-fills a new element from the template's snapshot (server-side merge — explicit fields always win)
 - Templates are set-scoped by default with an optional Make Global flag; full CRUD on REST (`/api/element-templates`), MCP (`create_element_template` / `list_element_templates` / `get_element_template` / `update_element_template` / `delete_element_template`), and CLI (`iris create element-template …`, etc.). `create_element` on all three surfaces accepts an optional `template_id`
 
+### Relationships for agents *(v6.50.0)*
+
+- MCP tools `create_relationships` (up to 100 per call, each item succeeds or fails on its own), `update_relationship`, `list_relationships` (by element or set, optional type filter, paginated), `get_relationship` and `delete_relationship` (soft delete); CLI `iris create relationship` / `iris create relationships --from-json`, `iris update relationship`, `iris delete relationship`, `iris relationships list|get` (ADR-249)
+- UML role names (`source_role` / `target_role`) are stored as `data.sourceRole` / `data.targetRole`, the same keys the Sparx importer and the canvas use; list results return them alongside `data`
+- The agent path rejects self-referencing and cross-set relationships with a per-item error; returned ids work as a diagram edge's `relationshipId` without creating duplicates
+- REST: `POST /api/batch/relationships/create`; `PUT /api/relationships/{id}` can now change `relationship_type`; `GET /api/relationships` filters by `set_id` and `relationship_type`
+
 ### Batch Operations
 
 - Select mode toggle on views and entities list pages with checkboxes on each item

@@ -562,6 +562,22 @@ async def update_diagram(
             source_element = node_entity_map.get(edge.get("source", ""))
             target_element = node_entity_map.get(edge.get("target", ""))
             if source_element and target_element:
+                edge_data = edge.get("data") if isinstance(edge.get("data"), dict) else {}
+                # ADR-249: an edge that names an existing relationship between
+                # the same two elements (in either direction) via
+                # data.relationshipId already represents it — e.g. an agent
+                # reusing a create_relationships id on an edge drawn
+                # target -> source. Don't auto-create a reversed duplicate.
+                linked_id = edge_data.get("relationshipId")
+                if isinstance(linked_id, str) and linked_id:
+                    cursor = await db.execute(
+                        "SELECT source_element_id, target_element_id FROM relationships "
+                        "WHERE id = ? AND is_deleted = 0",
+                        (linked_id,),
+                    )
+                    linked = await cursor.fetchone()
+                    if linked and {linked[0], linked[1]} == {source_element, target_element}:
+                        continue
                 # Check if relationship already exists
                 cursor = await db.execute(
                     "SELECT id FROM relationships "

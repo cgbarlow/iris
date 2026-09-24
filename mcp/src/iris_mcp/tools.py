@@ -405,6 +405,77 @@ async def _update_elements(c: IrisClient, args: dict[str, Any]) -> str:
     return json.dumps(resp.json())
 
 
+# ── Relationships (v6.50.0, ADR-249, issue #298) ─────────────────────
+
+
+async def _create_relationships(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-249: bulk create element relationships (per-item isolation)."""
+    try:
+        result = await c.create_relationships(args.get("relationships") or [])
+    except IrisAuthError:
+        return _auth_required_payload("Create relationships")
+    return json.dumps(result)
+
+
+async def _update_relationship(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-249: partial relationship update (If-Match read from current)."""
+    try:
+        result = await c.update_relationship(
+            args["relationship_id"],
+            relationship_type=args.get("relationship_type"),
+            source_role=args.get("source_role"),
+            target_role=args.get("target_role"),
+            label=args.get("label"),
+            description=args.get("description"),
+            data=args.get("data"),
+            change_summary=args.get("change_summary"),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Update relationship")
+    return json.dumps(result)
+
+
+async def _list_relationships(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-249: list relationships by element (either end) or set."""
+    if not args.get("element_id") and not args.get("set_id"):
+        return json.dumps({
+            "success": False,
+            "error": "missing_scope",
+            "message": "Pass element_id (relationships at either end) or set_id.",
+        })
+    try:
+        result = await c.list_relationships(
+            element_id=args.get("element_id"),
+            set_id=args.get("set_id"),
+            relationship_type=args.get("relationship_type"),
+            page=int(args.get("page", 1)),
+            page_size=int(args.get("page_size", 50)),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("List relationships")
+    return json.dumps(result)
+
+
+async def _get_relationship(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-249: fetch one relationship."""
+    try:
+        result = await c.get_relationship(args["relationship_id"])
+    except IrisAuthError:
+        return _auth_required_payload("Get relationship")
+    return json.dumps(result)
+
+
+async def _delete_relationship(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-249: soft-delete a relationship."""
+    try:
+        await c.delete_relationship(args["relationship_id"])
+    except IrisAuthError:
+        return _auth_required_payload("Delete relationship")
+    return json.dumps({
+        "success": True, "relationship_id": args["relationship_id"], "deleted": True,
+    })
+
+
 async def _create_element(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-178 (v6.4.0): create a standalone Element.
 
@@ -1822,6 +1893,172 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_update_elements,
+    ),
+    # ── Relationships (v6.50.0, ADR-249, issue #298) ─────────────────
+    Tool(
+        name="create_relationships",
+        description=(
+            "Create up to 100 relationships between existing elements in "
+            "one call (v6.50.0, ADR-249). Each item needs "
+            "source_element_id, target_element_id and relationship_type "
+            "(e.g. association, aggregation, composition, dependency, "
+            "generalization, realization, uses). Both elements must be in "
+            "the SAME set, and an element can't relate to itself — those "
+            "items are rejected. Optional source_role / target_role are UML "
+            "role names (e.g. partner, child), stored exactly like "
+            "Sparx-imported and canvas-drawn relationships "
+            "(data.sourceRole / data.targetRole). Per-item failure "
+            "isolation: returns {succeeded, failed, errors[], ids[]} — "
+            "errors name the failing item's index. Call list_relationships "
+            "first to avoid creating duplicates. To draw a relationship on "
+            "a diagram, pass the returned id as the edge's "
+            "data.relationshipId in update_diagram, with the edge's source "
+            "node's data.entityId = the relationship's source_element_id "
+            "and its target node's = target_element_id (keep the direction "
+            "so the arrow and role ends are drawn correctly) — no "
+            "duplicate relationship is created. The canvas draws role "
+            "names from the edge, so also copy them to the edge's "
+            "data.sourceRole / data.targetRole (as the Sparx importer does)."
+        ),
+        input_schema=_schema({
+            "relationships": (
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source_element_id": {
+                                "type": "string", "description": "Source element id",
+                            },
+                            "target_element_id": {
+                                "type": "string",
+                                "description": "Target element id (same set as source)",
+                            },
+                            "relationship_type": {
+                                "type": "string",
+                                "description": "Relationship type, e.g. association",
+                            },
+                            "source_role": {
+                                "type": "string",
+                                "description": "UML role name at the source end",
+                            },
+                            "target_role": {
+                                "type": "string",
+                                "description": "UML role name at the target end",
+                            },
+                            "label": {"type": "string", "description": "Display label"},
+                            "description": {"type": "string"},
+                            "data": {
+                                "type": "object",
+                                "additionalProperties": True,
+                                "description": (
+                                    "Extra attributes, e.g. "
+                                    "{\"gedcom_role\": \"HUSB\"}"
+                                ),
+                            },
+                        },
+                        "required": [
+                            "source_element_id", "target_element_id",
+                            "relationship_type",
+                        ],
+                    },
+                    "description": "Relationships to create (1-100).",
+                },
+                True,
+            ),
+        }),
+        handler=_create_relationships,
+    ),
+    Tool(
+        name="update_relationship",
+        description=(
+            "Update one relationship (v6.50.0, ADR-249). Partial: pass only "
+            "what changes — relationship_type, source_role, target_role, "
+            "label, description, data. The current version is read for "
+            "you. `data` replaces the stored data except the role names, "
+            "which are kept unless you pass source_role / target_role "
+            "(empty string clears a role). Source and target can't be "
+            "changed — delete and re-create instead."
+        ),
+        input_schema=_schema({
+            "relationship_id": _str_arg("relationship_id", "Relationship id"),
+            "relationship_type": _str_arg(
+                "relationship_type", "New relationship type", required=False,
+            ),
+            "source_role": _str_arg(
+                "source_role", "UML role name at the source end ('' clears)",
+                required=False,
+            ),
+            "target_role": _str_arg(
+                "target_role", "UML role name at the target end ('' clears)",
+                required=False,
+            ),
+            "label": _str_arg("label", "New display label", required=False),
+            "description": _str_arg("description", "New description", required=False),
+            "data": (
+                {"type": "object", "additionalProperties": True},
+                False,
+            ),
+            "change_summary": _str_arg(
+                "change_summary", "Optional summary of what changed", required=False,
+            ),
+        }),
+        handler=_update_relationship,
+    ),
+    Tool(
+        name="list_relationships",
+        description=(
+            "List relationships (v6.50.0, ADR-249) by element_id (the "
+            "element at either end) or set_id (either end in the set), "
+            "optionally filtered by relationship_type. Paginated (page, "
+            "page_size <= 100); returns {items, total, page, page_size}. "
+            "Each item has id, source/target element ids and names, "
+            "relationship_type, label, source_role, target_role and data. "
+            "Use it to check what exists before create_relationships. "
+            "Needs sign-in (unlike other list_* reads) — returns "
+            "auth_required when anonymous."
+        ),
+        input_schema=_schema({
+            "element_id": _str_arg(
+                "element_id", "Element id (matches source or target)", required=False,
+            ),
+            "set_id": _str_arg("set_id", "Set id", required=False),
+            "relationship_type": _str_arg(
+                "relationship_type", "Only this relationship type", required=False,
+            ),
+            "page": ({"type": "integer", "minimum": 1, "default": 1}, False),
+            "page_size": (
+                {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
+                False,
+            ),
+        }),
+        handler=_list_relationships,
+    ),
+    Tool(
+        name="get_relationship",
+        description=(
+            "Fetch one relationship by id (v6.50.0, ADR-249). Needs "
+            "sign-in (unlike other get_* reads) — returns auth_required "
+            "when anonymous."
+        ),
+        input_schema=_schema({
+            "relationship_id": _str_arg("relationship_id", "Relationship id"),
+        }),
+        handler=_get_relationship,
+    ),
+    Tool(
+        name="delete_relationship",
+        description=(
+            "Soft-delete a relationship (v6.50.0, ADR-249), consistent with "
+            "elements. Diagram edges that referenced it stay on the canvas "
+            "until you remove them with update_diagram."
+        ),
+        input_schema=_schema({
+            "relationship_id": _str_arg("relationship_id", "Relationship id"),
+        }),
+        handler=_delete_relationship,
     ),
     # ── Element templates (v6.8.0, ADR-191, issue #153) ────────────────
     Tool(
