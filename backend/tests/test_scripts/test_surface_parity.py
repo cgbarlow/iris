@@ -60,3 +60,27 @@ def test_relationship_write_parity_on_every_surface() -> None:
         for verb in ("create", "update", "delete"):
             assert (verb, "relationship") in ve, (verb, surface)
     assert report.hard_violations == []
+
+
+# ── ADR-252 (v6.51.0, #301): `patch` is its own write verb ────────────
+
+
+def test_http_patch_is_the_patch_verb() -> None:
+    """HTTP PATCH on an entity is an incremental edit (ADR-252), not a full
+    update — it must be matched by a ``patch_<entity>`` MCP tool and an
+    ``iris patch <entity>`` CLI command, not by ``update_<entity>``."""
+    mod = _load()
+    verb = mod._verb_from_method_and_path  # type: ignore[attr-defined]
+    assert verb("patch", "/{diagram_id}") == "patch"
+    # PUT semantics are unchanged.
+    assert verb("put", "/{diagram_id}") == "update"
+    assert verb("put", "/{diagram_id}/parent") == "move"
+
+
+def test_patch_diagram_parity_on_every_surface() -> None:
+    mod = _load()
+    report = mod.analyse()  # type: ignore[attr-defined]
+    for surface in (report.backend, report.mcp, report.cli):
+        ve = {(op.verb, op.entity) for op in surface}
+        assert ("patch", "diagram") in ve, surface
+    assert report.hard_violations == []

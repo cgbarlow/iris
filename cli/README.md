@@ -50,6 +50,11 @@ iris create relationships --from-json rels.json         # {"relationships": [...
 iris update relationship <rel-id> --type composition --data-json '{"child_order": 2}'
 iris delete relationship <rel-id>                       # soft delete
 
+# Incremental diagram edits (v6.51.0, ADR-252) — atomic, one new version
+iris patch diagram <diag-id> --from-json ops.json --expected-version 7
+#   ops.json: {"operations": [{"op": "add_node", "node": {...}},
+#              {"op": "add_edge", "edge": {...}}, {"op": "sync_labels"}]}
+
 iris move diagram <diag-id> --to-package <pkg-id>       # in-set re-parent
 iris move diagram <diag-id> --to-package null           # move to set root
 iris move set <set-id> --to-collection <new-col-id>     # cross-collection

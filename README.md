@@ -167,6 +167,12 @@ A hand-written user guide at `/guide` covers every user-facing capability across
 - The agent path rejects self-referencing and cross-set relationships with a per-item error; returned ids work as a diagram edge's `relationshipId` without creating duplicates
 - REST: `POST /api/batch/relationships/create`; `PUT /api/relationships/{id}` can now change `relationship_type`; `GET /api/relationships` filters by `set_id` and `relationship_type`
 
+### Incremental diagram edits for agents *(v6.51.0)*
+
+- MCP `patch_diagram`, CLI `iris patch diagram`, REST `PATCH /api/diagrams/{id}`: 1–200 ordered node/edge operations (`add_node`, `update_node`, `remove_node`, `add_edge`, `update_edge`, `remove_edge`, `sync_labels`) applied atomically as one new version, so agents can edit large diagrams without resending the whole canvas (ADR-252)
+- Optional `expected_version` (`If-Match`) rejects a patch if the diagram changed since it was read; a failing operation writes nothing and the error names its index
+- `sync_labels` resets node labels to their elements' current names without touching layout or styling
+
 ### Batch Operations
 
 - Select mode toggle on views and entities list pages with checkboxes on each item

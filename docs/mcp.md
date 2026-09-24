@@ -54,6 +54,7 @@ Or use `iris login` from `iris-cli` (mints + saves a PAT in one step).
 | `apply_diagram_creation` | Apply an AI-generated diagram bundle (`mode="creation"` output of `ask`) |
 | `list_conversations` | AI conversation history for a set |
 | `create_relationships` / `update_relationship` / `list_relationships` / `get_relationship` / `delete_relationship` | Connect elements: batch create (≤100, per-item errors, same-set only, `source_role` / `target_role`), partial update, list by element or set, soft delete (ADR-249) |
+| `patch_diagram` | Small edits to an existing diagram without resending the canvas: 1–200 ordered, atomic node/edge operations plus `sync_labels`, optional `expected_version` concurrency check, one new version per patch (ADR-252) |
 | `aggregate` / `create_aggregation_profile` / `list_aggregation_profiles` / `get_aggregation_profile` / `update_aggregation_profile` / `delete_aggregation_profile` | Run and manage generic aggregation profiles (ADR-212) |
 
 Each tool ships with an LLM-facing description with "when to use"

@@ -64,7 +64,7 @@ class WriteOp:
     """A write operation observed on one surface."""
 
     surface: str  # "backend" / "mcp" / "cli"
-    verb: str     # "create" / "update" / "move" / "delete"
+    verb: str     # "create" / "update" / "patch" / "move" / "delete"
     entity: str   # "collection" / "set" / "package" / "diagram" / "element"
 
 
@@ -108,12 +108,12 @@ def parse_mcp_writes() -> set[WriteOp]:
     """Scan MCP tool registrations for write tools.
 
     Looks for `Tool(name="verb_entity",...)` where verb is one of
-    create/update/move/delete and entity is one of the known kinds.
+    create/update/patch/move/delete and entity is one of the known kinds.
     """
     results: set[WriteOp] = set()
     tools_path = REPO_ROOT / "mcp/src/iris_mcp/tools.py"
     text = tools_path.read_text(encoding="utf-8")
-    pat = re.compile(r'name="((?:create|update|move|delete)_[a-z_]+)"')
+    pat = re.compile(r'name="((?:create|update|patch|move|delete)_[a-z_]+)"')
     for name in pat.findall(text):
         verb, raw_entity = name.split("_", 1)
         # ADR-249: plural batch tools (create_relationships,
@@ -127,7 +127,7 @@ def parse_mcp_writes() -> set[WriteOp]:
 def parse_cli_writes() -> set[WriteOp]:
     """Scan CLI for write subcommand groups.
 
-    Looks for `@{create,update,move,delete}_app.command("entity")`
+    Looks for `@{create,update,patch,move,delete}_app.command("entity")`
     decorators in cli/src/iris_cli/main.py. Entity names may be
     kebab-case in the CLI (e.g. ``"element-template"``) — we
     normalise to underscores for cross-surface comparison.
@@ -136,7 +136,7 @@ def parse_cli_writes() -> set[WriteOp]:
     cli_path = REPO_ROOT / "cli/src/iris_cli/main.py"
     text = cli_path.read_text(encoding="utf-8")
     pat = re.compile(
-        r'@(create|update|move|delete)_app\.command\(\s*"([a-z_-]+)"',
+        r'@(create|update|patch|move|delete)_app\.command\(\s*"([a-z_-]+)"',
     )
     for verb, entity in pat.findall(text):
         normalised = _normalise_entity(entity.replace("-", "_"))
@@ -228,7 +228,11 @@ def _verb_from_method_and_path(method: str, path: str) -> str | None:
     if method == "patch":
         if "/parent" in path:
             return "move"
-        return "update"
+        # ADR-252: HTTP PATCH is an incremental edit (e.g. patch_diagram's
+        # operation list), a different contract from PUT's full replace, so
+        # it is its own verb: it needs a `patch_<entity>` MCP tool and an
+        # `iris patch <entity>` CLI command, not just `update_<entity>`.
+        return "patch"
     if method == "delete":
         return "delete"
     return None

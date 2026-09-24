@@ -10,9 +10,16 @@ from typing import TYPE_CHECKING
 from app.migrations.m012_sets import DEFAULT_SET_ID
 from app.authz.collection_resolver import resolve_effective_set
 from app.diagrams.canvas_normalize import normalize_canvas_data
+from app.diagrams.canvas_patch import (
+    ElementRef,
+    PatchContext,
+    apply_operations,
+    referenced_ids,
+)
+from app.elements.service import get_element_names_and_sets
 from app.diagrams.thumbnail import VALID_THEMES, generate_and_store_thumbnail
 from app.package_relationships.service import create_package_relationship
-from app.relationships.service import create_relationship
+from app.relationships.service import create_relationship, get_relationship_endpoints
 from app.diagrams.notation_detection import detect_notations as _detect_notations
 from app.diagrams.registry_service import get_default_notation, validate_type_notation
 from app.search.service import index_diagram as _index_diagram
@@ -490,11 +497,16 @@ async def update_diagram(
     detected = _detect_notations(data) if isinstance(data, dict) else []
     detected_json = json.dumps(detected)
 
-    await db.execute(
+    # ADR-252: compare-and-swap on the version read above, so a write that
+    # lands in between (another request, or a retrying patch) makes this
+    # one fail with nothing written instead of both claiming new_version.
+    swapped = await db.execute(
         "UPDATE diagrams SET current_version = ?, updated_at = ?, "
-        "detected_notations = ? WHERE id = ?",
-        (new_version, now, detected_json, diagram_id),
+        "detected_notations = ? WHERE id = ? AND current_version = ?",
+        (new_version, now, detected_json, diagram_id, expected_version),
     )
+    if swapped.rowcount == 0:
+        return None
     await db.execute(
         "INSERT INTO diagram_versions (diagram_id, version, name, description, "
         "data, change_type, change_summary, created_at, created_by, metadata) "
@@ -645,6 +657,117 @@ async def update_diagram(
         pass  # Don't fail diagram save if package relationship auto-creation fails
 
     return {"current_version": new_version, "updated_at": now}
+
+
+class DiagramNotFoundError(LookupError):
+    """The diagram does not exist or is soft-deleted."""
+
+
+class DiagramVersionConflictError(Exception):
+    """The diagram's ``current_version`` isn't the one the caller expected
+    (ADR-252). Carries the version the diagram is actually at."""
+
+    def __init__(self, current_version: int, expected_version: int | None) -> None:
+        self.current_version = current_version
+        self.expected_version = expected_version
+        if expected_version is None:
+            message = (
+                f"diagram kept changing while the patch was applied (now at "
+                f"version {current_version}); retry"
+            )
+        else:
+            message = (
+                f"diagram is at version {current_version}, not "
+                f"{expected_version}; re-read it and retry"
+            )
+        super().__init__(message)
+
+
+# Attempts for a patch sent without an expected version: a write that lands
+# between the read and the compare-and-swap is retried on the new version.
+_PATCH_ATTEMPTS = 3
+
+
+async def patch_diagram(
+    db: DatabasePort,
+    diagram_id: str,
+    *,
+    operations: list[dict[str, object]],
+    change_summary: str | None,
+    updated_by: str,
+    expected_version: int | None = None,
+) -> dict[str, object]:
+    """Apply canvas operations atomically as one new version (ADR-252).
+
+    Reads the current canvas, applies ``operations`` in memory with
+    :func:`app.diagrams.canvas_patch.apply_operations` (raising
+    ``CanvasPatchError`` — nothing written — if any fails), then persists
+    the result through :func:`update_diagram` with the current name,
+    description and metadata, so the stored version and every save side
+    effect (notation detection, search index, thumbnails, set membership,
+    edge → relationship auto-create) match a full update with that canvas.
+
+    ``expected_version`` given: the patch applies only to that version,
+    else :class:`DiagramVersionConflictError`. Omitted: it applies to the
+    current version, retrying on a concurrent write.
+    """
+    for _ in range(_PATCH_ATTEMPTS):
+        cursor = await db.execute(
+            "SELECT d.current_version, d.set_id, dv.name, dv.description, "
+            "dv.data, dv.metadata "
+            "FROM diagrams d JOIN diagram_versions dv ON d.id = dv.diagram_id "
+            "AND d.current_version = dv.version "
+            "WHERE d.id = ? AND d.is_deleted = 0",
+            (diagram_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise DiagramNotFoundError(diagram_id)
+        version = row[0]
+        if expected_version is not None and version != expected_version:
+            raise DiagramVersionConflictError(version, expected_version)
+
+        data = json.loads(row[4]) if row[4] else {}
+        element_ids, relationship_ids = referenced_ids(data, operations)
+        names_and_sets = await get_element_names_and_sets(db, element_ids)
+        context = PatchContext(
+            set_id=row[1],
+            elements={
+                eid: ElementRef(name=name, set_id=set_id)
+                for eid, (name, set_id) in names_and_sets.items()
+            },
+            relationships=await get_relationship_endpoints(db, relationship_ids),
+        )
+        outcome = apply_operations(data, operations, context)
+
+        saved = await update_diagram(
+            db, diagram_id,
+            name=row[2],
+            description=row[3],
+            data=outcome.data,
+            change_summary=change_summary,
+            updated_by=updated_by,
+            expected_version=version,
+            metadata=json.loads(row[5]) if row[5] else None,
+        )
+        if saved is not None:
+            return {
+                "id": diagram_id,
+                "current_version": saved["current_version"],
+                "updated_at": saved["updated_at"],
+                "applied": len(outcome.results),
+                "results": outcome.results,
+            }
+        if expected_version is not None:
+            break
+    cursor = await db.execute(
+        "SELECT current_version FROM diagrams WHERE id = ? AND is_deleted = 0",
+        (diagram_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        raise DiagramNotFoundError(diagram_id)
+    raise DiagramVersionConflictError(row[0], expected_version)
 
 
 async def soft_delete_diagram(

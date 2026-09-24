@@ -996,6 +996,42 @@ async def _update_diagram(c: IrisClient, args: dict[str, Any]) -> str:
         return _auth_required_payload("Update diagram")
     return with_web_url(json.dumps(resp.json()), "diagram")
 
+async def _patch_diagram(c: IrisClient, args: dict[str, Any]) -> str:
+    """ADR-252 (v6.51.0, #301): atomic incremental canvas edits.
+
+    A version conflict (409) or a failing operation (422) comes back as a
+    structured ``{"success": false, "error": ..., ...}`` payload — the
+    backend's detail, incl. ``current_version`` / ``op_index`` — so the
+    model can re-read or fix the named operation.
+    """
+    expected = args.get("expected_version")
+    try:
+        result = await c.patch_diagram(
+            args["diagram_id"],
+            args.get("operations") or [],
+            expected_version=int(expected) if expected is not None else None,
+            change_summary=args.get("change_summary"),
+        )
+    except IrisAuthError:
+        return _auth_required_payload("Patch diagram")
+    except IrisHTTPError as exc:
+        detail = _structured_detail(exc)
+        if exc.status_code in (409, 422) and detail is not None:
+            return json.dumps({"success": False, **detail})
+        raise
+    return with_web_url(json.dumps(result), "diagram")
+
+
+def _structured_detail(exc: IrisHTTPError) -> dict[str, Any] | None:
+    """The backend's ``detail`` object from an error response, if it is one."""
+    if exc.response is None:
+        return None
+    try:
+        detail = exc.response.json().get("detail")
+    except (ValueError, AttributeError):
+        return None
+    return detail if isinstance(detail, dict) else None
+
 
 async def _update_element(c: IrisClient, args: dict[str, Any]) -> str:
     """ADR-178 (v6.3.0): update an Element's metadata or data.
@@ -1912,7 +1948,8 @@ TOOLS: list[Tool] = [
             "errors name the failing item's index. Call list_relationships "
             "first to avoid creating duplicates. To draw a relationship on "
             "a diagram, pass the returned id as the edge's "
-            "data.relationshipId in update_diagram, with the edge's source "
+            "data.relationshipId in an add_edge op of patch_diagram (or in "
+            "update_diagram), with the edge's source "
             "node's data.entityId = the relationship's source_element_id "
             "and its target node's = target_element_id (keep the direction "
             "so the arrow and role ends are drawn correctly) — no "
@@ -2629,7 +2666,10 @@ TOOLS: list[Tool] = [
             "Versioned — every successful update increments "
             "current_version. To re-parent a diagram, use "
             "`move_diagram`. To validate edits to `data`, the backend "
-            "applies the same checks as create_diagram."
+            "applies the same checks as create_diagram. `data` REPLACES "
+            "the whole canvas — any node or edge left out is deleted. For "
+            "small edits to an existing canvas (add/move/remove a few "
+            "nodes or edges, refresh labels) use `patch_diagram` instead."
         ),
         input_schema=_schema({
             "diagram_id": _str_arg("diagram_id", "Diagram id"),
@@ -2659,6 +2699,119 @@ TOOLS: list[Tool] = [
             ),
         }),
         handler=_update_diagram,
+    ),
+    Tool(
+        name="patch_diagram",
+        description=(
+            "Edit an existing diagram's canvas with a list of 1-200 "
+            "operations instead of resending it (v6.51.0, ADR-252) — use "
+            "this rather than update_diagram for small edits to large "
+            "diagrams. Operations apply in order and are atomic: if any "
+            "fails, nothing is written and the error names its op_index. "
+            "A successful patch creates exactly one new version and saves "
+            "like update_diagram (edges between element nodes auto-create "
+            "relationships unless data.relationshipId names one). Ops: "
+            "add_node {node: full node — id, position {x, y}, data "
+            "{label, entityType, entityId?}; entityId must be an element "
+            "in the diagram's set}; update_node {id, position? (partial), "
+            "width?, height?, type?, data? — shallow-merged, null deletes "
+            "a key}; remove_node {id, cascade_edges? (default true removes "
+            "connected edges; false fails if any)}; add_edge {edge: full "
+            "edge — id, source, target node ids, data {relationshipType, "
+            "relationshipId?}; a relationshipId must link the two nodes' "
+            "elements}; update_edge {id, data?, sourceHandle?, "
+            "targetHandle?, type?}; remove_edge {id}; sync_labels "
+            "{node_ids? — default all}: resets each node's data.label to "
+            "its element's current name, touching nothing else. Pass "
+            "expected_version (the current_version you read) to reject "
+            "the patch if the diagram changed since — you get "
+            "error=version_conflict with current_version, and nothing is "
+            "written. Returns {id, current_version, applied, results[] "
+            "(index, op, id), web_url}. Only {nodes, edges} diagrams can be "
+            "patched (use update_diagram for markdown and the like)."
+        ),
+        input_schema=_schema({
+            "diagram_id": _str_arg("diagram_id", "Diagram id"),
+            "operations": (
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "add_node", "update_node", "remove_node",
+                                    "add_edge", "update_edge", "remove_edge",
+                                    "sync_labels",
+                                ],
+                            },
+                            "id": {
+                                "type": "string",
+                                "description": "Node / edge id (update_*, remove_*)",
+                            },
+                            "node": {
+                                "type": "object", "additionalProperties": True,
+                                "description": "add_node: the full node",
+                            },
+                            "edge": {
+                                "type": "object", "additionalProperties": True,
+                                "description": "add_edge: the full edge",
+                            },
+                            "position": {
+                                "type": "object",
+                                "properties": {
+                                    "x": {"type": "number"}, "y": {"type": "number"},
+                                },
+                                "description": "update_node: partial position",
+                            },
+                            "width": {"type": "number"},
+                            "height": {"type": "number"},
+                            "type": {"type": "string"},
+                            "data": {
+                                "type": "object", "additionalProperties": True,
+                                "description": (
+                                    "update_node / update_edge: keys to set "
+                                    "(null deletes a key)"
+                                ),
+                            },
+                            "sourceHandle": {"type": ["string", "null"]},
+                            "targetHandle": {"type": ["string", "null"]},
+                            "cascade_edges": {
+                                "type": "boolean",
+                                "description": "remove_node: also remove connected edges (default true)",
+                            },
+                            "node_ids": {
+                                "type": "array", "items": {"type": "string"},
+                                "description": "sync_labels: only these nodes (default all)",
+                            },
+                        },
+                        "required": ["op"],
+                        "additionalProperties": True,
+                    },
+                    "description": "Operations to apply in order (1-200).",
+                },
+                True,
+            ),
+            "expected_version": (
+                {
+                    "type": "integer",
+                    "description": (
+                        "The diagram's current_version you read; the patch is "
+                        "rejected (nothing written) if it has changed since."
+                    ),
+                },
+                False,
+            ),
+            "change_summary": _str_arg(
+                "change_summary",
+                "Optional human-readable summary stored on the new version",
+                required=False,
+            ),
+        }),
+        handler=_patch_diagram,
     ),
     Tool(
         name="update_element",

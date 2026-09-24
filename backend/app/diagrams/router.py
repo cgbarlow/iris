@@ -17,10 +17,13 @@ from app.authz import (
     resolve_effective_set,
 )
 from app.diagrams.canvas_entities import get_canvas_entity_ids
+from app.diagrams.canvas_patch import CanvasPatchError
 from app.diagrams.models import (
     DiagramCreate,
     DiagramHierarchyNode,
     DiagramListResponse,
+    DiagramPatch,
+    DiagramPatchResponse,
     DiagramResponse,
     DiagramRollback,
     DiagramUpdate,
@@ -28,6 +31,8 @@ from app.diagrams.models import (
     ReorderRequest,
 )
 from app.diagrams.service import (
+    DiagramNotFoundError,
+    DiagramVersionConflictError,
     create_diagram,
     get_diagram,
     get_diagram_ancestors,
@@ -35,6 +40,7 @@ from app.diagrams.service import (
     get_diagram_hierarchy,
     get_diagram_versions,
     list_diagrams,
+    patch_diagram,
     reorder_siblings,
     rollback_diagram,
     set_diagram_parent,
@@ -47,6 +53,27 @@ from app.elements.service import get_elements_by_ids
 
 router = APIRouter(prefix="/api/diagrams", tags=["diagrams"])
 admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _if_match_version(
+    request: Request, *, required: bool = True,
+    missing_detail: str = "If-Match header required",
+) -> int | None:
+    """The integer version in the ``If-Match`` header (optimistic concurrency).
+
+    Missing: 428 when ``required``, else ``None``. Not an integer: 400.
+    """
+    if_match = request.headers.get("If-Match")
+    if if_match is None:
+        if required:
+            raise HTTPException(status_code=428, detail=missing_detail)
+        return None
+    try:
+        return int(if_match)
+    except ValueError:
+        raise HTTPException(  # noqa: B904
+            status_code=400, detail="If-Match must be an integer version"
+        )
 
 
 def _require_admin(current_user: dict[str, Any]) -> None:
@@ -190,17 +217,7 @@ async def update(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> DiagramResponse:
     """Update a diagram with optimistic concurrency."""
-    if_match = request.headers.get("If-Match")
-    if if_match is None:
-        raise HTTPException(
-            status_code=428, detail="If-Match header required"
-        )
-    try:
-        expected_version = int(if_match)
-    except ValueError:
-        raise HTTPException(  # noqa: B904
-            status_code=400, detail="If-Match must be an integer version"
-        )
+    expected_version = _if_match_version(request)
 
     db = request.app.state.db_manager.main_db
     # ADR-237: gate by write-scope on the diagram's collection.
@@ -222,6 +239,57 @@ async def update(
     return DiagramResponse(**diagram)  # type: ignore[arg-type]
 
 
+@router.patch("/{diagram_id}", response_model=DiagramPatchResponse)
+async def patch(
+    diagram_id: str,
+    body: DiagramPatch,
+    request: Request,
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+) -> DiagramPatchResponse:
+    """Apply 1-200 canvas operations atomically as one new version (ADR-252).
+
+    ``If-Match`` is optional: given, the patch applies only to that version
+    (409 with the current version otherwise); omitted, it applies to the
+    current version. A failing operation is a 422 naming its index, and
+    nothing is written.
+    """
+    expected_version = _if_match_version(request, required=False)
+    db = request.app.state.db_manager.main_db
+    # ADR-237/238: same write-scope gate as PUT /api/diagrams/{id}.
+    await assert_write_allowed(db, current_user, await collection_of_diagram(db, diagram_id))
+    try:
+        result = await patch_diagram(
+            db, diagram_id,
+            operations=body.operations,
+            change_summary=body.change_summary,
+            updated_by=current_user["id"],
+            expected_version=expected_version,
+        )
+    except DiagramNotFoundError:
+        raise HTTPException(status_code=404, detail="Diagram not found")  # noqa: B904
+    except DiagramVersionConflictError as exc:
+        raise HTTPException(  # noqa: B904
+            status_code=409,
+            detail={
+                "error": "version_conflict",
+                "message": str(exc),
+                "current_version": exc.current_version,
+                "expected_version": exc.expected_version,
+            },
+        )
+    except CanvasPatchError as exc:
+        raise HTTPException(  # noqa: B904
+            status_code=422,
+            detail={
+                "error": "operation_failed" if exc.op_index is not None else "invalid_patch",
+                "message": str(exc),
+                "op_index": exc.op_index,
+                "op": exc.op,
+            },
+        )
+    return DiagramPatchResponse(**result)
+
+
 @router.delete("/{diagram_id}", status_code=204)
 async def delete(
     diagram_id: str,
@@ -229,17 +297,7 @@ async def delete(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> None:
     """Soft-delete a diagram."""
-    if_match = request.headers.get("If-Match")
-    if if_match is None:
-        raise HTTPException(
-            status_code=428, detail="If-Match header required"
-        )
-    try:
-        expected_version = int(if_match)
-    except ValueError:
-        raise HTTPException(  # noqa: B904
-            status_code=400, detail="If-Match must be an integer version"
-        )
+    expected_version = _if_match_version(request)
 
     db = request.app.state.db_manager.main_db
     # ADR-237: gate by write-scope on the diagram's collection.
@@ -324,17 +382,9 @@ async def rollback(
     current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> DiagramResponse:
     """Rollback a diagram to a previous version."""
-    if_match = request.headers.get("If-Match")
-    if if_match is None:
-        raise HTTPException(
-            status_code=428, detail="If-Match header required for rollback"
-        )
-    try:
-        expected_version = int(if_match)
-    except ValueError:
-        raise HTTPException(  # noqa: B904
-            status_code=400, detail="If-Match must be an integer version"
-        )
+    expected_version = _if_match_version(
+        request, missing_detail="If-Match header required for rollback",
+    )
 
     db = request.app.state.db_manager.main_db
     # ADR-237: gate by write-scope on the diagram's collection.
