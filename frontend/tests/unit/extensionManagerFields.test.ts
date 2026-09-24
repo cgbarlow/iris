@@ -30,8 +30,9 @@ describe('Extension manager fields (v5.5.0, issue #48)', () => {
 	});
 
 	it('renders the source URL link', () => {
-		// Look for `target="_blank"` with `href` referencing the source_url.
-		expect(SRC).toMatch(/href=\{[^}]*source_url[^}]*\}[\s\S]{0,400}?target="_blank"/);
+		// Look for `target="_blank"` with `href` referencing the source URL.
+		// v5.5.5 resolves it through effectiveSourceUrl() (registry first).
+		expect(SRC).toMatch(/href=\{[^}]*(source_url|effectiveSourceUrl)[^}]*\}[\s\S]{0,400}?target="_blank"/);
 	});
 
 	it('renders Check for updates + Upgrade buttons', () => {

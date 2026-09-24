@@ -29,9 +29,9 @@ describe('Smart-tab default (#9) — Text views with content land on Canvas', ()
 	it('hasContent considers diagram.data.content for Text views', () => {
 		// The smart-tab block in loadDiagram. After the fix it must include
 		// a check on diagram.data?.content (markdown source) for Text.
-		const block = PAGE.match(/Smart default tab[\s\S]{0,400}/)?.[0]
-			?? PAGE.match(/!userSelectedTab[\s\S]{0,400}/)?.[0]
-			?? '';
+		// ADR-204 put the set's view_tab_default first, so the heuristic
+		// sits in the no-set branch: match from `isText` to the assignment.
+		const block = PAGE.match(/const isText[\s\S]*?activeTab = hasContent/)?.[0] ?? '';
 		expect(block).toMatch(/data\.?\?\.\s*content|data\?\.\s*content|data\.content/);
 		expect(block).toMatch(/text|canvasType\s*===\s*['"]text['"]|diagram_type\s*===\s*['"]text['"]/);
 	});
