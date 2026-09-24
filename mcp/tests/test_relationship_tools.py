@@ -87,20 +87,17 @@ class TestInventory:
             assert f"`{name}`" in _FALLBACK_INSTRUCTIONS
         assert "data.relationshipId" in _FALLBACK_INSTRUCTIONS
 
-    def test_server_instructions_say_relationship_reads_need_sign_in(self) -> None:
-        """GET /api/relationships[/{id}] require auth (unlike element reads),
-        so the AUTH RECOVERY text must not promise every list_* / get_*
-        works anonymously (ADR-249)."""
+    def test_server_instructions_do_not_carve_out_relationship_reads(self) -> None:
+        """ADR-251: relationship reads are anonymous like every other read,
+        so AUTH RECOVERY keeps the plain "reads work without sign-in" line."""
         from iris_mcp.server_instructions import _FALLBACK_INSTRUCTIONS
 
-        assert (
-            "except `list_relationships` / `get_relationship`, which need it"
-            in _FALLBACK_INSTRUCTIONS
-        )
+        assert "except `list_relationships`" not in _FALLBACK_INSTRUCTIONS
+        assert "work without sign-in; only writes" in _FALLBACK_INSTRUCTIONS
 
-    def test_read_tool_descriptions_say_sign_in_required(self) -> None:
+    def test_read_tool_descriptions_do_not_claim_sign_in(self) -> None:
         for name in ("list_relationships", "get_relationship"):
-            assert "sign-in" in _defs()[name].description.lower()
+            assert "sign-in" not in _defs()[name].description.lower()
 
     def test_create_description_mentions_diagram_edge_reuse(self) -> None:
         desc = _defs()["create_relationships"].description

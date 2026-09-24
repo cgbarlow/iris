@@ -27,7 +27,7 @@ or `null`) read back from `data`.
 | `backend/app/batch/models.py` | `BatchRelationshipCreateItem` (all fields optional at the model so bad rows fail per item) and `BatchRelationshipsCreate` (`relationships`, 1–100). |
 | `backend/app/batch/service.py` | `batch_create_relationships(db, items, user=)`: per item → required fields → `validate_new_relationship` → `assert_write_allowed(collection_of_element(source))` (403 detail becomes the item error) → `create_relationship(data=apply_role_fields(...))`. Errors are `"Relationship at index <i>: <reason>"`. |
 | `backend/app/batch/router.py` | `POST /api/batch/relationships/create` → `BatchResultWithIds`. |
-| `backend/app/seed/creation_prompts.py` | MCP server instructions WORKFLOW GUIDANCE names the relationship tools and the `data.relationshipId` edge reuse; AUTH RECOVERY says `list_relationships` / `get_relationship` need sign-in. |
+| `backend/app/seed/creation_prompts.py` | MCP server instructions WORKFLOW GUIDANCE names the relationship tools and the `data.relationshipId` edge reuse; AUTH RECOVERY originally said `list_relationships` / `get_relationship` need sign-in; since ADR-251 (v6.50.3) relationship reads are anonymous and the carve-out is gone. |
 | `backend/app/diagrams/service.py` | Edge auto-create: before the source/target dedup, an edge whose `data.relationshipId` names a non-deleted relationship whose `{source_element_id, target_element_id}` equals the edge's two element ids (either direction) is skipped. A `relationshipId` for other elements is ignored. |
 
 Unchanged on purpose: `create_relationship` (canvas, importers, diagram-edge
@@ -41,7 +41,7 @@ cross-set relationships remain possible there.
 | `iris-client/src/iris_client/client.py` | `create_relationships(items)`, `list_relationships(element_id=, set_id=, relationship_type=, page=, page_size=)` (returns the envelope), `get_relationship(id)`, `update_relationship(id, relationship_type=, source_role=, target_role=, label=, description=, data=, change_summary=)` (GET → merge → PUT with `If-Match: current_version`; `data` replaces stored data except `sourceRole` / `targetRole`, which carry over unless a role is passed), `delete_relationship(id)` (GET version → DELETE with `If-Match`). |
 | `mcp/src/iris_mcp/tools.py` | Tools `create_relationships` (typed item schema, `minItems` 1 / `maxItems` 100), `update_relationship`, `list_relationships` (requires `element_id` or `set_id`; otherwise returns `{"success": false, "error": "missing_scope"}`), `get_relationship`, `delete_relationship`. Auth errors return the shared `auth_required` payload; other HTTP errors surface via `dispatch` as `ERROR: HTTP <status>: <detail>`. |
 | `mcp/src/iris_mcp/server_instructions.py` | Fallback body mirrors the seed change. |
-| Tool descriptions | `create_relationships` states the edge direction (source node = `source_element_id`); `list_relationships` / `get_relationship` state they need sign-in (the REST reads use `get_current_user`). |
+| Tool descriptions | `create_relationships` states the edge direction (source node = `source_element_id`); `list_relationships` / `get_relationship` no longer mention sign-in: since ADR-251 (v6.50.3) the REST reads use `get_optional_user`. |
 | `cli/src/iris_cli/main.py` | `iris relationships list|get`; `iris create relationship` (one-item batch; exits 1 with the item error when rejected); `iris create relationships --from-json`; `iris update relationship`; `iris delete relationship`. |
 | `scripts/check_surface_parity.py` | `relationship` ∈ `_KNOWN_ENTITIES`; `_normalise_entity` maps plural names; `_batch_route_op` attributes `POST /<entities>/{create,update,delete}` on the batch router (clone/set/tags ignored). |
 
@@ -63,7 +63,7 @@ methods / tools / commands; parity checker attributes), then green:
   on an edge drawn target → source, while a `relationshipId` for other
   elements doesn't suppress the create; the single
   POST still accepts a reflexive relationship; seed instructions mention the
-  tools and that relationship reads need sign-in.
+  tools (the sign-in carve-out assertion was inverted by ADR-251).
 - `backend/tests/test_scripts/test_surface_parity.py` — known entity, batch
   route attribution, plural normalisation, and relationship
   create/update/delete present on backend, MCP and CLI with no hard

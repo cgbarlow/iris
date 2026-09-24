@@ -113,6 +113,7 @@ headers and upgrade proactively.
   - `GET /api/relationships?element_id=&set_id=&relationship_type=&page=&page_size=`
     — `element_id` matches either end; `set_id` matches when either end is
     in the set. Every item includes `source_role`, `target_role` and `data`.
+    Anonymous-friendly, as is `GET /api/relationships/{id}` (ADR-251).
   - `PUT /api/relationships/{id}` (`If-Match: <current_version>`) — full
     replace of `label` / `description` / `data`; optional
     `relationship_type` (omit to keep), `source_role` / `target_role`

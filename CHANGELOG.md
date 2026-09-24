@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.50.3] - 2026-09-24
+
+### Changed
+
+- **Relationships can be read without signing in (ADR-251).** Listing and
+  fetching relationships (`GET /api/relationships`, `GET /api/relationships/{id}`,
+  and the MCP tools `list_relationships` / `get_relationship`) now works for
+  anonymous visitors and agents, like reading elements and diagrams already
+  did. Creating, changing and deleting relationships still needs sign-in.
+
+### Fixed
+
+- **Anonymous visitors saw "Failed to load comments" (ADR-251).** Comments
+  need sign-in, so for anonymous visitors the comments panel always failed.
+  The Comments buttons, counts and panel are now hidden for anonymous
+  visitors on diagram and element pages, and no comments request is made.
+  Signed-in users see no change.
+
 ## [6.50.2] - 2026-09-24
 
 ### Security

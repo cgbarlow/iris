@@ -11,7 +11,7 @@
  */
 
 import { expect, test } from '@playwright/test';
-import { seedAdmin, loginAsAdmin } from './fixtures';
+import { createDiagram, getAuthToken, seedAdmin, loginAsAdmin } from './fixtures';
 
 test.describe('Anonymous read-only bypass (ADR-123)', () => {
 	test.describe.configure({ timeout: 60_000 });
@@ -86,5 +86,43 @@ test.describe('Anonymous read-only bypass (ADR-123)', () => {
 
 		// Admin nav items now visible.
 		await expect(page.getByRole('link', { name: /^users$/i })).toBeVisible({ timeout: 5_000 });
+	});
+
+	test('anonymous visitor sees no comments UI on a diagram (ADR-251)', async ({ page, baseURL }) => {
+		// Comments need sign-in to read or write, so an anonymous visitor
+		// used to get a "Failed to load comments" panel. The comments UI is
+		// now hidden for them, and no comments request is made.
+		const token = await getAuthToken(baseURL);
+		const diagram = await createDiagram(baseURL, token, {
+			diagram_type: 'component',
+			notation: 'simple',
+			name: `Anon comments ${Date.now()}`,
+		});
+		const commentRequests: string[] = [];
+		page.on('request', (req) => {
+			if (req.url().includes('/comments')) commentRequests.push(req.url());
+		});
+
+		await page.goto('/');
+		await page.evaluate(() => {
+			localStorage.clear();
+			sessionStorage.clear();
+		});
+		await page.goto(`/views/${diagram.id}`);
+		await expect(page.getByRole('heading', { name: String(diagram.name) })).toBeVisible({
+			timeout: 15_000,
+		});
+		await page.waitForLoadState('networkidle');
+
+		await expect(page.getByRole('button', { name: /comments/i })).toHaveCount(0);
+		await expect(page.getByText('Failed to load comments')).toHaveCount(0);
+		expect(commentRequests).toEqual([]);
+
+		// Signed in, the comments UI is back.
+		await loginAsAdmin(page);
+		await page.goto(`/views/${diagram.id}`);
+		await expect(page.getByRole('button', { name: /comments/i }).first()).toBeVisible({
+			timeout: 15_000,
+		});
 	});
 });

@@ -2016,9 +2016,7 @@ TOOLS: list[Tool] = [
             "page_size <= 100); returns {items, total, page, page_size}. "
             "Each item has id, source/target element ids and names, "
             "relationship_type, label, source_role, target_role and data. "
-            "Use it to check what exists before create_relationships. "
-            "Needs sign-in (unlike other list_* reads) — returns "
-            "auth_required when anonymous."
+            "Use it to check what exists before create_relationships."
         ),
         input_schema=_schema({
             "element_id": _str_arg(
@@ -2039,9 +2037,7 @@ TOOLS: list[Tool] = [
     Tool(
         name="get_relationship",
         description=(
-            "Fetch one relationship by id (v6.50.0, ADR-249). Needs "
-            "sign-in (unlike other get_* reads) — returns auth_required "
-            "when anonymous."
+            "Fetch one relationship by id (v6.50.0, ADR-249)."
         ),
         input_schema=_schema({
             "relationship_id": _str_arg("relationship_id", "Relationship id"),

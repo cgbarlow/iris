@@ -688,9 +688,63 @@ def test_server_instructions_seed_points_at_relationship_tools() -> None:
     ):
         assert f"`{name}`" in MCP_SERVER_INSTRUCTIONS_BODY
     assert "data.relationshipId" in MCP_SERVER_INSTRUCTIONS_BODY
-    # Relationship reads require auth (unlike element reads) — the AUTH
-    # RECOVERY text must say so.
-    assert (
-        "except `list_relationships` / `get_relationship`, which need it"
-        in MCP_SERVER_INSTRUCTIONS_BODY
-    )
+    # ADR-251: relationship reads are anonymous like every other read, so the
+    # AUTH RECOVERY text must not carve them out.
+    assert "except `list_relationships`" not in MCP_SERVER_INSTRUCTIONS_BODY
+    assert "work without sign-in; only writes" in MCP_SERVER_INSTRUCTIONS_BODY
+
+
+class TestAnonymousReads:
+    """ADR-251: relationship reads need no sign-in, like element reads
+    (ADR-123). Writes still do; a present-but-invalid token is still 401."""
+
+    async def _seed(self, client: httpx.AsyncClient) -> tuple[str, str, str, str]:
+        h = await _auth(client)
+        s = await _mk_set(client, h)
+        a = await _mk_el(client, h, s, "A")
+        b = await _mk_el(client, h, s, "B")
+        r = await _batch(client, h, [{
+            "source_element_id": a, "target_element_id": b,
+            "relationship_type": "association",
+            "source_role": "partner", "data": {"gedcom_role": "HUSB"},
+        }])
+        assert r.status_code == 200, r.text
+        return s, a, b, r.json()["ids"][0]
+
+    async def test_list_by_element_anonymous(self, client) -> None:
+        _s, a, _b, rid = await self._seed(client)
+        r = await client.get(f"/api/relationships?element_id={a}")
+        assert r.status_code == 200, r.text
+        item = r.json()["items"][0]
+        assert item["id"] == rid
+        assert item["source_role"] == "partner"
+        assert item["data"]["gedcom_role"] == "HUSB"
+
+    async def test_list_by_set_and_type_anonymous(self, client) -> None:
+        s, _a, _b, rid = await self._seed(client)
+        r = await client.get(
+            f"/api/relationships?set_id={s}&relationship_type=association",
+        )
+        assert r.status_code == 200, r.text
+        assert [i["id"] for i in r.json()["items"]] == [rid]
+
+    async def test_get_one_anonymous(self, client) -> None:
+        _s, _a, _b, rid = await self._seed(client)
+        r = await client.get(f"/api/relationships/{rid}")
+        assert r.status_code == 200, r.text
+        assert r.json()["id"] == rid
+
+    async def test_invalid_token_still_rejected(self, client) -> None:
+        _s, _a, _b, rid = await self._seed(client)
+        bad = {"Authorization": "Bearer not-a-token"}
+        assert (await client.get(f"/api/relationships/{rid}", headers=bad)).status_code == 401
+        assert (await client.get("/api/relationships", headers=bad)).status_code == 401
+
+    async def test_writes_still_need_sign_in(self, client) -> None:
+        _s, _a, _b, rid = await self._seed(client)
+        r = await client.put(
+            f"/api/relationships/{rid}", json={"data": {}}, headers={"If-Match": "1"},
+        )
+        assert r.status_code == 401
+        r = await client.delete(f"/api/relationships/{rid}", headers={"If-Match": "1"})
+        assert r.status_code == 401
