@@ -66,6 +66,11 @@ delete_app = typer.Typer(
     no_args_is_help=True,
 )
 move_app = typer.Typer(help="Re-parent entities (diagram / package / set).", no_args_is_help=True)
+# v6.51.0 (ADR-252): incremental, atomic edits (parity with MCP patch_diagram).
+patch_app = typer.Typer(
+    help="Apply incremental, atomic edits (diagram canvas — ADR-252).",
+    no_args_is_help=True,
+)
 render_app = typer.Typer(help="Render diagrams or markdown to md/docx/pdf artefacts.", no_args_is_help=True)
 
 app.add_typer(diagrams_app, name="diagrams")
@@ -82,6 +87,7 @@ app.add_typer(create_app, name="create")
 app.add_typer(update_app, name="update")
 app.add_typer(delete_app, name="delete")
 app.add_typer(move_app, name="move")
+app.add_typer(patch_app, name="patch")
 app.add_typer(render_app, name="render")
 
 
@@ -1730,6 +1736,48 @@ def aggregate_cmd(
                 "POST", "/api/aggregation/run", json=body,
             )
             return resp.json()
+    output.print_json(_run(_do()))
+
+
+# ── iris patch ─────────────────────────────────────────────────────────────
+
+
+@patch_app.command("diagram")
+def patch_diagram_cmd(
+    diagram_id: str = typer.Argument(...),
+    from_json: str = typer.Option(
+        ...,
+        "--from-json",
+        help=(
+            "Path to a JSON file, or '-' for stdin. Format: "
+            '{"operations": [{"op": "add_node", "node": {...}}, '
+            '{"op": "update_node", "id": "...", "position": {"x": 0}}, '
+            '{"op": "remove_node", "id": "...", "cascade_edges": true}, '
+            '{"op": "add_edge", "edge": {...}}, '
+            '{"op": "update_edge", "id": "...", "data": {...}}, '
+            '{"op": "remove_edge", "id": "..."}, '
+            '{"op": "sync_labels", "node_ids": ["..."]}]} (1-200 ops).'
+        ),
+    ),
+    expected_version: int | None = typer.Option(
+        None, "--expected-version",
+        help="Reject (exit 1, nothing written) unless the diagram is at this version.",
+    ),
+    change_summary: str | None = typer.Option(None, "--change-summary"),
+) -> None:
+    """Edit a diagram's canvas with ordered operations, atomically, as one
+    new version (v6.51.0, ADR-252). Any failing operation fails the whole
+    patch (exit 1, the error names its index) and nothing is written."""
+    body = _load_batch_payload(from_json, key="operations")
+
+    async def _do() -> dict[str, Any]:
+        async with _client() as c:
+            return await c.patch_diagram(
+                diagram_id, body["operations"],
+                expected_version=expected_version,
+                change_summary=change_summary,
+            )
+
     output.print_json(_run(_do()))
 
 

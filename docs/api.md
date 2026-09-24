@@ -122,6 +122,29 @@ headers and upgrade proactively.
   - A returned id can be set as a diagram edge's `data.relationshipId` in
     `PUT /api/diagrams/{id}`; saving the diagram does not create a second
     relationship for that source/target pair.
+- **`PATCH /api/diagrams/{id}`** — incremental canvas edits (ADR-252,
+  v6.51.0). Body `{"operations": [...], "change_summary"?}` with 1–200
+  operations, each an object with an `op`:
+  `add_node {node}`, `update_node {id, position?, width?, height?, type?,
+  data?}`, `remove_node {id, cascade_edges?=true}`, `add_edge {edge}`,
+  `update_edge {id, data?, sourceHandle?, targetHandle?, type?}`,
+  `remove_edge {id}`, `sync_labels {node_ids?}`. `data` in the update ops
+  is shallow-merged (`null` deletes a key). Operations apply in order and
+  atomically: the response `{id, current_version, updated_at, applied,
+  results[]}` describes one new version (each result has the op's `index`,
+  `op` and affected `id`; `remove_node` adds `removed_edges`, `sync_labels`
+  returns `ids` changed and `skipped` nodes whose element is gone). A
+  failing operation → `422` with `detail: {error: "operation_failed",
+  op_index, op, message}` and nothing written. `If-Match: <version>` is
+  optional; on a mismatch → `409` with `detail: {error:
+  "version_conflict", current_version, expected_version, message}`.
+  Validation: `add_node`'s `data.entityId` must be a live element in the
+  diagram's set; node and edge ids must be new; edges must join existing
+  nodes and a `data.relationshipId` must link the two nodes' elements
+  (either direction). Only `{nodes, edges}` canvases can be patched. The
+  new canvas is saved through the same path as `PUT`, so the stored data
+  and side effects (relationship auto-create, search, thumbnails) match a
+  full update. Same write-scope rules as `PUT`.
 - **`GET /api/diagrams/{id}/elements`** — every element drawn on the
   diagram's current canvas, in one call (ADR-248). Each item is identical
   to `GET /api/elements/{id}` (tags, relationship and diagram-usage counts

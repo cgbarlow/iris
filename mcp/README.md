@@ -140,10 +140,22 @@ ADR-123/129).
     and `get_relationship(relationship_id)` — items include roles and
     `data`. Like other reads, these work without sign-in (ADR-251).
   - `delete_relationship(relationship_id)` — soft delete.
-  - Pass a returned id as an edge's `data.relationshipId` in
-    `update_diagram` to draw it without creating a duplicate. Keep the
+  - Pass a returned id as an edge's `data.relationshipId` in a
+    `patch_diagram` `add_edge` op (or `update_diagram`) to draw it without
+    creating a duplicate. Keep the
     edge's source node on the relationship's source element so the
     arrow and role ends point the right way.
+- **Diagram patch tool** (v6.51.0, ADR-252):
+  - `patch_diagram(diagram_id, operations=[...], expected_version?, change_summary?)`
+    — edit an existing canvas with 1–200 ordered operations instead of
+    resending it through `update_diagram`: `add_node`, `update_node`,
+    `remove_node` (`cascade_edges`, default true), `add_edge`,
+    `update_edge`, `remove_edge`, `sync_labels` (reset node labels to
+    their elements' current names). Atomic — a failing op writes nothing
+    and returns `{success: false, error: "operation_failed", op_index,
+    message}`; one new version per successful patch. With
+    `expected_version`, a stale read returns `error: "version_conflict"`
+    and the `current_version`.
 - **Render tools** (v6.2.0, ADR-179):
   - `render_diagram(diagram_id, format)` and
     `render_markdown(markdown, title, format)` — produce md/docx/pdf

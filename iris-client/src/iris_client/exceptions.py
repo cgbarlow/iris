@@ -61,4 +61,9 @@ def _extract_detail(response: httpx.Response) -> str:
         detail = payload["detail"]
         if isinstance(detail, str):
             return detail
+        # ADR-252: structured details (e.g. PATCH /api/diagrams/{id}'s
+        # {error, message, op_index, ...}) carry a human-readable message;
+        # the full object stays available on ``exc.response``.
+        if isinstance(detail, dict) and isinstance(detail.get("message"), str):
+            return detail["message"]
     return str(payload)

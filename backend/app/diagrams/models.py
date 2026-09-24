@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
+
+from app.diagrams.canvas_patch import MAX_OPERATIONS
 
 
 class DiagramCreate(BaseModel):
@@ -26,6 +30,28 @@ class DiagramUpdate(BaseModel):
     data: dict[str, object] = Field(default_factory=dict)
     change_summary: str | None = None
     metadata: dict[str, object] | None = None
+
+
+class DiagramPatch(BaseModel):
+    """Request body for ``PATCH /api/diagrams/{id}`` (ADR-252).
+
+    Each operation is a JSON object with an ``op`` field; the canvas-patch
+    engine (``app.diagrams.canvas_patch``) validates them, so every op
+    error comes back naming its index.
+    """
+
+    operations: list[dict[str, Any]] = Field(min_length=1, max_length=MAX_OPERATIONS)
+    change_summary: str | None = None
+
+
+class DiagramPatchResponse(BaseModel):
+    """Result of a diagram patch: the new version and one result per op."""
+
+    id: str
+    current_version: int
+    updated_at: str
+    applied: int
+    results: list[dict[str, Any]]
 
 
 class DiagramRollback(BaseModel):

@@ -10,6 +10,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from app.common.id_chunks import id_chunks
+
 if TYPE_CHECKING:
     import aiosqlite
     from app.db.adapter import DatabasePort
@@ -207,6 +209,25 @@ async def get_relationship(
     if row is None:
         return None
     return _row_to_relationship(row)
+
+
+async def get_relationship_endpoints(
+    db: DatabasePort,
+    relationship_ids: list[str],
+) -> dict[str, tuple[str, str]]:
+    """``{id: (source_element_id, target_element_id)}`` for the live
+    relationships among the ids — one query per chunk (ADR-252)."""
+    found: dict[str, tuple[str, str]] = {}
+    for chunk in id_chunks(relationship_ids):
+        placeholders = ",".join("?" for _ in chunk)
+        cursor = await db.execute(
+            "SELECT id, source_element_id, target_element_id "  # noqa: S608
+            f"FROM relationships WHERE id IN ({placeholders}) AND is_deleted = 0",
+            tuple(chunk),
+        )
+        for row in await cursor.fetchall():
+            found[row[0]] = (row[1], row[2])
+    return found
 
 
 async def list_relationships(

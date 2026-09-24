@@ -7,6 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from app.common.id_chunks import ID_CHUNK_SIZE, id_chunks
 from app.common.nullable_filter import parse_nullable_id
 from app.authz.collection_resolver import resolve_effective_set
 from app.elements.diagram_usage import count_diagram_usage
@@ -263,10 +264,9 @@ _ELEMENT_DETAIL_SELECT = (
     "LEFT JOIN sets s ON e.set_id = s.id "
 )
 
-# ADR-248: ids per IN-list. The relationship-count query binds each chunk
-# twice, so 400 keeps every statement under SQLite's historical
-# 999-variable limit (and far under PostgreSQL's 32767).
-_ID_CHUNK_SIZE = 400
+# ADR-248: ids per IN-list (the relationship-count query binds each chunk
+# twice); the shared default from app.common.id_chunks (ADR-252).
+_ID_CHUNK_SIZE = ID_CHUNK_SIZE
 
 
 def _element_detail_from_row(row: Any) -> dict[str, object]:
@@ -439,6 +439,31 @@ async def get_elements_by_ids(
             element["diagram_usage_count"] = usage[eid]
 
     return [found[eid] for eid in ordered if eid in found]
+
+
+async def get_element_names_and_sets(
+    db: DatabasePort,
+    element_ids: list[str],
+) -> dict[str, tuple[str, str | None]]:
+    """``{id: (current name, set_id)}`` for the live elements among the ids.
+
+    The lean lookup behind diagram patches (ADR-252): one query per
+    chunk of ids, none of the tag / relationship / usage enrichment that
+    :func:`get_elements_by_ids` does. Deleted or unknown ids are absent.
+    """
+    found: dict[str, tuple[str, str | None]] = {}
+    for chunk in id_chunks(element_ids, _ID_CHUNK_SIZE):
+        placeholders = ",".join("?" for _ in chunk)
+        cursor = await db.execute(
+            "SELECT e.id, ev.name, e.set_id FROM elements e "  # noqa: S608
+            "JOIN element_versions ev ON e.id = ev.element_id "
+            "  AND e.current_version = ev.version "
+            f"WHERE e.id IN ({placeholders}) AND e.is_deleted = 0",
+            tuple(chunk),
+        )
+        for row in await cursor.fetchall():
+            found[row[0]] = (row[1], row[2])
+    return found
 
 
 async def list_elements(

@@ -239,6 +239,91 @@ class TestRelationshipToolsEndToEnd:
             assert remaining["total"] == 1
 
 
+class TestPatchDiagramEndToEnd:
+    """ADR-252 (v6.51.0, #301): the MCP patch_diagram tool against a real
+    backend — incremental add + relationship edge, sync_labels after a
+    rename, a failing op writing nothing, and an expected_version conflict."""
+
+    @pytest.mark.asyncio
+    async def test_patch_lifecycle(
+        self, backend_transport: httpx.ASGITransport,
+    ) -> None:
+        from iris_client import IrisClient
+        from iris_mcp import tools
+
+        base, pat = await _setup_admin_and_pat(backend_transport)
+
+        async def call(name: str, args: dict) -> dict:
+            out = await tools.dispatch(name, client, args)
+            return json.loads(out[0].text)
+
+        async with IrisClient(url=base, token=pat, transport=backend_transport) as client:
+            s1 = (await client._request(
+                "POST", "/api/sets", json={"name": "Family"},
+            )).json()["id"]
+            els = await call("create_elements", {"elements": [
+                {"element_type": "object", "name": "Peter", "set_id": s1},
+                {"element_type": "object", "name": "Elizabeth", "set_id": s1},
+            ]})
+            peter, liz = els["ids"]
+            rel = (await call("create_relationships", {"relationships": [
+                {"source_element_id": peter, "target_element_id": liz,
+                 "relationship_type": "association"},
+            ]}))["ids"][0]
+            diagram = (await client._request("POST", "/api/diagrams", json={
+                "diagram_type": "class", "name": "Tree", "set_id": s1,
+                "notation": "uml",
+                "data": {"nodes": [
+                    {"id": "n-p", "type": "object", "position": {"x": 0, "y": 0},
+                     "data": {"label": "Peter (single-parent family)",
+                              "entityType": "object", "entityId": peter}},
+                ], "edges": []},
+            })).json()
+
+            patched = await call("patch_diagram", {
+                "diagram_id": diagram["id"], "expected_version": 1,
+                "change_summary": "Add Elizabeth",
+                "operations": [
+                    {"op": "add_node", "node": {
+                        "id": "n-l", "type": "object", "position": {"x": 300, "y": 0},
+                        "data": {"label": "Elizabeth", "entityType": "object",
+                                 "entityId": liz}}},
+                    {"op": "add_edge", "edge": {
+                        "id": "e1", "source": "n-l", "target": "n-p",
+                        "type": "association",
+                        "data": {"relationshipType": "association",
+                                 "relationshipId": rel}}},
+                    {"op": "sync_labels"},
+                ],
+            })
+            assert patched["current_version"] == 2
+            assert patched["applied"] == 3
+            assert patched["results"][2]["ids"] == ["n-p"]
+            listed = await call("list_relationships", {"element_id": liz})
+            assert listed["total"] == 1  # reversed edge reused rel, no duplicate
+
+            failed = await call("patch_diagram", {
+                "diagram_id": diagram["id"],
+                "operations": [{"op": "remove_node", "id": "n-l",
+                                "cascade_edges": False}],
+            })
+            assert failed["success"] is False
+            assert failed["op_index"] == 0
+
+            stale = await call("patch_diagram", {
+                "diagram_id": diagram["id"], "expected_version": 1,
+                "operations": [{"op": "remove_edge", "id": "e1"}],
+            })
+            assert stale["error"] == "version_conflict"
+            assert stale["current_version"] == 2
+
+            got = await client.get_diagram(diagram["id"])
+            assert got.current_version == 2
+            labels = {n["id"]: n["data"]["label"] for n in got.data["nodes"]}
+            assert labels == {"n-p": "Peter", "n-l": "Elizabeth"}
+            assert [e["id"] for e in got.data["edges"]] == ["e1"]
+
+
 def test_cli_dispatch_noop() -> None:
     """Sanity: the Typer app imports cleanly; no commands shell out at import."""
     from iris_cli.main import app

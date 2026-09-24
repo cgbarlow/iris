@@ -816,6 +816,38 @@ class IrisClient:
         response = await self._request("POST", "/api/diagrams", json=body)
         return Diagram.model_validate(response.json())
 
+    async def patch_diagram(
+        self,
+        diagram_id: str,
+        operations: list[dict[str, Any]],
+        *,
+        expected_version: int | None = None,
+        change_summary: str | None = None,
+    ) -> dict[str, Any]:
+        """Apply 1-200 canvas operations atomically (PATCH /api/diagrams/{id}).
+
+        ADR-252. Operations (``add_node``, ``update_node``, ``remove_node``,
+        ``add_edge``, ``update_edge``, ``remove_edge``, ``sync_labels``) apply
+        in order and produce one new version. ``expected_version`` is sent
+        as ``If-Match``: on a mismatch the backend answers 409 with the
+        current version and writes nothing. A failing operation is a 422
+        naming its index; nothing is written. Both raise ``IrisHTTPError``
+        whose ``response`` carries the structured ``detail``. Returns
+        ``{id, current_version, updated_at, applied, results}``. Auth
+        required.
+        """
+        body: dict[str, Any] = {"operations": operations}
+        if change_summary is not None:
+            body["change_summary"] = change_summary
+        headers = (
+            {"If-Match": str(expected_version)} if expected_version is not None else None
+        )
+        response = await self._request(
+            "PATCH", f"/api/diagrams/{diagram_id}", json=body, headers=headers,
+        )
+        payload: dict[str, Any] = response.json()
+        return payload
+
     async def apply_diagram_creation(
         self,
         set_id: str,

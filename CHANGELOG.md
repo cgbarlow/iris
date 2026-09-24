@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.51.0] - 2026-09-24
+
+### Added
+
+- **Agents can make small edits to large diagrams without resending them
+  (ADR-252, #301).** Until now the only way to change a diagram through MCP
+  was `update_diagram`, which replaces the whole canvas: adding 13 people
+  and 10 lines to the 274-node Full Family Tree meant sending about 170 KB
+  back, and any node the agent dropped along the way was silently deleted.
+  The new MCP tool `patch_diagram` takes a list of 1–200 changes instead —
+  add, update or remove a node; add, update or remove an edge; and
+  `sync_labels` — and applies them in order as one new version. If any
+  change is invalid, nothing is saved and the error says which one (by its
+  position in the list) and why. The CLI gains the same as
+  `iris patch diagram <id> --from-json changes.json`, and the REST API as
+  `PATCH /api/diagrams/{id}`.
+- **Edits from different people no longer overwrite each other unnoticed.**
+  Pass `expected_version` (the version you last read; `If-Match` on the REST
+  call) and the patch is refused, with the diagram's current version in the
+  reply, if anyone has saved the diagram since. Without it, the patch is
+  applied to whatever the latest version is.
+- **`sync_labels` refreshes stale node labels.** Labels are copied from
+  elements when a node is drawn, so a later rename (for example "Peter
+  Barlow (single-parent family)" → "Peter Barlow ⚭ Elizabeth Short") stayed
+  on the canvas. `sync_labels` sets each node's label back to its element's
+  current name — for every node, or only the ones you list — and leaves
+  positions, sizes and styling exactly as they were.
+- Checks on each change: a new node's element must belong to the diagram's
+  set and a node id can't be reused; a new edge must join existing nodes,
+  and if it names a relationship, that relationship must connect those two
+  nodes' elements (either way round). Removing a node removes its edges too
+  unless you ask it not to; a node that other nodes are nested inside
+  can't be removed until they are.
+- A patch is saved exactly as a full update with the same canvas would be:
+  same stored diagram, same search index and thumbnails, and new edges
+  between elements create relationships the same way (without duplicating
+  one an edge already names).
+- The MCP server's instructions now point agents at `patch_diagram` for
+  small edits, and `update_diagram`'s description warns that it replaces
+  the whole canvas.
+
+### Fixed
+
+- Two saves of the same diagram landing at the same moment could both
+  claim the same new version. The save now only goes ahead if the diagram
+  is still at the version it read; otherwise it reports a version conflict
+  and writes nothing.
+
 ## [6.50.3] - 2026-09-24
 
 ### Changed
