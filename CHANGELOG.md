@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.51.2] - 2026-09-24
+
+### Fixed
+
+- **A bad `.eap` upload could return a server error (ADR-254, #307).** On a
+  server without `mdbtools`, importing a file with an `.eap` extension that
+  isn't really a Sparx EA (JET4) database returned HTTP 500. The file is now
+  checked first, so it gets a clear 400 "File is not a JET4 (MDB) file"
+  everywhere. The hosted service was not affected, because it has `mdbtools`.
+- **Test suites are green again (ADR-254, #307).** 24 failures that were
+  already on `main` across the frontend, backend and MCP suites are fixed, and 8
+  backend startup tests that had stopped running now run. Nothing changes for
+  users.
+
 ## [6.51.1] - 2026-09-24
 
 ### Changed
