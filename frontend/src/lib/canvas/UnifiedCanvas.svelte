@@ -6,6 +6,7 @@
 	 */
 	import { setContext } from 'svelte';
 	import { SvelteFlow, SvelteFlowProvider, Controls, Background } from '@xyflow/svelte';
+	import { CANVAS_MIN_ZOOM } from '$lib/canvas/zoom';
 	import { ConnectionMode } from '@xyflow/system';
 	import type { Connection, Edge } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
@@ -325,6 +326,7 @@
 			nodeTypes={unifiedNodeTypes}
 			edgeTypes={unifiedEdgeTypes}
 			fitView
+			minZoom={CANVAS_MIN_ZOOM}
 			{fitViewOptions}
 			onnodeclick={handleNodeClick}
 			onpaneclick={handlePaneClick}
@@ -347,6 +349,7 @@
 			nodeTypes={unifiedNodeTypes}
 			edgeTypes={unifiedEdgeTypes}
 			fitView
+			minZoom={CANVAS_MIN_ZOOM}
 			{fitViewOptions}
 			connectionMode={ConnectionMode.Loose}
 			onnodeclick={handleNodeClick}

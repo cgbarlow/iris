@@ -4,6 +4,7 @@
 	 * node/edge types, zoom/pan, keyboard navigation, and ARIA announcer.
 	 */
 	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
+	import { CANVAS_MIN_ZOOM } from '$lib/canvas/zoom';
 	import { ConnectionMode } from '@xyflow/system';
 	import '@xyflow/svelte/dist/style.css';
 
@@ -187,6 +188,7 @@
 		nodeTypes={simpleViewNodeTypes}
 		edgeTypes={simpleViewEdgeTypes}
 		fitView
+		minZoom={CANVAS_MIN_ZOOM}
 		connectionMode={ConnectionMode.Loose}
 		onnodeclick={handleNodeClick}
 		onedgeclick={handleEdgeClick}

@@ -4,6 +4,7 @@
 	 * Selects the appropriate node/edge type registries based on viewType prop.
 	 */
 	import { SvelteFlow, Controls, Background } from '@xyflow/svelte';
+	import { CANVAS_MIN_ZOOM } from '$lib/canvas/zoom';
 	import { ConnectionMode } from '@xyflow/system';
 	import '@xyflow/svelte/dist/style.css';
 
@@ -193,6 +194,7 @@
 		{nodeTypes}
 		{edgeTypes}
 		fitView
+		minZoom={CANVAS_MIN_ZOOM}
 		connectionMode={ConnectionMode.Loose}
 		onnodeclick={handleNodeClick}
 		onedgeclick={handleEdgeClick}

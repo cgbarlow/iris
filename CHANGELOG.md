@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.51.1] - 2026-09-24
+
+### Changed
+
+- **Diagrams zoom out much further (ADR-253).** Canvases could only zoom out
+  to 50%, so a large diagram such as a family tree opened with most of it off
+  screen. Every canvas now zooms out to 5%, and fit-to-view (on load, from the
+  fit button or the keyboard shortcut) shows the whole diagram.
+
 ## [6.51.0] - 2026-09-24
 
 ### Added
