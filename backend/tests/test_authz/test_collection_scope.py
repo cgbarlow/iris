@@ -11,129 +11,28 @@ these tests specifically drive a *scoped* ``architect`` user end-to-end.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-import httpx
-import pytest
-
-from app.config import AppConfig, AuthConfig, DatabaseConfig
-from app.database import DatabaseManager
-from app.main import create_app
-from app.startup import initialize_databases
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-    from pathlib import Path
-
-_ARCH_PW = "ArchitectPass123!"
-
-
-@pytest.fixture
-def app_config(tmp_path: Path) -> AppConfig:
-    return AppConfig(
-        debug=True,
-        cors_origins=["http://localhost:5173"],
-        database=DatabaseConfig(data_dir=str(tmp_path / "data")),
-        auth=AuthConfig(
-            jwt_secret="test-secret-key-that-is-at-least-32-bytes-long-for-hs256",
-            argon2_time_cost=1,
-            argon2_memory_cost=8192,
-            argon2_parallelism=1,
-        ),
-    )
-
-
-@pytest.fixture
-async def ctx(
-    app_config: AppConfig,
-) -> AsyncIterator[tuple[httpx.AsyncClient, DatabaseManager]]:
-    application = create_app(app_config)
-    db_manager = DatabaseManager(app_config)
-    await initialize_databases(db_manager)
-    application.state.db_manager = db_manager
-    transport = httpx.ASGITransport(app=application)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c, db_manager
-    await db_manager.close()
-
-
-async def _admin_headers(client: httpx.AsyncClient) -> dict[str, str]:
-    await client.post(
-        "/api/auth/setup", json={"username": "admin", "password": "AdminPass123!"}
-    )
-    r = await client.post(
-        "/api/auth/login", json={"username": "admin", "password": "AdminPass123!"}
-    )
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
-
-
-async def _create_architect(
-    client: httpx.AsyncClient, admin_headers: dict[str, str], username: str = "arch"
-) -> str:
-    r = await client.post(
-        "/api/users",
-        json={"username": username, "password": _ARCH_PW, "role": "architect"},
-        headers=admin_headers,
-    )
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
-
-
-async def _login(client: httpx.AsyncClient, username: str) -> dict[str, str]:
-    r = await client.post(
-        "/api/auth/login", json={"username": username, "password": _ARCH_PW}
-    )
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
-
-
-async def _add_scope(db_manager: DatabaseManager, user_id: str, *collection_ids: str) -> None:
-    db = db_manager.main_db
-    for cid in collection_ids:
-        await db.execute(
-            "INSERT INTO user_collection_scope (user_id, collection_id) VALUES (?, ?)",
-            (user_id, cid),
-        )
-    await db.commit()
-
-
-async def _mk_collection(client: httpx.AsyncClient, headers: dict[str, str], name: str) -> str:
-    r = await client.post("/api/collections", json={"name": name}, headers=headers)
-    assert r.status_code == 201, r.text
-    return r.json()["id"]
-
-
-async def _mk_set(
-    client: httpx.AsyncClient, headers: dict[str, str], name: str, collection_id: str
-) -> httpx.Response:
-    return await client.post(
-        "/api/sets", json={"name": name, "collection_id": collection_id}, headers=headers
-    )
-
-
-async def _mk_element(
-    client: httpx.AsyncClient, headers: dict[str, str], set_id: str, name: str
-) -> dict:
-    r = await client.post(
-        "/api/elements",
-        json={"element_type": "component", "name": name, "data": {}, "set_id": set_id},
-        headers=headers,
-    )
-    assert r.status_code == 201, r.text
-    return r.json()
+from tests.test_authz.scope_helpers import (
+    add_scope,
+    admin_headers,
+    create_architect,
+    login,
+    mk_collection,
+    mk_element,
+    mk_set,
+)
 
 
 class TestCollectionWriteScope:
     async def test_scoped_user_writes_inside_scope(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
 
         # set + package + element all succeed inside collection A
-        s = await _mk_set(client, arch, "set-in-a", coll_a)
+        s = await mk_set(client, arch, "set-in-a", coll_a)
         assert s.status_code == 201, s.text
         set_id = s.json()["id"]
         pkg = await client.post(
@@ -149,17 +48,17 @@ class TestCollectionWriteScope:
 
     async def test_scoped_user_403_outside_scope(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
         # admin seeds a set inside B
-        set_b = (await _mk_set(client, admin, "set-in-b", coll_b)).json()["id"]
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        set_b = (await mk_set(client, admin, "set-in-b", coll_b)).json()["id"]
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
 
         # creating a set in B is denied
-        denied = await _mk_set(client, arch, "nope", coll_b)
+        denied = await mk_set(client, arch, "nope", coll_b)
         assert denied.status_code == 403, denied.text
         # creating an element in B's set is denied
         el = await client.post(
@@ -171,16 +70,16 @@ class TestCollectionWriteScope:
 
     async def test_scoped_user_update_element_gated_by_collection(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
-        set_b = (await _mk_set(client, admin, "sb", coll_b)).json()["id"]
-        el_a = await _mk_element(client, admin, set_a, "ea")
-        el_b = await _mk_element(client, admin, set_b, "eb")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
+        set_b = (await mk_set(client, admin, "sb", coll_b)).json()["id"]
+        el_a = await mk_element(client, admin, set_a, "ea")
+        el_b = await mk_element(client, admin, set_b, "eb")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
 
         # update inside scope (A) → 200
         ok = await client.put(
@@ -199,56 +98,56 @@ class TestCollectionWriteScope:
 
     async def test_unscoped_user_unaffected(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_b = await _mk_collection(client, admin, "B")
-        await _create_architect(client, admin)  # NO scope rows
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_b = await mk_collection(client, admin, "B")
+        await create_architect(client, admin)  # NO scope rows
+        arch = await login(client, "arch")
         # writes everywhere, as before ADR-237
-        s = await _mk_set(client, arch, "free", coll_b)
+        s = await mk_set(client, arch, "free", coll_b)
         assert s.status_code == 201, s.text
 
     async def test_admin_bypasses_even_with_scope_rows(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
         # find admin id and scope them to A only
         cur = await dbm.main_db.execute("SELECT id FROM users WHERE username = 'admin'")
         admin_id = (await cur.fetchone())[0]
-        await _add_scope(dbm, admin_id, coll_a)
+        await add_scope(dbm, admin_id, coll_a)
         # admin still writes in B
-        s = await _mk_set(client, admin, "admin-set-b", coll_b)
+        s = await mk_set(client, admin, "admin-set-b", coll_b)
         assert s.status_code == 201, s.text
 
     async def test_scoped_user_cannot_create_collection(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         r = await client.post("/api/collections", json={"name": "new"}, headers=arch)
         assert r.status_code == 403, r.text
 
     async def test_scoped_user_cannot_delete_collection_even_in_scope(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         r = await client.delete(f"/api/collections/{coll_a}", headers=arch)
         assert r.status_code == 403, r.text
 
     async def test_scoped_user_cannot_create_global_template(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
-        el = await _mk_element(client, admin, set_a, "e")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
+        el = await mk_element(client, admin, set_a, "e")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         r = await client.post(
             "/api/element-templates",
             json={
@@ -262,13 +161,13 @@ class TestCollectionWriteScope:
 
     async def test_set_move_across_boundary_denied(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         # moving an in-scope set OUT to B (not in scope) is denied
         r = await client.put(
             f"/api/sets/{set_a}",
@@ -279,16 +178,16 @@ class TestCollectionWriteScope:
 
     async def test_comment_create_gated_by_collection(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
-        set_b = (await _mk_set(client, admin, "sb", coll_b)).json()["id"]
-        el_a = await _mk_element(client, admin, set_a, "ea")
-        el_b = await _mk_element(client, admin, set_b, "eb")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
+        set_b = (await mk_set(client, admin, "sb", coll_b)).json()["id"]
+        el_a = await mk_element(client, admin, set_a, "ea")
+        el_b = await mk_element(client, admin, set_b, "eb")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
 
         ok = await client.post(
             f"/api/elements/{el_a['id']}/comments",
@@ -303,14 +202,14 @@ class TestCollectionWriteScope:
 
     async def test_reads_unaffected_for_scoped_user(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
-        set_b = (await _mk_set(client, admin, "sb", coll_b)).json()["id"]
-        el_b = await _mk_element(client, admin, set_b, "eb")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
+        set_b = (await mk_set(client, admin, "sb", coll_b)).json()["id"]
+        el_b = await mk_element(client, admin, set_b, "eb")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         # reads outside scope still succeed
         assert (await client.get(f"/api/sets/{set_b}", headers=arch)).status_code == 200
         assert (await client.get(f"/api/elements/{el_b['id']}", headers=arch)).status_code == 200
@@ -320,25 +219,25 @@ class TestCollectionWriteScope:
 class TestAuthMeWriteScope:
     async def test_scoped_user_me_lists_scope(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         me = (await client.get("/api/auth/me", headers=arch)).json()
         assert me["write_scope"] == [coll_a]
 
     async def test_unscoped_user_me_null_scope(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        await _create_architect(client, admin)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        await create_architect(client, admin)
+        arch = await login(client, "arch")
         me = (await client.get("/api/auth/me", headers=arch)).json()
         assert me["write_scope"] is None
 
     async def test_admin_me_null_scope(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
+        admin = await admin_headers(client)
         me = (await client.get("/api/auth/me", headers=admin)).json()
         assert me["write_scope"] is None
 
@@ -350,17 +249,17 @@ class TestScopeConsistencyADR238:
 
     async def test_create_under_package_without_set_id_then_update(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
         pkg = (
             await client.post(
                 "/api/packages", json={"name": "p", "set_id": set_a}, headers=admin
             )
         ).json()
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
 
         # Diagram created with ONLY parent_package_id (the canvas/hierarchy shape)
         dg = await client.post(
@@ -400,11 +299,11 @@ class TestScopeConsistencyADR238:
 
     async def test_element_create_without_context_denied_for_scoped(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
         # No set_id and no package_id → resolves to the Default set (collection
         # NULL) → 403 for a scoped user.
         r = await client.post(
@@ -414,8 +313,8 @@ class TestScopeConsistencyADR238:
         )
         assert r.status_code == 403, r.text
         # An UNSCOPED architect can still do it (lands in Default) — unchanged.
-        await _create_architect(client, admin, username="free")
-        free = await _login(client, "free")
+        await create_architect(client, admin, username="free")
+        free = await login(client, "free")
         r2 = await client.post(
             "/api/elements",
             json={"element_type": "component", "name": "e", "data": {}},
@@ -425,18 +324,18 @@ class TestScopeConsistencyADR238:
 
     async def test_relationship_create_gated_by_collection(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        coll_b = await _mk_collection(client, admin, "B")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
-        set_b = (await _mk_set(client, admin, "sb", coll_b)).json()["id"]
-        a1 = await _mk_element(client, admin, set_a, "a1")
-        a2 = await _mk_element(client, admin, set_a, "a2")
-        b1 = await _mk_element(client, admin, set_b, "b1")
-        b2 = await _mk_element(client, admin, set_b, "b2")
-        uid = await _create_architect(client, admin)
-        await _add_scope(dbm, uid, coll_a)
-        arch = await _login(client, "arch")
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        coll_b = await mk_collection(client, admin, "B")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
+        set_b = (await mk_set(client, admin, "sb", coll_b)).json()["id"]
+        a1 = await mk_element(client, admin, set_a, "a1")
+        a2 = await mk_element(client, admin, set_a, "a2")
+        b1 = await mk_element(client, admin, set_b, "b1")
+        b2 = await mk_element(client, admin, set_b, "b2")
+        uid = await create_architect(client, admin)
+        await add_scope(dbm, uid, coll_a)
+        arch = await login(client, "arch")
 
         ok = await client.post(
             "/api/relationships",
@@ -459,9 +358,9 @@ class TestScopeConsistencyADR238:
 
     async def test_package_response_carries_collection_id(self, ctx) -> None:
         client, dbm = ctx
-        admin = await _admin_headers(client)
-        coll_a = await _mk_collection(client, admin, "A")
-        set_a = (await _mk_set(client, admin, "sa", coll_a)).json()["id"]
+        admin = await admin_headers(client)
+        coll_a = await mk_collection(client, admin, "A")
+        set_a = (await mk_set(client, admin, "sa", coll_a)).json()["id"]
         pkg = (
             await client.post(
                 "/api/packages", json={"name": "p", "set_id": set_a}, headers=admin

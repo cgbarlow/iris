@@ -45,7 +45,7 @@ async def delete_diagrams(
 ) -> BatchResult:
     """Batch soft-delete diagrams."""
     db = request.app.state.db_manager.main_db
-    result = await batch_delete_diagrams(db, body.ids, deleted_by=current_user["id"])
+    result = await batch_delete_diagrams(db, body.ids, user=current_user)
     return BatchResult(**result)
 
 
@@ -57,7 +57,7 @@ async def clone_diagrams(
 ) -> BatchResult:
     """Batch clone diagrams."""
     db = request.app.state.db_manager.main_db
-    result = await batch_clone_diagrams(db, body.ids, cloned_by=current_user["id"])
+    result = await batch_clone_diagrams(db, body.ids, user=current_user)
     return BatchResult(**result)
 
 
@@ -65,11 +65,11 @@ async def clone_diagrams(
 async def set_diagrams(
     body: BatchModifySet,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> BatchResult:
     """Batch reassign diagrams to a different set."""
     db = request.app.state.db_manager.main_db
-    result = await batch_set_diagrams(db, body.ids, set_id=body.set_id)
+    result = await batch_set_diagrams(db, body.ids, set_id=body.set_id, user=current_user)
     return BatchResult(**result)
 
 
@@ -85,7 +85,7 @@ async def tags_diagrams(
         db, body.ids,
         add_tags=body.add_tags,
         remove_tags=body.remove_tags,
-        modified_by=current_user["id"],
+        user=current_user,
     )
     return BatchResult(**result)
 
@@ -101,7 +101,7 @@ async def delete_elements(
 ) -> BatchResult:
     """Batch soft-delete elements."""
     db = request.app.state.db_manager.main_db
-    result = await batch_delete_elements(db, body.ids, deleted_by=current_user["id"])
+    result = await batch_delete_elements(db, body.ids, user=current_user)
     return BatchResult(**result)
 
 
@@ -113,7 +113,7 @@ async def clone_elements(
 ) -> BatchResult:
     """Batch clone elements."""
     db = request.app.state.db_manager.main_db
-    result = await batch_clone_elements(db, body.ids, cloned_by=current_user["id"])
+    result = await batch_clone_elements(db, body.ids, user=current_user)
     return BatchResult(**result)
 
 
@@ -121,11 +121,11 @@ async def clone_elements(
 async def set_elements(
     body: BatchModifySet,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
 ) -> BatchResult:
     """Batch reassign elements to a different set."""
     db = request.app.state.db_manager.main_db
-    result = await batch_set_elements(db, body.ids, set_id=body.set_id)
+    result = await batch_set_elements(db, body.ids, set_id=body.set_id, user=current_user)
     return BatchResult(**result)
 
 
@@ -141,7 +141,7 @@ async def tags_elements(
         db, body.ids,
         add_tags=body.add_tags,
         remove_tags=body.remove_tags,
-        modified_by=current_user["id"],
+        user=current_user,
     )
     return BatchResult(**result)
 
@@ -159,7 +159,7 @@ async def create_elements(
     db = request.app.state.db_manager.main_db
     items = [el.model_dump() for el in body.elements]
     result = await batch_create_elements(
-        db, items, created_by=current_user["id"],
+        db, items, user=current_user,
     )
     return BatchResultWithIds(**result)
 
@@ -176,7 +176,7 @@ async def update_elements(
     # only items whose payload explicitly included the key get it forwarded.
     items = [u.model_dump(exclude_unset=True) for u in body.updates]
     result = await batch_update_elements(
-        db, items, updated_by=current_user["id"],
+        db, items, user=current_user,
     )
     return BatchResultWithIds(**result)
 
