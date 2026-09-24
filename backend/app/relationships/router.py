@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_user
 from app.authz import (
     assert_write_allowed,
     collection_of_element,
@@ -63,7 +63,8 @@ async def list_all(
     relationship_type: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    # ADR-251: reads are anonymous, like element reads (ADR-123).
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> RelationshipListResponse:
     """List relationships, optionally filtered by element (either end),
     set (either end in the set) and/or relationship type (ADR-249)."""
@@ -85,7 +86,8 @@ async def list_all(
 async def get_one(
     rel_id: str,
     request: Request,
-    _current_user: dict[str, Any] = Depends(get_current_user),  # noqa: B008
+    # ADR-251: reads are anonymous, like element reads (ADR-123).
+    _current_user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> RelationshipResponse:
     """Get a single relationship by ID."""
     db = request.app.state.db_manager.main_db

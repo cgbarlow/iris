@@ -138,7 +138,7 @@ ADR-123/129).
     `relationship_type`, roles, `label`, `description`, `data`.
   - `list_relationships(element_id | set_id, relationship_type?, page?, page_size?)`
     and `get_relationship(relationship_id)` — items include roles and
-    `data`. Unlike other reads these need sign-in (`IRIS_TOKEN` / OAuth).
+    `data`. Like other reads, these work without sign-in (ADR-251).
   - `delete_relationship(relationship_id)` — soft delete.
   - Pass a returned id as an edge's `data.relationshipId` in
     `update_diagram` to draw it without creating a duplicate. Keep the

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { canWrite } from '$lib/stores/auth.svelte.js';
+	import { canWrite, isAnonymous } from '$lib/stores/auth.svelte.js';
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { onDestroy, untrack } from 'svelte';
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
@@ -233,6 +233,9 @@
 	// Comments sidebar state
 	let showCommentsSidebar = $state(false);
 	let commentCount = $state(0);
+	/** ADR-251: comments need sign-in to read or write, so anonymous visitors
+	 *  get no comments UI (and make no comments requests). */
+	const commentsAvailable = $derived(!isAnonymous());
 
 	/** True when the comments sidebar should shift page content (windowed, non-edit). */
 	const windowedCommentsSidebar = $derived(!editing && !focusMode && showCommentsSidebar);
@@ -995,6 +998,10 @@
 	}
 
 	async function loadCommentCount(id: string) {
+		if (isAnonymous()) {
+			commentCount = 0;
+			return;
+		}
 		try {
 			const result = await apiFetch<unknown[]>(`/api/diagrams/${id}/comments`);
 			commentCount = result.length;
@@ -2755,7 +2762,7 @@
 								flowElement={() => getFlowElement()}
 							/>
 						{/if}
-						{#if !editing}
+						{#if !editing && commentsAvailable}
 							<button
 								onclick={toggleCommentsSidebar}
 								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
@@ -2886,7 +2893,7 @@
 										<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
 									</svg>
 								</button>
-								{#if !editing}
+								{#if !editing && commentsAvailable}
 									<button
 										onclick={toggleCommentsSidebar}
 										aria-label="Toggle comments"
@@ -3077,7 +3084,7 @@
 								flowElement={() => getFlowElement()}
 							/>
 						{/if}
-						{#if !editing}
+						{#if !editing && commentsAvailable}
 							<button
 								onclick={toggleCommentsSidebar}
 								class="rounded px-3 py-1.5 text-sm flex items-center gap-1.5"
@@ -3430,6 +3437,7 @@
 											<path d="M176,152h32a16,16,0,0,0,16-16V104a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H88V80h8a16,16,0,0,0,16-16V32A16,16,0,0,0,96,16H64A16,16,0,0,0,48,32V64A16,16,0,0,0,64,80h8V192a24,24,0,0,0,24,24h64v8a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V192a16,16,0,0,0-16-16H176a16,16,0,0,0-16,16v8H96a8,8,0,0,1-8-8V128h72v8A16,16,0,0,0,176,152ZM64,32H96V64H64ZM176,192h32v32H176Zm0-88h32v32H176Z"/>
 										</svg>
 									</button>
+									{#if commentsAvailable}
 									<button
 										onclick={toggleCommentsSidebar}
 										aria-label="Toggle comments"
@@ -3439,6 +3447,7 @@
 										Comments
 										<span class="inline-flex items-center justify-center rounded text-xs font-medium" style="min-width: 20px; height: 20px; padding: 0 5px; background: var(--color-muted); color: white">{commentCount}</span>
 									</button>
+									{/if}
 									<UnifiedCanvas
 										{notation}
 										{preferredThemeId}

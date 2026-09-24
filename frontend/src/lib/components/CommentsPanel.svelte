@@ -5,7 +5,7 @@
 	 */
 	import DOMPurify from 'dompurify';
 	import { apiFetch, ApiError } from '$lib/utils/api';
-	import { canWrite } from '$lib/stores/auth.svelte.js';
+	import { canWrite, isAnonymous } from '$lib/stores/auth.svelte.js';
 	import type { Comment } from '$lib/types/api';
 
 	interface Props {
@@ -21,7 +21,8 @@
 	let { targetType, targetId, collectionId, onclose, oncount }: Props = $props();
 
 	// ADR-237: hide the comments section entirely in read-only collections.
-	const writable = $derived(canWrite(collectionId));
+	// ADR-251: and for anonymous visitors — comments need sign-in to read too.
+	const writable = $derived(!isAnonymous() && canWrite(collectionId));
 
 	let comments = $state<Comment[]>([]);
 	let loading = $state(true);
@@ -47,7 +48,7 @@
 	}
 
 	$effect(() => {
-		if (targetId) loadComments();
+		if (targetId && !isAnonymous()) loadComments();
 	});
 
 	/** Build the target-specific base URL for comments. */
