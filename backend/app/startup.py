@@ -95,6 +95,8 @@ from app.seed.example_models import seed_example_models
 from app.settings.service import seed_defaults
 
 if TYPE_CHECKING:
+    import aiosqlite
+
     from app.database import DatabaseManager
 
 
@@ -114,13 +116,12 @@ async def initialize_databases(db_manager: DatabaseManager) -> None:
         await _initialize_sqlite(db_manager)
 
 
-async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
-    """Run SQLite initialization: migrations, seeds, FTS rebuild, audit verify."""
-    # Migrations expect raw aiosqlite.Connection (executescript / SQLite-specific DDL).
-    main = db_manager.raw_main_db
-    audit = db_manager.raw_audit_db
+async def run_sqlite_main_migrations(main: aiosqlite.Connection) -> None:
+    """Apply every main-database migration, in order, to a SQLite connection.
 
-    # Main database migrations
+    Startup runs this, and so do tests that build their own database, so a
+    test schema can't fall behind the real one.
+    """
     await m001_up(main)
     await m002_up(main)
     await m004_up(main)
@@ -202,6 +203,15 @@ async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
     await m081_up(main)  # v6.43.0: elements.parent_element_id containment axis (ADR-231)
     await m082_up(main)  # v6.45.0: user_collection_scope per-user write-scope (ADR-237)
     await m083_up(main)  # content_hash guard for idempotent thumbnail regen (ADR-242)
+
+
+async def _initialize_sqlite(db_manager: DatabaseManager) -> None:
+    """Run SQLite initialization: migrations, seeds, FTS rebuild, audit verify."""
+    # Migrations expect raw aiosqlite.Connection (executescript / SQLite-specific DDL).
+    main = db_manager.raw_main_db
+    audit = db_manager.raw_audit_db
+
+    await run_sqlite_main_migrations(main)
 
     # Service-layer seeds — receive DatabasePort (SqliteAdapter wrapping main)
     port = db_manager.main_db

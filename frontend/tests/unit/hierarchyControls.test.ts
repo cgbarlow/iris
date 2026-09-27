@@ -18,6 +18,7 @@ const ROOT = resolve(import.meta.dirname, '../..');
 const COMPONENT = resolve(ROOT, 'src/lib/components/HierarchyControls.svelte');
 const DASHBOARD = resolve(ROOT, 'src/routes/+page.svelte');
 const VIEWS_INDEX = resolve(ROOT, 'src/routes/views/+page.svelte');
+const PACKAGE_PAGE = resolve(ROOT, 'src/routes/packages/[id]/+page.svelte');
 const TREE_NODE = resolve(ROOT, 'src/lib/components/TreeNode.svelte');
 
 describe('HierarchyControls (issue #27)', () => {
@@ -27,8 +28,9 @@ describe('HierarchyControls (issue #27)', () => {
 
 	it('exposes the four documented callbacks', () => {
 		const src = readFileSync(COMPONENT, 'utf-8');
-		expect(src).toMatch(/oncreateview:/);
-		expect(src).toMatch(/oncreatepackage:/);
+		// The create callbacks are optional so hosts can hide entries.
+		expect(src).toMatch(/oncreateview\??:/);
+		expect(src).toMatch(/oncreatepackage\??:/);
 		expect(src).toMatch(/onShowDiagrams:/);
 		expect(src).toMatch(/onShowText:/);
 	});
@@ -50,10 +52,16 @@ describe('HierarchyControls (issue #27)', () => {
 		expect(src).not.toMatch(/showCreateMenu/);
 	});
 
-	it('Views index uses HierarchyControls in place of the standalone New buttons', () => {
-		const src = readFileSync(VIEWS_INDEX, 'utf-8');
+	it('Package page uses HierarchyControls', () => {
+		const src = readFileSync(PACKAGE_PAGE, 'utf-8');
 		expect(src).toMatch(/import HierarchyControls/);
 		expect(src).toMatch(/<HierarchyControls/);
+	});
+
+	it('Views index uses a single New View button instead (v6.17.0, #194)', () => {
+		const src = readFileSync(VIEWS_INDEX, 'utf-8');
+		expect(src).not.toMatch(/<HierarchyControls/);
+		expect(src).toMatch(/showCreateDialog = true[\s\S]{0,300}New View/);
 	});
 
 	it('TreeNode honours the showDiagrams / showText toggles', () => {

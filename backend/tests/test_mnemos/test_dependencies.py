@@ -5,25 +5,14 @@ import pytest_asyncio
 import aiosqlite
 
 from app.extensions.service import install_extension, is_extension_enabled
+from app.startup import run_sqlite_main_migrations
 
 
 @pytest_asyncio.fixture
 async def db():
+    # The real schema, so the extensions table matches production.
     async with aiosqlite.connect(":memory:") as conn:
-        await conn.executescript("""
-            CREATE TABLE extensions (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                description TEXT,
-                version TEXT NOT NULL,
-                is_enabled INTEGER NOT NULL DEFAULT 1,
-                installed_at TEXT NOT NULL,
-                installed_by TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                config TEXT DEFAULT '{}'
-            );
-        """)
-        await conn.commit()
+        await run_sqlite_main_migrations(conn)
         yield conn
 
 

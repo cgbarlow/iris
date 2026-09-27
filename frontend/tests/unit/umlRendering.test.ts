@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
+import { nodeOverrideStyle } from '$lib/canvas/utils/visualStyles';
 
 /**
  * Tests for UML rendering behaviour — EA Rendering Parity (ADR-086, ADR-088).
@@ -134,12 +135,17 @@ describe('Fixed node sizing (ADR-088)', () => {
 		expect(content).toContain('box-sizing: border-box');
 	});
 
-	it('visualStyles uses min-height not height for fixed-size nodes (ADR-089)', () => {
-		const vsContent = readFileSync(join(dirname(RENDERER_FILE), '..', 'utils', 'visualStyles.ts'), 'utf-8');
-		// Height should always use min-height to prevent clipping
-		expect(vsContent).toContain('min-height: ${visual.height}px');
-		// Should NOT have hard height constraint
-		expect(vsContent).not.toMatch(/`height: \$\{visual\.height\}px`/);
+	it('authored nodes use min-height so labels are not clipped (ADR-089)', () => {
+		const style = nodeOverrideStyle({ width: 120, height: 60 });
+		expect(style).toContain('min-height: 60px');
+		expect(style).not.toMatch(/(^|; )height: 60px/);
+	});
+
+	it('EA fixed-size nodes use exact height + clip (ADR-234 supersedes ADR-089 here)', () => {
+		const style = nodeOverrideStyle({ width: 120, height: 60 }, true);
+		expect(style).toMatch(/(^|; )height: 60px/);
+		expect(style).toContain('overflow: hidden');
+		expect(style).not.toContain('min-height');
 	});
 });
 

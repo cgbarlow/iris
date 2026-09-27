@@ -25,10 +25,13 @@ class TestInventory:
         names = {t.name for t in tools.tool_definitions()}
         assert "create_element" in names
 
-    def test_create_element_schema_requires_type_and_name(self) -> None:
+    def test_create_element_schema_offers_type_and_name(self) -> None:
+        # v6.8.0 (ADR-191): `element_type` and `name` may come from a
+        # template, so they are offered but not schema-required
+        # (see test_element_templates.test_create_element_required_relaxed).
         defs = {t.name: t for t in tools.tool_definitions()}
         schema = defs["create_element"].inputSchema
-        assert set(schema["required"]) == {"element_type", "name"}
+        assert {"element_type", "name", "template_id"} <= set(schema["properties"])
 
 
 class TestCreateElement:

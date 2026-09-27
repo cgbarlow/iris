@@ -84,10 +84,14 @@ class TestIsJet4File:
 class TestConvertEapToSqlite:
     """Verify MDB→SQLite conversion."""
 
-    async def test_convert_raises_without_mdbtools(self) -> None:
+    async def test_convert_raises_without_mdbtools(self, tmp_path) -> None:
+        # A real JET4 header, so the content check passes and the missing
+        # tool is what gets reported.
+        eap = tmp_path / "model.eap"
+        eap.write_bytes(b"\x00\x01\x00\x00Standard Jet DB\x00" + b"\x00" * 64)
         with patch("app.import_sparx.eap_converter.shutil.which", return_value=None):
             with pytest.raises(RuntimeError, match="mdbtools is not installed"):
-                await convert_eap_to_sqlite("/some/file.eap")
+                await convert_eap_to_sqlite(str(eap))
 
     async def test_convert_raises_for_non_jet4(self) -> None:
         """SQLite files should be rejected."""

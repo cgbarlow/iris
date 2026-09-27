@@ -62,13 +62,15 @@ async def convert_eap_to_sqlite(eap_path: str) -> str:
         RuntimeError: If mdbtools is not installed.
         ValueError: If the file is not a JET4 (MDB) file.
     """
+    # Validate the upload before the environment, so a bad file is a 400
+    # (ValueError) on every host, not a 500 where mdbtools is missing.
+    if not is_jet4_file(eap_path):
+        raise ValueError("File is not a JET4 (MDB) file")
+
     if not shutil.which("mdb-tables"):
         raise RuntimeError(
             "mdbtools is not installed. Install with: sudo apt install mdbtools"
         )
-
-    if not is_jet4_file(eap_path):
-        raise ValueError("File is not a JET4 (MDB) file")
 
     tmp = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
     sqlite_path = tmp.name

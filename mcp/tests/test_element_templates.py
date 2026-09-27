@@ -73,11 +73,15 @@ class TestInventory:
         assert "name" not in required
 
     def test_create_element_template_required_fields(self) -> None:
+        # v6.19.0 (ADR-211): content comes from `source_element_id` +
+        # `included_fields`, `template_data` or `markdown_stamp`, so only
+        # `name` is schema-required; the backend checks a source is given.
         defs = {t.name: t for t in tools.tool_definitions()}
-        required = defs["create_element_template"].inputSchema["required"]
-        assert "source_element_id" in required
-        assert "name" in required
-        assert "included_fields" in required
+        schema = defs["create_element_template"].inputSchema
+        assert schema["required"] == ["name"]
+        assert {
+            "source_element_id", "included_fields", "template_data", "markdown_stamp",
+        } <= set(schema["properties"])
 
 
 class TestCreateElementTemplateForward:

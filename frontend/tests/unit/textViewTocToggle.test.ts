@@ -18,8 +18,9 @@ describe('Text view TOC toggle (issue #32 reopen)', () => {
 	it('the page has a TOC button rendered for Text views', () => {
 		// The button must appear conditionally on canvasType === 'text' so it
 		// doesn't show on canvas/sequence/BPMN views. Match the literal label
-		// "TOC" inside a button for Text canvases.
-		expect(PAGE).toMatch(/canvasType\s*===\s*'text'[\s\S]{0,800}<button[\s\S]*?TOC[\s\S]*?<\/button>/);
+		// "TOC" inside a button for Text canvases. The guard may carry a
+		// TS cast: `(canvasType as string) === 'text'`.
+		expect(PAGE).toMatch(/\(?canvasType(?:\s+as\s+string\))?\s*===\s*'text'[\s\S]{0,800}<button[\s\S]*?TOC[\s\S]*?<\/button>/);
 	});
 
 	it('the button toggles showTocDrawer (the existing v5.1.0 state)', () => {
