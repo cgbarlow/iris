@@ -79,6 +79,7 @@ In **Admin → AI Providers**, each provider has an **Advanced Settings** panel 
 - `top_p`, `top_k`, `min_p` — sampling parameters.
 - `frequency_penalty`, `presence_penalty` — repetition control.
 - `stop` sequences — terminate generation on specific strings.
+- `reasoning_effort` — none / low / medium / high, for OpenAI-compatible providers. Set `none` to stop a reasoning model from thinking (blank = not sent).
 
 Unsupported parameters are silently omitted on providers that don't accept them.
 

@@ -18,6 +18,8 @@ class ModelParameters(BaseModel):
     frequency_penalty: float | None = Field(None, ge=-2.0, le=2.0)
     presence_penalty: float | None = Field(None, ge=-2.0, le=2.0)
     stop: list[str] | None = None
+    # OpenAI-compatible only; None = omit from the request (ADR-256).
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None = None
 
 
 class ProviderCreate(BaseModel):

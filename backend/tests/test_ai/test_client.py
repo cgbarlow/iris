@@ -142,6 +142,40 @@ class TestOpenAICompatibleClient:
         for key in ("top_k", "min_p", "frequency_penalty", "presence_penalty", "stop"):
             assert key not in payload
 
+    # --- Reasoning effort (ADR-256, #310) ---
+
+    def test_payload_includes_reasoning_effort_none(self):
+        provider = make_provider(parameters=json.dumps({"reasoning_effort": "none"}))
+        client = OpenAICompatibleClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        assert payload["reasoning_effort"] == "none"
+
+    def test_payload_includes_reasoning_effort_in_stream(self):
+        provider = make_provider(parameters=json.dumps({"reasoning_effort": "high"}))
+        client = OpenAICompatibleClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}], stream=True)
+        assert payload["reasoning_effort"] == "high"
+
+    def test_payload_unchanged_when_reasoning_effort_blank(self):
+        provider = make_provider(parameters="{}")
+        client = OpenAICompatibleClient(provider)
+        payload = client._payload([{"role": "user", "content": "test"}])
+        assert payload == {
+            "model": provider["model"],
+            "messages": [{"role": "user", "content": "test"}],
+            "stream": False,
+        }
+
+    @pytest.mark.asyncio
+    async def test_test_connection_sends_reasoning_effort(self, respx_mock):
+        route = respx_mock.post("https://api.openai.com/v1/chat/completions").mock(
+            return_value=httpx.Response(200, json=self._make_chat_response("ok"))
+        )
+        provider = make_provider(parameters=json.dumps({"reasoning_effort": "none"}))
+        result = await OpenAICompatibleClient(provider).test_connection()
+        assert result.ok
+        assert json.loads(route.calls.last.request.content)["reasoning_effort"] == "none"
+
 
 class TestAnthropicClient:
     def _make_messages_response(self, content: str, tokens_in=15, tokens_out=30):
@@ -213,6 +247,12 @@ class TestAnthropicClient:
         payload = client._payload([{"role": "user", "content": "test"}])
         for key in ("frequency_penalty", "presence_penalty", "min_p"):
             assert key not in payload
+
+    def test_payload_omits_reasoning_effort(self):
+        params = json.dumps({"reasoning_effort": "none", "max_tokens": 4096})
+        provider = make_provider(provider_type="anthropic", model="claude-3-5-sonnet-20241022", parameters=params)
+        payload = AnthropicClient(provider)._payload([{"role": "user", "content": "test"}])
+        assert "reasoning_effort" not in payload
 
 
 class TestFactory:
