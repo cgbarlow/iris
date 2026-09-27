@@ -14,11 +14,12 @@ correctly blocked by prompt-injection defense (see ADR-151).
 
 from __future__ import annotations
 
-import os
 import re
 from typing import TYPE_CHECKING
 
 from mcp import types
+
+from iris_mcp.links import web_url_for
 
 if TYPE_CHECKING:
     from iris_client import IrisClient
@@ -34,18 +35,6 @@ _NAME_RE = re.compile(
 )
 
 
-def _web_base() -> str | None:
-    raw = os.environ.get("IRIS_WEB_URL")
-    return raw.rstrip("/") if raw else None
-
-
-def _scope_web_url(scope_type: str, scope_id: str) -> str | None:
-    base = _web_base()
-    if not base:
-        return None
-    return f"{base}/{scope_type}s/{scope_id}"
-
-
 def _preamble(
     scope_type: str,
     scope_name: str,
@@ -58,7 +47,7 @@ def _preamble(
     prompt (ADR-154), includes `— prompt "<name>"` in the preamble.
     """
     label = scope_type.title()
-    url = _scope_web_url(scope_type, scope_id)
+    url = web_url_for(scope_type, scope_id)
     suffix = f' — prompt "{prompt_name}"' if prompt_name else ""
     if url:
         return f'Loaded from Iris {label} "{scope_name}"{suffix} ({url}):\n\n'

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.52.1] - 2026-09-27
+
+### Fixed
+
+- **MCP links to collections and sets now open the knowledge graph
+  (ADR-257).** Asking an MCP client to "open collection X" gave a link to the
+  collection's info page (`/collections/<id>`). The links now go to the
+  knowledge graph view (`/?collection_id=<id>`, `/?set_id=<id>`). The links in
+  loaded set and collection prompts change the same way.
+
 ## [6.52.0] - 2026-09-27
 
 ### Added
