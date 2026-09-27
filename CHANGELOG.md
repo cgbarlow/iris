@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.51.3] - 2026-09-27
+
+### Fixed
+
+- **AI providers could not be deleted once they had been used (ADR-255).**
+  Deleting any provider that had answered a question failed with a server
+  error, which the browser reported as a CORS error, and Admin → Settings → AI
+  showed "Delete failed". Such providers can now be deleted. Past conversations
+  and usage logs are kept and still show which model was used.
+
 ## [6.51.2] - 2026-09-24
 
 ### Fixed
