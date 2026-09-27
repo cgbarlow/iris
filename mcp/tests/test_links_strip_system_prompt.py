@@ -43,7 +43,7 @@ class TestWithWebUrlStripsSystemPrompt:
         assert out["name"] == "DoView Book"
         assert out["description"] == "Visual companion."
         # web_url still decorated.
-        assert out["web_url"] == f"{WEB}/sets/set-1"
+        assert out["web_url"] == f"{WEB}/?set_id=set-1"
 
     def test_strips_system_prompt_from_collection(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", WEB)
@@ -53,7 +53,7 @@ class TestWithWebUrlStripsSystemPrompt:
         })
         out = json.loads(with_web_url(payload, "collection"))
         assert "system_prompt" not in out
-        assert out["web_url"] == f"{WEB}/collections/coll-1"
+        assert out["web_url"] == f"{WEB}/?collection_id=coll-1"
 
     def test_strips_even_when_iris_web_url_is_unset(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         """The leak must not depend on IRIS_WEB_URL being configured — local
@@ -71,7 +71,7 @@ class TestWithWebUrlStripsSystemPrompt:
         out = json.loads(with_web_url(payload, "set"))
         assert "system_prompt" not in out
         assert out["id"] == "set-1"
-        assert out["web_url"] == f"{WEB}/sets/set-1"
+        assert out["web_url"] == f"{WEB}/?set_id=set-1"
 
     def test_invalid_json_passes_through_unchanged(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", WEB)
@@ -95,7 +95,7 @@ class TestWithWebUrlsListStripsSystemPrompt:
         out = json.loads(with_web_urls_list(payload, "set"))
         assert all("system_prompt" not in item for item in out)
         assert [item["id"] for item in out] == ["s1", "s2", "s3"]
-        assert all(item["web_url"].startswith(f"{WEB}/sets/") for item in out)
+        assert all(item["web_url"].startswith(f"{WEB}/?set_id=") for item in out)
 
     def test_strips_from_each_collection_item(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", WEB)

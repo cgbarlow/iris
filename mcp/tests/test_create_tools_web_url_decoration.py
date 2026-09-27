@@ -58,7 +58,7 @@ class TestCreateCollectionWebUrl:
             "create_collection", client, {"name": "Test Collection"},
         )
         body = json.loads(result[0].text)
-        assert body["web_url"] == f"{WEB}/collections/col-abc"
+        assert body["web_url"] == f"{WEB}/?collection_id=col-abc"
 
 
 class TestCreateSetWebUrl:
@@ -85,7 +85,7 @@ class TestCreateSetWebUrl:
             "create_set", client, {"name": "claude test"},
         )
         body = json.loads(result[0].text)
-        assert body["web_url"] == f"{WEB}/sets/set-xyz"
+        assert body["web_url"] == f"{WEB}/?set_id=set-xyz"
         # Regression on the original symptom: this is exactly the URL
         # the model would have guessed wrong in v6.0.14 (e.g.
         # `iris.chrisbarlow.nz/sets/...` instead of iris-uat).

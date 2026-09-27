@@ -27,10 +27,16 @@ _KIND_TO_PATH: dict[str, str] = {
     "elements": "elements",
     "package": "packages",
     "packages": "packages",
-    "set": "sets",
-    "sets": "sets",
-    "collection": "collections",
-    "collections": "collections",
+}
+
+# v6.52.1 (ADR-257): sets and collections link to the knowledge graph view
+# (`/?set_id=<id>`), which is what "open this collection" means, not to
+# their `/sets/<id>` / `/collections/<id>` info pages.
+_SCOPE_KIND_TO_PARAM: dict[str, str] = {
+    "set": "set_id",
+    "sets": "set_id",
+    "collection": "collection_id",
+    "collections": "collection_id",
 }
 
 
@@ -188,11 +194,15 @@ def _strip_sensitive_keys_list(items: Any) -> None:
 
 
 def web_url_for(kind: str, entity_id: str, base: str | None = None) -> str | None:
-    """Build a `<base>/<path>/<id>` URL for the given entity, or None if
-    the web base or kind is unknown."""
+    """Build the web URL for the given entity, or None if the web base or
+    kind is unknown. Sets and collections get `<base>/?<kind>_id=<id>` (the
+    knowledge graph); everything else gets `<base>/<path>/<id>`."""
     resolved_base = base if base is not None else web_base()
     if not resolved_base or not entity_id:
         return None
+    param = _SCOPE_KIND_TO_PARAM.get(kind)
+    if param:
+        return f"{resolved_base}/?{param}={entity_id}"
     path = _KIND_TO_PATH.get(kind)
     if not path:
         return None

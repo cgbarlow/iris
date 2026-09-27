@@ -81,7 +81,7 @@ class TestGetPromptHappyPath:
             client, "set:11111111-1111-1111-1111-111111111111",
         )
         text = result.messages[0].content.text
-        assert "https://iris-uat.chrisbarlow.nz/sets/11111111-1111-1111-1111-111111111111" in text
+        assert "https://iris-uat.chrisbarlow.nz/?set_id=11111111-1111-1111-1111-111111111111" in text
 
     @pytest.mark.asyncio
     async def test_omits_web_url_when_iris_web_url_unset(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]

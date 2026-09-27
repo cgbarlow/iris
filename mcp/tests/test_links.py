@@ -47,12 +47,24 @@ class TestWebUrlFor:
             ("diagrams", "views"),
             ("element", "elements"),
             ("package", "packages"),
-            ("set", "sets"),
-            ("collection", "collections"),
         ],
     )
     def test_routes_each_kind_to_frontend_path(self, kind: str, path: str) -> None:
         assert web_url_for(kind, "x-1", base=WEB) == f"{WEB}/{path}/x-1"
+
+    @pytest.mark.parametrize(
+        ("kind", "param"),
+        [
+            ("set", "set_id"),
+            ("sets", "set_id"),
+            ("collection", "collection_id"),
+            ("collections", "collection_id"),
+        ],
+    )
+    def test_scopes_route_to_knowledge_graph(self, kind: str, param: str) -> None:
+        """v6.52.1 (ADR-257): sets and collections open the knowledge graph
+        view (`/?set_id=` / `/?collection_id=`), not their info pages."""
+        assert web_url_for(kind, "x-1", base=WEB) == f"{WEB}/?{param}=x-1"
 
     def test_strips_trailing_slash_via_web_base(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", "https://iris.example.com/")
@@ -93,7 +105,7 @@ class TestDecorateSearch:
         assert urls == [
             f"{WEB}/views/d1",
             f"{WEB}/elements/e1",
-            f"{WEB}/sets/s1",
+            f"{WEB}/?set_id=s1",
         ]
 
 
@@ -115,8 +127,8 @@ class TestWrappers:
             '[{"id": "a"}, {"id": "b"}]', "set",
         )
         body = json.loads(decorated)
-        assert body[0]["web_url"] == f"{WEB}/sets/a"
-        assert body[1]["web_url"] == f"{WEB}/sets/b"
+        assert body[0]["web_url"] == f"{WEB}/?set_id=a"
+        assert body[1]["web_url"] == f"{WEB}/?set_id=b"
 
     def test_with_web_urls_search_decorates_results(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
         monkeypatch.setenv("IRIS_WEB_URL", WEB)
