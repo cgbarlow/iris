@@ -205,12 +205,22 @@ async def delete_provider(
     db: DatabasePort,
     provider_id: str,
 ) -> bool:
-    """Delete a provider. Returns False if not found or is_default."""
+    """Delete a provider. Returns False if not found or is_default.
+
+    Conversations and usage-log rows that used the provider are kept, with
+    ``provider_id`` cleared, so the foreign keys don't block the delete
+    (ADR-255). Each row still records its model name.
+    """
     row = await (await db.execute(
         "SELECT is_default FROM ai_providers WHERE id = ?", (provider_id,)
     )).fetchone()
     if row is None or row[0]:
         return False
+    for table in ("ai_conversations", "ai_usage_log"):
+        await db.execute(
+            f"UPDATE {table} SET provider_id = NULL WHERE provider_id = ?",  # noqa: S608
+            (provider_id,),
+        )
     await db.execute("DELETE FROM ai_providers WHERE id = ?", (provider_id,))
     await db.commit()
     return True

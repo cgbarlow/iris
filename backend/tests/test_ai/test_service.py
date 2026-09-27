@@ -114,6 +114,40 @@ async def test_delete_provider(db):
 
 
 @pytest.mark.asyncio
+async def test_delete_provider_that_has_been_used(db):
+    """A provider referenced by conversations and usage logs can still be
+    deleted; the history rows are kept with provider_id cleared (ADR-255)."""
+    await db.execute("PRAGMA foreign_keys=ON")
+    await db.execute(
+        "INSERT INTO sets (id, name, created_at, created_by, updated_at) "
+        "VALUES ('s1', 'Set', 'now', 'u1', 'now')"
+    )
+    p = await create_provider(db, name="used", provider_type="openai", model="m")
+    await db.execute(
+        "INSERT INTO ai_conversations (id, set_id, user_id, question, answer, "
+        "model_used, provider_id) VALUES ('c1', 's1', 'u1', 'q', 'a', 'm', ?)",
+        (p["id"],),
+    )
+    await log_usage(
+        db, provider_id=p["id"], user_id="u1", endpoint="ask", model="m",
+        tokens_in=1, tokens_out=1, duration_ms=1, status="ok",
+    )
+    await db.commit()
+
+    assert await delete_provider(db, p["id"]) is True
+    assert await get_provider(db, p["id"]) is None
+
+    conv = await (await db.execute(
+        "SELECT provider_id, model_used FROM ai_conversations WHERE id = 'c1'"
+    )).fetchone()
+    assert conv == (None, "m")
+    usage = await (await db.execute(
+        "SELECT provider_id, model FROM ai_usage_log"
+    )).fetchall()
+    assert usage == [(None, "m")]
+
+
+@pytest.mark.asyncio
 async def test_delete_default_provider_refused(db):
     p = await create_provider(db, name="def", provider_type="openai", model="m", is_default=True)
     result = await delete_provider(db, p["id"])
