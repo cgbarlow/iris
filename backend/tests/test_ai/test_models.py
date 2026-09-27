@@ -82,6 +82,17 @@ class TestModelParameters:
         p = ModelParameters(stop=[])
         assert p.stop == []
 
+    @pytest.mark.parametrize("effort", ["none", "low", "medium", "high"])
+    def test_reasoning_effort_valid(self, effort):
+        assert ModelParameters(reasoning_effort=effort).reasoning_effort == effort
+
+    def test_reasoning_effort_default_omitted(self):
+        assert "reasoning_effort" not in ModelParameters().model_dump(exclude_none=True)
+
+    def test_reasoning_effort_invalid(self):
+        with pytest.raises(ValidationError):
+            ModelParameters(reasoning_effort="extreme")
+
     def test_all_advanced_parameters(self):
         p = ModelParameters(
             temperature=0.7, max_tokens=4096, top_p=0.9,

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { apiFetch, ApiError } from '$lib/utils/api';
 	import type { AIProvider } from '$lib/types/api';
+	import { REASONING_EFFORTS, reasoningEffortFromParams, type ReasoningEffort } from '$lib/utils/reasoningEffort';
 
 	type CreationPrompt = {
 		id: string;
@@ -56,6 +57,7 @@
 		frequency_penalty: '',
 		presence_penalty: '',
 		stop: '',
+		reasoning_effort: '' as ReasoningEffort | '',
 	});
 
 	$effect(() => {
@@ -96,6 +98,7 @@
 			frequency_penalty: '',
 			presence_penalty: '',
 			stop: '',
+			reasoning_effort: '',
 		};
 		showModal = true;
 	}
@@ -106,7 +109,7 @@
 		const params = p.parameters as Record<string, unknown>;
 		// Auto-expand advanced section if any advanced params are set
 		showAdvanced = [params.top_p, params.top_k, params.min_p,
-			params.frequency_penalty, params.presence_penalty, params.stop].some(v => v != null);
+			params.frequency_penalty, params.presence_penalty, params.stop, params.reasoning_effort].some(v => v != null);
 		form = {
 			name: p.name,
 			provider_type: p.provider_type as typeof PROVIDER_TYPES[number],
@@ -126,6 +129,7 @@
 			frequency_penalty: params.frequency_penalty != null ? String(params.frequency_penalty) : '',
 			presence_penalty: params.presence_penalty != null ? String(params.presence_penalty) : '',
 			stop: Array.isArray(params.stop) ? (params.stop as string[]).join(', ') : '',
+			reasoning_effort: reasoningEffortFromParams(params),
 		};
 		showModal = true;
 	}
@@ -138,7 +142,7 @@
 	async function saveProvider() {
 		saving = true;
 		modalError = null;
-		const parameters: Record<string, number | string[]> = {};
+		const parameters: Record<string, number | string | string[]> = {};
 		if (form.temperature !== '') parameters.temperature = Number(form.temperature);
 		if (form.max_tokens !== '') parameters.max_tokens = Number(form.max_tokens);
 		if (form.top_p !== '') parameters.top_p = Number(form.top_p);
@@ -147,6 +151,7 @@
 		if (form.frequency_penalty !== '') parameters.frequency_penalty = Number(form.frequency_penalty);
 		if (form.presence_penalty !== '') parameters.presence_penalty = Number(form.presence_penalty);
 		if (form.stop !== '') parameters.stop = form.stop.split(',').map(s => s.trim()).filter(Boolean);
+		if (form.reasoning_effort !== '') parameters.reasoning_effort = form.reasoning_effort;
 
 		const body = {
 			name: form.name,
@@ -522,6 +527,18 @@
 								class="rounded border px-3 py-2"
 								style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)"
 								placeholder="e.g. END, \n" />
+						</label>
+						<label class="flex flex-col gap-1 text-sm" style="color: var(--color-fg)">
+							Reasoning effort <span style="color: var(--color-muted)">(OpenAI-compatible providers)</span>
+							<select bind:value={form.reasoning_effort} data-testid="reasoning-effort"
+								class="rounded border px-3 py-2"
+								style="border-color: var(--color-border); background: var(--color-bg); color: var(--color-fg)">
+								<option value="">Default (not sent)</option>
+								{#each REASONING_EFFORTS as effort}
+									<option value={effort}>{effort}</option>
+								{/each}
+							</select>
+							<span class="text-xs" style="color: var(--color-muted)">Set to "none" to stop reasoning models (e.g. Qwen3 via LM Studio) from thinking.</span>
 						</label>
 					</div>
 				{/if}

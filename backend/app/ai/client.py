@@ -137,6 +137,8 @@ class OpenAICompatibleClient(AIClient):
             payload["presence_penalty"] = self._params["presence_penalty"]
         if self._params.get("stop") is not None:
             payload["stop"] = self._params["stop"]
+        if self._params.get("reasoning_effort") is not None:
+            payload["reasoning_effort"] = self._params["reasoning_effort"]
         return payload
 
     async def _do_chat(self, messages: list[dict[str, str]]) -> tuple[str, int | None, int | None]:

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.52.0] - 2026-09-27
+
+### Added
+
+- **Reasoning effort setting for AI providers (ADR-256, #310).** Advanced
+  Settings has a new **Reasoning effort** dropdown (none / low / medium /
+  high). When it is set, Iris sends `reasoning_effort` to OpenAI-compatible
+  providers (OpenAI, LM Studio, Ollama, OpenRouter, custom). Choose `none` to
+  stop reasoning models such as Qwen3 from using up the token budget on
+  thinking. Test uses the setting too. Leave it blank and requests are
+  unchanged.
+
 ## [6.51.3] - 2026-09-27
 
 ### Fixed

@@ -68,7 +68,7 @@ Shows every active edit lock in the system. Columns: entity type, entity id, loc
 - **Ping** — continuous background health check. Results feed the green/red dot next to each provider in the chat picker.
 - **Edit / delete**.
 - **Set default** — one provider marked default; new conversations use it unless the user picks another.
-- **Advanced settings per provider** — top_p, top_k, min_p, frequency_penalty, presence_penalty, stop sequences.
+- **Advanced settings per provider** — top_p, top_k, min_p, frequency_penalty, presence_penalty, stop sequences, reasoning effort.
 
 ### Creation prompts
 
