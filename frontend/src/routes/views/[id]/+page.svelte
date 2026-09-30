@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { canWrite, isAnonymous } from '$lib/stores/auth.svelte.js';
 	import { goto, beforeNavigate } from '$app/navigation';
+	import { focusCarryOverTarget } from '$lib/utils/focusCarryOver';
 	import { onDestroy, untrack } from 'svelte';
 	import EntityImagesEditor from '$lib/components/EntityImagesEditor.svelte';
 	import { apiFetch, ApiError } from '$lib/utils/api';
@@ -510,6 +511,16 @@
 		}
 		document.addEventListener('noderesizeend', onNodeResizeEnd);
 		return () => document.removeEventListener('noderesizeend', onNodeResizeEnd);
+	});
+
+	// ADR-258: following a link to another view from full screen keeps the
+	// next view in full screen. Registered before the lock-release hook so
+	// the redirected navigation is the one that proceeds.
+	beforeNavigate((nav) => {
+		const target = focusCarryOverTarget(focusMode, page.url, nav.to?.url ?? null, nav.type);
+		if (!target) return;
+		nav.cancel();
+		void goto(target);
 	});
 
 	// Release lock on navigation and component destroy (ADR-080/086)

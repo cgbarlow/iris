@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.52.2] - 2026-09-30
+
+### Fixed
+
+- **Links to other diagrams keep you in full screen (ADR-258).** In full
+  screen (focus view), clicking a linked-diagram node or a diagram link now
+  opens the next diagram in full screen too. Before, it dropped you back to
+  the normal layout. Back returns to the previous diagram, still in full
+  screen.
+
 ## [6.52.1] - 2026-09-27
 
 ### Fixed
