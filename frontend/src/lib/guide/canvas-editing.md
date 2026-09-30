@@ -60,6 +60,8 @@ There is **no autosave** — this is a deliberate choice to avoid surprising ove
 
 Click the **Maximise** icon (top-right of the canvas area) or press `F` to enter **Focus View** — the left sidebar and header hide, and the canvas expands to fill the browser. Press `Escape` or the **Exit** button (top-left) to return.
 
+Following a link to another diagram while in focus view (a linked-diagram node, or a diagram link in a text view) opens that diagram in focus view too.
+
 Focus view is especially useful on laptop screens when working with large DoView or ArchiMate diagrams.
 
 ## Search within a diagram
