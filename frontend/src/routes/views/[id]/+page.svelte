@@ -54,6 +54,7 @@
 	import { Accordion } from 'bits-ui';
 	import { createCanvasHistory } from '$lib/canvas/useCanvasHistory.svelte';
 	import { elementToNodeData } from '$lib/canvas/elementToNodeData';
+	import { storedNodesToCanvas } from '$lib/canvas/storedCanvasNodes';
 	import { hasLinkedElements, hydrateCanvasNodes, inheritedTagsFromElements } from '$lib/canvas/diagramElementHydration';
 	import { createLockManager } from '$lib/utils/locks.svelte';
 	import DOMPurify from 'dompurify';
@@ -966,13 +967,7 @@
 				activations: Array.isArray(data.activations) ? data.activations : [],
 			} as SequenceDiagramData;
 		} else {
-			canvasNodes = ((Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[]).map((n) => {
-				const vw = n.data?.visual?.width ?? n.measured?.width ?? 200;
-				// Don't set explicit height — let SvelteFlow auto-measure from content
-				// so descriptions are fully visible and resize handles are correctly positioned.
-				const { height: _h, measured: _m, ...rest } = n;
-				return { ...rest, width: n.width ?? vw };
-			});
+			canvasNodes = storedNodesToCanvas((Array.isArray(data.nodes) ? data.nodes : []) as CanvasNode[]);
 			canvasEdges = (Array.isArray(data.edges) ? data.edges : []) as CanvasEdge[];
 		}
 		canvasDirty = false;

@@ -43,6 +43,13 @@ Cancel connect mode with `Escape`.
 - **Resize handles** — four corner + four edge handles appear when an element is selected. Drag any to resize. Elements with a square aspect ratio snap automatically.
 - **`Delete`** — remove the selected element or relationship. A confirmation prompt appears if the element is referenced elsewhere.
 
+## How text shows on the canvas
+
+- **Titles wrap.** A long element name wraps onto up to three lines. Past that it is cut off with "…". Hover over a title to see the full name.
+- **Notes.** Note text is the same size as an element's description, so it reads at normal zoom.
+- **Boundaries.** A boundary keeps the width and height it was given, so it can enclose other elements. Other elements grow to fit their text.
+- **Class members.** A UML class lists its attributes and operations under its name. They come from the element when the element has them, and otherwise from the diagram.
+
 ## Undo / redo
 
 - `Ctrl + Z` (undo) — supported for every canvas operation: add, move, resize, delete, connect, disconnect, reconnect.

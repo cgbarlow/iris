@@ -676,9 +676,9 @@ UML diagrams may additionally use `actor` from the Simple set where an actor is 
 - Classes: 220×140 by default; 260×180 if many attributes/operations.
 - Interfaces: 220×80; enumerations: 220×120.
 - Edge styles follow UML conventions — composition uses filled diamond, aggregation hollow diamond, dependency dashed. These are rendered by Iris from the edge `type`; you do not need to set arrow markers manually.
-- For classes, emit attributes and operations via `data.compartments`:
+- For classes, emit attributes and operations via `data.attributes` and `data.operations` (lists of strings):
   ```
-  "data": { "compartments": { "attributes": ["name: String"], "operations": ["save(): void"] } }
+  "data": { "attributes": ["name: String"], "operations": ["save(): void"] }
   ```"""
 
 ARCHIMATE_NOTATION_PROMPT = """## ArchiMate Notation Creation Methodology
@@ -887,15 +887,13 @@ For uml/class diagrams:
 - Horizontal spacing 80 px between classes; vertical spacing 60 px.
 - Group tightly related classes inside a `package_uml` element.
 
-### Compartments
-Emit attributes and operations via `data.compartments`:
+### Class members
+Emit attributes and operations via `data.attributes` and `data.operations` (lists of strings):
 
 ```
 "data": {
-  "compartments": {
-    "attributes": ["id: UUID", "name: String"],
-    "operations": ["save(): void", "delete(): void"]
-  }
+  "attributes": ["id: UUID", "name: String"],
+  "operations": ["save(): void", "delete(): void"]
 }
 ```
 

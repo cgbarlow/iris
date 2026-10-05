@@ -62,7 +62,7 @@
 			{#if !hideIcons}
 				<span class="canvas-node__icon" aria-hidden="true">📝</span>
 			{/if}
-			<span class="canvas-node__label">{data.label}</span>
+			<span class="canvas-node__label" title={data.label}>{data.label}</span>
 		</div>
 	{/if}
 	{#if showDescription}
@@ -99,8 +99,10 @@
 		height: 100%;
 		min-width: 100px;
 		position: relative;
-		font-size: 8px;
-		line-height: 1.2;
+		/* ADR-260: readable at 100% zoom (was 8px). visual.fontSize still
+		   overrides it, and the header scales with it. */
+		font-size: 0.75rem;
+		line-height: 1.3;
 		overflow: hidden;
 		word-break: break-word;
 		overflow-wrap: break-word;
@@ -108,12 +110,14 @@
 	}
 	.canvas-node--note :global(.canvas-node__header) {
 		font-weight: normal;
-		font-size: 9px;
+		font-size: 1.125em;
 		flex-wrap: wrap;
 	}
+	/* A note's header is its text, so it wraps in full: no three-line clamp. */
 	.canvas-node--note :global(.canvas-node__header .canvas-node__label) {
-		white-space: normal;
-		text-overflow: unset;
+		display: block;
+		-webkit-line-clamp: unset;
+		line-clamp: unset;
 		overflow: visible;
 	}
 	.canvas-node--note :global(.canvas-node__description ol),

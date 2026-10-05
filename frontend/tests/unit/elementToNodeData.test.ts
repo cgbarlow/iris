@@ -74,6 +74,38 @@ describe('elementToNodeData', () => {
 		expect(node.qualifier).toBe('inventory');
 	});
 
+	it('reads members from element.data.compartments when the flat keys are absent (issue #315)', () => {
+		const node = elementToNodeData({
+			...base,
+			data: {
+				compartments: { attributes: ['id: UUID'], operations: ['save(): void'] },
+			},
+		});
+		expect(node.attributes).toEqual(['id: UUID']);
+		expect(node.operations).toEqual(['save(): void']);
+	});
+
+	it('prefers element.data.attributes over element.data.compartments', () => {
+		const node = elementToNodeData({
+			...base,
+			data: {
+				attributes: ['flat: String'],
+				compartments: { attributes: ['nested: String'], operations: ['save(): void'] },
+			},
+		});
+		expect(node.attributes).toEqual(['flat: String']);
+		expect(node.operations).toEqual(['save(): void']);
+	});
+
+	it('omits member keys the element does not define', () => {
+		const node = elementToNodeData({ ...base, data: {} });
+		expect('attributes' in node).toBe(false);
+		expect('operations' in node).toBe(false);
+		expect('literals' in node).toBe(false);
+		expect('stereotype' in node).toBe(false);
+		expect('qualifier' in node).toBe(false);
+	});
+
 	it('passes through visual overrides on element.data.visual', () => {
 		const visual = { width: 300, height: 120, icon: 'box' };
 		const node = elementToNodeData({ ...base, data: { visual } });

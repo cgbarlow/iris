@@ -87,6 +87,42 @@ describe('hydrateCanvasNodes', () => {
 		expect(out[0].data.entityType).toBe('capability');
 	});
 
+	it('keeps node-level class members the element does not define (issue #315)', () => {
+		const nodes = [
+			node('n1', {
+				entityId: 'e1',
+				label: 'Order',
+				attributes: ['id: UUID'],
+				operations: ['submit(): void'],
+				literals: ['OPEN'],
+				stereotype: 'entity',
+				qualifier: 'sales',
+			}),
+		];
+		const { nodes: out } = hydrateCanvasNodes(nodes, [element('e1', { name: 'Order', data: {} })]);
+		expect(out[0].data.attributes).toEqual(['id: UUID']);
+		expect(out[0].data.operations).toEqual(['submit(): void']);
+		expect(out[0].data.literals).toEqual(['OPEN']);
+		expect(out[0].data.stereotype).toBe('entity');
+		expect(out[0].data.qualifier).toBe('sales');
+	});
+
+	it('lets the element win for each member key it does define', () => {
+		const nodes = [
+			node('n1', { entityId: 'e1', attributes: ['stale: String'], operations: ['kept(): void'] }),
+		];
+		const els = [element('e1', { data: { attributes: ['fresh: String'] } })];
+		const { nodes: out } = hydrateCanvasNodes(nodes, els);
+		expect(out[0].data.attributes).toEqual(['fresh: String']);
+		expect(out[0].data.operations).toEqual(['kept(): void']);
+	});
+
+	it('clears node-level members when the element defines the key as empty', () => {
+		const nodes = [node('n1', { entityId: 'e1', attributes: ['stale: String'] })];
+		const { nodes: out } = hydrateCanvasNodes(nodes, [element('e1', { data: { attributes: [] } })]);
+		expect(out[0].data.attributes).toEqual([]);
+	});
+
 	it('trims a description that starts with the label (BPMN-style payloads)', () => {
 		const nodes = [node('n1', { entityId: 'e1' })];
 		const els = [element('e1', { name: 'Title', description: 'Title\n\nBody text' })];

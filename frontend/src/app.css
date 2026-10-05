@@ -250,10 +250,16 @@ body.scroll-locked {
 	flex-shrink: 0;
 }
 
+/* Titles wrap to three lines, then clip with an ellipsis (ADR-260). The
+   full name is on the element's title attribute. */
 .canvas-node__label {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	line-clamp: 3;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
+	min-width: 0;
 }
 
 .canvas-node__count-badge {
