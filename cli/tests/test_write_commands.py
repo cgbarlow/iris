@@ -143,9 +143,11 @@ class TestUpdate:
         assert body["name"] == "Original Name"  # preserved from GET
         assert body["description"] == "new desc"  # overridden
 
-    def test_update_set_excludes_collection_id(
+    def test_update_set_preserves_collection_id(
         self, respx_mock: respx.Router,
     ) -> None:
+        """Issue #314: the PUT replaces the whole row, so the current
+        collection_id must go back with it or the set is un-grouped."""
         respx_mock.get(f"{BASE}/api/sets/s1").mock(
             return_value=httpx.Response(200, json=_entity(
                 id="s1", collection_id="col-existing",
@@ -153,14 +155,37 @@ class TestUpdate:
         )
         put_route = respx_mock.put(f"{BASE}/api/sets/s1").mock(
             return_value=httpx.Response(200, json=_entity(
-                id="s1", name="Renamed",
+                id="s1", name="Renamed", collection_id="col-existing",
             )),
         )
         code, _out, _ = _invoke("update", "set", "s1", "--name", "Renamed")
         assert code == 0
         body = json.loads(put_route.calls[0].request.content)
-        # collection_id intentionally NOT in body (move concern).
-        assert "collection_id" not in body
+        assert body["name"] == "Renamed"
+        assert body["collection_id"] == "col-existing"
+
+    def test_update_set_sends_hierarchy_sort(
+        self, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/sets/s1").mock(
+            return_value=httpx.Response(200, json=_entity(
+                id="s1", hierarchy_sort="manual",
+                package_tab_default="relationships",
+                view_tab_default="canvas",
+            )),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/sets/s1").mock(
+            return_value=httpx.Response(200, json=_entity(id="s1")),
+        )
+        code, _out, _ = _invoke(
+            "update", "set", "s1", "--hierarchy-sort", "alpha",
+            "--view-tab-default", "details",
+        )
+        assert code == 0
+        body = json.loads(put_route.calls[0].request.content)
+        assert body["hierarchy_sort"] == "alpha"
+        assert body["view_tab_default"] == "details"
+        assert body["package_tab_default"] == "relationships"
 
     def test_update_diagram_data(self, respx_mock: respx.Router) -> None:
         respx_mock.get(f"{BASE}/api/diagrams/d1").mock(

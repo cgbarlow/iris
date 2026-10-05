@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.52.3] - 2026-10-05
+
+### Fixed
+
+- **Editing a set through MCP or the CLI no longer drops it from its
+  collection (ADR-259, #314).** `update_set` (MCP) and `iris update set`
+  (CLI) left `collection_id` out of the request, and the backend stored that
+  as "no collection". The set vanished from its collection after a plain name
+  or description edit. Both now send the set's current collection back.
+- **`PUT /api/sets/{id}` leaves out-of-body fields alone (ADR-259).** A
+  description, thumbnail setting, collection or prompt that is missing from
+  the request body keeps its stored value. Sending `null` still clears it, so
+  `move_set` with no collection still un-groups a set.
+- **`iris update set --hierarchy-sort`, `--package-tab-default` and
+  `--view-tab-default` now take effect.** The CLI accepted these options but
+  never sent them.
+
 ## [6.52.2] - 2026-09-30
 
 ### Fixed
