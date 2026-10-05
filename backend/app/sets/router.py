@@ -32,6 +32,12 @@ router = APIRouter(prefix="/api/sets", tags=["sets"])
 
 _MAX_THUMBNAIL_SIZE = 2 * 1024 * 1024  # 2 MB
 _ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg"}
+# ADR-259: SetUpdate fields where a missing key means "leave unchanged"
+# and an explicit null means "clear".
+_KEEP_WHEN_OMITTED = (
+    "description", "thumbnail_source", "thumbnail_diagram_id",
+    "collection_id", "system_prompt", "mcp_system_context",
+)
 
 
 @router.post("", response_model=SetResponse, status_code=201)
@@ -101,16 +107,18 @@ async def update(
     await assert_write_allowed(db, current_user, await collection_of_set(db, set_id))
     if body.collection_id:
         await assert_write_allowed(db, current_user, body.collection_id)
+    # ADR-259: a field left out of the body keeps its stored value; an
+    # explicit null still clears it (that is how move_set un-groups).
+    supplied = {
+        field: getattr(body, field)
+        for field in _KEEP_WHEN_OMITTED
+        if field in body.model_fields_set
+    }
     try:
         result = await update_set(
             db, set_id,
             name=body.name,
-            description=body.description,
-            thumbnail_source=body.thumbnail_source,
-            thumbnail_diagram_id=body.thumbnail_diagram_id,
-            collection_id=body.collection_id,
-            system_prompt=body.system_prompt,
-            mcp_system_context=body.mcp_system_context,
+            **supplied,
             hierarchy_sort=body.hierarchy_sort,
             package_tab_default=body.package_tab_default,
             view_tab_default=body.view_tab_default,

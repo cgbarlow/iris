@@ -955,9 +955,13 @@ _COLLECTION_UPDATE_FIELDS = (
     "name", "description", "thumbnail_source", "thumbnail_diagram_id",
     "system_prompt", "mcp_system_context",
 )
-_SET_METADATA_FIELDS = (
+# Every field the set PUT carries. `update set` and `move set` both send
+# the whole list: the current collection_id has to go back with a
+# metadata edit or the set is un-grouped (issue #314, ADR-259).
+_SET_UPDATE_FIELDS = (
     "name", "description", "thumbnail_source", "thumbnail_diagram_id",
-    "system_prompt", "mcp_system_context",
+    "collection_id", "system_prompt", "mcp_system_context",
+    "hierarchy_sort", "package_tab_default", "view_tab_default",
 )
 _PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
 _DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
@@ -1004,9 +1008,8 @@ def update_set_cmd(
     package_tab_default: str | None = typer.Option(None, "--package-tab-default"),
     view_tab_default: str | None = typer.Option(None, "--view-tab-default"),
 ) -> None:
-    """Update a Set's metadata. To move a set between collections, use
-    `iris move set` instead — this command deliberately excludes
-    collection_id.
+    """Update a Set's metadata. The set stays in its collection; to
+    move it, use `iris move set`.
 
     --hierarchy-sort: manual | alpha | newest | oldest (ADR-202).
     --package-tab-default: relationships | details (ADR-204).
@@ -1026,7 +1029,7 @@ def update_set_cmd(
     async def _do() -> Any:
         async with _client() as c:
             return await _put_merge_partial(
-                c, "sets", set_id, partial, _SET_METADATA_FIELDS,
+                c, "sets", set_id, partial, _SET_UPDATE_FIELDS,
             )
     output.print_json(_run(_do()))
 
@@ -1824,12 +1827,6 @@ def move_package_cmd(
             )
             return resp.json()
     output.print_json(_run(_do()))
-
-
-_SET_UPDATE_FIELDS = (
-    "name", "description", "thumbnail_source", "thumbnail_diagram_id",
-    "collection_id", "system_prompt", "mcp_system_context",
-)
 
 
 @move_app.command("set")

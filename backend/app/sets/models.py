@@ -34,7 +34,13 @@ class SetCreate(BaseModel):
 
 
 class SetUpdate(BaseModel):
-    """Request body for updating a set."""
+    """Request body for updating a set.
+
+    ADR-259: only ``name`` is required. Any other field left out of the
+    body keeps its stored value. For description, the thumbnail fields,
+    ``collection_id`` and the two prompts, an explicit ``null`` clears
+    the value; the router tells the two apart with ``model_fields_set``.
+    """
 
     name: str = Field(min_length=1, max_length=255)
     description: str | None = None

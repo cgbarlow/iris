@@ -17,6 +17,19 @@ if TYPE_CHECKING:
     from app.db.adapter import DatabasePort
 
 
+class _Unset:
+    """Type of ``UNSET``: marks an ``update_set`` field the caller did not
+    supply, as distinct from an explicit ``None`` (ADR-259)."""
+
+
+UNSET = _Unset()
+
+
+def _supplied_or(value: str | None | _Unset, stored: str | None) -> str | None:
+    """The caller's value, or ``stored`` when the caller left it ``UNSET``."""
+    return stored if isinstance(value, _Unset) else value
+
+
 def _row_to_dict(row: tuple, *, has_thumbnail_image: bool = False) -> dict[str, object]:
     """Convert a sets row to a dict (without counts)."""
     return {
@@ -255,18 +268,23 @@ async def update_set(
     set_id: str,
     *,
     name: str,
-    description: str | None,
-    thumbnail_source: str | None = None,
-    thumbnail_diagram_id: str | None = None,
-    collection_id: str | None = None,
-    system_prompt: str | None = None,
-    mcp_system_context: str | None = None,
+    description: str | None | _Unset = UNSET,
+    thumbnail_source: str | None | _Unset = UNSET,
+    thumbnail_diagram_id: str | None | _Unset = UNSET,
+    collection_id: str | None | _Unset = UNSET,
+    system_prompt: str | None | _Unset = UNSET,
+    mcp_system_context: str | None | _Unset = UNSET,
     hierarchy_sort: str | None = None,
     package_tab_default: str | None = None,
     view_tab_default: str | None = None,
     element_tab_default: str | None = None,
 ) -> dict[str, object] | None:
     """Update a set's metadata.
+
+    ADR-259 (issue #314): the description, thumbnail, collection and
+    prompt fields default to ``UNSET``, which keeps the stored value.
+    ``None`` clears the field, so un-grouping a set takes an explicit
+    ``collection_id=None``.
 
     ADR-202 adds ``hierarchy_sort``; ADR-204 adds ``package_tab_default``
     and ``view_tab_default``; ADR-208 adds ``element_tab_default``. All
@@ -277,11 +295,22 @@ async def update_set(
     Returns None if not found.
     """
     cursor = await db.execute(
-        "SELECT id FROM sets WHERE id = ? AND is_deleted = 0",
+        "SELECT thumbnail_source, thumbnail_diagram_id, collection_id, "
+        "system_prompt, mcp_system_context, description FROM sets "
+        "WHERE id = ? AND is_deleted = 0",
         (set_id,),
     )
-    if await cursor.fetchone() is None:
+    current = await cursor.fetchone()
+    if current is None:
         return None
+
+    # ADR-259: a field the caller did not supply keeps its stored value.
+    thumbnail_source = _supplied_or(thumbnail_source, current[0])
+    thumbnail_diagram_id = _supplied_or(thumbnail_diagram_id, current[1])
+    collection_id = _supplied_or(collection_id, current[2])
+    system_prompt = _supplied_or(system_prompt, current[3])
+    mcp_system_context = _supplied_or(mcp_system_context, current[4])
+    description = _supplied_or(description, current[5])
 
     # Validate thumbnail_diagram_id belongs to this set when source is 'diagram'
     if thumbnail_source in ("model", "diagram") and thumbnail_diagram_id:

@@ -106,8 +106,9 @@ class TestUpdateSet:
     async def test_update_set_preserves_collection_id(
         self, client: IrisClient, respx_mock: respx.Router,
     ) -> None:
-        """Calling update_set with new name shouldn't strip the
-        existing collection_id (handler preserves all SET_METADATA_FIELDS)."""
+        """Issue #314: the backend PUT replaces the whole row, so a
+        rename must send the set's current collection_id back. Leaving
+        it out un-groups the set."""
         respx_mock.get(f"{BASE}/api/sets/s-1").mock(
             return_value=httpx.Response(200, json=_entity(
                 id="s-1", name="My Set",
@@ -125,10 +126,50 @@ class TestUpdateSet:
             {"set_id": "s-1", "name": "Renamed Set"},
         )
         put_body = json.loads(put_route.calls[0].request.content)
-        # collection_id is intentionally NOT in the merge field list
-        # for update_set (move_set's job), so it shouldn't appear in
-        # the PUT body.
-        assert "collection_id" not in put_body
+        assert put_body["name"] == "Renamed Set"
+        assert put_body["collection_id"] == "col-7"
+
+    @pytest.mark.asyncio
+    async def test_update_set_keeps_ungrouped_set_ungrouped(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        respx_mock.get(f"{BASE}/api/sets/s-1").mock(
+            return_value=httpx.Response(200, json=_entity(
+                id="s-1", collection_id=None,
+            )),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/sets/s-1").mock(
+            return_value=httpx.Response(200, json=_entity(id="s-1")),
+        )
+        await tools.dispatch(
+            "update_set", client,
+            {"set_id": "s-1", "description": "new"},
+        )
+        put_body = json.loads(put_route.calls[0].request.content)
+        assert put_body["collection_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_update_set_ignores_caller_collection_id(
+        self, client: IrisClient, respx_mock: respx.Router,
+    ) -> None:
+        """Moves stay move_set's job: a collection_id slipped into the
+        update_set arguments must not move the set."""
+        respx_mock.get(f"{BASE}/api/sets/s-1").mock(
+            return_value=httpx.Response(200, json=_entity(
+                id="s-1", collection_id="col-7",
+            )),
+        )
+        put_route = respx_mock.put(f"{BASE}/api/sets/s-1").mock(
+            return_value=httpx.Response(200, json=_entity(
+                id="s-1", collection_id="col-7",
+            )),
+        )
+        await tools.dispatch(
+            "update_set", client,
+            {"set_id": "s-1", "name": "X", "collection_id": "col-other"},
+        )
+        put_body = json.loads(put_route.calls[0].request.content)
+        assert put_body["collection_id"] == "col-7"
 
 
 class TestUpdatePackage:

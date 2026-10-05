@@ -334,3 +334,59 @@ def test_cli_dispatch_noop() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     asyncio.run(_setup_admin_and_pat)  # type: ignore[arg-type]
+
+
+class TestSetUpdateEndToEnd:
+    """Issue #314 (ADR-259): MCP `update_set` and `move_set` against a
+    real backend. A metadata edit keeps the set in its collection; only
+    `move_set` with a null collection un-groups it."""
+
+    @pytest.mark.asyncio
+    async def test_update_set_keeps_collection_and_move_set_ungroups(
+        self, backend_transport: httpx.ASGITransport,
+    ) -> None:
+        from iris_client import IrisClient
+        from iris_mcp import tools
+
+        base, pat = await _setup_admin_and_pat(backend_transport)
+
+        async def call(name: str, args: dict) -> dict:
+            out = await tools.dispatch(name, client, args)
+            return json.loads(out[0].text)
+
+        async with IrisClient(url=base, token=pat, transport=backend_transport) as client:
+            collection = (await client._request(
+                "POST", "/api/collections", json={"name": "Home"},
+            )).json()["id"]
+            set_id = (await client._request(
+                "POST", "/api/sets",
+                json={"name": "Grouped", "collection_id": collection},
+            )).json()["id"]
+            cover = (await client._request("POST", "/api/diagrams", json={
+                "diagram_type": "simple-view", "name": "Cover",
+                "set_id": set_id, "data": {"nodes": [], "edges": []},
+            })).json()["id"]
+
+            updated = await call(
+                "update_set", {"set_id": set_id, "description": "edited"},
+            )
+            assert updated["description"] == "edited"
+            assert updated["collection_id"] == collection
+            assert updated["collection_name"] == "Home"
+            fetched = await call("get_set", {"set_id": set_id})
+            assert fetched["collection_id"] == collection
+
+            # The follow-on error from the issue: the collection's thumbnail
+            # diagram lives in this set, so the set must still be a member.
+            with_thumb = await call("update_collection", {
+                "collection_id": collection,
+                "thumbnail_source": "diagram",
+                "thumbnail_diagram_id": cover,
+            })
+            assert with_thumb["thumbnail_diagram_id"] == cover
+
+            moved = await call(
+                "move_set", {"set_id": set_id, "collection_id": None},
+            )
+            assert moved["collection_id"] is None
+            assert moved["description"] == "edited"

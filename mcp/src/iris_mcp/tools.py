@@ -938,7 +938,6 @@ _SET_UPDATE_FIELDS = (
     "package_tab_default",
     "view_tab_default",
 )
-_SET_METADATA_FIELDS = tuple(f for f in _SET_UPDATE_FIELDS if f != "collection_id")
 _PACKAGE_UPDATE_FIELDS = ("name", "description", "metadata")
 _DIAGRAM_UPDATE_FIELDS = ("name", "description", "data", "metadata", "change_summary")
 _ELEMENT_UPDATE_FIELDS = ("name", "description", "data", "metadata")
@@ -960,12 +959,15 @@ async def _update_collection(c: IrisClient, args: dict[str, Any]) -> str:
 
 
 async def _update_set(c: IrisClient, args: dict[str, Any]) -> str:
-    """ADR-178 (v6.3.0): update a Set's metadata (excluding
-    collection_id — use `move_set` for cross-collection moves)."""
+    """ADR-178 (v6.3.0): update a Set's metadata. Moving a set to another
+    collection is `move_set`'s job, so a caller-supplied collection_id is
+    dropped. The set's current collection_id still goes back in the PUT
+    body (issue #314, ADR-259): leaving it out used to un-group the set."""
+    partial = {k: v for k, v in args.items() if k != "collection_id"}
     try:
         resp = await _put_merge_partial(
             c, "sets", args["set_id"],
-            args, _SET_METADATA_FIELDS,
+            partial, _SET_UPDATE_FIELDS,
         )
     except IrisAuthError:
         return _auth_required_payload("Update set")
@@ -2591,10 +2593,10 @@ TOOLS: list[Tool] = [
         name="update_set",
         description=(
             "Update a Set's metadata. All fields except set_id are "
-            "optional — pass only what you want to change. To move a "
-            "set between collections, use `move_set` (this tool "
-            "deliberately excludes the collection_id field). Returns "
-            "the updated entity dict with web_url."
+            "optional — pass only what you want to change. The set "
+            "stays in its collection; to move it between collections, "
+            "use `move_set`. Returns the updated entity dict with "
+            "web_url."
         ),
         input_schema=_schema({
             "set_id": _str_arg("set_id", "Set id"),

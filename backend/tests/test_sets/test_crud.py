@@ -138,6 +138,237 @@ class TestUpdateSet:
         assert resp.json()["description"] == "Updated"
 
 
+class TestUpdateSetOmittedFields:
+    """Issue #314 (ADR-259): a field left out of the PUT body is left
+    unchanged; an explicit null still clears it."""
+
+    async def _grouped_set(
+        self, client: httpx.AsyncClient, headers: dict[str, str],
+    ) -> tuple[str, str]:
+        collection_id = (
+            await client.post(
+                "/api/collections", json={"name": "Home"}, headers=headers,
+            )
+        ).json()["id"]
+        set_id = (
+            await client.post(
+                "/api/sets",
+                json={"name": "Grouped", "collection_id": collection_id},
+                headers=headers,
+            )
+        ).json()["id"]
+        return set_id, collection_id
+
+    async def test_put_without_collection_id_keeps_collection(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, collection_id = await self._grouped_set(client, headers)
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "description": "edited"},
+            headers=headers,
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["description"] == "edited"
+        assert resp.json()["collection_id"] == collection_id
+        assert resp.json()["collection_name"] == "Home"
+        got = await client.get(f"/api/sets/{set_id}", headers=headers)
+        assert got.json()["collection_id"] == collection_id
+        listed = await client.get(
+            "/api/sets", params={"collection_id": collection_id}, headers=headers,
+        )
+        assert [s["id"] for s in listed.json()["items"]] == [set_id]
+
+    async def test_put_with_null_collection_id_ungroups(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "collection_id": None},
+            headers=headers,
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["collection_id"] is None
+        assert resp.json()["collection_name"] is None
+
+    async def test_put_with_collection_id_moves(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        other = (
+            await client.post(
+                "/api/collections", json={"name": "Other"}, headers=headers,
+            )
+        ).json()["id"]
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "collection_id": other},
+            headers=headers,
+        )
+
+        assert resp.json()["collection_id"] == other
+
+    async def test_put_without_description_keeps_it(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "description": "About this set"},
+            headers=headers,
+        )
+
+        kept = await client.put(
+            f"/api/sets/{set_id}", json={"name": "Renamed"}, headers=headers,
+        )
+        assert kept.json()["description"] == "About this set"
+
+        cleared = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Renamed", "description": None},
+            headers=headers,
+        )
+        assert cleared.json()["description"] is None
+
+    async def test_put_without_prompts_keeps_them(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        await client.put(
+            f"/api/sets/{set_id}",
+            json={
+                "name": "Grouped",
+                "system_prompt": "Be terse.",
+                "mcp_system_context": "Orient sheet.",
+            },
+            headers=headers,
+        )
+
+        resp = await client.put(
+            f"/api/sets/{set_id}", json={"name": "Renamed"}, headers=headers,
+        )
+
+        assert resp.json()["name"] == "Renamed"
+        assert resp.json()["system_prompt"] == "Be terse."
+        assert resp.json()["mcp_system_context"] == "Orient sheet."
+
+    async def test_put_with_null_prompts_clears_them(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        await client.put(
+            f"/api/sets/{set_id}",
+            json={
+                "name": "Grouped",
+                "system_prompt": "Be terse.",
+                "mcp_system_context": "Orient sheet.",
+            },
+            headers=headers,
+        )
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={
+                "name": "Grouped",
+                "system_prompt": None,
+                "mcp_system_context": None,
+            },
+            headers=headers,
+        )
+
+        assert resp.json()["system_prompt"] is None
+        assert resp.json()["mcp_system_context"] is None
+
+    async def test_put_without_thumbnail_fields_keeps_diagram_thumbnail(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        diagram_id = (
+            await client.post(
+                "/api/diagrams",
+                json={
+                    "diagram_type": "simple-view", "name": "Cover",
+                    "data": {}, "set_id": set_id,
+                },
+                headers=headers,
+            )
+        ).json()["id"]
+        await client.put(
+            f"/api/sets/{set_id}",
+            json={
+                "name": "Grouped",
+                "thumbnail_source": "diagram",
+                "thumbnail_diagram_id": diagram_id,
+            },
+            headers=headers,
+        )
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "description": "edited"},
+            headers=headers,
+        )
+
+        assert resp.json()["thumbnail_source"] == "diagram"
+        assert resp.json()["thumbnail_diagram_id"] == diagram_id
+
+    async def test_put_without_thumbnail_source_keeps_uploaded_image(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+        upload = await client.post(
+            f"/api/sets/{set_id}/thumbnail",
+            files={"file": ("cover.png", png, "image/png")},
+            headers=headers,
+        )
+        assert upload.status_code in (200, 204)
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "description": "edited"},
+            headers=headers,
+        )
+
+        assert resp.json()["thumbnail_source"] == "image"
+        assert resp.json()["has_thumbnail_image"] is True
+
+    async def test_put_with_null_thumbnail_source_clears_uploaded_image(
+        self, client: httpx.AsyncClient,
+    ) -> None:
+        headers = await _auth_headers(client)
+        set_id, _ = await self._grouped_set(client, headers)
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+        await client.post(
+            f"/api/sets/{set_id}/thumbnail",
+            files={"file": ("cover.png", png, "image/png")},
+            headers=headers,
+        )
+
+        resp = await client.put(
+            f"/api/sets/{set_id}",
+            json={"name": "Grouped", "thumbnail_source": None},
+            headers=headers,
+        )
+
+        assert resp.json()["thumbnail_source"] is None
+        assert resp.json()["has_thumbnail_image"] is False
+
+
 class TestSetSystemPrompt:
     """ADR-150: sets can carry a free-text system_prompt."""
 
