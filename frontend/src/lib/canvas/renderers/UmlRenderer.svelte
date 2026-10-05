@@ -127,7 +127,7 @@
 		{#if stereotype}
 			<div class="uml-node__stereotype">&laquo;{stereotype}&raquo;</div>
 		{/if}
-		<span class="uml-node__label" class:uml-node__label--underline={data.entityType === 'object'} class:uml-node__label--italic={isAbstract} class:uml-node__label--no-bold={isAbstract && abstractBoldOverride === false} style={titleStyle}>{data.label}</span>
+		<span class="uml-node__label" title={data.label} class:uml-node__label--underline={data.entityType === 'object'} class:uml-node__label--italic={isAbstract} class:uml-node__label--no-bold={isAbstract && abstractBoldOverride === false} style={titleStyle}>{data.label}</span>
 	</div>
 	{#if hasCompartments}
 		{#if attributes && attributes.length > 0}

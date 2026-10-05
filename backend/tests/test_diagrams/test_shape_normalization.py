@@ -223,3 +223,122 @@ class TestUpdateNormalizesFlatNodes:
         )
         assert put.status_code == 200
         _assert_canvas_shaped(put.json()["data"])
+
+
+def _class_with_compartments() -> dict:
+    return {
+        "nodes": [
+            {
+                "id": "c1",
+                "type": "class",
+                "position": {"x": 0, "y": 0},
+                "width": 220,
+                "data": {
+                    "label": "Order",
+                    "entityType": "class",
+                    "compartments": {
+                        "attributes": ["id: UUID"],
+                        "operations": ["save(): void"],
+                    },
+                },
+            },
+        ],
+        "edges": [],
+    }
+
+
+class TestClassMembersNormalized:
+    """ADR-260 (issue #315): ``data.compartments`` becomes
+    ``data.attributes`` / ``data.operations``, on save and on read."""
+
+    async def test_create_stores_attributes_and_operations(
+        self, app_and_client: tuple[httpx.AsyncClient, DatabaseManager]
+    ) -> None:
+        client, db_manager = app_and_client
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "class",
+                "notation": "uml",
+                "name": "Members on save",
+                "data": _class_with_compartments(),
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        diagram_id = resp.json()["id"]
+
+        got = await client.get(f"/api/diagrams/{diagram_id}", headers=headers)
+        data = got.json()["data"]["nodes"][0]["data"]
+        assert data["attributes"] == ["id: UUID"]
+        assert data["operations"] == ["save(): void"]
+        assert "compartments" not in data
+
+        cur = await db_manager.main_db.execute(
+            "SELECT data FROM diagram_versions WHERE diagram_id = ? AND version = 1",
+            (diagram_id,),
+        )
+        stored = json.loads((await cur.fetchone())[0])["nodes"][0]["data"]
+        assert stored["attributes"] == ["id: UUID"]
+        assert "compartments" not in stored
+
+    async def test_existing_diagram_healed_on_get(
+        self, app_and_client: tuple[httpx.AsyncClient, DatabaseManager]
+    ) -> None:
+        client, db_manager = app_and_client
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "class",
+                "notation": "uml",
+                "name": "Saved before the fix",
+                "data": {},
+            },
+            headers=headers,
+        )
+        diagram_id = resp.json()["id"]
+        db = db_manager.main_db
+        await db.execute(
+            "UPDATE diagram_versions SET data = ? WHERE diagram_id = ? AND version = 1",
+            (json.dumps(_class_with_compartments()), diagram_id),
+        )
+        await db.commit()
+
+        got = await client.get(f"/api/diagrams/{diagram_id}", headers=headers)
+        data = got.json()["data"]["nodes"][0]["data"]
+        assert data["attributes"] == ["id: UUID"]
+        assert data["operations"] == ["save(): void"]
+
+    async def test_patch_add_node_with_compartments(
+        self, app_and_client: tuple[httpx.AsyncClient, DatabaseManager]
+    ) -> None:
+        client, _ = app_and_client
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/api/diagrams",
+            json={
+                "diagram_type": "class",
+                "notation": "uml",
+                "name": "Members by patch",
+                "data": {"nodes": [], "edges": []},
+            },
+            headers=headers,
+        )
+        diagram_id = resp.json()["id"]
+        patched = await client.patch(
+            f"/api/diagrams/{diagram_id}",
+            json={
+                "operations": [
+                    {"op": "add_node", "node": _class_with_compartments()["nodes"][0]},
+                ],
+            },
+            headers=headers,
+        )
+        assert patched.status_code == 200, patched.text
+
+        got = await client.get(f"/api/diagrams/{diagram_id}", headers=headers)
+        data = got.json()["data"]["nodes"][0]["data"]
+        assert data["attributes"] == ["id: UUID"]
+        assert "compartments" not in data

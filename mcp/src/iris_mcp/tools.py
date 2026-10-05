@@ -139,6 +139,27 @@ CREATION FLOW (recommended):
 """.strip()
 
 
+# ADR-260 (issue #315): the canvas keys that decide how a node or edge
+# renders. Shared by every tool that writes a canvas, so a model building a
+# diagram through MCP knows what the canvas actually reads.
+CANVAS_LAYOUT_KEYS = (
+    "Canvas keys that decide how things render. Nodes: width sets a "
+    "node's width; height is kept only for a boundary (give it both so it "
+    "encloses its contents), and every other node grows to fit its text. "
+    "A title wraps to three lines, then clips (the full name shows on "
+    "hover). UML class members go in data.attributes and data.operations "
+    "as lists of strings such as \"id: UUID\" (enumeration values in "
+    "data.literals); on a node with data.entityId, the element's own "
+    "lists win when it has them. Edges: data.label is the text on the "
+    "line, and data.label \"\" hides it; data.labelOffsetX and "
+    "data.labelOffsetY move the label that many pixels from the middle "
+    "of the line, so use them when a label would cover a node; "
+    "data.waypoints is a list of {x, y} canvas points the line bends "
+    "through, and null (or leaving it out) returns the line to its "
+    "default route."
+)
+
+
 @dataclass(frozen=True)
 class Tool:
     name: str
@@ -1754,7 +1775,8 @@ TOOLS: list[Tool] = [
                         "Svelte-Flow-shaped {nodes, edges} payload "
                         "matching the layout rules in the creation "
                         "prompt. For markdown diagrams: "
-                        "{\"content\": \"<markdown>\"}."
+                        "{\"content\": \"<markdown>\"}. "
+                        + CANVAS_LAYOUT_KEYS
                     ),
                     "additionalProperties": True,
                 },
@@ -2684,7 +2706,8 @@ TOOLS: list[Tool] = [
                         "Replacement canvas data — same shape as "
                         "create_diagram (Svelte-Flow {nodes, edges} "
                         "for visual notations; {\"content\": \"<md>\"} "
-                        "for markdown)."
+                        "for markdown). "
+                        + CANVAS_LAYOUT_KEYS
                     ),
                     "additionalProperties": True,
                 },
@@ -2730,7 +2753,8 @@ TOOLS: list[Tool] = [
             "error=version_conflict with current_version, and nothing is "
             "written. Returns {id, current_version, applied, results[] "
             "(index, op, id), web_url}. Only {nodes, edges} diagrams can be "
-            "patched (use update_diagram for markdown and the like)."
+            "patched (use update_diagram for markdown and the like). "
+            + CANVAS_LAYOUT_KEYS
         ),
         input_schema=_schema({
             "diagram_id": _str_arg("diagram_id", "Diagram id"),

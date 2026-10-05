@@ -56,11 +56,12 @@
 
 	/* Theme-driven: wrap labels when wrapLabels is true */
 	.doview-node--wrap :global(.canvas-node__label) {
-		white-space: normal;
+		display: block;
+		-webkit-line-clamp: unset;
+		line-clamp: unset;
 		word-wrap: break-word;
 		overflow-wrap: break-word;
 		overflow: visible;
-		text-overflow: unset;
 		line-height: 1.3;
 	}
 

@@ -69,7 +69,7 @@
 		{:else}
 			<span class="canvas-node__icon" aria-hidden="true">{icon}</span>
 		{/if}
-		<span class="canvas-node__label">{data.label}</span>
+		<span class="canvas-node__label" title={data.label}>{data.label}</span>
 	</div>
 	{#if children}
 		{@render children()}

@@ -35,6 +35,26 @@ export interface ElementNodeData {
 	[key: string]: unknown;
 }
 
+/** Element ``data`` keys the canvas renders as class members and labels. */
+const MEMBER_KEYS = ['attributes', 'operations', 'literals', 'stereotype', 'qualifier'] as const;
+
+/**
+ * The member keys this element defines (issue #315, ADR-260). A key the
+ * element leaves out is left out here too, so hydration does not wipe a
+ * value stored on the canvas node. ``data.compartments.{attributes,
+ * operations}`` is read as a fallback: older creation prompts wrote
+ * members there.
+ */
+function definedMembers(data: Record<string, unknown>): Partial<ElementNodeData> {
+	const compartments = (data.compartments ?? {}) as Record<string, unknown>;
+	const members: Record<string, unknown> = {};
+	for (const key of MEMBER_KEYS) {
+		const value = data[key] ?? compartments[key];
+		if (value !== undefined) members[key] = value;
+	}
+	return members;
+}
+
 export function elementToNodeData(element: Element): ElementNodeData {
 	const data = (element.data ?? {}) as Record<string, unknown>;
 	return {
@@ -45,11 +65,7 @@ export function elementToNodeData(element: Element): ElementNodeData {
 		description: element.description ?? '',
 		entityId: element.id,
 		notation: element.notation ?? 'simple',
-		attributes: data.attributes,
-		operations: data.operations,
-		literals: data.literals,
-		stereotype: data.stereotype,
-		qualifier: data.qualifier,
+		...definedMembers(data),
 		visual: data.visual as NodeVisualOverrides | undefined,
 		diagramUsageCount: element.diagram_usage_count ?? 0,
 	};

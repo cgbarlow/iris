@@ -175,7 +175,7 @@
 		</span>
 	{/if}
 	<div class="archimate-node__header" style={headerAlign ? `text-align: ${headerAlign}` : ''}>
-		<span class="archimate-node__label" style={titleStyle}>{data.label}</span>
+		<span class="archimate-node__label" title={data.label} style={titleStyle}>{data.label}</span>
 	</div>
 	{#if data.description && !hideDesc}
 		<div class="archimate-node__description" style={descStyle}>{data.description}</div>

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.52.4] - 2026-10-05
+
+### Fixed
+
+- **Canvas text is readable (ADR-260, #315).**
+  - **Notes.** Note text is 12px. The header was 9px.
+  - **Titles.** A long element name wraps onto up to three lines instead of
+    being cut off after one. Hover over a title to see the full name.
+  - **UML classes.** A class shows its attributes and operations when they
+    were saved under `data.compartments`, which is what the creation prompts
+    used to ask for. The prompts now ask for `data.attributes` and
+    `data.operations`, and existing diagrams are fixed when they are opened.
+    A class linked to an element keeps the members stored on the diagram
+    when the element has none of its own.
+  - **Boundaries.** A boundary renders at its stored width and height. It
+    used to collapse to its header unless it had been resized by hand.
+- **The MCP diagram tools say what the canvas reads (ADR-260).**
+  `create_diagram`, `update_diagram` and `patch_diagram` now describe the
+  node size rules, the class member keys, and the edge keys that move a label
+  off a node (`data.labelOffsetX`, `data.labelOffsetY`) or bend a line
+  (`data.waypoints`).
+
+### Changed
+
+- A node with a long title is now taller, because the title wraps. A dense
+  diagram may need its nodes spaced out.
+
 ## [6.52.3] - 2026-10-05
 
 ### Fixed

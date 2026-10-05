@@ -18,7 +18,7 @@
 >
 	<div class="canvas-node__header">
 		<span class="canvas-node__icon" aria-hidden="true">◎</span>
-		<span class="canvas-node__label">{data.label}</span>
+		<span class="canvas-node__label" title={data.label}>{data.label}</span>
 	</div>
 	{#if data.description}
 		<div class="canvas-node__description">{data.description}</div>

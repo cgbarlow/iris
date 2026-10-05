@@ -20,6 +20,7 @@ from __future__ import annotations
 from app.diagrams.canvas_normalize import (
     flat_edge_to_canvas,
     flat_node_to_canvas,
+    needs_normalization,
     normalize_canvas_data,
 )
 
@@ -215,3 +216,134 @@ class TestNormalizeCanvasData:
         # original flat node still flat (no data key added in place)
         assert "data" not in node
         assert node["label"] == "New Zealanders (service users)"
+
+
+class TestClassMembers:
+    """ADR-260 (issue #315): the canvas reads class members from
+    ``data.attributes`` / ``data.operations``. Older creation prompts told
+    models to write them under ``data.compartments``, so those classes
+    rendered as a header only."""
+
+    def _canvas_class(self, data: dict) -> dict:
+        return {
+            "id": "c1",
+            "type": "class",
+            "position": {"x": 0, "y": 0},
+            "width": 220,
+            "data": {"label": "Order", "entityType": "class", **data},
+        }
+
+    def test_compartments_become_attributes_and_operations(self) -> None:
+        node = self._canvas_class({
+            "compartments": {
+                "attributes": ["id: UUID"],
+                "operations": ["save(): void"],
+            },
+        })
+        out = normalize_canvas_data({"nodes": [node], "edges": []})
+        data = out["nodes"][0]["data"]
+        assert data["attributes"] == ["id: UUID"]
+        assert data["operations"] == ["save(): void"]
+        assert "compartments" not in data
+        assert data["label"] == "Order"
+
+    def test_literals_are_lifted_too(self) -> None:
+        node = self._canvas_class({"compartments": {"literals": ["OPEN", "PAID"]}})
+        out = normalize_canvas_data({"nodes": [node]})
+        assert out["nodes"][0]["data"]["literals"] == ["OPEN", "PAID"]
+
+    def test_existing_flat_key_wins_over_compartments(self) -> None:
+        node = self._canvas_class({
+            "attributes": ["kept: String"],
+            "compartments": {
+                "attributes": ["ignored: String"],
+                "operations": ["save(): void"],
+            },
+        })
+        data = normalize_canvas_data({"nodes": [node]})["nodes"][0]["data"]
+        assert data["attributes"] == ["kept: String"]
+        assert data["operations"] == ["save(): void"]
+
+    def test_unknown_compartment_keys_are_kept(self) -> None:
+        node = self._canvas_class({
+            "compartments": {"attributes": ["id: UUID"], "receptions": ["ping"]},
+        })
+        data = normalize_canvas_data({"nodes": [node]})["nodes"][0]["data"]
+        assert data["attributes"] == ["id: UUID"]
+        assert data["compartments"] == {"receptions": ["ping"]}
+
+    def test_non_dict_compartments_left_alone(self) -> None:
+        node = self._canvas_class({"compartments": "n/a"})
+        out = normalize_canvas_data({"nodes": [node]})
+        assert out["nodes"][0] == node
+
+    def test_node_without_compartments_is_the_same_object(self) -> None:
+        node = self._canvas_class({"attributes": ["id: UUID"]})
+        out = normalize_canvas_data({"nodes": [node]})
+        assert out["nodes"][0] is node
+
+    def test_does_not_mutate_the_input_node(self) -> None:
+        node = self._canvas_class({"compartments": {"attributes": ["id: UUID"]}})
+        normalize_canvas_data({"nodes": [node]})
+        assert node["data"]["compartments"] == {"attributes": ["id: UUID"]}
+        assert "attributes" not in node["data"]
+
+    def test_flat_node_keeps_members_from_its_data(self) -> None:
+        """The creation prompt's node: flat keys plus a ``data`` object
+        that carries only the class members."""
+        flat = {
+            "id": "c1",
+            "type": "class",
+            "label": "Order",
+            "position": {"x": 0, "y": 0},
+            "size": {"width": 220, "height": 140},
+            "data": {"attributes": ["id: UUID"], "operations": ["save(): void"]},
+        }
+        out = flat_node_to_canvas(flat)
+        assert out["data"]["label"] == "Order"
+        assert out["data"]["entityType"] == "class"
+        assert out["data"]["attributes"] == ["id: UUID"]
+        assert out["data"]["operations"] == ["save(): void"]
+        assert out["width"] == 220
+
+    def test_flat_node_with_compartments_is_lifted(self) -> None:
+        flat = {
+            "id": "c1",
+            "type": "class",
+            "label": "Order",
+            "position": {"x": 0, "y": 0},
+            "data": {"compartments": {"attributes": ["id: UUID"]}},
+        }
+        out = flat_node_to_canvas(flat)
+        assert out["data"]["attributes"] == ["id: UUID"]
+        assert "compartments" not in out["data"]
+
+    def test_flat_node_with_member_data_is_converted_on_save(self) -> None:
+        """Saved through create_diagram, the prompt's node has a top-level
+        label and a ``data`` object with no label. It is still a flat node."""
+        flat = {
+            "id": "c1",
+            "type": "class",
+            "label": "Order",
+            "position": {"x": 0, "y": 0},
+            "data": {"attributes": ["id: UUID"]},
+        }
+        assert needs_normalization({"nodes": [flat]}) is True
+        node = normalize_canvas_data({"nodes": [flat]})["nodes"][0]
+        assert node["data"]["label"] == "Order"
+        assert node["data"]["entityType"] == "class"
+        assert node["data"]["attributes"] == ["id: UUID"]
+        assert "label" not in node
+
+    def test_needs_normalization_sees_compartments(self) -> None:
+        node = self._canvas_class({"compartments": {"attributes": ["id: UUID"]}})
+        assert needs_normalization({"nodes": [node]}) is True
+        clean = self._canvas_class({"attributes": ["id: UUID"]})
+        assert needs_normalization({"nodes": [clean]}) is False
+
+    def test_idempotent(self) -> None:
+        node = self._canvas_class({
+            "compartments": {"attributes": ["id: UUID"], "operations": ["save(): void"]},
+        })
+        once = normalize_canvas_data({"nodes": [node]})
+        assert normalize_canvas_data(once) == once
